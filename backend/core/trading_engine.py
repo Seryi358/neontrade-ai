@@ -36,6 +36,12 @@ try:
 except ImportError:
     _ALERTS_AVAILABLE = False
 
+try:
+    from ai.openai_analyzer import OpenAIAnalyzer
+    _AI_AVAILABLE = bool(settings.openai_api_key)
+except ImportError:
+    _AI_AVAILABLE = False
+
 
 # ── Trading Mode ──────────────────────────────────────────────────
 
@@ -98,6 +104,14 @@ class TradingEngine:
         self.broker = _create_broker()
         self.risk_manager = RiskManager(self.broker)
         self.position_manager = PositionManager(self.broker)
+
+        # OpenAI analyzer for AI-enhanced trade validation
+        if _AI_AVAILABLE:
+            self.ai_analyzer = OpenAIAnalyzer()
+            logger.info("OpenAI analyzer initialized (AI-enhanced trading active)")
+        else:
+            self.ai_analyzer = None
+            logger.warning("OpenAI analyzer not available — trading without AI validation")
         self.market_analyzer = MarketAnalyzer(self.broker)
         self.explanation_engine = ExplanationEngine()
         self.news_filter = NewsFilter(
@@ -152,6 +166,9 @@ class TradingEngine:
 
         # WebSocket broadcast callback (set externally when WS is connected)
         self._ws_broadcast: Optional[Callable] = None
+
+        # Database reference (injected by main.py after DB init)
+        self._db = None
 
         # Notification queue for Electron native notifications
         self._notifications: List[Dict] = []
@@ -330,6 +347,18 @@ class TradingEngine:
         logger.info(f"Watching {len(settings.forex_watchlist)} pairs")
         logger.info(f"Scan interval: {self._scan_interval}s")
 
+        # Send startup alert
+        if self.alert_manager and hasattr(self.alert_manager, 'send_engine_status'):
+            try:
+                await self.alert_manager.send_engine_status(
+                    "STARTED",
+                    f"NeonTrade AI engine started. Mode: {self.mode.value}. "
+                    f"Broker: {broker_name}. Balance: {balance} {currency}. "
+                    f"Watching {len(settings.forex_watchlist)} pairs.",
+                )
+            except Exception:
+                pass
+
         # Initial scan on startup — run regardless of market hours
         # so that analysis data is available immediately for the UI
         logger.info("Running initial scan (ignoring market hours)...")
@@ -361,6 +390,12 @@ class TradingEngine:
 
         # Always expire old pending setups
         self._expire_old_setups()
+
+        # Daily summary: send at end of trading day (21:00 UTC) once
+        if now.hour == settings.trading_end_hour and now.minute < 3:
+            if not hasattr(self, '_daily_summary_sent_date') or self._daily_summary_sent_date != now.date():
+                self._daily_summary_sent_date = now.date()
+                asyncio.create_task(self._send_daily_summary())
 
         if market_open:
             # Check Friday close rule
@@ -447,6 +482,28 @@ class TradingEngine:
                             "instrument": pos.instrument,
                             "reason": "external",
                         })
+
+                    # Persist close to database
+                    if self._db:
+                        try:
+                            await self._db.update_trade(tid, {
+                                "status": "closed_manual",
+                                "closed_at": datetime.now(timezone.utc).isoformat(),
+                            })
+                        except Exception:
+                            pass
+
+                    # Send close alert
+                    if self.alert_manager:
+                        try:
+                            await self.alert_manager.send_trade_closed(
+                                instrument=pos.instrument,
+                                pnl=0.0,
+                                pips=0.0,
+                                reason="Position closed externally (broker/SL/TP)",
+                            )
+                        except Exception:
+                            pass
         except Exception as e:
             logger.debug(f"Position sync failed (non-critical): {e}")
 
@@ -593,6 +650,32 @@ class TradingEngine:
             f"Strategy {signal.strategy_variant} detected on {signal.instrument}: "
             f"{signal.direction} | Confidence: {signal.confidence:.0f}%"
         )
+
+        # AI validation: ask OpenAI to validate the setup before proceeding
+        if self.ai_analyzer:
+            try:
+                ai_result = await self.ai_analyzer.validate_setup_with_ai(signal, analysis)
+                ai_score = ai_result.get("ai_score", 0)
+                ai_rec = ai_result.get("ai_recommendation", "SKIP")
+                ai_reason = ai_result.get("ai_reasoning", "")
+                logger.info(
+                    f"AI validation for {signal.instrument}: "
+                    f"Score={ai_score} Rec={ai_rec} — {ai_reason}"
+                )
+                if ai_rec == "SKIP" and ai_score < 40:
+                    logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
+                    return None
+                # Apply AI-suggested SL/TP adjustments if provided
+                adjustments = ai_result.get("suggested_adjustments", {})
+                if adjustments:
+                    new_sl = adjustments.get("suggested_sl")
+                    new_tp = adjustments.get("suggested_tp1")
+                    if new_sl and isinstance(new_sl, (int, float)) and new_sl > 0:
+                        signal.stop_loss = float(new_sl)
+                    if new_tp and isinstance(new_tp, (int, float)) and new_tp > 0:
+                        signal.take_profit_1 = float(new_tp)
+            except Exception as e:
+                logger.warning(f"AI validation failed (proceeding without): {e}")
 
         # Validate risk management
         if not self.risk_manager.validate_reward_risk(
@@ -840,6 +923,27 @@ class TradingEngine:
                     lowest_price=setup.entry_price,
                 ))
 
+                # Persist trade to database
+                if self._db:
+                    try:
+                        await self._db.record_trade({
+                            "id": trade_id,
+                            "instrument": setup.instrument,
+                            "strategy": getattr(setup, '_strategy_name', 'DETECTED'),
+                            "strategy_variant": getattr(setup, '_strategy_name', 'DETECTED'),
+                            "direction": setup.direction,
+                            "units": abs(setup.units),
+                            "entry_price": setup.entry_price,
+                            "stop_loss": setup.stop_loss,
+                            "take_profit": setup.take_profit_1,
+                            "mode": self.mode.value,
+                            "confidence": setup.reward_risk_ratio * 33,
+                            "risk_reward_ratio": setup.reward_risk_ratio,
+                            "reasoning": f"R:R {setup.reward_risk_ratio:.2f} | Risk {setup.risk_percent:.2%}",
+                        })
+                    except Exception as db_err:
+                        logger.warning(f"DB record_trade failed (non-critical): {db_err}")
+
                 # Send native notification
                 dir_text = 'COMPRA' if setup.direction == 'BUY' else 'VENTA'
                 inst_text = setup.instrument.replace('_', '/')
@@ -913,6 +1017,62 @@ class TradingEngine:
         )
 
         await self._execute_setup(trade_risk)
+
+    # ── Daily Summary ────────────────────────────────────────────
+
+    async def _send_daily_summary(self):
+        """Send daily trading summary via alerts and optionally via AI-generated report."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        logger.info(f"Generating daily summary for {today}...")
+
+        stats = {}
+        if self._db:
+            try:
+                stats = await self._db.get_daily_stats(today)
+            except Exception as e:
+                logger.warning(f"Failed to get daily stats: {e}")
+
+        # Send basic summary via alert channels
+        if self.alert_manager:
+            try:
+                await self.alert_manager.send_daily_summary({
+                    "total_pnl": stats.get("total_pnl", 0.0),
+                    "trades_count": stats.get("total_trades", 0),
+                    "wins": stats.get("winning_trades", 0),
+                    "losses": stats.get("losing_trades", 0),
+                    "best_trade": f"{stats.get('best_trade_pnl', 0):.2f}",
+                    "worst_trade": f"{stats.get('worst_trade_pnl', 0):.2f}",
+                })
+            except Exception as e:
+                logger.warning(f"Failed to send daily summary alert: {e}")
+
+        # Generate AI-powered daily report
+        if self.ai_analyzer and self._db:
+            try:
+                trades = await self._db.get_trade_history(limit=50)
+                today_trades = [t for t in trades if t.get("opened_at", "").startswith(today)]
+                account = None
+                try:
+                    account = await self.broker.get_account_summary()
+                except Exception:
+                    pass
+                report = await self.ai_analyzer.generate_daily_report(
+                    trades=today_trades,
+                    account_summary={"balance": account.balance, "currency": account.currency} if account else {},
+                    scan_results={
+                        inst: {"score": r.score, "htf_trend": r.htf_trend.value}
+                        for inst, r in self._last_scan_results.items()
+                    },
+                )
+                # Send AI report via email
+                if self.alert_manager:
+                    await self.alert_manager.send_alert(
+                        "ai_daily_report",
+                        f"NeonTrade AI - Daily Report {today}",
+                        report,
+                    )
+            except Exception as e:
+                logger.warning(f"AI daily report failed: {e}")
 
     # ── Status ───────────────────────────────────────────────────
 

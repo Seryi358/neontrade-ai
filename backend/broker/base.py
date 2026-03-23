@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, List, Any
 from dataclasses import dataclass
 from enum import Enum
+from loguru import logger
 
 
 class BrokerType(Enum):
@@ -166,6 +167,17 @@ class BaseBroker(ABC):
     async def close_trade(self, trade_id: str) -> bool:
         """Close a specific trade."""
         pass
+
+    async def close_trade_partial(self, trade_id: str, percent: int = 50) -> bool:
+        """Close a percentage of a trade (partial close). Default implementation closes fully."""
+        # Most brokers don't support partial close natively via simple API.
+        # Override in broker-specific clients if supported.
+        # Default: log warning and skip (full close handled by SL/TP)
+        logger.warning(
+            f"Partial close not implemented for this broker — "
+            f"trade {trade_id} will be managed by trailing SL instead"
+        )
+        return False
 
     async def close_all_trades(self) -> int:
         """Close all open trades. Returns count closed."""

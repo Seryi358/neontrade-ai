@@ -15,6 +15,7 @@ import asyncio
 import base64
 import json
 import smtplib
+import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
@@ -109,6 +110,10 @@ class AlertManager:
     def __init__(self, config: Optional[AlertConfig] = None):
         self._config: AlertConfig = config or AlertConfig()
         self._http: Optional[httpx.AsyncClient] = None
+
+        # Gmail OAuth2 token cache
+        self._gmail_access_token: Optional[str] = None
+        self._gmail_token_expires_at: float = 0.0
 
         # Try to load persisted config from disk (overridden by explicit arg)
         if config is None:
@@ -326,6 +331,66 @@ class AlertManager:
         )
         await self.send_alert("daily_summary", title, body, stats)
 
+    async def send_position_update(
+        self,
+        instrument: str,
+        phase: str,
+        current_sl: float,
+        entry_price: float,
+    ):
+        """Notify about SL moves and phase changes on an open position."""
+        title = f"\U0001F504 Position Update: {instrument}"  # arrows circle
+        body = (
+            f"<b>Instrument:</b> {instrument}\n"
+            f"<b>Phase:</b> {phase}\n"
+            f"<b>Current SL:</b> {current_sl}\n"
+            f"<b>Entry Price:</b> {entry_price}"
+        )
+        data = {
+            "instrument": instrument,
+            "phase": phase,
+            "current_sl": current_sl,
+            "entry_price": entry_price,
+        }
+        await self.send_alert("position_update", title, body, data)
+
+    async def send_engine_status(self, status: str, message: str):
+        """Notify about engine start, stop, or error events."""
+        status_emojis = {
+            "started": "\U00002705",   # check mark
+            "stopped": "\U000026D4",   # no entry
+            "error": "\U0000274C",     # cross mark
+        }
+        emoji = status_emojis.get(status.lower(), "\U00002139\uFE0F")  # info
+        title = f"{emoji} Engine {status.capitalize()}"
+        body = (
+            f"<b>Status:</b> {status.upper()}\n"
+            f"<b>Message:</b> {message}\n"
+            f"<b>Time:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        )
+        data = {"status": status, "message": message}
+        await self.send_alert("engine_status", title, body, data)
+
+    async def send_risk_alert(
+        self,
+        alert_type: str,
+        message: str,
+        current_risk: float,
+    ):
+        """Notify about risk threshold warnings."""
+        title = f"\U000026A0\uFE0F Risk Alert: {alert_type}"  # warning sign
+        body = (
+            f"<b>Alert Type:</b> {alert_type}\n"
+            f"<b>Message:</b> {message}\n"
+            f"<b>Current Risk:</b> {current_risk:.2f}%"
+        )
+        data = {
+            "alert_type": alert_type,
+            "message": message,
+            "current_risk": current_risk,
+        }
+        await self.send_alert("risk_alert", title, body, data)
+
     # ── Test a single channel ────────────────────────────────────
 
     async def test_channel(self, channel: AlertChannel) -> bool:
@@ -504,7 +569,11 @@ class AlertManager:
         logger.debug("Gmail alert sent: {}", plain_title)
 
     async def _get_gmail_access_token(self) -> Optional[str]:
-        """Exchange refresh token for a fresh access token."""
+        """Return a cached access token, refreshing only when expired."""
+        # Return cached token if still valid (100s safety margin before 3600s expiry)
+        if self._gmail_access_token and time.time() < self._gmail_token_expires_at:
+            return self._gmail_access_token
+
         cfg = self._config
         resp = await self._get_http().post(
             "https://oauth2.googleapis.com/token",
@@ -516,8 +585,14 @@ class AlertManager:
             },
         )
         if resp.status_code == 200:
-            return resp.json().get("access_token")
+            self._gmail_access_token = resp.json().get("access_token")
+            self._gmail_token_expires_at = time.time() + 3500  # cache for ~58 min
+            logger.debug("Gmail access token refreshed, expires in 3500s")
+            return self._gmail_access_token
+
         logger.error("Gmail token refresh failed: {} {}", resp.status_code, resp.text)
+        self._gmail_access_token = None
+        self._gmail_token_expires_at = 0.0
         return None
 
 

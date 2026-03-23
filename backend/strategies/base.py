@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from loguru import logger
 
+from config import settings
 from core.market_analyzer import AnalysisResult, Trend, MarketCondition
 
 
@@ -502,13 +503,13 @@ class BlueStrategy(BaseStrategy):
             failed.append("Paso 7: No se pudo calcular SL o TP")
             return None
 
-        # Validar R:R minimo (1.5:1 para Blue)
+        # Validar R:R minimo (config: min_rr_ratio para Blue)
         risk = abs(entry_price - sl)
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < 1.5:
-                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo 1.5:1)")
+            if rr < settings.min_rr_ratio:
+                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
         else:
@@ -751,8 +752,8 @@ class RedStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < 1.5:
-                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo 1.5:1)")
+            if rr < settings.min_rr_ratio:
+                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
         else:
@@ -1002,8 +1003,8 @@ class PinkStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < 1.0:
-                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo 1.0:1 para Pink)")
+            if rr < settings.min_rr_ratio:
+                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
         else:
@@ -1220,8 +1221,8 @@ class WhiteStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < 1.5:
-                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo 1.5:1)")
+            if rr < settings.min_rr_ratio:
+                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
         else:
@@ -1471,11 +1472,12 @@ class BlackStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            # BLACK requiere MINIMO 2:1
-            if rr < 2.0:
-                failed.append(f"R:R insuficiente: {rr:.2f}:1 (BLACK requiere MINIMO 2:1)")
+            # BLACK requiere MINIMO 2:1 o min_rr_ratio (el mayor de los dos)
+            black_min_rr = max(2.0, settings.min_rr_ratio)
+            if rr < black_min_rr:
+                failed.append(f"R:R insuficiente: {rr:.2f}:1 (BLACK requiere MINIMO {black_min_rr}:1)")
                 return None
-            met.append(f"R:R valido: {rr:.2f}:1 (minimo Black: 2:1)")
+            met.append(f"R:R valido: {rr:.2f}:1 (minimo Black: {black_min_rr}:1)")
             if rr >= 2.8:
                 confidence += 5.0
                 met.append(f"R:R excepcional (>= 2.80 promedio del curso)")
@@ -1714,8 +1716,10 @@ class GreenStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < 2.0:
-                failed.append(f"R:R insuficiente: {rr:.2f}:1 (Green busca minimo 2:1, ideal 5-10:1)")
+            # GREEN busca minimo 2:1 o min_rr_ratio (el mayor de los dos)
+            green_min_rr = max(2.0, settings.min_rr_ratio)
+            if rr < green_min_rr:
+                failed.append(f"R:R insuficiente: {rr:.2f}:1 (Green busca minimo {green_min_rr}:1, ideal 5-10:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
             if rr >= 5.0:

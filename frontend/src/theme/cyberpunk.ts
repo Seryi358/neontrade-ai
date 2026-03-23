@@ -52,10 +52,26 @@ export const theme = {
     border: '#2a2445',
     borderActive: '#eb4eca',
 
-    // Chart
+    // Chart - core
     chartBullish: '#00ff88',
     chartBearish: '#ff2e63',
     chartGrid: '#1a1530',
+
+    // Chart - TradingView professional palette
+    chartBackground: '#0a0713',
+    chartGridLines: '#1a1535',
+    chartCandleUp: '#00ff88',
+    chartCandleDown: '#ff2e63',
+    chartVolumeUp: 'rgba(0, 255, 136, 0.3)',
+    chartVolumeDown: 'rgba(255, 46, 99, 0.3)',
+    chartCrosshair: '#eb4eca',
+    chartEma20: '#00f0ff',
+    chartEma50: '#eb4eca',
+    chartSupport: '#00ff88',
+    chartResistance: '#ff2e63',
+    chartPivot: '#ffb800',
+    chartTextColor: '#8892a0',
+    chartCurrentPrice: '#00f0ff',
   },
 
   fonts: {
@@ -214,4 +230,64 @@ export const cssTheme = `
   .confidence-high { color: ${theme.colors.confidenceHigh}; }
   .confidence-medium { color: ${theme.colors.confidenceMedium}; }
   .confidence-low { color: ${theme.colors.confidenceLow}; }
+
+  /* ── Chart-specific styles ─────────────────────────────────── */
+  --chart-bg: ${theme.colors.chartBackground};
+  --chart-grid: ${theme.colors.chartGridLines};
+  --chart-candle-up: ${theme.colors.chartCandleUp};
+  --chart-candle-down: ${theme.colors.chartCandleDown};
+  --chart-volume-up: ${theme.colors.chartVolumeUp};
+  --chart-volume-down: ${theme.colors.chartVolumeDown};
+  --chart-crosshair: ${theme.colors.chartCrosshair};
+  --chart-ema20: ${theme.colors.chartEma20};
+  --chart-ema50: ${theme.colors.chartEma50};
+  --chart-support: ${theme.colors.chartSupport};
+  --chart-resistance: ${theme.colors.chartResistance};
+  --chart-pivot: ${theme.colors.chartPivot};
+
+  /* TradingView chart container glow on hover */
+  .tv-lightweight-charts {
+    border-radius: var(--radius-md);
+    transition: box-shadow 0.3s ease;
+  }
+  .tv-lightweight-charts:hover {
+    box-shadow: 0 0 12px rgba(235, 78, 202, 0.15),
+                0 0 4px rgba(0, 240, 255, 0.1);
+  }
+
+  /* Neon glow utility classes */
+  .glow-green {
+    box-shadow: 0 0 6px rgba(0, 255, 136, 0.4),
+                0 0 12px rgba(0, 255, 136, 0.15);
+  }
+  .glow-red {
+    box-shadow: 0 0 6px rgba(255, 46, 99, 0.4),
+                0 0 12px rgba(255, 46, 99, 0.15);
+  }
+  .glow-cyan {
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.4),
+                0 0 12px rgba(0, 240, 255, 0.15);
+  }
+  .glow-pink {
+    box-shadow: 0 0 6px rgba(235, 78, 202, 0.4),
+                0 0 12px rgba(235, 78, 202, 0.15);
+  }
+  .glow-yellow {
+    box-shadow: 0 0 6px rgba(255, 184, 0, 0.4),
+                0 0 12px rgba(255, 184, 0, 0.15);
+  }
+
+  /* Text glow utilities */
+  .text-glow-green {
+    text-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+  }
+  .text-glow-red {
+    text-shadow: 0 0 6px rgba(255, 46, 99, 0.5);
+  }
+  .text-glow-cyan {
+    text-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+  }
+  .text-glow-pink {
+    text-shadow: 0 0 6px rgba(235, 78, 202, 0.5);
+  }
 `;

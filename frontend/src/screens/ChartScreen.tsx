@@ -1,10 +1,12 @@
 /**
  * NeonTrade AI - Chart Screen
- * Custom candlestick chart view with key levels, EMAs, and strategy info.
- * Built entirely with React Native View primitives (no external chart libraries).
+ * Professional TradingView lightweight-charts integration with cyberpunk theme.
+ *
+ * Web: Uses lightweight-charts directly in a DOM div.
+ * Native: Falls back to the custom React Native candlestick renderer.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,9 +16,30 @@ import {
   ActivityIndicator,
   Dimensions,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
 import { API_URL, authFetch, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
+
+// ─── TradingView lightweight-charts (web only) ─────────────────────────────
+let createChart: any;
+let ColorType: any;
+let CrosshairMode: any;
+let LineStyle: any;
+let PriceScaleMode: any;
+
+if (Platform.OS === 'web') {
+  try {
+    const lc = require('lightweight-charts');
+    createChart = lc.createChart;
+    ColorType = lc.ColorType;
+    CrosshairMode = lc.CrosshairMode;
+    LineStyle = lc.LineStyle;
+    PriceScaleMode = lc.PriceScaleMode;
+  } catch (e) {
+    console.warn('lightweight-charts not available:', e);
+  }
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +70,16 @@ interface KeyLevels {
   resistance: number[];
 }
 
+interface PivotPoints {
+  P?: number;
+  S1?: number;
+  S2?: number;
+  S3?: number;
+  R1?: number;
+  R2?: number;
+  R3?: number;
+}
+
 interface AnalysisSummary {
   score: number;
   trend: string;
@@ -55,6 +88,7 @@ interface AnalysisSummary {
   key_levels: KeyLevels;
   ema_20: number[];
   ema_50: number[];
+  pivot_points: PivotPoints;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -74,15 +108,30 @@ const GRANULARITY_MAP: Record<Timeframe, string> = {
   W: 'W',
 };
 
-const CHART_PADDING_TOP = 20;
-const CHART_PADDING_BOTTOM = 20;
-const CANDLE_COUNT = 80;
-const PRICE_LABEL_WIDTH = 65;
+const CANDLE_COUNT = 120;
+
+// ─── Chart Color Theme ─────────────────────────────────────────────────────
+
+const CHART_COLORS = {
+  background: '#0a0713',
+  gridLines: '#1a1535',
+  candleUp: '#00ff88',
+  candleDown: '#ff2e63',
+  volumeUp: 'rgba(0, 255, 136, 0.3)',
+  volumeDown: 'rgba(255, 46, 99, 0.3)',
+  crosshair: '#eb4eca',
+  ema20: '#00f0ff',
+  ema50: '#eb4eca',
+  support: '#00ff88',
+  resistance: '#ff2e63',
+  pivot: '#ffb800',
+  textColor: '#8892a0',
+  currentPrice: '#00f0ff',
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const formatPrice = (price: number, instrument: string) => {
-  // JPY pairs have 3 decimals, others 5
   const isJpy = instrument?.toUpperCase().includes('JPY');
   return price.toFixed(isJpy ? 3 : 5);
 };
@@ -99,6 +148,34 @@ const _strategyColor = (name: string | null): string | null => {
   return '#eb4eca';
 };
 
+/**
+ * Convert candle time string to a lightweight-charts compatible timestamp.
+ * lightweight-charts v4 expects Unix timestamp in seconds (UTCTimestamp).
+ */
+const parseCandleTime = (timeStr: string): number => {
+  const d = new Date(timeStr);
+  return Math.floor(d.getTime() / 1000);
+};
+
+/**
+ * Calculate EMA from close prices.
+ */
+const calculateEMA = (closes: number[], period: number): number[] => {
+  if (closes.length === 0) return [];
+  const k = 2 / (period + 1);
+  const ema: number[] = [closes[0]];
+  for (let i = 1; i < closes.length; i++) {
+    ema.push(closes[i] * k + ema[i - 1] * (1 - k));
+  }
+  return ema;
+};
+
+// ─── Native Chart Helpers (fallback for non-web) ───────────────────────────
+
+const CHART_PADDING_TOP = 20;
+const CHART_PADDING_BOTTOM = 20;
+const PRICE_LABEL_WIDTH = 65;
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function ChartScreen() {
@@ -113,9 +190,17 @@ export default function ChartScreen() {
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Refs for TradingView chart (web only)
+  const chartContainerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<any>(null);
+  const candlestickSeriesRef = useRef<any>(null);
+  const volumeSeriesRef = useRef<any>(null);
+  const ema20SeriesRef = useRef<any>(null);
+  const ema50SeriesRef = useRef<any>(null);
+  const priceLinesRef = useRef<any[]>([]);
+
   // ── Data Fetching ───────────────────────────────────────────────────────
 
-  // Load watchlist once (with fallback instruments if API fails)
   useEffect(() => {
     const FALLBACK_PAIRS = [
       'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD', 'USD_CAD',
@@ -136,7 +221,6 @@ export default function ChartScreen() {
       } catch (err) {
         console.error('Failed to fetch watchlist:', err);
       }
-      // Fallback: use hardcoded pairs so charts always work
       const fallback = FALLBACK_PAIRS.map(p => ({ instrument: p, score: 0, trend: 'neutral' }));
       setWatchlist(fallback);
       setSelectedInstrument((prev) => prev || fallback[0].instrument);
@@ -144,7 +228,6 @@ export default function ChartScreen() {
     loadWatchlist();
   }, []);
 
-  // Fetch chart data when instrument or timeframe changes
   const fetchChartData = useCallback(async () => {
     if (!selectedInstrument) return;
     setLoading(true);
@@ -167,19 +250,16 @@ export default function ChartScreen() {
       }
       if (analysisRes.ok) {
         const analysisData = await analysisRes.json();
-        // Extract key levels from analysis (API uses "supports"/"resistances" plural)
         const keyLevels = analysisData.key_levels || {};
         const supports = keyLevels.supports || keyLevels.support || [];
         const resistances = keyLevels.resistances || keyLevels.resistance || [];
 
-        // Extract EMA values from the ema_values dict
-        // The API returns: {"EMA_H1_20": val, "EMA_H1_50": val, "EMA_H4_20": val, ...}
         const emaValues = analysisData.ema_values || {};
         const ema20Val = emaValues[`EMA_H1_20`] || emaValues[`EMA_H4_20`] || null;
         const ema50Val = emaValues[`EMA_H1_50`] || emaValues[`EMA_H4_50`] || null;
 
-        // Strategy info from explanation
         const strategyDetected = analysisData.explanation?.strategy_detected || null;
+        const pivotPoints = analysisData.pivot_points || {};
 
         setAnalysisSummary({
           score: analysisData.score ?? 0,
@@ -192,6 +272,7 @@ export default function ChartScreen() {
           },
           ema_20: ema20Val ? [ema20Val] : [],
           ema_50: ema50Val ? [ema50Val] : [],
+          pivot_points: pivotPoints,
         });
       }
     } catch (err: any) {
@@ -216,26 +297,296 @@ export default function ChartScreen() {
     setRefreshing(false);
   };
 
-  // ── Chart Calculations ────────────────────────────────────────────────────
+  // ── TradingView Chart (Web) ─────────────────────────────────────────────
+
+  // Initialize the chart once when the container mounts
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !createChart || !chartContainerRef.current) return;
+
+    // Clean up previous chart
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+
+    const container = chartContainerRef.current;
+    const chartWidth = container.clientWidth || SCREEN_WIDTH - 32;
+    const chartHeight = Math.min(SCREEN_HEIGHT * 0.55, 500);
+
+    const chart = createChart(container, {
+      width: chartWidth,
+      height: chartHeight,
+      layout: {
+        background: { type: ColorType.Solid, color: CHART_COLORS.background },
+        textColor: CHART_COLORS.textColor,
+        fontFamily: "'Terminess Nerd Font', 'Fira Code', 'Courier New', monospace",
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: CHART_COLORS.gridLines, style: 1 },
+        horzLines: { color: CHART_COLORS.gridLines, style: 1 },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: CHART_COLORS.crosshair,
+          width: 1,
+          style: 2,
+          labelBackgroundColor: CHART_COLORS.crosshair,
+        },
+        horzLine: {
+          color: CHART_COLORS.crosshair,
+          width: 1,
+          style: 2,
+          labelBackgroundColor: CHART_COLORS.crosshair,
+        },
+      },
+      rightPriceScale: {
+        borderColor: CHART_COLORS.gridLines,
+        scaleMargins: { top: 0.1, bottom: 0.25 },
+      },
+      timeScale: {
+        borderColor: CHART_COLORS.gridLines,
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 5,
+        barSpacing: 8,
+      },
+      handleScale: {
+        axisPressedMouseMove: true,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+      },
+    });
+
+    // Candlestick series
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: CHART_COLORS.candleUp,
+      downColor: CHART_COLORS.candleDown,
+      borderUpColor: CHART_COLORS.candleUp,
+      borderDownColor: CHART_COLORS.candleDown,
+      wickUpColor: CHART_COLORS.candleUp,
+      wickDownColor: CHART_COLORS.candleDown,
+    });
+
+    // Volume series (histogram in separate pane area via priceScaleId)
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+    });
+
+    // Configure volume scale
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+      drawTicks: false,
+    });
+
+    // EMA 20 line
+    const ema20Series = chart.addLineSeries({
+      color: CHART_COLORS.ema20,
+      lineWidth: 1,
+      lineStyle: 0, // solid
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
+    // EMA 50 line
+    const ema50Series = chart.addLineSeries({
+      color: CHART_COLORS.ema50,
+      lineWidth: 1,
+      lineStyle: 0,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
+    chartRef.current = chart;
+    candlestickSeriesRef.current = candleSeries;
+    volumeSeriesRef.current = volumeSeries;
+    ema20SeriesRef.current = ema20Series;
+    ema50SeriesRef.current = ema50Series;
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartRef.current && container) {
+        chartRef.current.applyOptions({
+          width: container.clientWidth,
+        });
+      }
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update chart data when candles, analysis, or price change
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !chartRef.current || !candlestickSeriesRef.current) return;
+
+    const candleSeries = candlestickSeriesRef.current;
+    const volumeSeries = volumeSeriesRef.current;
+    const ema20Series = ema20SeriesRef.current;
+    const ema50Series = ema50SeriesRef.current;
+    const chart = chartRef.current;
+
+    if (candles.length === 0) return;
+
+    // Sort candles by time and remove duplicates
+    const sorted = [...candles]
+      .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+    const seen = new Set<number>();
+    const uniqueCandles = sorted.filter(c => {
+      const t = parseCandleTime(c.time);
+      if (seen.has(t)) return false;
+      seen.add(t);
+      return true;
+    });
+
+    // Candlestick data
+    const candleData = uniqueCandles.map(c => ({
+      time: parseCandleTime(c.time) as any,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }));
+
+    // Volume data
+    const volumeData = uniqueCandles.map(c => ({
+      time: parseCandleTime(c.time) as any,
+      value: c.volume,
+      color: c.close >= c.open ? CHART_COLORS.volumeUp : CHART_COLORS.volumeDown,
+    }));
+
+    candleSeries.setData(candleData);
+    volumeSeries.setData(volumeData);
+
+    // Calculate and set EMAs from candle close prices
+    const closes = uniqueCandles.map(c => c.close);
+    const ema20Values = calculateEMA(closes, 20);
+    const ema50Values = calculateEMA(closes, 50);
+
+    const ema20Data = uniqueCandles.map((c, i) => ({
+      time: parseCandleTime(c.time) as any,
+      value: ema20Values[i],
+    })).filter((_, i) => i >= 19); // EMA needs warmup
+
+    const ema50Data = uniqueCandles.map((c, i) => ({
+      time: parseCandleTime(c.time) as any,
+      value: ema50Values[i],
+    })).filter((_, i) => i >= 49);
+
+    ema20Series.setData(ema20Data);
+    ema50Series.setData(ema50Data);
+
+    // Remove old price lines
+    for (const line of priceLinesRef.current) {
+      try {
+        candleSeries.removePriceLine(line);
+      } catch (_) {}
+    }
+    priceLinesRef.current = [];
+
+    // Support lines
+    if (analysisSummary?.key_levels?.support) {
+      for (const level of analysisSummary.key_levels.support) {
+        const line = candleSeries.createPriceLine({
+          price: level,
+          color: CHART_COLORS.support,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'S',
+        });
+        priceLinesRef.current.push(line);
+      }
+    }
+
+    // Resistance lines
+    if (analysisSummary?.key_levels?.resistance) {
+      for (const level of analysisSummary.key_levels.resistance) {
+        const line = candleSeries.createPriceLine({
+          price: level,
+          color: CHART_COLORS.resistance,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'R',
+        });
+        priceLinesRef.current.push(line);
+      }
+    }
+
+    // Pivot Points
+    if (analysisSummary?.pivot_points) {
+      const pivots = analysisSummary.pivot_points;
+      const pivotEntries: Array<{ key: string; value: number }> = [];
+      if (pivots.P) pivotEntries.push({ key: 'PP', value: pivots.P });
+      if (pivots.S1) pivotEntries.push({ key: 'S1', value: pivots.S1 });
+      if (pivots.S2) pivotEntries.push({ key: 'S2', value: pivots.S2 });
+      if (pivots.S3) pivotEntries.push({ key: 'S3', value: pivots.S3 });
+      if (pivots.R1) pivotEntries.push({ key: 'R1', value: pivots.R1 });
+      if (pivots.R2) pivotEntries.push({ key: 'R2', value: pivots.R2 });
+      if (pivots.R3) pivotEntries.push({ key: 'R3', value: pivots.R3 });
+
+      for (const entry of pivotEntries) {
+        const line = candleSeries.createPriceLine({
+          price: entry.value,
+          color: CHART_COLORS.pivot,
+          lineWidth: 1,
+          lineStyle: LineStyle.SparseDotted,
+          axisLabelVisible: true,
+          title: entry.key,
+        });
+        priceLinesRef.current.push(line);
+      }
+    }
+
+    // Current price line
+    if (price) {
+      const line = candleSeries.createPriceLine({
+        price: price.bid,
+        color: CHART_COLORS.currentPrice,
+        lineWidth: 2,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: '',
+      });
+      priceLinesRef.current.push(line);
+    }
+
+    // Scroll to latest
+    chart.timeScale().scrollToRealTime();
+  }, [candles, analysisSummary, price]);
+
+  // ── Native Chart Calculations (fallback) ─────────────────────────────────
 
   const chartWidth = SCREEN_WIDTH - theme.spacing.md * 2 - PRICE_LABEL_WIDTH;
   const chartHeight = SCREEN_HEIGHT * 0.48;
+  const NATIVE_CANDLE_COUNT = 80;
 
   const visibleCandles = useMemo(() => {
-    return candles.slice(-CANDLE_COUNT);
+    return candles.slice(-NATIVE_CANDLE_COUNT);
   }, [candles]);
 
   const { priceMin, priceMax, priceRange } = useMemo(() => {
     if (visibleCandles.length === 0) return { priceMin: 0, priceMax: 1, priceRange: 1 };
-
     let min = Infinity;
     let max = -Infinity;
     for (const c of visibleCandles) {
       if (c.low < min) min = c.low;
       if (c.high > max) max = c.high;
     }
-
-    // Include key levels in range
     if (analysisSummary?.key_levels) {
       for (const s of analysisSummary.key_levels.support) {
         if (s < min) min = s;
@@ -246,23 +597,15 @@ export default function ChartScreen() {
         if (r > max) max = r;
       }
     }
-
     const range = max - min;
     const padding = range * 0.08;
-    return {
-      priceMin: min - padding,
-      priceMax: max + padding,
-      priceRange: range + padding * 2,
-    };
+    return { priceMin: min - padding, priceMax: max + padding, priceRange: range + padding * 2 };
   }, [visibleCandles, analysisSummary]);
 
   const priceToY = useCallback(
     (p: number) => {
       if (priceRange === 0) return chartHeight / 2;
-      return (
-        CHART_PADDING_TOP +
-        ((priceMax - p) / priceRange) * (chartHeight - CHART_PADDING_TOP - CHART_PADDING_BOTTOM)
-      );
+      return CHART_PADDING_TOP + ((priceMax - p) / priceRange) * (chartHeight - CHART_PADDING_TOP - CHART_PADDING_BOTTOM);
     },
     [priceMax, priceRange, chartHeight]
   );
@@ -276,31 +619,15 @@ export default function ChartScreen() {
   const bodyWidth = Math.max(1, candleWidth - 2);
   const wickWidth = 1;
 
-  // ── EMA line Y values ─────────────────────────────────────────────────────
-
-  const ema20Points = useMemo(() => {
-    if (!analysisSummary?.ema_20 || analysisSummary.ema_20.length === 0) return [];
-    return analysisSummary.ema_20.slice(-visibleCandles.length);
-  }, [analysisSummary, visibleCandles.length]);
-
-  const ema50Points = useMemo(() => {
-    if (!analysisSummary?.ema_50 || analysisSummary.ema_50.length === 0) return [];
-    return analysisSummary.ema_50.slice(-visibleCandles.length);
-  }, [analysisSummary, visibleCandles.length]);
-
-  // ── Price Grid Lines ──────────────────────────────────────────────────────
-
   const gridLines = useMemo(() => {
     if (priceRange === 0) return [];
     const lines: number[] = [];
     const step = priceRange / 5;
-    for (let i = 0; i <= 5; i++) {
-      lines.push(priceMin + step * i);
-    }
+    for (let i = 0; i <= 5; i++) lines.push(priceMin + step * i);
     return lines;
   }, [priceMin, priceRange]);
 
-  // ── Render Methods ────────────────────────────────────────────────────────
+  // ── Render: Instrument Picker ────────────────────────────────────────────
 
   const renderPicker = () => (
     <View style={styles.pickerContainer}>
@@ -312,7 +639,7 @@ export default function ChartScreen() {
         <Text style={styles.pickerText}>
           {selectedInstrument ? selectedInstrument.replace('_', '/') : 'Seleccionar...'}
         </Text>
-        <Text style={styles.pickerChevron}>{pickerOpen ? '▾' : '▸'}</Text>
+        <Text style={styles.pickerChevron}>{pickerOpen ? '\u25BE' : '\u25B8'}</Text>
       </TouchableOpacity>
 
       {pickerOpen && (
@@ -346,6 +673,8 @@ export default function ChartScreen() {
     </View>
   );
 
+  // ── Render: Timeframe Buttons ────────────────────────────────────────────
+
   const renderTimeframeButtons = () => (
     <View style={styles.tfButtonRow}>
       {TIMEFRAMES.map((tf) => (
@@ -362,6 +691,8 @@ export default function ChartScreen() {
       ))}
     </View>
   );
+
+  // ── Render: Price Overlay ────────────────────────────────────────────────
 
   const renderPriceOverlay = () => {
     if (!price) return null;
@@ -381,9 +712,51 @@ export default function ChartScreen() {
     );
   };
 
-  const renderChart = () => {
-    if (visibleCandles.length === 0) return null;
+  // ── Render: TradingView Chart (Web) ──────────────────────────────────────
 
+  const renderWebChart = () => {
+    const chartHeightPx = Math.min(SCREEN_HEIGHT * 0.55, 500);
+    return (
+      <View style={styles.tvChartWrapper}>
+        <div
+          ref={(el: HTMLDivElement | null) => {
+            if (el && !chartContainerRef.current) {
+              chartContainerRef.current = el;
+            }
+          }}
+          style={{
+            width: '100%',
+            height: chartHeightPx,
+            borderRadius: 8,
+            overflow: 'hidden',
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        />
+        {/* EMA Legend */}
+        <View style={styles.emaLegend}>
+          <View style={styles.emaLegendItem}>
+            <View style={[styles.emaLegendDot, { backgroundColor: CHART_COLORS.ema20 }]} />
+            <Text style={styles.emaLegendText}>EMA 20</Text>
+          </View>
+          <View style={styles.emaLegendItem}>
+            <View style={[styles.emaLegendDot, { backgroundColor: CHART_COLORS.ema50 }]} />
+            <Text style={styles.emaLegendText}>EMA 50</Text>
+          </View>
+          {analysisSummary?.pivot_points?.P && (
+            <View style={styles.emaLegendItem}>
+              <View style={[styles.emaLegendDot, { backgroundColor: CHART_COLORS.pivot }]} />
+              <Text style={styles.emaLegendText}>PIVOTS</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // ── Render: Native Chart (React Native fallback) ─────────────────────────
+
+  const renderNativeChart = () => {
+    if (visibleCandles.length === 0) return null;
     return (
       <View style={[styles.chartArea, { height: chartHeight }]}>
         {/* Grid lines */}
@@ -396,15 +769,12 @@ export default function ChartScreen() {
           );
         })}
 
-        {/* Price labels on right side */}
+        {/* Price labels */}
         <View style={styles.priceLabelsColumn}>
           {gridLines.map((p, i) => {
             const y = priceToY(p);
             return (
-              <Text
-                key={`label-${i}`}
-                style={[styles.priceLabel, { top: y - 6 }]}
-              >
+              <Text key={`label-${i}`} style={[styles.priceLabel, { top: y - 6 }]}>
                 {formatPrice(p, selectedInstrument)}
               </Text>
             );
@@ -431,44 +801,31 @@ export default function ChartScreen() {
           );
         })}
 
-        {/* EMA Lines (horizontal lines at current EMA values) */}
-        {ema20Points.length > 0 && (() => {
-          const y = priceToY(ema20Points[0]);
+        {/* Pivot Points (native) */}
+        {analysisSummary?.pivot_points && Object.entries(analysisSummary.pivot_points).map(([key, val]) => {
+          if (!val || typeof val !== 'number') return null;
+          const y = priceToY(val);
           if (y < 0 || y > chartHeight) return null;
           return (
-            <View key="ema20-line" style={[styles.emaLine, { top: y, borderColor: theme.colors.neonCyan }]}>
-              <Text style={[styles.emaLabel, { color: theme.colors.neonCyan }]}>EMA 20</Text>
+            <View key={`piv-${key}`} style={[styles.keyLevel, styles.pivotLevel, { top: y }]}>
+              <Text style={styles.pivotLevelText}>{key} {formatPrice(val, selectedInstrument)}</Text>
             </View>
           );
-        })()}
-        {ema50Points.length > 0 && (() => {
-          const y = priceToY(ema50Points[0]);
-          if (y < 0 || y > chartHeight) return null;
-          return (
-            <View key="ema50-line" style={[styles.emaLine, { top: y, borderColor: theme.colors.neonPink }]}>
-              <Text style={[styles.emaLabel, { color: theme.colors.neonPink }]}>EMA 50</Text>
-            </View>
-          );
-        })()}
+        })}
 
         {/* Candlesticks */}
         {visibleCandles.map((candle, i) => {
           const isBullish = candle.close >= candle.open;
           const color = isBullish ? theme.colors.chartBullish : theme.colors.chartBearish;
-
           const bodyTop = priceToY(Math.max(candle.open, candle.close));
           const bodyBottom = priceToY(Math.min(candle.open, candle.close));
           const bodyHeight = Math.max(1, bodyBottom - bodyTop);
-
           const wickTop = priceToY(candle.high);
           const wickBottom = priceToY(candle.low);
           const wickHeight = Math.max(1, wickBottom - wickTop);
-
           const x = i * candleWidth;
-
           return (
             <View key={i} style={{ position: 'absolute', left: x, width: candleWidth }}>
-              {/* Wick */}
               <View
                 style={{
                   position: 'absolute',
@@ -479,7 +836,6 @@ export default function ChartScreen() {
                   backgroundColor: color,
                 }}
               />
-              {/* Body */}
               <View
                 style={{
                   position: 'absolute',
@@ -498,12 +854,7 @@ export default function ChartScreen() {
 
         {/* Current price line */}
         {price && (
-          <View
-            style={[
-              styles.currentPriceLine,
-              { top: priceToY(price.bid) },
-            ]}
-          >
+          <View style={[styles.currentPriceLine, { top: priceToY(price.bid) }]}>
             <View style={styles.currentPriceDash} />
             <View style={styles.currentPriceTag}>
               <Text style={styles.currentPriceText}>
@@ -516,38 +867,20 @@ export default function ChartScreen() {
     );
   };
 
-  const renderEmaLegend = () => {
-    if (ema20Points.length === 0 && ema50Points.length === 0) return null;
-    return (
-      <View style={styles.emaLegend}>
-        {ema20Points.length > 0 && (
-          <View style={styles.emaLegendItem}>
-            <View style={[styles.emaLegendDot, { backgroundColor: theme.colors.neonCyan }]} />
-            <Text style={styles.emaLegendText}>EMA 20</Text>
-          </View>
-        )}
-        {ema50Points.length > 0 && (
-          <View style={styles.emaLegendItem}>
-            <View style={[styles.emaLegendDot, { backgroundColor: theme.colors.neonPink }]} />
-            <Text style={styles.emaLegendText}>EMA 50</Text>
-          </View>
-        )}
-      </View>
-    );
-  };
+  // ── Render: Bottom Info Bar ──────────────────────────────────────────────
 
   const renderBottomBar = () => {
     if (!analysisSummary) return null;
-
+    const stratColorMap: Record<string, string> = {
+      BLUE: '#0088ff',
+      RED: '#ff2e63',
+      PINK: '#ff69b4',
+      WHITE: '#ffffff',
+      BLACK: '#333333',
+      GREEN: '#00ff88',
+    };
     const stratColor = analysisSummary.strategy_color
-      ? {
-          BLUE: '#0088ff',
-          RED: '#ff2e63',
-          PINK: '#ff69b4',
-          WHITE: '#ffffff',
-          BLACK: '#333333',
-          GREEN: '#00ff88',
-        }[analysisSummary.strategy_color.toUpperCase()] || theme.colors.textMuted
+      ? stratColorMap[analysisSummary.strategy_color.toUpperCase()] || theme.colors.textMuted
       : theme.colors.textMuted;
 
     return (
@@ -585,6 +918,9 @@ export default function ChartScreen() {
 
   // ── Main Render ───────────────────────────────────────────────────────────
 
+  const isWeb = Platform.OS === 'web';
+  const hasCandles = candles.length > 0;
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -607,12 +943,12 @@ export default function ChartScreen() {
         {/* Price Overlay */}
         {renderPriceOverlay()}
 
-        {loading && candles.length === 0 ? (
+        {loading && !hasCandles ? (
           <View style={styles.centerMessage}>
             <ActivityIndicator size="large" color={theme.colors.neonPink} />
             <Text style={styles.loadingText}>Cargando velas...</Text>
           </View>
-        ) : error && candles.length === 0 ? (
+        ) : error && !hasCandles ? (
           <View style={styles.centerMessage}>
             <Text style={styles.errorIcon}>!</Text>
             <Text style={styles.errorText}>{error}</Text>
@@ -620,24 +956,24 @@ export default function ChartScreen() {
               <Text style={styles.retryButtonText}>REINTENTAR</Text>
             </TouchableOpacity>
           </View>
-        ) : visibleCandles.length > 0 ? (
+        ) : hasCandles ? (
           <>
-            {/* Chart Container */}
-            <View style={[styles.chartContainer, { height: chartHeight + 4 }]}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  width: Math.max(chartWidth, visibleCandles.length * candleWidth + PRICE_LABEL_WIDTH),
-                  height: chartHeight,
-                }}
-              >
-                {renderChart()}
-              </ScrollView>
-            </View>
-
-            {/* EMA Legend */}
-            {renderEmaLegend()}
+            {isWeb && createChart ? (
+              renderWebChart()
+            ) : (
+              <View style={[styles.chartContainer, { height: chartHeight + 4 }]}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    width: Math.max(chartWidth, visibleCandles.length * candleWidth + PRICE_LABEL_WIDTH),
+                    height: chartHeight,
+                  }}
+                >
+                  {renderNativeChart()}
+                </ScrollView>
+              </View>
+            )}
           </>
         ) : (
           <View style={styles.centerMessage}>
@@ -795,7 +1131,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // ── Chart ───────────────────────────────────────────
+  // ── TradingView Chart Wrapper (web) ─────────────────
+  tvChartWrapper: {
+    marginBottom: theme.spacing.sm,
+  },
+
+  // ── Native Chart ────────────────────────────────────
   chartContainer: {
     backgroundColor: theme.colors.backgroundDark,
     borderRadius: theme.borderRadius.md,
@@ -846,12 +1187,17 @@ const styles = StyleSheet.create({
   supportLevel: {
     borderTopWidth: 1,
     borderStyle: 'dashed' as any,
-    borderColor: 'rgba(57, 255, 20, 0.4)',
+    borderColor: 'rgba(0, 255, 136, 0.5)',
   },
   resistanceLevel: {
     borderTopWidth: 1,
     borderStyle: 'dashed' as any,
-    borderColor: 'rgba(255, 7, 58, 0.4)',
+    borderColor: 'rgba(255, 46, 99, 0.5)',
+  },
+  pivotLevel: {
+    borderTopWidth: 1,
+    borderStyle: 'dashed' as any,
+    borderColor: 'rgba(255, 184, 0, 0.5)',
   },
   supportLevelText: {
     fontFamily: theme.fonts.mono,
@@ -873,31 +1219,15 @@ const styles = StyleSheet.create({
     left: 2,
     top: -8,
   },
-
-  // ── EMA Dots ────────────────────────────────────────
-  emaDot: {
-    position: 'absolute',
-    width: 2,
-    height: 2,
-    borderRadius: 1,
-  },
-  emaLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 0,
-    borderTopWidth: 1,
-    borderStyle: 'dashed',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  emaLabel: {
+  pivotLevelText: {
     fontFamily: theme.fonts.mono,
     fontSize: 7,
+    color: '#ffb800',
+    backgroundColor: theme.colors.backgroundDark,
+    paddingHorizontal: 2,
     position: 'absolute',
-    right: 2,
-    top: -10,
-    opacity: 0.8,
+    left: 2,
+    top: -8,
   },
 
   // ── Current Price Line ──────────────────────────────
@@ -942,7 +1272,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   emaLegendDot: {
-    width: 8,
+    width: 12,
     height: 3,
     borderRadius: 1,
   },

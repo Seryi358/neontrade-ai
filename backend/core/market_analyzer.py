@@ -85,6 +85,10 @@ class AnalysisResult:
     pivot_points: Dict[str, float] = field(default_factory=dict)
     # Premium/Discount zone: "premium", "discount", "equilibrium", or None
     premium_discount_zone: Optional[str] = None
+    # Volume divergence: "bullish", "bearish", or None
+    volume_divergence: Optional[str] = None
+    # Mitigation Blocks: order blocks that have been partially filled
+    mitigation_blocks: List[Dict] = field(default_factory=list)
 
 
 class MarketAnalyzer:
@@ -251,6 +255,16 @@ class MarketAnalyzer:
             candles.get("D", pd.DataFrame()), current_price
         )
 
+        # Step 22: Volume divergence detection on H1
+        volume_divergence = self._detect_volume_divergence(
+            candles.get("H1", pd.DataFrame())
+        )
+
+        # Step 23: Mitigation Blocks (order blocks revisited by price)
+        mitigation_blocks = self._detect_mitigation_blocks(
+            candles.get("H1", pd.DataFrame()), order_blocks
+        )
+
         return AnalysisResult(
             instrument=instrument,
             htf_trend=htf_trend,
@@ -278,6 +292,8 @@ class MarketAnalyzer:
             elliott_wave_detail=elliott_wave_detail,
             pivot_points=pivot_points,
             premium_discount_zone=premium_discount_zone,
+            volume_divergence=volume_divergence,
+            mitigation_blocks=mitigation_blocks,
         )
 
     def _candles_to_dataframe(self, candles) -> pd.DataFrame:
@@ -408,6 +424,7 @@ class MarketAnalyzer:
         emas = {}
         ema_configs = {
             "W": [8],
+            "D": [20, 50],
             "H4": [20, 50],
             "H1": [20, 50],
             "M5": [2, 5, 20],
@@ -551,7 +568,60 @@ class MarketAnalyzer:
             else:
                 patterns.append("INSIDE_BAR_BEARISH")
 
+        # ── Three Drives Pattern (Power of Three / AMD) ──
+        # Detect when price makes 3 roughly equal pushes to a level.
+        # Requires more candles; use the full dataframe.
+        if len(df) >= 20:
+            self._detect_three_drives(df, patterns)
+
         return patterns
+
+    def _detect_three_drives(self, df: pd.DataFrame, patterns: List[str]) -> None:
+        """
+        Detect Three Drives pattern: 3 roughly equal pushes in the same direction.
+        Bullish three drives: 3 successive lower lows with roughly equal spacing.
+        Bearish three drives: 3 successive higher highs with roughly equal spacing.
+        """
+        data = df.tail(20).reset_index(drop=True)
+        if len(data) < 10:
+            return
+
+        # Find swing lows for bullish three drives (reversal)
+        swing_lows = []
+        for i in range(1, len(data) - 1):
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                data["low"].iloc[i] < data["low"].iloc[i + 1]):
+                swing_lows.append((i, float(data["low"].iloc[i])))
+
+        if len(swing_lows) >= 3:
+            last3 = swing_lows[-3:]
+            # Check 3 successive lower lows
+            if last3[0][1] > last3[1][1] > last3[2][1]:
+                # Check roughly equal drive sizes (within 50%)
+                drive1 = last3[0][1] - last3[1][1]
+                drive2 = last3[1][1] - last3[2][1]
+                if drive1 > 0 and drive2 > 0:
+                    ratio = drive1 / drive2
+                    if 0.5 <= ratio <= 2.0:
+                        patterns.append("THREE_DRIVES_BULLISH")
+
+        # Find swing highs for bearish three drives (reversal)
+        swing_highs = []
+        for i in range(1, len(data) - 1):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                data["high"].iloc[i] > data["high"].iloc[i + 1]):
+                swing_highs.append((i, float(data["high"].iloc[i])))
+
+        if len(swing_highs) >= 3:
+            last3 = swing_highs[-3:]
+            # Check 3 successive higher highs
+            if last3[0][1] < last3[1][1] < last3[2][1]:
+                drive1 = last3[1][1] - last3[0][1]
+                drive2 = last3[2][1] - last3[1][1]
+                if drive1 > 0 and drive2 > 0:
+                    ratio = drive1 / drive2
+                    if 0.5 <= ratio <= 2.0:
+                        patterns.append("THREE_DRIVES_BEARISH")
 
     def _calculate_trade_score(
         self,
@@ -1076,25 +1146,114 @@ class MarketAnalyzer:
         if df.empty or len(df) < 2:
             return {}
 
-        # Use the last completed daily candle (second-to-last row)
-        prev = df.iloc[-2]
-        h = float(prev["high"])
-        l = float(prev["low"])
-        c = float(prev["close"])
+        # Average over the last 5 completed sessions for smoother pivots
+        sessions = min(5, len(df) - 1)
+        if sessions < 1:
+            return {}
 
-        p = (h + l + c) / 3.0
-        r1 = 2.0 * p - l
-        s1 = 2.0 * p - h
-        r2 = p + (h - l)
-        s2 = p - (h - l)
+        totals = {"P": 0.0, "R1": 0.0, "S1": 0.0, "R2": 0.0, "S2": 0.0}
+        for i in range(sessions):
+            candle = df.iloc[-(i + 2)]  # Skip current incomplete candle
+            h, l, c = float(candle["high"]), float(candle["low"]), float(candle["close"])
+            p = (h + l + c) / 3.0
+            totals["P"] += p
+            totals["R1"] += 2 * p - l
+            totals["S1"] += 2 * p - h
+            totals["R2"] += p + (h - l)
+            totals["S2"] += p - (h - l)
 
-        return {
-            "P": round(p, 5),
-            "R1": round(r1, 5),
-            "R2": round(r2, 5),
-            "S1": round(s1, 5),
-            "S2": round(s2, 5),
-        }
+        return {k: round(v / sessions, 5) for k, v in totals.items()}
+
+    # ── Volume Divergence Detection (TradingLab Gap #6) ──────────────
+
+    def _detect_volume_divergence(self, df: pd.DataFrame) -> Optional[str]:
+        """
+        Detect volume divergence on the last 10 candles.
+        - Bearish divergence: price making higher highs but volume decreasing.
+        - Bullish divergence (selling exhaustion): price making lower lows but volume decreasing.
+        Returns "bullish", "bearish", or None.
+        """
+        if df.empty or len(df) < 10:
+            return None
+
+        recent = df.tail(10).reset_index(drop=True)
+
+        # Find highest high in first half vs second half
+        first_half = recent.iloc[:5]
+        second_half = recent.iloc[5:]
+
+        fh_high = float(first_half["high"].max())
+        sh_high = float(second_half["high"].max())
+        fh_low = float(first_half["low"].min())
+        sh_low = float(second_half["low"].min())
+
+        fh_vol = float(first_half["volume"].mean()) if "volume" in first_half.columns else 0
+        sh_vol = float(second_half["volume"].mean()) if "volume" in second_half.columns else 0
+
+        if fh_vol <= 0 or sh_vol <= 0:
+            return None
+
+        # Bearish divergence: higher highs + decreasing volume
+        if sh_high > fh_high and sh_vol < fh_vol * 0.85:
+            return "bearish"
+
+        # Bullish divergence (selling exhaustion): lower lows + decreasing volume
+        if sh_low < fh_low and sh_vol < fh_vol * 0.85:
+            return "bullish"
+
+        return None
+
+    # ── Mitigation Block Detection (TradingLab Gap #7) ─────────────
+
+    def _detect_mitigation_blocks(
+        self, df: pd.DataFrame, order_blocks: List[Dict]
+    ) -> List[Dict]:
+        """
+        Detect Mitigation Blocks: order blocks that price has revisited (partially filled).
+        A mitigated OB is one where price returned to the OB zone after the initial impulse.
+        """
+        if df.empty or not order_blocks:
+            return []
+
+        mitigation_blocks = []
+        data = df.reset_index(drop=True)
+
+        for ob in order_blocks:
+            ob_idx = ob.get("index", 0)
+            ob_high = ob.get("high", 0)
+            ob_low = ob.get("low", 0)
+            ob_type = ob.get("type", "")
+
+            if ob_high == 0 or ob_low == 0:
+                continue
+
+            # Check if price revisited this OB zone after it was created
+            mitigated = False
+            for j in range(ob_idx + 2, len(data)):
+                candle_low = float(data["low"].iloc[j])
+                candle_high = float(data["high"].iloc[j])
+
+                if ob_type == "bullish_ob":
+                    # Bullish OB mitigated: price dipped back into the OB zone
+                    if candle_low <= ob_high and candle_low >= ob_low:
+                        mitigated = True
+                        break
+                elif ob_type == "bearish_ob":
+                    # Bearish OB mitigated: price rallied back into the OB zone
+                    if candle_high >= ob_low and candle_high <= ob_high:
+                        mitigated = True
+                        break
+
+            if mitigated:
+                mitigation_blocks.append({
+                    "type": f"mitigated_{ob_type}",
+                    "high": ob_high,
+                    "low": ob_low,
+                    "mid": (ob_high + ob_low) / 2,
+                    "original_index": ob_idx,
+                })
+
+        return mitigation_blocks[-10:]
 
     # ── Premium / Discount Zone Detection (TradingLab SMC) ────────────
 
@@ -1124,12 +1283,24 @@ class MarketAnalyzer:
         if rng <= 0:
             return None
 
-        # Calculate position within the range (0.0 = swing low, 1.0 = swing high)
-        position = (current_price - swing_low) / rng
+        # Use Fibonacci levels for zone classification:
+        # position = 0.0 at swing_low, 1.0 at swing_high
+        # Fibonacci retracement measured from swing_high:
+        #   0.236 retracement = price near top (premium)
+        #   0.382 retracement = still premium
+        #   0.5   = equilibrium boundary
+        #   0.618 retracement = discount zone
+        #   0.786 retracement = deep discount
+        position = (current_price - swing_low) / rng  # 0=low, 1=high
 
-        if position >= 0.667:
+        # Premium: above 50% Fib level (position > 0.5, near 0.236-0.382 retracement)
+        if position > 0.5:
             return "premium"
-        elif position <= 0.333:
+        # Deep discount: near 70-80% retracement (position < 0.2)
+        elif position < 0.2:
+            return "deep_discount"
+        # Discount: below 50% Fib level (near 0.618-0.786 retracement)
+        elif position <= 0.5:
             return "discount"
         else:
             return "equilibrium"

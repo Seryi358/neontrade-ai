@@ -338,8 +338,8 @@ def _check_premium_discount_zone(analysis, direction: str) -> tuple[bool, str]:
     if zone is None:
         return True, ""  # No data = don't block
 
-    if direction == "BUY" and zone == "discount":
-        return True, "Precio en zona de DESCUENTO (favorable para compra)"
+    if direction == "BUY" and zone in ("discount", "deep_discount"):
+        return True, f"Precio en zona de DESCUENTO {'profundo ' if zone == 'deep_discount' else ''}(favorable para compra)"
     elif direction == "SELL" and zone == "premium":
         return True, "Precio en zona PREMIUM (favorable para venta)"
     elif zone == "equilibrium":
@@ -595,15 +595,16 @@ def _count_confluence_points(
         pos_pts += 1
         pos_details.append("Patron de velas a favor")
 
-    # 9. MACD alignment
+    # 9. MACD alignment - check if MACD main line is above/below zero
     macd_h1 = analysis.macd_values.get("H1", {})
     if macd_h1:
-        if direction == "BUY" and macd_h1.get("bullish", False):
+        macd_val = macd_h1.get("macd", 0)
+        if direction == "BUY" and macd_val > 0:
             pos_pts += 1
-            pos_details.append("MACD H1 alcista")
-        elif direction == "SELL" and not macd_h1.get("bullish", True):
+            pos_details.append(f"MACD H1 positivo ({macd_val:.5f})")
+        elif direction == "SELL" and macd_val < 0:
             pos_pts += 1
-            pos_details.append("MACD H1 bajista")
+            pos_details.append(f"MACD H1 negativo ({macd_val:.5f})")
         else:
             neg_pts += 1
             neg_details.append("MACD H1 en contra")
@@ -733,6 +734,52 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
     return "BLUE_B"
 
 
+def _adjust_sl_away_from_round_numbers(sl: float, direction: str) -> float:
+    """
+    TradingLab: Nudge SL 3-5 pips away from psychological levels (x.x000, x.x500).
+    Market makers tend to hunt stops at round numbers.
+    For BUY (SL below entry): move SL slightly lower.
+    For SELL (SL above entry): move SL slightly higher.
+    """
+    if sl <= 0:
+        return sl
+
+    # Determine pip size based on price magnitude
+    # For JPY pairs (price > 10), 1 pip = 0.01; for others 1 pip = 0.0001
+    if sl > 10:
+        pip = 0.01
+    else:
+        pip = 0.0001
+
+    nudge = 4 * pip  # 4 pips nudge
+
+    # Check proximity to round numbers (x.x000, x.x500)
+    # Get the fractional part at the relevant precision
+    if sl > 10:
+        # JPY: check .00 and .50 levels
+        frac = sl % 1.0
+        nearest_round = round(frac * 2) / 2  # nearest 0.00 or 0.50
+        distance_to_round = abs(frac - nearest_round)
+        threshold = 10 * pip  # within 10 pips of round number
+    else:
+        # Standard pairs: check .x000 and .x500 levels
+        frac = (sl * 10000) % 1000
+        # Distance to nearest 000 or 500
+        nearest_round = round(frac / 500) * 500
+        distance_to_round = abs(frac - nearest_round) * pip
+        threshold = 10 * pip
+
+    if distance_to_round < threshold:
+        if direction == "BUY":
+            # SL is below entry, move it slightly further below
+            sl -= nudge
+        else:
+            # SL is above entry, move it slightly further above
+            sl += nudge
+
+    return round(sl, 5)
+
+
 # ---------------------------------------------------------------------------
 # Clase base
 # ---------------------------------------------------------------------------
@@ -784,6 +831,17 @@ class BaseStrategy(ABC):
 
         signal = self.check_ltf_entry(analysis)
         if signal is not None:
+            # TradingLab: Adjust SL away from round numbers (psychological levels)
+            if signal.stop_loss > 0:
+                adjusted_sl = _adjust_sl_away_from_round_numbers(
+                    signal.stop_loss, signal.direction
+                )
+                if adjusted_sl != signal.stop_loss:
+                    signal.stop_loss = adjusted_sl
+                    signal.conditions_met.append(
+                        f"SL ajustado lejos de numero psicologico: {adjusted_sl:.5f}"
+                    )
+
             # Incorporar score de HTF al confidence total
             signal.confidence = min(100.0, signal.confidence + htf_score)
             signal.conditions_met = htf_met + signal.conditions_met
@@ -795,6 +853,14 @@ class BaseStrategy(ABC):
             )
             signal.confluence_score = pos_pts
             signal.anti_confluence_score = neg_pts
+
+            # TradingLab: Minimum 3 convergence factors required
+            if pos_pts < 3:
+                logger.debug(
+                    f"[{self.color.value}] Confluence too low: {pos_pts} positive points (min 3)"
+                )
+                return None
+
             # Bonus for high confluence
             if pos_pts >= 7:
                 signal.confidence = min(100.0, signal.confidence + 10.0)
@@ -845,14 +911,16 @@ class BaseStrategy(ABC):
                 signal.conditions_met.append(ew_desc)
 
             # TradingLab: Check for limit entry opportunity (3-level confluence)
-            limit_ok, limit_price, limit_desc = _check_limit_entry_confluence(
-                analysis, signal.direction, signal.entry_price
-            )
-            if limit_ok and limit_price:
-                signal.entry_type = "LIMIT"
-                signal.limit_price = limit_price
-                signal.confidence = min(100.0, signal.confidence + 5.0)
-                signal.conditions_met.append(limit_desc)
+            # Only check limit entry for strategies that support it (TradingLab rule)
+            if self.color in (StrategyColor.BLUE, StrategyColor.RED, StrategyColor.WHITE):
+                limit_ok, limit_price, limit_desc = _check_limit_entry_confluence(
+                    analysis, signal.direction, signal.entry_price
+                )
+                if limit_ok and limit_price:
+                    signal.entry_type = "LIMIT"
+                    signal.limit_price = limit_price
+                    signal.confidence = min(100.0, signal.confidence + 5.0)
+                    signal.conditions_met.append(limit_desc)
 
             logger.info(
                 f"[{self.color.value}] SETUP detectado {analysis.instrument} "
@@ -1653,19 +1721,31 @@ class PinkStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL debajo del minimo anterior (proteger el patron)."""
+        """SL debajo del minimo anterior (proteger el patron). Fib 0.618 as candidate."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
+            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                return max(below)
+                candidates.append(max(below))
+            # Add Fib 0.618 as candidate if valid
+            if fib_618 > 0 and fib_618 < entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return max(candidates)  # Prefer tighter SL (closest to entry)
             return entry_price * 0.99
         else:
+            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                return min(above)
+                candidates.append(min(above))
+            if fib_618 > 0 and fib_618 > entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return min(candidates)  # Prefer tighter SL
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -1895,19 +1975,31 @@ class WhiteStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY)."""
+        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Fib 0.618 as candidate."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
+            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                return max(below)
+                candidates.append(max(below))
+            # Add Fib 0.618 as candidate if valid
+            if fib_618 > 0 and fib_618 < entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return max(candidates)  # Prefer tighter SL
             return entry_price * 0.99
         else:
+            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                return min(above)
+                candidates.append(min(above))
+            if fib_618 > 0 and fib_618 > entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return min(candidates)  # Prefer tighter SL
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2192,21 +2284,31 @@ class BlackStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY)."""
+        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Fib 0.618 as candidate."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
-            # SL debajo del minimo anterior
+            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                return max(below)
+                candidates.append(max(below))
+            # Add Fib 0.618 as candidate if valid
+            if fib_618 > 0 and fib_618 < entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return max(candidates)  # Prefer tighter SL
             return entry_price * 0.985  # 1.5% fallback (tight for counter-trend)
         else:
-            # SL encima del maximo anterior
+            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                return min(above)
+                candidates.append(min(above))
+            if fib_618 > 0 and fib_618 > entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return min(candidates)  # Prefer tighter SL
             return entry_price * 1.015
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2471,27 +2573,36 @@ class GreenStrategy(BaseStrategy):
         """
         SL debajo del minimo anterior de 1H (ajustado para lograr alto R:R).
         Green usa SL muy ajustado, por eso logra R:R tan altos.
+        Fib 0.618 as candidate for better protection.
         """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
         ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
+        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
-            # SL debajo del minimo anterior de 1H (tight)
+            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                nearest_support = max(below)
-                # Usar el soporte mas cercano (tight SL)
-                return nearest_support
+                candidates.append(max(below))
+            # Add Fib 0.618 as candidate if valid
+            if fib_618 > 0 and fib_618 < entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return max(candidates)  # Tightest SL for high R:R
             # Fallback: ligeramente debajo de EMA 1H si disponible
             if ema_1h_50 and ema_1h_50 < entry_price:
                 return ema_1h_50 * 0.999
             return entry_price * 0.995  # 0.5% tight SL
         else:
+            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                nearest_resistance = min(above)
-                return nearest_resistance
+                candidates.append(min(above))
+            if fib_618 > 0 and fib_618 > entry_price:
+                candidates.append(fib_618)
+            if candidates:
+                return min(candidates)
             if ema_1h_50 and ema_1h_50 > entry_price:
                 return ema_1h_50 * 1.001
             return entry_price * 1.005

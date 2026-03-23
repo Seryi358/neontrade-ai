@@ -263,6 +263,7 @@ async def get_analysis(instrument: str):
         "rsi_divergence": getattr(analysis, 'rsi_divergence', None),
         "order_blocks": getattr(analysis, 'order_blocks', []),
         "structure_breaks": getattr(analysis, 'structure_breaks', []),
+        "pivot_points": getattr(analysis, 'pivot_points', {}),
     }
 
     # Add detailed explanation if available

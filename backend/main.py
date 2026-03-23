@@ -96,6 +96,17 @@ async def lifespan(app: FastAPI):
     logger.info("  NeonTrade AI v1.0 - Starting Up")
     logger.info("=" * 60)
 
+    # Startup diagnostics (mask secrets but confirm they exist)
+    logger.info("Config check: broker={}, identifier={}, api_key={}, password={}",
+                settings.active_broker,
+                settings.capital_identifier[:3] + "***" if settings.capital_identifier else "EMPTY",
+                settings.capital_api_key[:4] + "***" if settings.capital_api_key else "EMPTY",
+                "SET" if settings.capital_password else "EMPTY")
+    logger.info("Config check: openai={}, finnhub={}, gmail={}",
+                "SET" if settings.openai_api_key else "EMPTY",
+                "SET" if settings.finnhub_api_key else "EMPTY",
+                "SET" if getattr(settings, 'gmail_refresh_token', '') else "EMPTY")
+
     # Initialize database
     try:
         from db.models import TradeDatabase

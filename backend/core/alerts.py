@@ -320,14 +320,30 @@ class AlertManager:
         pnl_emoji = "\U0001F4C8" if total_pnl >= 0 else "\U0001F4C9"  # chart up / down
         title = f"{pnl_emoji} Daily Summary"
         sign = "+" if total_pnl >= 0 else ""
+
+        # Activity proof stats
+        scans = stats.get("scans_completed", 0)
+        setups_found = stats.get("setups_found", 0)
+        setups_executed = stats.get("setups_executed", 0)
+        setups_skipped = stats.get("setups_skipped_ai", 0)
+        scan_errors = stats.get("scan_errors", 0)
+
         body = (
-            f"<b>Date:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d')}\n"
+            f"<b>Date:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d')}\n\n"
+            f"<b>--- Trading Results ---</b>\n"
             f"<b>Total P&L:</b> {sign}{total_pnl:.2f}\n"
             f"<b>Trades:</b> {trades}  |  "
             f"<b>Wins:</b> {wins}  |  <b>Losses:</b> {losses}\n"
             f"<b>Win Rate:</b> {win_rate:.1f}%\n"
             f"<b>Best:</b> {best}\n"
-            f"<b>Worst:</b> {worst}"
+            f"<b>Worst:</b> {worst}\n\n"
+            f"<b>--- Engine Activity (Proof of Life) ---</b>\n"
+            f"<b>Scan cycles completed:</b> {scans}\n"
+            f"<b>Setups found by strategies:</b> {setups_found}\n"
+            f"<b>Setups executed:</b> {setups_executed}\n"
+            f"<b>Setups rejected by AI:</b> {setups_skipped}\n"
+            f"<b>Scan errors:</b> {scan_errors}\n\n"
+            f"<i>If scans > 0, the engine was alive and scanning all day.</i>"
         )
         await self.send_alert("daily_summary", title, body, stats)
 

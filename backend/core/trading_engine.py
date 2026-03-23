@@ -177,6 +177,14 @@ class TradingEngine:
         # Equity snapshot tracking (record every 10 minutes)
         self._last_equity_snapshot: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
+        # Daily activity counters (reset each day) — proves the app was alive
+        self._daily_scan_count: int = 0
+        self._daily_setups_found: int = 0
+        self._daily_setups_executed: int = 0
+        self._daily_setups_skipped_ai: int = 0
+        self._daily_errors: int = 0
+        self._daily_counter_date: str = ""  # YYYY-MM-DD of current counters
+
     # ── Notifications ──────────────────────────────────────────────
 
     def _push_notification(self, notif_type: str, title: str, body: str, data: dict = None):
@@ -391,8 +399,14 @@ class TradingEngine:
         now = datetime.now(timezone.utc)
         market_open = self._is_market_open(now)
 
+        # Reset daily counters at midnight UTC
+        self._reset_daily_counters()
+
         # Always expire old pending setups
         self._expire_old_setups()
+
+        # Morning heartbeat email (proof of life)
+        await self._maybe_send_morning_heartbeat(now)
 
         # Daily summary: send at end of trading day (21:00 UTC) once
         if now.hour == settings.trading_end_hour and now.minute < 3:
@@ -627,6 +641,7 @@ class TradingEngine:
 
     async def _scan_for_setups(self):
         """Scan all watchlist pairs for trading setups."""
+        self._daily_scan_count += 1
         for instrument in settings.forex_watchlist:
             try:
                 # Check if we can take more risk
@@ -657,11 +672,13 @@ class TradingEngine:
                 # Check for strategy setups
                 setup = await self._detect_setup(analysis)
                 if setup:
+                    self._daily_setups_found += 1
                     # Re-generate explanation with the setup signal context
                     # (setup is TradeRisk, not SetupSignal, so we pass what we can)
                     await self._handle_setup(setup, analysis, explanation)
 
             except Exception as e:
+                self._daily_errors += 1
                 logger.error(f"Error scanning {instrument}: {e}")
             # Throttle between pairs to avoid 429 rate limits from broker API
             await asyncio.sleep(1.5)
@@ -706,6 +723,7 @@ class TradingEngine:
                 )
                 if ai_rec == "SKIP" and ai_score < 40:
                     logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
+                    self._daily_setups_skipped_ai += 1
                     return None
                 # Apply AI-suggested SL/TP adjustments if provided
                 adjustments = ai_result.get("suggested_adjustments", {})
@@ -995,6 +1013,7 @@ class TradingEngine:
                     f"{dir_text} | Entry: {setup.entry_price:.5f} | SL: {setup.stop_loss:.5f} | TP: {setup.take_profit_1:.5f} | R:R {setup.reward_risk_ratio:.1f}",
                     {"trade_id": trade_id, "instrument": setup.instrument},
                 )
+                self._daily_setups_executed += 1
                 logger.info(f"Trade {trade_id} opened and tracked")
 
                 # Send external alerts
@@ -1074,7 +1093,7 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"Failed to get daily stats: {e}")
 
-        # Send basic summary via alert channels
+        # Send basic summary via alert channels (includes activity proof)
         if self.alert_manager:
             try:
                 await self.alert_manager.send_daily_summary({
@@ -1084,6 +1103,12 @@ class TradingEngine:
                     "losses": stats.get("losing_trades", 0),
                     "best_trade": f"{stats.get('best_trade_pnl', 0):.2f}",
                     "worst_trade": f"{stats.get('worst_trade_pnl', 0):.2f}",
+                    # Activity proof — proves the engine was alive all day
+                    "scans_completed": self._daily_scan_count,
+                    "setups_found": self._daily_setups_found,
+                    "setups_executed": self._daily_setups_executed,
+                    "setups_skipped_ai": self._daily_setups_skipped_ai,
+                    "scan_errors": self._daily_errors,
                 })
             except Exception as e:
                 logger.warning(f"Failed to send daily summary alert: {e}")
@@ -1116,6 +1141,69 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"AI daily report failed: {e}")
 
+    # ── Daily Heartbeat ─────────────────────────────────────────
+
+    def _reset_daily_counters(self):
+        """Reset daily activity counters for a new day."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if self._daily_counter_date != today:
+            self._daily_scan_count = 0
+            self._daily_setups_found = 0
+            self._daily_setups_executed = 0
+            self._daily_setups_skipped_ai = 0
+            self._daily_errors = 0
+            self._daily_counter_date = today
+
+    async def _maybe_send_morning_heartbeat(self, now: datetime):
+        """
+        Send a 'proof of life' email at ~8:00 UTC (3am Colombia) every day.
+        This way the user knows the app is alive even if 0 trades happen.
+        """
+        if now.hour != 8 or now.minute >= 3:
+            return
+        if hasattr(self, '_heartbeat_sent_date') and self._heartbeat_sent_date == now.date():
+            return
+
+        self._heartbeat_sent_date = now.date()
+
+        if not self.alert_manager:
+            return
+
+        try:
+            # Gather status info
+            account = None
+            try:
+                account = await self.broker.get_account_summary()
+            except Exception:
+                pass
+
+            balance_str = f"{account.balance:.2f} {account.currency}" if account else "N/A"
+            open_positions = len(self.position_manager.positions)
+            pairs_analyzed = len(self._last_scan_results)
+            mode = self.mode.value.upper()
+            strategies_on = sum(1 for v in self._enabled_strategies.values() if v)
+
+            body = (
+                f"<b>NeonTrade AI is ALIVE and running.</b>\n\n"
+                f"<b>Balance:</b> {balance_str}\n"
+                f"<b>Mode:</b> {mode}\n"
+                f"<b>Open Positions:</b> {open_positions}\n"
+                f"<b>Pairs Watched:</b> {len(settings.forex_watchlist)}\n"
+                f"<b>Pairs Analyzed:</b> {pairs_analyzed}\n"
+                f"<b>Strategies Active:</b> {strategies_on}/9\n"
+                f"<b>Scan Interval:</b> {self._scan_interval}s\n\n"
+                f"<i>Trading hours: 07:00-21:00 UTC. You'll get a summary at 21:00 UTC.</i>"
+            )
+
+            await self.alert_manager.send_alert(
+                "engine_status",
+                f"NeonTrade AI - Morning Heartbeat ({now.strftime('%Y-%m-%d')})",
+                body,
+            )
+            logger.info("Morning heartbeat email sent")
+        except Exception as e:
+            logger.warning(f"Failed to send morning heartbeat: {e}")
+
     # ── Status ───────────────────────────────────────────────────
 
     def get_status(self) -> Dict:
@@ -1133,6 +1221,14 @@ class TradingEngine:
             "watchlist_count": len(settings.forex_watchlist),
             "pending_setups_count": pending_count,
             "enabled_strategies": self._enabled_strategies,
+            "daily_activity": {
+                "date": self._daily_counter_date,
+                "scans_completed": self._daily_scan_count,
+                "setups_found": self._daily_setups_found,
+                "setups_executed": self._daily_setups_executed,
+                "setups_skipped_ai": self._daily_setups_skipped_ai,
+                "errors": self._daily_errors,
+            },
             "last_scan": {
                 inst: {
                     "score": result.score,

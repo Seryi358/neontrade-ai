@@ -87,6 +87,36 @@ async def get_status():
     )
 
 
+# ── Daily Activity (Proof of Life) ────────────────────────────────
+
+@router.get("/daily-activity")
+async def get_daily_activity():
+    """
+    Get today's engine activity counters.
+    This is the 'proof of life' — shows scans completed, setups found/executed,
+    even if 0 trades happened. If scans_completed > 0, the engine was alive.
+    """
+    from main import engine
+    status = engine.get_status()
+    activity = status.get("daily_activity", {})
+    return {
+        "date": activity.get("date", ""),
+        "scans_completed": activity.get("scans_completed", 0),
+        "setups_found": activity.get("setups_found", 0),
+        "setups_executed": activity.get("setups_executed", 0),
+        "setups_skipped_ai": activity.get("setups_skipped_ai", 0),
+        "errors": activity.get("errors", 0),
+        "engine_running": status["running"],
+        "pairs_analyzed": len(status.get("last_scan", {})),
+        "open_positions": status["open_positions"],
+        "explanation": (
+            "If scans_completed > 0, the engine was active today. "
+            "0 trades is normal if no high-quality setups were found. "
+            "Expect 0-5 trades per day depending on market conditions."
+        ),
+    }
+
+
 # ── Trading Mode ──────────────────────────────────────────────────
 
 @router.get("/mode")

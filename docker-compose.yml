@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  neontrade:
+    build: .
+    container_name: neontrade-ai
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    volumes:
+      - neontrade-data:/app/data
+      - neontrade-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  neontrade-data:
+  neontrade-logs:

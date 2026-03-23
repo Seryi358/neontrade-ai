@@ -1,0 +1,43 @@
+# Core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+# OANDA API
+oandapyV20==0.7.2
+requests==2.32.3
+
+# OpenAI
+openai==1.59.6
+
+# Data & Analysis
+pandas==2.2.3
+numpy==2.2.1
+ta==0.11.0
+mplfinance==0.12.10b0
+
+# Database
+sqlalchemy==2.0.36
+aiosqlite==0.20.0
+
+# WebSocket & Real-time
+websockets==14.1
+python-socketio==5.12.1
+
+# Scheduling
+apscheduler==3.11.0
+
+# Notifications
+firebase-admin==6.6.0
+
+# Gmail OAuth2
+google-auth==2.38.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.159.0
+
+# Utilities
+httpx==0.28.1
+loguru==0.7.3
+python-dateutil==2.9.0

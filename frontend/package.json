@@ -1,0 +1,96 @@
+{
+  "name": "neontrade-ai",
+  "version": "2.2.0",
+  "description": "NeonTrade AI - Cyberpunk Trading System",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "web": "expo start --web",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "build:web": "expo export --platform web",
+    "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "preelectron:build": "node -e \"let p=require('./package.json');p.main='electron/main.js';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))\"",
+    "electron:build": "npm run build:web && npm run preelectron:build && electron-builder",
+    "postelectron:build": "node -e \"let p=require('./package.json');p.main='index.js';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))\"",
+    "electron:mac": "npm run build:web && npm run preelectron:build && electron-builder --mac && npm run postelectron:build && npm run move:app",
+    "move:app": "node -e \"const fs=require('fs'),p=require('path'),{execSync}=require('child_process');const bd='builds';const dirs=['mac','mac-x64','mac-arm64','mac-universal'];for(const d of dirs){const full=p.join(bd,d);if(fs.existsSync(full)){const apps=fs.readdirSync(full).filter(f=>f.endsWith('.app'));for(const a of apps){const src=p.join(full,a),dest=p.join(bd,a);if(fs.existsSync(dest))fs.rmSync(dest,{recursive:true});fs.renameSync(src,dest);console.log('Moved:',dest)}fs.rmSync(full,{recursive:true})}}['dmg','exe','blockmap','zip','yml','yaml'].forEach(ext=>{fs.readdirSync(bd).filter(f=>f.endsWith('.'+ext)).forEach(f=>{fs.unlinkSync(p.join(bd,f));console.log('Removed:',f)})});console.log('Done! .app is ready in builds/')\"",
+    "electron:win": "npm run build:web && npm run preelectron:build && electron-builder --win && npm run postelectron:build",
+    "eas:android": "eas build --platform android --profile preview",
+    "eas:ios": "eas build --platform ios --profile preview"
+  },
+  "build": {
+    "appId": "com.phinodia.neontrade",
+    "productName": "NeonTrade AI",
+    "directories": {
+      "output": "builds"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "src/assets/icon*",
+      "src/assets/fonts/**/*",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*.py",
+          "**/*.txt",
+          "**/*.pem",
+          ".env",
+          "!__pycache__/**",
+          "!*.pyc",
+          "!build/**",
+          "!dist/**"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.finance",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/assets/icon.icns",
+      "darkModeSupport": true,
+      "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/assets/icon.ico"
+    }
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~4.0.1",
+    "@react-navigation/bottom-tabs": "^7.0.0",
+    "@react-navigation/native": "^7.0.0",
+    "expo": "~52.0.0",
+    "expo-font": "~13.0.0",
+    "expo-notifications": "~0.29.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-web": "~0.19.13"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "~5.3.0"
+  }
+}

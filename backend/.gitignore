@@ -1,0 +1,31 @@
+# Environment
+.env
+
+# IBKR private keys (NEVER commit these)
+keys/private_*.pem
+keys/dhparam.pem
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Data & logs
+data/*.db
+data/*.json
+data/gmail_token.json
+logs/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Builds
+builds/
+*.egg-info/
+dist/

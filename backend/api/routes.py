@@ -1,0 +1,1026 @@
+"""
+NeonTrade AI - API Routes
+REST endpoints for the frontend app.
+Supports: Auto/Manual modes, trade history, explanations, broker selection.
+"""
+
+from fastapi import APIRouter, HTTPException, Query
+from typing import Dict, List, Optional
+from pydantic import BaseModel
+from enum import Enum
+
+router = APIRouter()
+
+
+# ── Request / Response Models ────────────────────────────────────
+
+class TradingModeRequest(BaseModel):
+    mode: str  # "AUTO" or "MANUAL"
+
+
+class SetupApprovalRequest(BaseModel):
+    setup_id: str
+
+
+class StrategyConfigRequest(BaseModel):
+    BLUE: Optional[bool] = None
+    BLUE_A: Optional[bool] = None
+    BLUE_B: Optional[bool] = None
+    BLUE_C: Optional[bool] = None
+    RED: Optional[bool] = None
+    PINK: Optional[bool] = None
+    WHITE: Optional[bool] = None
+    BLACK: Optional[bool] = None
+    GREEN: Optional[bool] = None
+
+
+class BrokerSelectionRequest(BaseModel):
+    broker: str  # "oanda", "tagmarkets", etc.
+    api_key: Optional[str] = None
+    account_id: Optional[str] = None
+    environment: Optional[str] = "practice"
+
+
+class TradeResponse(BaseModel):
+    trade_id: str
+    instrument: str
+    direction: str
+    entry_price: float
+    current_sl: float
+    take_profit: float
+    phase: str
+    unrealized_pnl: Optional[float] = None
+    strategy: Optional[str] = None
+
+
+class EngineStatusResponse(BaseModel):
+    running: bool
+    mode: str  # "AUTO" or "MANUAL"
+    broker: str
+    open_positions: int
+    pending_setups: int
+    total_risk: float
+    watchlist_count: int
+
+
+# ── Engine Status ─────────────────────────────────────────────────
+
+@router.get("/status", response_model=EngineStatusResponse)
+async def get_status():
+    """Get current trading engine status."""
+    from main import engine
+    status = engine.get_status()
+    mode = getattr(engine, 'mode', None)
+    mode_str = mode.value if mode else "AUTO"
+    pending = getattr(engine, 'pending_setups', [])
+    broker_name = getattr(engine.broker, 'broker_type', None)
+    broker_str = broker_name.value if broker_name else "oanda"
+
+    return EngineStatusResponse(
+        running=status["running"],
+        mode=mode_str,
+        broker=broker_str,
+        open_positions=status["open_positions"],
+        pending_setups=len(pending),
+        total_risk=status["total_risk"],
+        watchlist_count=status["watchlist_count"],
+    )
+
+
+# ── Trading Mode ──────────────────────────────────────────────────
+
+@router.get("/mode")
+async def get_mode():
+    """Get current trading mode (AUTO or MANUAL)."""
+    from main import engine
+    mode = getattr(engine, 'mode', None)
+    return {
+        "mode": mode.value if mode else "AUTO",
+        "description": "NeonTrade opera automáticamente" if (not mode or mode.value == "AUTO")
+                       else "NeonTrade sugiere operaciones para tu aprobación",
+    }
+
+
+@router.post("/mode")
+async def set_mode(request: TradingModeRequest):
+    """Switch between AUTO and MANUAL trading modes."""
+    from main import engine
+    mode_upper = request.mode.upper()
+    if mode_upper not in ("AUTO", "MANUAL"):
+        raise HTTPException(400, "Mode must be 'AUTO' or 'MANUAL'")
+
+    if hasattr(engine, 'set_mode'):
+        engine.set_mode(mode_upper)
+    return {
+        "mode": mode_upper,
+        "message": "Modo cambiado a AUTOMÁTICO" if mode_upper == "AUTO"
+                   else "Modo cambiado a MANUAL - aprobarás cada operación",
+    }
+
+
+# ── Manual Mode: Pending Setups ──────────────────────────────────
+
+@router.get("/pending-setups")
+async def get_pending_setups():
+    """Get all pending trade setups waiting for user approval (Manual Mode)."""
+    from main import engine
+    if hasattr(engine, 'get_pending_setups'):
+        return engine.get_pending_setups()
+    return []
+
+
+@router.post("/pending-setups/{setup_id}/approve")
+async def approve_setup(setup_id: str):
+    """Approve a pending trade setup for execution."""
+    from main import engine
+    if hasattr(engine, 'approve_setup'):
+        success = await engine.approve_setup(setup_id)
+        if success:
+            return {"status": "approved", "setup_id": setup_id,
+                    "message": "Operación aprobada y ejecutada"}
+        raise HTTPException(404, f"Setup {setup_id} not found or expired")
+    raise HTTPException(501, "Manual mode not available")
+
+
+@router.post("/pending-setups/{setup_id}/reject")
+async def reject_setup(setup_id: str):
+    """Reject a pending trade setup."""
+    from main import engine
+    if hasattr(engine, 'reject_setup'):
+        success = engine.reject_setup(setup_id)
+        if success:
+            return {"status": "rejected", "setup_id": setup_id,
+                    "message": "Operación rechazada"}
+        raise HTTPException(404, f"Setup {setup_id} not found")
+    raise HTTPException(501, "Manual mode not available")
+
+
+@router.post("/pending-setups/approve-all")
+async def approve_all_setups():
+    """Approve all pending setups at once."""
+    from main import engine
+    if hasattr(engine, 'approve_all_pending'):
+        count = await engine.approve_all_pending()
+        return {"status": "approved_all", "count": count,
+                "message": f"{count} operaciones aprobadas y ejecutadas"}
+    raise HTTPException(501, "Manual mode not available")
+
+
+@router.post("/pending-setups/reject-all")
+async def reject_all_setups():
+    """Reject all pending setups."""
+    from main import engine
+    if hasattr(engine, 'pending_setups'):
+        count = len(engine.pending_setups)
+        engine.pending_setups.clear()
+        return {"status": "rejected_all", "count": count}
+    return {"status": "ok", "count": 0}
+
+
+# ── Positions ─────────────────────────────────────────────────────
+
+@router.get("/positions")
+async def get_positions():
+    """Get all open positions with details."""
+    from main import engine
+    status = engine.get_status()
+    return status["positions"]
+
+
+# ── Analysis & Explanations ──────────────────────────────────────
+
+@router.get("/analysis/{instrument}")
+async def get_analysis(instrument: str):
+    """Get latest analysis for a specific instrument with full explanation."""
+    from main import engine
+    results = engine._last_scan_results
+    if instrument not in results:
+        # Return a default empty analysis instead of 404
+        return {
+            "instrument": instrument,
+            "score": 0,
+            "htf_trend": "unknown",
+            "ltf_trend": "unknown",
+            "convergence": False,
+            "condition": "unknown",
+            "key_levels": {},
+            "ema_values": {},
+            "fibonacci": {},
+            "patterns": [],
+            "elliott_wave": None,
+            "message": "Análisis no disponible — esperando próximo escaneo",
+        }
+
+    analysis = results[instrument]
+
+    response = {
+        "instrument": instrument,
+        "score": analysis.score,
+        "htf_trend": analysis.htf_trend.value,
+        "ltf_trend": analysis.ltf_trend.value,
+        "convergence": analysis.htf_ltf_convergence,
+        "condition": analysis.htf_condition.value,
+        "key_levels": analysis.key_levels,
+        "ema_values": analysis.ema_values,
+        "fibonacci": analysis.fibonacci_levels,
+        "patterns": analysis.candlestick_patterns,
+        "chart_patterns": getattr(analysis, 'chart_patterns', []),
+        "elliott_wave": getattr(analysis, 'elliott_wave', None),
+        # New indicators from course material
+        "macd": getattr(analysis, 'macd_values', {}),
+        "sma": getattr(analysis, 'sma_values', {}),
+        "rsi": getattr(analysis, 'rsi_values', {}),
+        "rsi_divergence": getattr(analysis, 'rsi_divergence', None),
+        "order_blocks": getattr(analysis, 'order_blocks', []),
+        "structure_breaks": getattr(analysis, 'structure_breaks', []),
+    }
+
+    # Add detailed explanation if available
+    if instrument in engine._latest_explanations:
+        explanation = engine._latest_explanations[instrument]
+        response["explanation"] = {
+            "overall_bias": explanation.overall_bias,
+            "confidence_level": explanation.confidence_level,
+            "timeframe_analysis": [
+                {
+                    "timeframe": tf.timeframe,
+                    "trend": tf.trend,
+                    "observations": tf.key_observations,
+                    "levels": tf.levels,
+                    "patterns": tf.patterns,
+                    "conclusion": tf.conclusion,
+                }
+                for tf in explanation.timeframe_analysis
+            ],
+            "strategy_detected": explanation.strategy_detected,
+            "strategy_steps": explanation.strategy_steps,
+            "conditions_met": explanation.conditions_met,
+            "conditions_missing": explanation.conditions_missing,
+            "entry_explanation": explanation.entry_explanation,
+            "sl_explanation": explanation.sl_explanation,
+            "tp_explanation": explanation.tp_explanation,
+            "risk_assessment": explanation.risk_assessment,
+            "recommendation": explanation.recommendation,
+        }
+
+    return response
+
+
+@router.get("/analysis")
+async def get_all_analyses():
+    """Get latest analysis summary for all scanned instruments."""
+    from main import engine
+    results = []
+    for inst, analysis in engine._last_scan_results.items():
+        entry = {
+            "instrument": inst,
+            "score": analysis.score,
+            "htf_trend": analysis.htf_trend.value,
+            "ltf_trend": analysis.ltf_trend.value,
+            "convergence": analysis.htf_ltf_convergence,
+            "condition": analysis.htf_condition.value,
+            "patterns": analysis.candlestick_patterns,
+        }
+        # Add strategy detection if available
+        if inst in engine._latest_explanations:
+            expl = engine._latest_explanations[inst]
+            entry["strategy_detected"] = expl.strategy_detected
+            entry["confidence_level"] = expl.confidence_level
+            entry["recommendation"] = expl.recommendation
+        results.append(entry)
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
+
+
+# ── Watchlist ────────────────────────────────────────────────────
+
+@router.get("/watchlist")
+async def get_watchlist():
+    """Get watchlist with latest scan results."""
+    from main import engine
+    from config import settings
+
+    watchlist = []
+    for instrument in settings.forex_watchlist:
+        entry = {
+            "instrument": instrument,
+            "score": 0,
+            "trend": "unknown",
+            "convergence": False,
+            "patterns": [],
+            "strategy_detected": None,
+        }
+        if instrument in engine._last_scan_results:
+            analysis = engine._last_scan_results[instrument]
+            entry["score"] = analysis.score
+            entry["trend"] = analysis.htf_trend.value
+            entry["convergence"] = analysis.htf_ltf_convergence
+            entry["patterns"] = analysis.candlestick_patterns
+            entry["condition"] = analysis.htf_condition.value
+
+            if instrument in engine._latest_explanations:
+                expl = engine._latest_explanations[instrument]
+                entry["strategy_detected"] = expl.strategy_detected
+                entry["confidence_level"] = expl.confidence_level
+
+        watchlist.append(entry)
+
+    watchlist.sort(key=lambda x: x["score"], reverse=True)
+    return watchlist
+
+
+# ── Account ──────────────────────────────────────────────────────
+
+@router.get("/account")
+async def get_account():
+    """Get account summary from the active broker."""
+    from main import engine
+    broker = engine.broker
+    try:
+        summary = await broker.get_account_summary()
+        return {
+            "balance": summary.balance,
+            "equity": summary.equity,
+            "unrealized_pnl": summary.unrealized_pnl,
+            "margin_used": summary.margin_used,
+            "margin_available": summary.margin_available,
+            "open_trade_count": summary.open_trade_count,
+            "currency": summary.currency,
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Error al obtener cuenta: {str(e)}")
+
+
+# ── Engine Control ───────────────────────────────────────────────
+
+@router.post("/engine/start")
+async def start_engine():
+    """Start the trading engine."""
+    from main import engine
+    import asyncio
+    if not engine._running:
+        asyncio.create_task(engine.start())
+        return {"status": "starting", "message": "Motor de trading iniciando..."}
+    return {"status": "already_running", "message": "El motor ya está en ejecución"}
+
+
+@router.post("/engine/stop")
+async def stop_engine():
+    """Stop the trading engine."""
+    from main import engine
+    await engine.stop()
+    return {"status": "stopped", "message": "Motor de trading detenido"}
+
+
+@router.post("/emergency/close-all")
+async def emergency_close_all():
+    """Emergency: close all open trades immediately."""
+    from main import engine
+    broker = engine.broker
+    count = await broker.close_all_trades()
+    if hasattr(engine, 'position_manager'):
+        engine.position_manager.positions.clear()
+    if hasattr(engine, 'risk_manager'):
+        engine.risk_manager._active_risks.clear()
+    return {
+        "status": "all_trades_closed",
+        "count": count,
+        "message": f"Emergencia: {count} operaciones cerradas",
+    }
+
+
+# ── Trade History ────────────────────────────────────────────────
+
+@router.get("/history")
+async def get_trade_history(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    instrument: Optional[str] = None,
+    strategy: Optional[str] = None,
+):
+    """Get trade history with optional filters."""
+    from main import db
+    if db is None:
+        return []
+    try:
+        trades = await db.get_trade_history(
+            limit=limit, offset=offset,
+            instrument=instrument, strategy=strategy,
+        )
+        return trades
+    except Exception as e:
+        raise HTTPException(500, f"Error al obtener historial: {str(e)}")
+
+
+@router.get("/history/stats")
+async def get_performance_stats(days: int = Query(30, ge=1, le=365)):
+    """Get trading performance statistics."""
+    from main import db
+    if db is None:
+        return {
+            "total_trades": 0, "winning_trades": 0, "losing_trades": 0,
+            "win_rate": 0, "total_pnl": 0, "avg_rr": 0,
+        }
+    try:
+        return await db.get_performance_summary(days=days)
+    except Exception as e:
+        raise HTTPException(500, f"Error al obtener estadísticas: {str(e)}")
+
+
+@router.get("/history/daily")
+async def get_daily_stats(date: Optional[str] = None):
+    """Get daily trading statistics."""
+    from main import db
+    if db is None:
+        return {}
+    if date is None:
+        from datetime import datetime, timezone
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        return await db.get_daily_stats(date)
+    except Exception as e:
+        raise HTTPException(500, f"Error al obtener stats diarios: {str(e)}")
+
+
+# ── Broker Selection ─────────────────────────────────────────────
+
+@router.get("/broker")
+async def get_current_broker():
+    """Get info about the currently active broker."""
+    from main import engine
+    broker = engine.broker
+    broker_type = getattr(broker, 'broker_type', None)
+
+    # Check if broker session is active (non-blocking — just check tokens)
+    connected = False
+    try:
+        cst = getattr(broker, '_cst', None)
+        sec = getattr(broker, '_security_token', None)
+        connected = bool(cst and sec)
+        # Also check if engine is running as a proxy for "connected"
+        if not connected and engine._running:
+            connected = True
+    except Exception:
+        connected = False
+
+    return {
+        "broker": broker_type.value if broker_type else "oanda",
+        "connected": connected,
+        "available_brokers": [
+            {
+                "id": "capital",
+                "name": "Capital.com",
+                "description": "Multi-activo: Forex, Acciones, Índices, Materias Primas. API REST gratuita.",
+                "safe_in_colombia": True,
+                "demo_available": True,
+                "implemented": True,
+            },
+            {
+                "id": "oanda",
+                "name": "OANDA",
+                "description": "Broker regulado, popular para Forex. API robusta.",
+                "safe_in_colombia": True,
+                "demo_available": True,
+                "implemented": True,
+            },
+            {
+                "id": "icmarkets",
+                "name": "IC Markets",
+                "description": "ECN broker australiano con spreads bajos.",
+                "safe_in_colombia": True,
+                "demo_available": True,
+                "implemented": False,
+            },
+            {
+                "id": "pepperstone",
+                "name": "Pepperstone",
+                "description": "Broker australiano regulado con MT4/MT5.",
+                "safe_in_colombia": True,
+                "demo_available": True,
+                "implemented": False,
+            },
+        ],
+    }
+
+
+@router.post("/broker")
+async def set_broker(request: BrokerSelectionRequest):
+    """Switch the active broker. Requires API credentials."""
+    supported = {"oanda", "capital", "ibkr"}
+    if request.broker.lower() not in supported:
+        raise HTTPException(
+            501,
+            f"Broker '{request.broker}' aún no está implementado. "
+            f"Disponibles: OANDA, Capital.com. "
+            f"TagMarkets e IC Markets estarán disponibles próximamente.",
+        )
+    return {
+        "broker": request.broker,
+        "status": "active",
+        "message": f"Broker {request.broker} configurado correctamente",
+    }
+
+
+# ── Candle Data (for charts) ────────────────────────────────────
+
+@router.get("/candles/{instrument}")
+async def get_candles(
+    instrument: str,
+    granularity: str = Query("H1", description="Timeframe: M5, M15, H1, H4, D, W"),
+    count: int = Query(200, ge=10, le=5000),
+):
+    """Get candlestick data for charting."""
+    from main import engine
+    broker = engine.broker
+    try:
+        candles = await broker.get_candles(instrument, granularity, count)
+        return [
+            {
+                "time": c.time,
+                "open": c.open,
+                "high": c.high,
+                "low": c.low,
+                "close": c.close,
+                "volume": c.volume,
+                "complete": c.complete,
+            }
+            for c in candles
+        ]
+    except Exception as e:
+        raise HTTPException(500, f"Error al obtener velas: {str(e)}")
+
+
+@router.get("/price/{instrument}")
+async def get_price(instrument: str):
+    """Get current bid/ask price for an instrument."""
+    from main import engine
+    broker = engine.broker
+    try:
+        price = await broker.get_current_price(instrument)
+        return {
+            "instrument": instrument,
+            "bid": price.bid,
+            "ask": price.ask,
+            "spread": price.spread,
+            "time": price.time,
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Error al obtener precio: {str(e)}")
+
+
+# ── Strategy Selection ────────────────────────────────────────────
+
+@router.get("/strategies/config")
+async def get_strategy_config():
+    """Get the current strategy enablement configuration."""
+    from main import engine
+    return engine.get_enabled_strategies()
+
+
+@router.put("/strategies/config")
+async def set_strategy_config(request: StrategyConfigRequest):
+    """Update which strategies are enabled for trading.
+
+    Send only the fields you want to change, or send all fields for a full update.
+    Example: {"BLUE": true, "BLUE_A": true, "BLUE_B": false, "BLUE_C": true, "RED": true}
+    """
+    from main import engine
+    # Build update dict from non-None fields
+    update = {k: v for k, v in request.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No strategies specified")
+
+    # Merge with current config
+    current = engine.get_enabled_strategies()
+    current.update(update)
+    engine.set_enabled_strategies(current)
+
+    enabled = [k for k, v in current.items() if v]
+    return {
+        "config": current,
+        "enabled": enabled,
+        "message": f"Estrategias actualizadas. Activas: {', '.join(enabled)}",
+    }
+
+
+# ── Strategies Info ──────────────────────────────────────────────
+
+@router.get("/strategies")
+async def get_strategies_info():
+    """Get info about all available trading strategies."""
+    return [
+        {
+            "color": "BLUE",
+            "name": "Cambio de tendencia en 1H",
+            "description": "Detecta cambios de tendencia en gráfico horario. 3 variantes (A/B/C). "
+                           "TP en EMA 50 de 4H.",
+            "wave": "Onda 1-2 de Elliott",
+            "risk_reward_avg": 1.5,
+            "variants": ["BLUE_A (Doble suelo)", "BLUE_B (Estándar)", "BLUE_C (Rechazo EMA 4H)"],
+            "steps": 7,
+        },
+        {
+            "color": "RED",
+            "name": "Cambio de tendencia en 4H",
+            "description": "Evolución de Blue. Detecta cambios de tendencia en gráfico de 4 horas. "
+                           "TP en máximo anterior o extensión Fibonacci.",
+            "wave": "Onda 2-3 de Elliott",
+            "risk_reward_avg": 2.0,
+            "variants": [],
+            "steps": 7,
+        },
+        {
+            "color": "PINK",
+            "name": "Patrón correctivo de continuación",
+            "description": "Detecta patrones correctivos (cuña/triángulo/canal) en 1H dentro de "
+                           "una tendencia establecida en 4H.",
+            "wave": "Onda 4→5 de Elliott",
+            "risk_reward_avg": 1.8,
+            "variants": [],
+            "steps": 6,
+        },
+        {
+            "color": "WHITE",
+            "name": "Continuación post-Pink",
+            "description": "Entrada después de una configuración Pink completada. "
+                           "Impulso + pullback en 1H.",
+            "wave": "Onda 3 de Onda 5 de Elliott",
+            "risk_reward_avg": 1.5,
+            "variants": [],
+            "steps": 6,
+        },
+        {
+            "color": "BLACK",
+            "name": "Anticipación contratendencia",
+            "description": "Estrategia contra tendencia. Requiere soporte/resistencia diario, "
+                           "sobrecompra/sobreventa en 4H, patrón de reversión en 1H. R:R mínimo 2:1.",
+            "wave": "Onda 1 de Elliott (nuevo ciclo)",
+            "risk_reward_avg": 2.8,
+            "variants": [],
+            "steps": 7,
+        },
+        {
+            "color": "GREEN",
+            "name": "Dirección semanal + patrón diario",
+            "description": "La más lucrativa. Usa dirección semanal, corrección en diario, "
+                           "y entrada precisa en 15M. Puede lograr R:R de 10:1.",
+            "wave": "Corrección semanal completada",
+            "risk_reward_avg": 5.0,
+            "variants": [],
+            "steps": 6,
+        },
+    ]
+
+
+# ── Notifications (for Electron native notifications) ─────────
+
+@router.get("/notifications")
+async def get_notifications():
+    """Get unread notifications for native OS notifications."""
+    from main import engine
+    if hasattr(engine, 'get_unread_notifications'):
+        return engine.get_unread_notifications()
+    return []
+
+
+# ── Economic Calendar ───────────────────────────────────────────
+
+@router.get("/calendar")
+async def get_economic_calendar():
+    """Get today's economic events that affect trading."""
+    from main import engine
+    if hasattr(engine, 'news_filter'):
+        events = await engine.news_filter.get_todays_events()
+        has_news, desc = await engine.news_filter.has_upcoming_news()
+        return {
+            "events": events,
+            "news_active": has_news,
+            "current_warning": desc,
+        }
+    return {"events": [], "news_active": False, "current_warning": None}
+
+
+# ── News Headlines ─────────────────────────────────────────────
+
+@router.get("/news")
+async def get_news_headlines(limit: int = Query(10, ge=1, le=50)):
+    """Get recent forex news headlines."""
+    from main import engine
+    if hasattr(engine, 'news_filter') and hasattr(engine.news_filter, 'get_news_headlines'):
+        return await engine.news_filter.get_news_headlines(limit=limit)
+    return []
+
+
+# ── Risk Configuration ─────────────────────────────────────────
+
+class RiskConfigRequest(BaseModel):
+    risk_day_trading: Optional[float] = None
+    risk_scalping: Optional[float] = None
+    risk_swing: Optional[float] = None
+    max_total_risk: Optional[float] = None
+    correlated_risk_factor: Optional[float] = None
+    min_rr_ratio: Optional[float] = None
+    move_sl_to_be_at: Optional[float] = None
+    # Drawdown management (ch18.7)
+    drawdown_method: Optional[str] = None  # "fixed_1pct", "variable", "fixed_levels"
+    # Delta algorithm (ch18.8)
+    delta_enabled: Optional[bool] = None
+    delta_parameter: Optional[float] = None
+    # Scale-in
+    scale_in_require_be: Optional[bool] = None
+
+
+@router.get("/risk-config")
+async def get_risk_config():
+    """Get current risk management configuration."""
+    from config import settings
+    return {
+        "risk_day_trading": settings.risk_day_trading,
+        "risk_scalping": settings.risk_scalping,
+        "risk_swing": settings.risk_swing,
+        "max_total_risk": settings.max_total_risk,
+        "correlated_risk_factor": settings.correlated_risk_factor,
+        "min_rr_ratio": settings.min_rr_ratio,
+        "move_sl_to_be_at": settings.move_sl_to_be_at,
+        "trading_start_hour": settings.trading_start_hour,
+        "trading_end_hour": settings.trading_end_hour,
+        "close_before_friday_hour": settings.close_before_friday_hour,
+        "avoid_news_minutes_before": settings.avoid_news_minutes_before,
+        "avoid_news_minutes_after": settings.avoid_news_minutes_after,
+        # Drawdown management (ch18.7)
+        "drawdown_method": settings.drawdown_method,
+        "drawdown_level_1": settings.drawdown_level_1,
+        "drawdown_level_2": settings.drawdown_level_2,
+        "drawdown_level_3": settings.drawdown_level_3,
+        "drawdown_risk_1": settings.drawdown_risk_1,
+        "drawdown_risk_2": settings.drawdown_risk_2,
+        "drawdown_risk_3": settings.drawdown_risk_3,
+        # Delta algorithm (ch18.8)
+        "delta_enabled": settings.delta_enabled,
+        "delta_parameter": settings.delta_parameter,
+        "delta_max_risk": settings.delta_max_risk,
+        # Scale-in rule
+        "scale_in_require_be": settings.scale_in_require_be,
+    }
+
+
+@router.get("/risk-status")
+async def get_risk_status():
+    """Get live risk status including drawdown and delta algorithm state."""
+    from main import engine
+    if engine is None:
+        return {"error": "Engine not initialized"}
+    try:
+        risk_mgr = engine.risk_manager
+        await risk_mgr.update_balance_tracking()
+        return risk_mgr.get_risk_status()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.put("/risk-config")
+async def set_risk_config(request: RiskConfigRequest):
+    """Update risk management configuration at runtime."""
+    from config import settings
+    import json, os
+
+    updates = {}
+    if request.risk_day_trading is not None:
+        if not (0.001 <= request.risk_day_trading <= 0.10):
+            raise HTTPException(400, "risk_day_trading debe estar entre 0.1% y 10%")
+        settings.risk_day_trading = request.risk_day_trading
+        updates["risk_day_trading"] = request.risk_day_trading
+
+    if request.risk_scalping is not None:
+        if not (0.001 <= request.risk_scalping <= 0.05):
+            raise HTTPException(400, "risk_scalping debe estar entre 0.1% y 5%")
+        settings.risk_scalping = request.risk_scalping
+        updates["risk_scalping"] = request.risk_scalping
+
+    if request.risk_swing is not None:
+        if not (0.005 <= request.risk_swing <= 0.10):
+            raise HTTPException(400, "risk_swing debe estar entre 0.5% y 10%")
+        settings.risk_swing = request.risk_swing
+        updates["risk_swing"] = request.risk_swing
+
+    if request.max_total_risk is not None:
+        if not (0.01 <= request.max_total_risk <= 0.25):
+            raise HTTPException(400, "max_total_risk debe estar entre 1% y 25%")
+        settings.max_total_risk = request.max_total_risk
+        updates["max_total_risk"] = request.max_total_risk
+
+    if request.correlated_risk_factor is not None:
+        if not (0.1 <= request.correlated_risk_factor <= 1.0):
+            raise HTTPException(400, "correlated_risk_factor debe estar entre 0.1 y 1.0")
+        settings.correlated_risk_factor = request.correlated_risk_factor
+        updates["correlated_risk_factor"] = request.correlated_risk_factor
+
+    if request.min_rr_ratio is not None:
+        if not (0.5 <= request.min_rr_ratio <= 5.0):
+            raise HTTPException(400, "min_rr_ratio debe estar entre 0.5 y 5.0")
+        settings.min_rr_ratio = request.min_rr_ratio
+        updates["min_rr_ratio"] = request.min_rr_ratio
+
+    if request.move_sl_to_be_at is not None:
+        if not (0.1 <= request.move_sl_to_be_at <= 0.9):
+            raise HTTPException(400, "move_sl_to_be_at debe estar entre 10% y 90%")
+        settings.move_sl_to_be_at = request.move_sl_to_be_at
+        updates["move_sl_to_be_at"] = request.move_sl_to_be_at
+
+    # Drawdown management (ch18.7)
+    if request.drawdown_method is not None:
+        valid_methods = ("fixed_1pct", "variable", "fixed_levels")
+        if request.drawdown_method not in valid_methods:
+            raise HTTPException(400, f"drawdown_method debe ser uno de: {valid_methods}")
+        settings.drawdown_method = request.drawdown_method
+        updates["drawdown_method"] = request.drawdown_method
+
+    # Delta algorithm (ch18.8)
+    if request.delta_enabled is not None:
+        settings.delta_enabled = request.delta_enabled
+        updates["delta_enabled"] = request.delta_enabled
+
+    if request.delta_parameter is not None:
+        if not (0.1 <= request.delta_parameter <= 0.95):
+            raise HTTPException(400, "delta_parameter debe estar entre 0.10 y 0.95")
+        settings.delta_parameter = request.delta_parameter
+        updates["delta_parameter"] = request.delta_parameter
+
+    # Scale-in
+    if request.scale_in_require_be is not None:
+        settings.scale_in_require_be = request.scale_in_require_be
+        updates["scale_in_require_be"] = request.scale_in_require_be
+
+    if not updates:
+        raise HTTPException(400, "No se especificaron cambios")
+
+    # Persist to data/risk_config.json
+    config_path = os.path.join("data", "risk_config.json")
+    existing = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path) as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    existing.update(updates)
+    os.makedirs("data", exist_ok=True)
+    with open(config_path, "w") as f:
+        json.dump(existing, f, indent=2)
+
+    return {
+        "updated": updates,
+        "message": f"Configuración de riesgo actualizada: {', '.join(updates.keys())}",
+    }
+
+
+# ── Alert Configuration ────────────────────────────────────────
+
+class AlertConfigRequest(BaseModel):
+    telegram_enabled: Optional[bool] = None
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    discord_enabled: Optional[bool] = None
+    discord_webhook_url: Optional[str] = None
+    email_enabled: Optional[bool] = None
+    email_smtp_server: Optional[str] = None
+    email_smtp_port: Optional[int] = None
+    email_username: Optional[str] = None
+    email_password: Optional[str] = None
+    email_recipient: Optional[str] = None
+    gmail_enabled: Optional[bool] = None
+    gmail_sender: Optional[str] = None
+    gmail_recipient: Optional[str] = None
+    gmail_client_id: Optional[str] = None
+    gmail_client_secret: Optional[str] = None
+    gmail_refresh_token: Optional[str] = None
+    notify_trade_executed: Optional[bool] = None
+    notify_setup_pending: Optional[bool] = None
+    notify_trade_closed: Optional[bool] = None
+    notify_daily_summary: Optional[bool] = None
+
+
+@router.get("/alerts/config")
+async def get_alert_config():
+    """Get current alert/notification channel configuration."""
+    from main import engine
+    if hasattr(engine, 'alert_manager'):
+        return engine.alert_manager.get_config()
+    return {"telegram_enabled": False, "discord_enabled": False, "email_enabled": False, "gmail_enabled": False}
+
+
+@router.put("/alerts/config")
+async def set_alert_config(request: AlertConfigRequest):
+    """Update alert channel configuration."""
+    from main import engine
+    if not hasattr(engine, 'alert_manager'):
+        raise HTTPException(501, "Alert manager not available")
+
+    from core.alerts import AlertConfig
+    current = engine.alert_manager._config
+
+    updates = {k: v for k, v in request.model_dump().items() if v is not None}
+    for key, value in updates.items():
+        if hasattr(current, key):
+            setattr(current, key, value)
+
+    engine.alert_manager.update_config(current)
+    return {
+        "config": engine.alert_manager.get_config(),
+        "message": f"Configuración de alertas actualizada",
+    }
+
+
+@router.post("/alerts/test/{channel}")
+async def test_alert_channel(channel: str):
+    """Send a test notification to verify channel configuration."""
+    from main import engine
+    if not hasattr(engine, 'alert_manager'):
+        raise HTTPException(501, "Alert manager not available")
+
+    from core.alerts import AlertChannel
+    try:
+        ch = AlertChannel(channel.lower())
+    except ValueError:
+        raise HTTPException(400, f"Canal no válido: {channel}. Usa: telegram, discord, email, gmail")
+
+    success = await engine.alert_manager.test_channel(ch)
+    if success:
+        return {"status": "ok", "message": f"Mensaje de prueba enviado a {channel}"}
+    raise HTTPException(500, f"Error al enviar mensaje de prueba a {channel}")
+
+
+# ── Backtesting ────────────────────────────────────────────────
+
+class BacktestRequest(BaseModel):
+    instrument: str
+    start_date: str  # ISO format YYYY-MM-DD
+    end_date: str    # ISO format YYYY-MM-DD
+    initial_balance: float = 10000.0
+    risk_per_trade: float = 0.01
+    slippage_pips: float = 0.5
+    spread_pips: float = 1.0
+    enabled_strategies: Optional[Dict[str, bool]] = None
+
+
+@router.post("/backtest")
+async def run_backtest(request: BacktestRequest):
+    """Run a backtest on historical data for a specific instrument."""
+    from main import engine
+    try:
+        from core.backtester import Backtester, BacktestConfig
+    except ImportError as e:
+        raise HTTPException(501, f"Backtester not available: {e}")
+
+    try:
+        config = BacktestConfig(
+            instrument=request.instrument,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            initial_balance=request.initial_balance,
+            risk_per_trade=request.risk_per_trade,
+            slippage_pips=request.slippage_pips,
+            spread_pips=request.spread_pips,
+            enabled_strategies=request.enabled_strategies or engine.get_enabled_strategies(),
+        )
+
+        backtester = Backtester(engine.broker)
+        result = await backtester.run(config)
+        import math
+        _safe = lambda v: 0.0 if (isinstance(v, float) and (math.isinf(v) or math.isnan(v))) else v
+        return {
+            "total_trades": result.total_trades,
+            "winning_trades": result.winning_trades,
+            "losing_trades": result.losing_trades,
+            "win_rate": _safe(result.win_rate),
+            "total_pnl": _safe(result.total_pnl),
+            "max_drawdown": _safe(result.max_drawdown),
+            "max_drawdown_pct": _safe(result.max_drawdown_pct),
+            "sharpe_ratio": _safe(result.sharpe_ratio),
+            "profit_factor": _safe(result.profit_factor),
+            "avg_rr_achieved": _safe(result.avg_rr_achieved),
+            "final_balance": _safe(result.final_balance),
+            "equity_curve": result.equity_curve,
+            "by_strategy": result.by_strategy,
+            "trades": [
+                {
+                    "instrument": t.instrument,
+                    "strategy": t.strategy,
+                    "direction": t.direction,
+                    "entry_price": t.entry_price,
+                    "exit_price": t.exit_price,
+                    "pnl": t.pnl,
+                    "pnl_pips": t.pnl_pips,
+                    "rr_achieved": t.risk_reward_achieved,
+                    "exit_reason": t.exit_reason,
+                    "entry_time": t.entry_time,
+                    "exit_time": t.exit_time,
+                }
+                for t in result.trades
+            ],
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"Error en backtest: {str(e)}")

@@ -1,0 +1,454 @@
+"""
+NeonTrade AI - Economic Calendar / News Filter
+Checks for upcoming high-impact economic events to avoid trading during news.
+
+Data sources (in priority order):
+  1. FinnHub   - Free economic calendar API (primary)
+  2. Trading Economics - Free calendar scraping (secondary fallback)
+  3. Known recurring events - Hard-coded NFP/CPI schedule (final fallback)
+
+Supplementary:
+  - NewsAPI.org - Forex news headlines for the UI (does NOT block trades)
+
+Rules from Trading Plan:
+- Don't trade 30 min before major news
+- Don't trade 15 min after major news
+"""
+
+import httpx
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from loguru import logger
+
+
+@dataclass
+class NewsEvent:
+    """An economic news event."""
+    time: datetime
+    currency: str
+    impact: str  # "high", "medium", "low"
+    title: str
+
+
+# Known recurring high-impact events and their typical UTC hours.
+# These happen on roughly predictable schedules.
+RECURRING_HIGH_IMPACT = [
+    # US events (usually 13:30 or 15:00 UTC)
+    {"currency": "USD", "title": "Non-Farm Payrolls", "day": "first_friday", "hour": 13, "minute": 30},
+    {"currency": "USD", "title": "CPI", "day": "mid_month", "hour": 13, "minute": 30},
+    {"currency": "USD", "title": "FOMC Rate Decision", "day": "fomc", "hour": 19, "minute": 0},
+    {"currency": "USD", "title": "Fed Chair Press Conference", "day": "fomc", "hour": 19, "minute": 30},
+    # EUR events
+    {"currency": "EUR", "title": "ECB Rate Decision", "day": "ecb", "hour": 13, "minute": 15},
+    # GBP events
+    {"currency": "GBP", "title": "BOE Rate Decision", "day": "boe", "hour": 12, "minute": 0},
+]
+
+# Currencies in our watchlist
+WATCHED_CURRENCIES = {"USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"}
+
+# FinnHub impact values that map to our impact levels
+_FINNHUB_HIGH_IMPACT = {"high", "3"}
+_FINNHUB_MEDIUM_IMPACT = {"medium", "2"}
+
+
+class NewsFilter:
+    """Checks for upcoming high-impact news events."""
+
+    def __init__(
+        self,
+        minutes_before: int = 30,
+        minutes_after: int = 15,
+        finnhub_key: str = "",
+        newsapi_key: str = "",
+    ):
+        self.minutes_before = minutes_before
+        self.minutes_after = minutes_after
+        self.finnhub_key = finnhub_key
+        self.newsapi_key = newsapi_key
+        self._cached_events: List[NewsEvent] = []
+        self._cache_date: Optional[str] = None
+        self._http = httpx.AsyncClient(timeout=10.0)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def has_upcoming_news(self, instrument: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        """
+        Check if there's a high-impact news event near the current time.
+        Returns (has_news, event_description).
+        """
+        now = datetime.now(timezone.utc)
+
+        # Refresh calendar cache once per day
+        today = now.strftime("%Y-%m-%d")
+        if self._cache_date != today:
+            await self._refresh_calendar(now)
+            self._cache_date = today
+
+        # Filter by instrument currencies if provided
+        currencies = WATCHED_CURRENCIES
+        if instrument:
+            parts = instrument.replace("/", "_").split("_")
+            currencies = set(p.upper() for p in parts if len(p) == 3)
+
+        # Check if any high-impact event is within our window
+        for event in self._cached_events:
+            if event.impact != "high":
+                continue
+
+            if currencies and event.currency not in currencies:
+                continue
+
+            time_until = (event.time - now).total_seconds() / 60  # minutes
+            time_since = (now - event.time).total_seconds() / 60
+
+            # Within the danger zone?
+            if -self.minutes_after <= time_until <= self.minutes_before:
+                desc = f"{event.currency} {event.title} @ {event.time.strftime('%H:%M')} UTC"
+                return True, desc
+
+            if 0 <= time_since <= self.minutes_after:
+                desc = f"{event.currency} {event.title} (just happened @ {event.time.strftime('%H:%M')} UTC)"
+                return True, desc
+
+        return False, None
+
+    async def get_todays_events(self) -> List[dict]:
+        """Get all events for today (for the frontend calendar view)."""
+        now = datetime.now(timezone.utc)
+        today = now.strftime("%Y-%m-%d")
+        if self._cache_date != today:
+            await self._refresh_calendar(now)
+            self._cache_date = today
+
+        return [
+            {
+                "time": e.time.isoformat(),
+                "currency": e.currency,
+                "impact": e.impact,
+                "title": e.title,
+            }
+            for e in self._cached_events
+        ]
+
+    async def get_news_headlines(self, limit: int = 10) -> List[dict]:
+        """
+        Get recent forex news headlines from NewsAPI.org.
+
+        This is supplementary information for the UI -- it does NOT affect
+        trade blocking decisions.
+
+        Returns a list of dicts:
+            [{"title": ..., "source": ..., "url": ..., "published": ..., "summary": ...}, ...]
+        """
+        if not self.newsapi_key:
+            logger.debug("NewsAPI key not configured -- skipping headlines fetch")
+            return []
+
+        try:
+            return await self._fetch_headlines_from_newsapi(limit)
+        except Exception as e:
+            logger.warning(f"Failed to fetch news headlines: {e}")
+            return []
+
+    async def close(self):
+        """Close HTTP client."""
+        await self._http.aclose()
+
+    # ------------------------------------------------------------------
+    # Calendar refresh (tries sources in priority order)
+    # ------------------------------------------------------------------
+
+    async def _refresh_calendar(self, now: datetime):
+        """Fetch today's economic calendar. Tries sources in priority order."""
+        self._cached_events = []
+
+        # 1) PRIMARY: FinnHub
+        if self.finnhub_key:
+            try:
+                events = await self._fetch_from_finnhub(now)
+                if events:
+                    self._cached_events = events
+                    logger.info(f"Loaded {len(events)} news events from FinnHub for today")
+                    return
+            except Exception as e:
+                logger.debug(f"FinnHub calendar fetch failed: {e}")
+
+        # 2) SECONDARY: Trading Economics
+        try:
+            events = await self._fetch_from_trading_economics(now)
+            if events:
+                self._cached_events = events
+                logger.info(f"Loaded {len(events)} news events from Trading Economics for today")
+                return
+        except Exception as e:
+            logger.debug(f"Trading Economics calendar fetch failed: {e}")
+
+        # 3) FINAL FALLBACK: known recurring high-impact schedule
+        self._cached_events = self._generate_known_events(now)
+        logger.info(f"Using {len(self._cached_events)} known recurring events as fallback")
+
+    # ------------------------------------------------------------------
+    # Source 1: FinnHub (primary)
+    # ------------------------------------------------------------------
+
+    async def _fetch_from_finnhub(self, now: datetime) -> List[NewsEvent]:
+        """
+        Fetch today's economic calendar from FinnHub.
+
+        Endpoint: GET https://finnhub.io/api/v1/calendar/economic
+        Requires a free API key from finnhub.io.
+        """
+        events: List[NewsEvent] = []
+        today = now.strftime("%Y-%m-%d")
+
+        resp = await self._http.get(
+            "https://finnhub.io/api/v1/calendar/economic",
+            params={
+                "from": today,
+                "to": today,
+                "token": self.finnhub_key,
+            },
+        )
+
+        if resp.status_code != 200:
+            logger.debug(f"FinnHub returned status {resp.status_code}")
+            return []
+
+        data = resp.json()
+        calendar_items = data.get("economicCalendar", [])
+
+        for item in calendar_items:
+            # FinnHub impact field: 1 = low, 2 = medium, 3 = high
+            raw_impact = str(item.get("impact", "")).lower().strip()
+
+            if raw_impact in _FINNHUB_HIGH_IMPACT:
+                impact = "high"
+            elif raw_impact in _FINNHUB_MEDIUM_IMPACT:
+                impact = "medium"
+            else:
+                continue  # skip low-impact events
+
+            country = item.get("country", "").upper()
+            # Map common FinnHub country codes to currency codes
+            currency = _country_to_currency(country)
+            if currency not in WATCHED_CURRENCIES:
+                continue
+
+            # Parse event time -- FinnHub typically returns "YYYY-MM-DD HH:MM:SS" in UTC
+            event_time_str = item.get("time", "")
+            event_time = _parse_event_time(event_time_str, today)
+            if event_time is None:
+                continue
+
+            events.append(NewsEvent(
+                time=event_time,
+                currency=currency,
+                impact=impact,
+                title=item.get("event", "Unknown"),
+            ))
+
+        return events
+
+    # ------------------------------------------------------------------
+    # Source 2: Trading Economics (secondary fallback)
+    # ------------------------------------------------------------------
+
+    async def _fetch_from_trading_economics(self, now: datetime) -> List[NewsEvent]:
+        """Fetch from Trading Economics free calendar API."""
+        events: List[NewsEvent] = []
+        today = now.strftime("%Y-%m-%d")
+
+        try:
+            resp = await self._http.get(
+                "https://economic-calendar.tradingeconomics.com/api/calendar",
+                params={"day": today},
+                headers={"User-Agent": "NeonTradeAI/1.0"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                for item in data:
+                    importance = item.get("importance", 0)
+                    if importance < 2:  # Only medium and high
+                        continue
+
+                    currency = item.get("currency", "").upper()
+                    if currency not in WATCHED_CURRENCIES:
+                        continue
+
+                    event_time_str = item.get("date", "")
+                    try:
+                        event_time = datetime.fromisoformat(event_time_str.replace("Z", "+00:00"))
+                    except (ValueError, AttributeError):
+                        continue
+
+                    events.append(NewsEvent(
+                        time=event_time,
+                        currency=currency,
+                        impact="high" if importance >= 3 else "medium",
+                        title=item.get("event", "Unknown"),
+                    ))
+        except Exception:
+            pass
+
+        return events
+
+    # ------------------------------------------------------------------
+    # Source 3: Known recurring events (final fallback)
+    # ------------------------------------------------------------------
+
+    def _generate_known_events(self, now: datetime) -> List[NewsEvent]:
+        """Generate events from known recurring schedule as fallback."""
+        events = []
+        today = now.date()
+        weekday = now.weekday()  # 0=Monday
+
+        # NFP: First Friday of the month
+        if weekday == 4 and today.day <= 7:
+            events.append(NewsEvent(
+                time=datetime(today.year, today.month, today.day, 13, 30, tzinfo=timezone.utc),
+                currency="USD",
+                impact="high",
+                title="Non-Farm Payrolls (estimated)",
+            ))
+
+        # US CPI: Usually around 10th-14th of month
+        if 10 <= today.day <= 14 and weekday < 5:
+            events.append(NewsEvent(
+                time=datetime(today.year, today.month, today.day, 13, 30, tzinfo=timezone.utc),
+                currency="USD",
+                impact="high",
+                title="CPI (estimated window)",
+            ))
+
+        return events
+
+    # ------------------------------------------------------------------
+    # NewsAPI.org headlines (supplementary)
+    # ------------------------------------------------------------------
+
+    async def _fetch_headlines_from_newsapi(self, limit: int) -> List[dict]:
+        """
+        Fetch recent forex news headlines from NewsAPI.org.
+
+        Endpoint: GET https://newsapi.org/v2/everything
+        Requires a free API key from newsapi.org.
+        """
+        resp = await self._http.get(
+            "https://newsapi.org/v2/everything",
+            params={
+                "q": "forex trading",
+                "language": "en",
+                "sortBy": "publishedAt",
+                "pageSize": limit,
+                "apiKey": self.newsapi_key,
+            },
+        )
+
+        if resp.status_code != 200:
+            logger.debug(f"NewsAPI returned status {resp.status_code}")
+            return []
+
+        data = resp.json()
+        articles = data.get("articles", [])
+
+        headlines: List[dict] = []
+        for article in articles[:limit]:
+            headlines.append({
+                "title": article.get("title", ""),
+                "source": article.get("source", {}).get("name", "Unknown"),
+                "url": article.get("url", ""),
+                "published": article.get("publishedAt", ""),
+                "summary": article.get("description", "") or "",
+            })
+
+        return headlines
+
+
+# ======================================================================
+# Module-level helpers
+# ======================================================================
+
+# Common country-code -> currency mappings used by FinnHub
+_COUNTRY_CURRENCY_MAP = {
+    "US": "USD",
+    "USA": "USD",
+    "EU": "EUR",
+    "EMU": "EUR",
+    "EUROZONE": "EUR",
+    "GB": "GBP",
+    "UK": "GBP",
+    "JP": "JPY",
+    "AU": "AUD",
+    "NZ": "NZD",
+    "CA": "CAD",
+    "CH": "CHF",
+    # Extended -- FinnHub sometimes uses full names or ISO-2 codes
+    "UNITED STATES": "USD",
+    "UNITED KINGDOM": "GBP",
+    "JAPAN": "JPY",
+    "AUSTRALIA": "AUD",
+    "NEW ZEALAND": "NZD",
+    "CANADA": "CAD",
+    "SWITZERLAND": "CHF",
+}
+
+
+def _country_to_currency(country: str) -> str:
+    """Convert a FinnHub country field to a 3-letter currency code."""
+    return _COUNTRY_CURRENCY_MAP.get(country.upper().strip(), country.upper().strip())
+
+
+def _parse_event_time(time_str: str, date_fallback: str) -> Optional[datetime]:
+    """
+    Parse an event time string from FinnHub into a timezone-aware datetime.
+
+    FinnHub may return:
+      - "HH:MM:SS"         (time only, assume today's date)
+      - "YYYY-MM-DD HH:MM:SS"
+      - ISO-8601 variants
+
+    Returns None if parsing fails.
+    """
+    if not time_str:
+        return None
+
+    time_str = time_str.strip()
+
+    # Try full ISO-8601 / datetime first
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%dT%H:%M:%S%z",
+    ):
+        try:
+            dt = datetime.strptime(time_str, fmt)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except ValueError:
+            continue
+
+    # Try time-only formats (prepend today's date)
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            t = datetime.strptime(time_str, fmt).time()
+            d = datetime.strptime(date_fallback, "%Y-%m-%d").date()
+            return datetime.combine(d, t, tzinfo=timezone.utc)
+        except ValueError:
+            continue
+
+    # Try fromisoformat as a last resort
+    try:
+        dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, AttributeError):
+        pass
+
+    return None

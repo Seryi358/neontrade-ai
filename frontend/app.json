@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "NeonTrade AI",
+    "slug": "neontrade-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "neontrade",
+    "platforms": ["web", "ios", "android"],
+    "icon": "./src/assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.phinodia.neontrade",
+      "supportsTablet": true,
+      "backgroundColor": "#0a0a1a",
+      "icon": "./src/assets/icon.png",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.phinodia.neontrade",
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/icon.png",
+        "backgroundColor": "#0a0a1a"
+      },
+      "permissions": ["INTERNET"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": ""
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    },
+    "entryPoint": "./index.js",
+    "plugins": [],
+    "experiments": {
+      "baseUrl": "."
+    }
+  }
+}

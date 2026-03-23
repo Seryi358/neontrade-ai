@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Main gradient: cyan -> violet -> pink (135deg) -->
+    <linearGradient id="neonGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f0ff"/>
+      <stop offset="50%" stop-color="#7b6ff0"/>
+      <stop offset="100%" stop-color="#eb4eca"/>
+    </linearGradient>
+    <!-- Glow filters -->
+    <filter id="glowCyan" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="25" result="blur"/>
+      <feFlood flood-color="#00f0ff" flood-opacity="0.4"/>
+      <feComposite in2="blur" operator="in"/>
+    </filter>
+    <filter id="glowPink" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="25" result="blur"/>
+      <feFlood flood-color="#eb4eca" flood-opacity="0.35"/>
+      <feComposite in2="blur" operator="in"/>
+    </filter>
+    <filter id="glowN" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feFlood flood-color="#7b6ff0" flood-opacity="0.25"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#0a0a1a"/>
+
+  <!-- Subtle grid texture (3% opacity) -->
+  <g opacity="0.03">
+    <line x1="0" y1="256" x2="1024" y2="256" stroke="#00f0ff" stroke-width="1"/>
+    <line x1="0" y1="512" x2="1024" y2="512" stroke="#00f0ff" stroke-width="1"/>
+    <line x1="0" y1="768" x2="1024" y2="768" stroke="#00f0ff" stroke-width="1"/>
+    <line x1="256" y1="0" x2="256" y2="1024" stroke="#00f0ff" stroke-width="1"/>
+    <line x1="512" y1="0" x2="512" y2="1024" stroke="#00f0ff" stroke-width="1"/>
+    <line x1="768" y1="0" x2="768" y2="1024" stroke="#00f0ff" stroke-width="1"/>
+  </g>
+
+  <!-- Ambient glow: cyan (bottom-left) -->
+  <ellipse cx="320" cy="680" rx="200" ry="200" fill="#00f0ff" opacity="0.08" filter="url(#glowCyan)"/>
+
+  <!-- Ambient glow: pink (top-right) -->
+  <ellipse cx="704" cy="344" rx="200" ry="200" fill="#eb4eca" opacity="0.07" filter="url(#glowPink)"/>
+
+  <!-- The "N" letterform with gradient -->
+  <g filter="url(#glowN)">
+    <!--
+      Geometric bold "N" constructed from 3 strokes:
+      - Left vertical bar
+      - Diagonal connecting bar (ascending = trend line)
+      - Right vertical bar
+      Centered in canvas with ~10% padding each side
+    -->
+    <path
+      d="M 275,740 L 275,284
+         L 370,284 L 654,572
+         L 654,284 L 749,284
+         L 749,740 L 654,740
+         L 370,452 L 370,740 Z"
+      fill="url(#neonGrad)"
+    />
+  </g>
+
+  <!-- Signal dot at top-right of diagonal (AI/data node) -->
+  <circle cx="700" cy="290" r="28" fill="#e0ffff" opacity="0.95"/>
+  <circle cx="700" cy="290" r="18" fill="#ffffff"/>
+
+  <!-- Specular edge highlights on the N strokes -->
+  <line x1="275" y1="284" x2="275" y2="740" stroke="rgba(255,255,255,0.15)" stroke-width="3"/>
+  <line x1="749" y1="284" x2="749" y2="740" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
+</svg>

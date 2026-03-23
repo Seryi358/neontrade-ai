@@ -53,8 +53,36 @@ export function resetBackendUrl(): void {
   WS_URL = DEFAULT_URL.replace('http', 'ws') + '/ws';
 }
 
+// ── API Key for authenticated requests ──────────────────────────
+// Stored in localStorage so the Electron app remembers it across sessions.
+function getApiKey(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      return window.localStorage.getItem('neontrade_api_key') || '';
+    } catch { return ''; }
+  }
+  return '';
+}
+
+export function setApiKey(key: string): void {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('neontrade_api_key', key);
+  }
+}
+
+export function clearApiKey(): void {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem('neontrade_api_key');
+  }
+}
+
 // ── Request timeout ──────────────────────────────────────────────
 const REQUEST_TIMEOUT_MS = 15_000;
+
+function authHeaders(): Record<string, string> {
+  const key = getApiKey();
+  return key ? { 'X-API-Key': key } : {};
+}
 
 async function fetchWithTimeout(
   input: RequestInfo,
@@ -74,7 +102,9 @@ async function fetchWithTimeout(
 // ── REST API Helpers ──────────────────────────────────────────────
 
 async function apiGet<T>(path: string): Promise<T> {
-  const resp = await fetchWithTimeout(`${API_URL}${path}`);
+  const resp = await fetchWithTimeout(`${API_URL}${path}`, {
+    headers: { ...authHeaders() },
+  });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: resp.statusText }));
     throw new Error(err.detail || `API error: ${resp.status}`);
@@ -85,8 +115,33 @@ async function apiGet<T>(path: string): Promise<T> {
 async function apiPost<T>(path: string, body?: any): Promise<T> {
   const resp = await fetchWithTimeout(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+    throw new Error(err.detail || `API error: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+async function apiPut<T>(path: string, body?: any): Promise<T> {
+  const resp = await fetchWithTimeout(`${API_URL}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+    throw new Error(err.detail || `API error: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+async function apiDelete<T>(path: string): Promise<T> {
+  const resp = await fetchWithTimeout(`${API_URL}${path}`, {
+    method: 'DELETE',
+    headers: { ...authHeaders() },
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: resp.statusText }));
@@ -151,6 +206,12 @@ export const api = {
 
   // Strategies Info
   getStrategies: () => apiGet<any[]>('/api/v1/strategies'),
+
+  // Security
+  getSecurityStatus: () => apiGet<any>('/api/v1/security/status'),
+  generateApiKey: (label = 'electron') => apiPost<any>(`/api/v1/security/generate-key?label=${label}`),
+  updateSecurity: (config: any) => apiPut<any>('/api/v1/security/config', config),
+  revokeApiKey: (hashPrefix: string) => apiDelete<any>(`/api/v1/security/revoke-key/${hashPrefix}`),
 };
 
 // ── Shared Constants ─────────────────────────────────────────────

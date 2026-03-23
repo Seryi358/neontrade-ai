@@ -16,6 +16,7 @@ import os
 
 from config import settings
 from core.trading_engine import TradingEngine
+from core.security import SecurityMiddleware, security_config
 from api.routes import router as api_router
 
 
@@ -153,14 +154,16 @@ app = FastAPI(
 )
 
 # CORS for frontend (React Native / Expo Web / Electron / Remote)
-# Allow all origins since this is a private trading bot accessed via Electron
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
+
+# Security middleware: API key auth, rate limiting, IP whitelist, headers
+app.add_middleware(SecurityMiddleware, security_config=security_config)
 
 # API routes
 app.include_router(api_router, prefix="/api/v1")

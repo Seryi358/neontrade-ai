@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     gmail_client_secret: str = ""
     gmail_refresh_token: str = ""
 
+    # Security
+    api_secret_key: str = ""  # Pre-shared API key (set in env to skip key generation)
+
     # Database
     database_url: str = "sqlite:///./data/trading.db"
 

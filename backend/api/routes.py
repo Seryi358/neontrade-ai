@@ -1024,3 +1024,72 @@ async def run_backtest(request: BacktestRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(500, f"Error en backtest: {str(e)}")
+
+
+# ── Security Management ──────────────────────────────────────────
+
+@router.post("/security/generate-key")
+async def generate_api_key(label: str = "default"):
+    """Generate a new API key. Returns the raw key ONCE - save it immediately."""
+    from core.security import security_config
+    raw_key = security_config.generate_api_key(label)
+    return {
+        "api_key": raw_key,
+        "label": label,
+        "message": "Guarda esta API key - no se mostrara de nuevo. "
+                   "Usala en el header X-API-Key para autenticarte.",
+    }
+
+
+@router.get("/security/status")
+async def get_security_status():
+    """Get current security configuration (no secrets exposed)."""
+    from core.security import security_config
+    return {
+        "auth_enabled": security_config.auth_enabled,
+        "rate_limit_enabled": security_config.rate_limit_enabled,
+        "rate_limit_rpm": security_config.rate_limit_rpm,
+        "api_keys_count": len(security_config.api_keys),
+        "api_keys": [
+            {"hash_prefix": h[:12] + "...", "label": label}
+            for h, label in security_config.api_keys.items()
+        ],
+        "ip_whitelist": security_config.ip_whitelist,
+    }
+
+
+class SecurityUpdateRequest(BaseModel):
+    auth_enabled: Optional[bool] = None
+    rate_limit_enabled: Optional[bool] = None
+    rate_limit_rpm: Optional[int] = None
+    ip_whitelist: Optional[List[str]] = None
+
+
+@router.put("/security/config")
+async def update_security_config(request: SecurityUpdateRequest):
+    """Update security settings."""
+    from core.security import security_config
+    if request.auth_enabled is not None:
+        security_config.auth_enabled = request.auth_enabled
+    if request.rate_limit_enabled is not None:
+        security_config.rate_limit_enabled = request.rate_limit_enabled
+    if request.rate_limit_rpm is not None:
+        if request.rate_limit_rpm < 10:
+            raise HTTPException(400, "rate_limit_rpm must be >= 10")
+        security_config.rate_limit_rpm = request.rate_limit_rpm
+    if request.ip_whitelist is not None:
+        security_config.ip_whitelist = request.ip_whitelist
+    security_config.save()
+    return {"message": "Configuracion de seguridad actualizada"}
+
+
+@router.delete("/security/revoke-key/{key_hash_prefix}")
+async def revoke_api_key(key_hash_prefix: str):
+    """Revoke an API key by its hash prefix (first 12 chars)."""
+    from core.security import security_config
+    for full_hash in list(security_config.api_keys.keys()):
+        if full_hash.startswith(key_hash_prefix):
+            label = security_config.api_keys[full_hash]
+            security_config.revoke_key(full_hash)
+            return {"message": f"API key '{label}' revocada", "revoked": True}
+    raise HTTPException(404, "API key no encontrada")

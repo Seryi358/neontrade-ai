@@ -37,8 +37,23 @@ def retry_async(
                     return await func(*args, **kwargs)
                 except exceptions as e:
                     last_exc = e
+                    # Check for 429 Rate Limit — respect Retry-After header
+                    retry_after = None
+                    if hasattr(e, 'response') and e.response is not None:
+                        status = getattr(e.response, 'status_code', 0)
+                        if status == 429:
+                            retry_after_hdr = e.response.headers.get('Retry-After')
+                            if retry_after_hdr:
+                                try:
+                                    retry_after = float(retry_after_hdr)
+                                except (ValueError, TypeError):
+                                    retry_after = None
+
                     if attempt < max_retries:
-                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        if retry_after is not None:
+                            delay = min(retry_after + 0.5, 30.0)
+                        else:
+                            delay = min(base_delay * (2 ** attempt), max_delay)
                         logger.warning(
                             f"[Retry] {func.__name__} attempt {attempt + 1}/{max_retries} "
                             f"failed: {e}. Retrying in {delay:.1f}s..."

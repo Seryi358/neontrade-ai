@@ -57,7 +57,9 @@ class TradeDatabase:
                 risk_reward_ratio REAL,
                 reasoning TEXT,
                 opened_at TEXT NOT NULL,
-                closed_at TEXT
+                closed_at TEXT,
+                notes TEXT,
+                ai_analysis TEXT
             );
 
             CREATE TABLE IF NOT EXISTS analysis_log (
@@ -99,6 +101,18 @@ class TradeDatabase:
                 best_trade_pnl REAL DEFAULT 0.0,
                 worst_trade_pnl REAL DEFAULT 0.0
             );
+
+            CREATE TABLE IF NOT EXISTS equity_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                balance REAL NOT NULL,
+                equity REAL NOT NULL,
+                unrealized_pnl REAL DEFAULT 0.0,
+                open_positions INTEGER DEFAULT 0,
+                total_risk REAL DEFAULT 0.0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_equity_snapshots_timestamp ON equity_snapshots(timestamp);
 
             CREATE INDEX IF NOT EXISTS idx_trades_instrument ON trades(instrument);
             CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
@@ -173,7 +187,7 @@ class TradeDatabase:
 
         allowed_columns = {
             "exit_price", "pnl", "pnl_pips", "status", "closed_at",
-            "stop_loss", "take_profit",
+            "stop_loss", "take_profit", "notes", "ai_analysis",
         }
         filtered = {k: v for k, v in updates.items() if k in allowed_columns}
         if not filtered:
@@ -509,3 +523,56 @@ class TradeDatabase:
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+    # ── Equity Snapshots ─────────────────────────────────────────
+
+    async def record_equity_snapshot(
+        self,
+        balance: float,
+        equity: float,
+        unrealized_pnl: float = 0.0,
+        open_positions: int = 0,
+        total_risk: float = 0.0,
+    ) -> None:
+        """Insert an equity snapshot for tracking the equity curve."""
+        now = datetime.now(timezone.utc).isoformat()
+        await self._db.execute(
+            """
+            INSERT INTO equity_snapshots
+                (timestamp, balance, equity, unrealized_pnl, open_positions, total_risk)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (now, balance, equity, unrealized_pnl, open_positions, total_risk),
+        )
+        await self._db.commit()
+        logger.debug(f"Equity snapshot recorded: balance={balance}, equity={equity}")
+
+    async def get_equity_curve(self, days: int = 30) -> List[dict]:
+        """Return equity snapshots for the last N days."""
+        from datetime import timedelta
+
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        cursor = await self._db.execute(
+            """
+            SELECT * FROM equity_snapshots
+            WHERE timestamp >= ?
+            ORDER BY timestamp ASC
+            """,
+            (cutoff,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Trade Notes ──────────────────────────────────────────────
+
+    async def update_trade_notes(self, trade_id: str, notes: str) -> bool:
+        """Update the notes field for a specific trade."""
+        cursor = await self._db.execute(
+            "UPDATE trades SET notes = ? WHERE id = ?",
+            (notes, trade_id),
+        )
+        await self._db.commit()
+        updated = cursor.rowcount > 0
+        if updated:
+            logger.info(f"Trade notes updated: {trade_id}")
+        return updated

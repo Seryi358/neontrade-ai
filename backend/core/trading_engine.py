@@ -174,6 +174,9 @@ class TradingEngine:
         self._notifications: List[Dict] = []
         self._max_notifications = 100
 
+        # Equity snapshot tracking (record every 10 minutes)
+        self._last_equity_snapshot: datetime = datetime.min.replace(tzinfo=timezone.utc)
+
     # ── Notifications ──────────────────────────────────────────────
 
     def _push_notification(self, notif_type: str, title: str, body: str, data: dict = None):
@@ -417,6 +420,9 @@ class TradingEngine:
             # Step 1: Update position management for open trades
             await self._manage_open_positions()
 
+            # Record equity snapshot every 10 minutes
+            await self._maybe_record_equity_snapshot(now)
+
             # Step 2: Scan for new opportunities (with trade execution)
             await self._scan_for_setups()
         else:
@@ -428,6 +434,36 @@ class TradingEngine:
                 logger.debug("Off-hours analysis scan...")
                 await self._scan_analysis_only()
                 self._last_offhours_scan = now
+
+    # ── Equity Snapshot ─────────────────────────────────────────
+
+    async def _maybe_record_equity_snapshot(self, now: datetime):
+        """Record an equity snapshot every 10 minutes if the DB is available."""
+        elapsed = (now - self._last_equity_snapshot).total_seconds()
+        if elapsed < 600:  # 10 minutes
+            return
+
+        if not self._db:
+            return
+
+        try:
+            summary = await self.broker.get_account_summary()
+            balance = summary.balance
+            equity = summary.equity
+            unrealized_pnl = summary.unrealized_pnl
+            open_positions = len(self.position_manager.positions)
+            total_risk = self.risk_manager.get_current_total_risk()
+
+            await self._db.record_equity_snapshot(
+                balance=balance,
+                equity=equity,
+                unrealized_pnl=unrealized_pnl,
+                open_positions=open_positions,
+                total_risk=total_risk,
+            )
+            self._last_equity_snapshot = now
+        except Exception as e:
+            logger.debug(f"Equity snapshot failed (non-critical): {e}")
 
     # ── Market Hours ─────────────────────────────────────────────
 
@@ -547,6 +583,8 @@ class TradingEngine:
                 self._latest_explanations[instrument] = explanation
             except Exception as e:
                 logger.debug(f"Off-hours scan failed for {instrument}: {e}")
+            # Throttle between pairs to avoid 429 rate limits from broker API
+            await asyncio.sleep(1.5)
 
     # ── Initial Scan (startup, ignores market hours) ────────────
 
@@ -577,6 +615,8 @@ class TradingEngine:
 
             except Exception as e:
                 logger.warning(f"Initial scan failed for {instrument}: {e}")
+            # Throttle between pairs to avoid 429 rate limits from broker API
+            await asyncio.sleep(1.5)
 
         logger.info(
             f"Initial scan complete: {len(self._last_scan_results)}/{len(settings.forex_watchlist)} pairs analyzed, "
@@ -623,6 +663,8 @@ class TradingEngine:
 
             except Exception as e:
                 logger.error(f"Error scanning {instrument}: {e}")
+            # Throttle between pairs to avoid 429 rate limits from broker API
+            await asyncio.sleep(1.5)
 
     async def _detect_setup(self, analysis: AnalysisResult) -> Optional[TradeRisk]:
         """

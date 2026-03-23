@@ -443,6 +443,47 @@ async def get_daily_stats(date: Optional[str] = None):
         raise HTTPException(500, f"Error al obtener stats diarios: {str(e)}")
 
 
+# ── Trade Notes ──────────────────────────────────────────────────
+
+class TradeNotesRequest(BaseModel):
+    notes: str
+
+
+@router.put("/history/{trade_id}/notes")
+async def update_trade_notes(trade_id: str, request: TradeNotesRequest):
+    """Update journal notes for a specific trade."""
+    from main import db
+    if db is None:
+        raise HTTPException(503, "Database not available")
+    try:
+        updated = await db.update_trade_notes(trade_id, request.notes)
+        if not updated:
+            raise HTTPException(404, f"Trade {trade_id} not found")
+        return {
+            "trade_id": trade_id,
+            "notes": request.notes,
+            "message": "Notas actualizadas",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Error al actualizar notas: {str(e)}")
+
+
+# ── Equity Curve ─────────────────────────────────────────────────
+
+@router.get("/equity-curve")
+async def get_equity_curve(days: int = Query(30, ge=1, le=365)):
+    """Get equity curve data (snapshots) for the last N days."""
+    from main import db
+    if db is None:
+        return []
+    try:
+        return await db.get_equity_curve(days=days)
+    except Exception as e:
+        raise HTTPException(500, f"Error al obtener curva de equity: {str(e)}")
+
+
 # ── Broker Selection ─────────────────────────────────────────────
 
 @router.get("/broker")

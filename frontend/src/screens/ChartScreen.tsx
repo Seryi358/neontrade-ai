@@ -115,20 +115,31 @@ export default function ChartScreen() {
 
   // ── Data Fetching ───────────────────────────────────────────────────────
 
-  // Load watchlist once
+  // Load watchlist once (with fallback instruments if API fails)
   useEffect(() => {
+    const FALLBACK_PAIRS = [
+      'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD', 'USD_CAD',
+      'EUR_GBP', 'EUR_JPY', 'GBP_JPY',
+    ];
     const loadWatchlist = async () => {
       try {
         const res = await authFetch(`${API_URL}/api/v1/watchlist`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setWatchlist(Array.isArray(data) ? data : []);
-        if (data.length > 0) {
-          setSelectedInstrument((prev) => prev || data[0].instrument);
+        if (res.ok) {
+          const data = await res.json();
+          const items = Array.isArray(data) ? data : [];
+          if (items.length > 0) {
+            setWatchlist(items);
+            setSelectedInstrument((prev) => prev || items[0].instrument);
+            return;
+          }
         }
       } catch (err) {
         console.error('Failed to fetch watchlist:', err);
       }
+      // Fallback: use hardcoded pairs so charts always work
+      const fallback = FALLBACK_PAIRS.map(p => ({ instrument: p, score: 0, trend: 'neutral' }));
+      setWatchlist(fallback);
+      setSelectedInstrument((prev) => prev || fallback[0].instrument);
     };
     loadWatchlist();
   }, []);
@@ -612,12 +623,13 @@ export default function ChartScreen() {
         ) : visibleCandles.length > 0 ? (
           <>
             {/* Chart Container */}
-            <View style={styles.chartContainer}>
+            <View style={[styles.chartContainer, { height: chartHeight + 4 }]}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{
                   width: Math.max(chartWidth, visibleCandles.length * candleWidth + PRICE_LABEL_WIDTH),
+                  height: chartHeight,
                 }}
               >
                 {renderChart()}

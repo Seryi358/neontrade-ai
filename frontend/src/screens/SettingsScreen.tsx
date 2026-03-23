@@ -575,8 +575,14 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>CANALES DE ALERTAS</Text>
         <Text style={styles.strategyHint}>
-          Configura notificaciones externas en Settings del backend (.env)
+          Se activan automaticamente cuando las credenciales estan en las variables de entorno
         </Text>
+        <View style={styles.configRow}>
+          <Text style={styles.configLabel}>Gmail OAuth2</Text>
+          <Text style={[styles.configValue, alertConfig.gmail_enabled ? styles.profit : styles.loss]}>
+            {alertConfig.gmail_enabled ? '● Activo' : '○ Inactivo'}
+          </Text>
+        </View>
         <View style={styles.configRow}>
           <Text style={styles.configLabel}>Telegram</Text>
           <Text style={[styles.configValue, alertConfig.telegram_enabled ? styles.profit : styles.loss]}>
@@ -590,12 +596,12 @@ export default function SettingsScreen() {
           </Text>
         </View>
         <View style={styles.configRow}>
-          <Text style={styles.configLabel}>Email</Text>
+          <Text style={styles.configLabel}>Email SMTP</Text>
           <Text style={[styles.configValue, alertConfig.email_enabled ? styles.profit : styles.loss]}>
             {alertConfig.email_enabled ? '● Activo' : '○ Inactivo'}
           </Text>
         </View>
-        {(alertConfig.telegram_enabled || alertConfig.discord_enabled || alertConfig.email_enabled) && (
+        {(alertConfig.telegram_enabled || alertConfig.discord_enabled || alertConfig.email_enabled || alertConfig.gmail_enabled) && (
           <>
             <View style={styles.configRow}>
               <Text style={styles.configLabel}>Trades ejecutados</Text>

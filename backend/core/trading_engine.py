@@ -123,29 +123,49 @@ class TradingEngine:
 
         # Alert manager (Telegram, Discord, Email, Gmail OAuth2)
         if _ALERTS_AVAILABLE:
-            # Auto-enable Gmail if OAuth2 credentials are configured
+            # Auto-enable each channel if credentials are configured
+            tg_token = getattr(settings, 'telegram_bot_token', '')
+            tg_chat = getattr(settings, 'telegram_chat_id', '')
+            discord_url = getattr(settings, 'discord_webhook_url', '')
+            email_user = getattr(settings, 'alert_email_username', '')
+            email_pass = getattr(settings, 'alert_email_password', '')
+            email_recip = getattr(settings, 'alert_email_recipient', '')
             gmail_refresh = getattr(settings, 'gmail_refresh_token', '')
-            gmail_enabled = bool(gmail_refresh and getattr(settings, 'gmail_client_id', ''))
+            gmail_cid = getattr(settings, 'gmail_client_id', '')
 
             alert_cfg = AlertConfig(
-                telegram_bot_token=getattr(settings, 'telegram_bot_token', ''),
-                telegram_chat_id=getattr(settings, 'telegram_chat_id', ''),
-                discord_webhook_url=getattr(settings, 'discord_webhook_url', ''),
+                telegram_enabled=bool(tg_token and tg_chat),
+                telegram_bot_token=tg_token,
+                telegram_chat_id=tg_chat,
+                discord_enabled=bool(discord_url),
+                discord_webhook_url=discord_url,
+                email_enabled=bool(email_user and email_pass and email_recip),
                 email_smtp_server=getattr(settings, 'alert_email_smtp_server', 'smtp.gmail.com'),
                 email_smtp_port=getattr(settings, 'alert_email_smtp_port', 587),
-                email_username=getattr(settings, 'alert_email_username', ''),
-                email_password=getattr(settings, 'alert_email_password', ''),
-                email_recipient=getattr(settings, 'alert_email_recipient', ''),
-                gmail_enabled=gmail_enabled,
+                email_username=email_user,
+                email_password=email_pass,
+                email_recipient=email_recip,
+                gmail_enabled=bool(gmail_refresh and gmail_cid),
                 gmail_sender=getattr(settings, 'gmail_sender', ''),
                 gmail_recipient=getattr(settings, 'gmail_recipient', '') or getattr(settings, 'gmail_sender', ''),
-                gmail_client_id=getattr(settings, 'gmail_client_id', ''),
+                gmail_client_id=gmail_cid,
                 gmail_client_secret=getattr(settings, 'gmail_client_secret', ''),
                 gmail_refresh_token=gmail_refresh,
             )
             self.alert_manager = AlertManager(alert_cfg)
-            if gmail_enabled:
-                logger.info("Gmail OAuth2 notifications enabled for {}", settings.gmail_sender)
+            channels = []
+            if alert_cfg.gmail_enabled:
+                channels.append("Gmail")
+            if alert_cfg.telegram_enabled:
+                channels.append("Telegram")
+            if alert_cfg.discord_enabled:
+                channels.append("Discord")
+            if alert_cfg.email_enabled:
+                channels.append("Email/SMTP")
+            if channels:
+                logger.info("Alert channels enabled: {}", ", ".join(channels))
+            else:
+                logger.warning("No alert channels configured — notifications disabled")
         else:
             self.alert_manager = None
 

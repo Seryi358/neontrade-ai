@@ -16,7 +16,7 @@ LTF Analysis (4H, 1H, 15m, 5m, 2m):
 4. 5m/2m -> find optimal entry execution
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import pandas as pd
@@ -68,6 +68,14 @@ class AnalysisResult:
     # Elliott Wave estimate
     elliott_wave: Optional[str] = None
     score: float = 0.0  # Overall trade quality score (0-100)
+    # TradingLab course additions
+    volume_analysis: Dict[str, Any] = field(default_factory=dict)
+    ema_w8: Optional[float] = None
+    sma_d200: Optional[float] = None
+    # Last closed candles per timeframe (for RCC confirmation)
+    last_candles: Dict[str, List[Dict]] = field(default_factory=dict)
+    # Current price (latest ask/bid midpoint from M5 close)
+    current_price: Optional[float] = None
 
 
 class MarketAnalyzer:
@@ -138,9 +146,9 @@ class MarketAnalyzer:
         except Exception as e:
             logger.debug(f"Chart pattern detection failed for {instrument}: {e}")
 
-        # Step 8: MACD (from scalping workshop - H1, M15, M5)
+        # Step 8: MACD (from scalping workshop - H1, M15, M5 + Daily from TradingLab)
         macd_values = {}
-        for tf in ("H1", "M15", "M5"):
+        for tf in ("D", "H1", "M15", "M5"):
             df = candles.get(tf, pd.DataFrame())
             if not df.empty:
                 macd_data = self._calculate_macd(df)
@@ -178,13 +186,43 @@ class MarketAnalyzer:
             candles.get("H1", pd.DataFrame())
         )
 
-        # Step 13: HTF/LTF convergence
+        # Step 13a: Volume analysis on H1 and M5 (TradingLab course)
+        volume_analysis = {}
+        for tf in ("H1", "M5"):
+            df = candles.get(tf, pd.DataFrame())
+            if not df.empty:
+                vol_data = self._analyze_volume(df)
+                if vol_data:
+                    volume_analysis[tf] = vol_data
+
+        # Step 13b: Extract EMA_W_8 and SMA_D_200 for convenience fields
+        ema_w8_val = ema_values.get("EMA_W_8")
+        sma_d200_val = sma_values.get("SMA_D_200")
+
+        # Step 14: HTF/LTF convergence
         convergence = htf_trend == ltf_trend
 
-        # Step 14: Score
+        # Step 15: Score
         score = self._calculate_trade_score(
             htf_trend, ltf_trend, convergence, htf_condition, patterns, chart_pats
         )
+
+        # Step 16: Last closed candles per timeframe (for RCC confirmation)
+        last_candles = {}
+        for tf in ("M5", "H1", "H4"):
+            df = candles.get(tf, pd.DataFrame())
+            if not df.empty and len(df) >= 3:
+                tail = df.tail(3)
+                last_candles[tf] = [
+                    {"open": float(r["open"]), "high": float(r["high"]),
+                     "low": float(r["low"]), "close": float(r["close"]),
+                     "volume": int(r.get("volume", 0))}
+                    for _, r in tail.iterrows()
+                ]
+
+        # Step 17: Current price from latest M5 close
+        m5_df = candles.get("M5", pd.DataFrame())
+        current_price = float(m5_df.iloc[-1]["close"]) if not m5_df.empty else None
 
         return AnalysisResult(
             instrument=instrument,
@@ -204,6 +242,11 @@ class MarketAnalyzer:
             order_blocks=order_blocks,
             structure_breaks=structure_breaks,
             score=score,
+            volume_analysis=volume_analysis,
+            ema_w8=ema_w8_val,
+            sma_d200=sma_d200_val,
+            last_candles=last_candles,
+            current_price=current_price,
         )
 
     def _candles_to_dataframe(self, candles) -> pd.DataFrame:
@@ -333,6 +376,7 @@ class MarketAnalyzer:
         """Calculate EMA values for multiple timeframes."""
         emas = {}
         ema_configs = {
+            "W": [8],
             "H4": [20, 50],
             "H1": [20, 50],
             "M5": [2, 5, 20],
@@ -540,6 +584,30 @@ class MarketAnalyzer:
                 score += 5.0
 
         return max(0.0, min(score, 100.0))
+
+    # ── Volume Analysis (TradingLab course) ────────────────────────
+
+    def _analyze_volume(
+        self, candles: pd.DataFrame, period: int = 20
+    ) -> Dict[str, Any]:
+        """
+        Analyze volume relative to its recent average.
+        Returns avg volume, current volume, ratio, and whether above average.
+        """
+        if candles.empty or "volume" not in candles.columns or len(candles) < period:
+            return {}
+
+        volumes = candles["volume"].tail(period)
+        avg_vol = float(volumes.mean())
+        current_vol = int(candles["volume"].iloc[-1])
+        ratio = current_vol / avg_vol if avg_vol > 0 else 0.0
+
+        return {
+            "avg_volume": avg_vol,
+            "current_volume": current_vol,
+            "volume_ratio": float(ratio),
+            "above_average": bool(current_vol > avg_vol),
+        }
 
     # ── MACD (from scalping workshop ch403) ──────────────────────────
 

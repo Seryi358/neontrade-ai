@@ -319,7 +319,7 @@ class TradingEngine:
         return count
 
     def _expire_old_setups(self):
-        """Mark setups past their expiry time as expired."""
+        """Mark setups past their expiry time as expired, and prune old non-pending setups."""
         now = datetime.now(timezone.utc)
         for setup in self.pending_setups:
             if setup.status != "pending":
@@ -332,6 +332,10 @@ class TradingEngine:
                         f"Setup expired: {setup.id} | {setup.instrument} "
                         f"(after {self._setup_expiry_minutes} min)"
                     )
+        # Prune: keep only pending setups + last 20 non-pending (prevent memory leak)
+        pending = [s for s in self.pending_setups if s.status == "pending"]
+        finished = [s for s in self.pending_setups if s.status != "pending"]
+        self.pending_setups = pending + finished[-20:]
 
     # ── Main Loop ────────────────────────────────────────────────
 
@@ -350,6 +354,10 @@ class TradingEngine:
             broker_name = self.broker.broker_type.value.upper()
             logger.info(f"Connected to {broker_name} | Balance: {balance} {currency}")
             logger.info(f"Broker: {broker_name} | Environment: {settings.active_broker}")
+            # Initialize risk manager with actual balance (fixes drawdown tracking)
+            self.risk_manager._current_balance = balance
+            self.risk_manager._peak_balance = balance
+            logger.info(f"Risk manager initialized: peak_balance={balance}")
         except Exception as e:
             logger.error(f"Failed to connect to broker: {e}")
             return
@@ -428,7 +436,13 @@ class TradingEngine:
                 await self._scan_analysis_only()
                 return
 
-            # Step 0: Sync positions from broker (detect external closes)
+            # Step 0: Sync balance for drawdown tracking (risk manager)
+            try:
+                await self.risk_manager.update_balance_tracking()
+            except Exception as e:
+                logger.warning(f"Balance tracking update failed: {e}")
+
+            # Step 0b: Sync positions from broker (detect external closes)
             await self._sync_positions_from_broker()
 
             # Step 1: Update position management for open trades

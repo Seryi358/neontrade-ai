@@ -12,7 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, authFetch } from '../services/api';
+import { API_URL, authFetch, wsManager } from '../services/api';
 
 // Types
 interface AccountData {
@@ -33,6 +33,14 @@ interface Position {
   strategy?: string;
 }
 
+interface DailyActivity {
+  scans_completed: number;
+  setups_found: number;
+  setups_executed: number;
+  setups_skipped_ai: number;
+  errors: number;
+}
+
 interface EngineStatus {
   running: boolean;
   mode: string;
@@ -42,6 +50,7 @@ interface EngineStatus {
   total_risk: number;
   watchlist_count: number;
   positions: Record<string, Position>;
+  daily_activity?: DailyActivity;
 }
 
 export default function DashboardScreen() {
@@ -67,9 +76,28 @@ export default function DashboardScreen() {
   };
 
   useEffect(() => {
+    // Initial fetch
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+
+    // Real-time updates via WebSocket
+    wsManager.connect();
+    const unsubStatus = wsManager.on('engine_status', (data: any) => {
+      if (data) {
+        setStatus(prev => ({ ...prev, ...data }));
+      }
+    });
+    const unsubTrade = wsManager.on('trade_executed', () => fetchData());
+    const unsubClose = wsManager.on('trade_closed', () => fetchData());
+
+    // Fallback polling every 15s (less aggressive than 5s)
+    const interval = setInterval(fetchData, 15000);
+
+    return () => {
+      clearInterval(interval);
+      unsubStatus();
+      unsubTrade();
+      unsubClose();
+    };
   }, []);
 
   const onRefresh = async () => {
@@ -191,6 +219,38 @@ export default function DashboardScreen() {
           <Text style={styles.emptyText}>
             Ve a la pestaña MANUAL para aprobar o rechazar
           </Text>
+        </View>
+      )}
+
+      {/* Daily Activity (Proof of Life) */}
+      {status?.daily_activity && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>ACTIVIDAD HOY</Text>
+          <View style={styles.row}>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>SCANS</Text>
+              <Text style={styles.statValue}>{status.daily_activity.scans_completed}</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>SETUPS</Text>
+              <Text style={styles.statValue}>{status.daily_activity.setups_found}</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>EJECUTADOS</Text>
+              <Text style={[styles.statValue, { color: theme.colors.neonGreen }]}>
+                {status.daily_activity.setups_executed}
+              </Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>AI REJECT</Text>
+              <Text style={styles.statValue}>{status.daily_activity.setups_skipped_ai}</Text>
+            </View>
+          </View>
+          {status.daily_activity.scans_completed > 0 && (
+            <Text style={[styles.emptyText, { color: theme.colors.neonGreen, marginTop: 4 }]}>
+              Motor activo y escaneando
+            </Text>
+          )}
         </View>
       )}
 

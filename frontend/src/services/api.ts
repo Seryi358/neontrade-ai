@@ -101,7 +101,7 @@ export function authFetch(input: RequestInfo, init?: RequestInit): Promise<Respo
   const headers: Record<string, string> = {};
   if (init?.headers) {
     if (init.headers instanceof Headers) {
-      init.headers.forEach((v, k) => { headers[k] = v; });
+      init.headers.forEach((v: string, k: string) => { headers[k] = v; });
     } else if (Array.isArray(init.headers)) {
       init.headers.forEach(([k, v]) => { headers[k] = v; });
     } else {
@@ -296,7 +296,10 @@ class WebSocketManager {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
     try {
-      this.ws = new WebSocket(WS_URL);
+      // Include API key in WS connection for authentication
+      const apiKey = getApiKey();
+      const wsUrlAuth = apiKey ? `${WS_URL}?api_key=${encodeURIComponent(apiKey)}` : WS_URL;
+      this.ws = new WebSocket(wsUrlAuth);
 
       this.ws.onopen = () => {
         this.isConnected = true;

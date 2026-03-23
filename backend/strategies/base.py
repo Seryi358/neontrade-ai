@@ -178,6 +178,31 @@ def _is_at_key_level(analysis: AnalysisResult, direction: str) -> Tuple[bool, fl
         return False, 0.0, "No hay resistencia diaria cercana al precio actual"
 
 
+def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
+    """
+    TradingLab RCC: Ruptura + Cierre + Confirmación.
+    Checks that the PREVIOUS completed M5 candle closed on the correct side of the EMA,
+    confirming the breakout (not just a wick through).
+    Returns True if RCC is confirmed.
+    """
+    ema_val = _ema_val(analysis, ema_key)
+    if ema_val is None:
+        return True  # Can't check, don't block
+
+    m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
+    if len(m5_candles) < 2:
+        return True  # Not enough data, don't block
+
+    # The second-to-last candle is the last COMPLETED candle (confirmation candle)
+    prev_candle = m5_candles[-2]
+    prev_close = prev_candle["close"]
+
+    if direction == "BUY":
+        return prev_close > ema_val  # Closed above EMA = confirmed breakout
+    else:
+        return prev_close < ema_val  # Closed below EMA = confirmed breakdown
+
+
 def _check_ema_break(analysis: AnalysisResult, ema_key: str, direction: str) -> Tuple[bool, str]:
     """
     Verifica si el precio ha roto la EMA especificada.
@@ -243,6 +268,53 @@ def _get_current_price_proxy(analysis: AnalysisResult) -> Optional[float]:
         if v is not None:
             return v
     return None
+
+
+def _check_volume_confirmation(analysis, timeframe_key: str = "H1") -> tuple[bool, float]:
+    """
+    Check if current volume is above average (required by TradingLab for all breakouts).
+    Returns (confirmed, volume_ratio).
+    """
+    vol = analysis.volume_analysis.get(timeframe_key, {})
+    if not vol:
+        return True, 1.0  # No volume data = pass (don't block)
+    ratio = vol.get("volume_ratio", 1.0)
+    return ratio >= 1.0, ratio
+
+
+def _check_rsi_divergence(analysis, direction: str) -> tuple[bool, float]:
+    """
+    Check for RSI divergence confirming the trade direction.
+    Bullish divergence: price makes lower low but RSI makes higher low (BUY signal).
+    Bearish divergence: price makes higher high but RSI makes lower high (SELL signal).
+    Returns (has_divergence, confidence_bonus).
+    """
+    divs = getattr(analysis, 'rsi_divergences', [])
+    if not divs:
+        return False, 0.0
+    for div in divs:
+        if direction == "BUY" and div.get("type") == "bullish":
+            return True, 10.0
+        if direction == "SELL" and div.get("type") == "bearish":
+            return True, 10.0
+    return False, 0.0
+
+
+def _check_weekly_ema8_filter(analysis, direction: str) -> bool:
+    """
+    TradingLab: EMA 8 Weekly is the long-term trend filter.
+    BUY only if price > EMA 8 Weekly. SELL only if price < EMA 8 Weekly.
+    """
+    ema_w8 = getattr(analysis, 'ema_w8', None)
+    if ema_w8 is None:
+        return True  # No data = don't block
+    current_price = analysis.current_price
+    if not current_price:
+        return True
+    if direction == "BUY":
+        return current_price >= ema_w8
+    else:
+        return current_price <= ema_w8
 
 
 def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
@@ -433,6 +505,15 @@ class BlueStrategy(BaseStrategy):
             else:
                 return None
 
+        # TradingLab: Volume confirmation on breakout
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
+        if not vol_ok:
+            return None  # No entry without volume confirmation
+
+        # TradingLab: EMA 8 Weekly trend filter
+        if not _check_weekly_ema8_filter(analysis, direction):
+            return None  # Don't trade against weekly trend
+
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
             return None
@@ -469,13 +550,18 @@ class BlueStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 5: {rev_desc}")
 
-        # --- Paso 6: Entrada en 5M (rompimiento de EMA 5M / diagonal / EMA 2M) ---
+        # --- Paso 6: Entrada en 5M (RCC: Ruptura + Cierre + Confirmación) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M2_2", direction)
 
         if ema_5m_break:
-            confidence += 10.0
-            met.append(f"Paso 6: Rompimiento EMA 5M confirmado - {ema_5m_desc}")
+            # TradingLab RCC: verify previous candle confirmed the breakout
+            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                confidence += 10.0
+                met.append(f"Paso 6: RCC confirmado en EMA 5M - {ema_5m_desc}")
+            else:
+                confidence += 3.0  # Breakout without confirmation = weaker
+                met.append(f"Paso 6: Rompimiento EMA 5M sin confirmacion RCC")
         else:
             failed.append(f"Paso 6: {ema_5m_desc}")
 
@@ -493,6 +579,11 @@ class BlueStrategy(BaseStrategy):
         elif variant == "BLUE_C":
             confidence -= 5.0
             met.append("Variante C: Rechazo de EMA 4H (mas riesgosa)")
+
+        # TradingLab: RSI divergence bonus
+        has_div, div_bonus = _check_rsi_divergence(analysis, direction)
+        if has_div:
+            confidence += div_bonus
 
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -683,6 +774,15 @@ class RedStrategy(BaseStrategy):
             else:
                 return None
 
+        # TradingLab: Volume confirmation on breakout
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
+        if not vol_ok:
+            return None  # No entry without volume confirmation
+
+        # TradingLab: EMA 8 Weekly trend filter
+        if not _check_weekly_ema8_filter(analysis, direction):
+            return None  # Don't trade against weekly trend
+
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
             return None
@@ -730,13 +830,22 @@ class RedStrategy(BaseStrategy):
             confidence += 10.0
             met.append(f"Paso 5b: {rev_desc}")
 
-        # --- Paso 6: Entrada en 5M ---
+        # --- Paso 6: Entrada en 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         if ema_5m_break:
-            confidence += 10.0
-            met.append(f"Paso 6: {ema_5m_desc}")
+            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                confidence += 10.0
+                met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
+            else:
+                confidence += 3.0
+                met.append(f"Paso 6: Rompimiento sin RCC")
         else:
             failed.append(f"Paso 6: {ema_5m_desc}")
+
+        # TradingLab: RSI divergence bonus
+        has_div, div_bonus = _check_rsi_divergence(analysis, direction)
+        if has_div:
+            confidence += div_bonus
 
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -937,6 +1046,15 @@ class PinkStrategy(BaseStrategy):
         if direction is None:
             return None
 
+        # TradingLab: Volume confirmation on breakout
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
+        if not vol_ok:
+            return None  # No entry without volume confirmation
+
+        # TradingLab: EMA 8 Weekly trend filter
+        if not _check_weekly_ema8_filter(analysis, direction):
+            return None  # Don't trade against weekly trend
+
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
             return None
@@ -976,12 +1094,15 @@ class PinkStrategy(BaseStrategy):
             confidence += 5.0
             met.append("Paso 4b: Patron de consolidacion detectado (DOJI = compresion)")
 
-        # --- Paso 5: Ejecutar al final del patron en 5M ---
-        # Rompimiento en 5M a favor de la tendencia principal
+        # --- Paso 5: Ejecutar al final del patron en 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         if ema_5m_break:
-            confidence += 15.0
-            met.append(f"Paso 5: Rompimiento 5M a favor de tendencia - {ema_5m_desc}")
+            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                confidence += 15.0
+                met.append(f"Paso 5: RCC confirmado en 5M - {ema_5m_desc}")
+            else:
+                confidence += 5.0
+                met.append(f"Paso 5: Rompimiento 5M sin RCC")
         else:
             failed.append(f"Paso 5: Sin rompimiento 5M - {ema_5m_desc}")
 
@@ -989,6 +1110,11 @@ class PinkStrategy(BaseStrategy):
         if has_reversal:
             confidence += 10.0
             met.append(f"Paso 5b: Patron de giro detectado - {rev_desc}")
+
+        # TradingLab: RSI divergence bonus
+        has_div, div_bonus = _check_rsi_divergence(analysis, direction)
+        if has_div:
+            confidence += div_bonus
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -1160,6 +1286,15 @@ class WhiteStrategy(BaseStrategy):
         if direction is None:
             return None
 
+        # TradingLab: Volume confirmation on breakout
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
+        if not vol_ok:
+            return None  # No entry without volume confirmation
+
+        # TradingLab: EMA 8 Weekly trend filter
+        if not _check_weekly_ema8_filter(analysis, direction):
+            return None  # Don't trade against weekly trend
+
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
             return None
@@ -1195,11 +1330,15 @@ class WhiteStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 4: {rev_desc}")
 
-        # --- Paso 5: Entrada en 5M ---
+        # --- Paso 5: Entrada en 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         if ema_5m_break:
-            confidence += 10.0
-            met.append(f"Paso 5: {ema_5m_desc}")
+            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                confidence += 10.0
+                met.append(f"Paso 5: RCC confirmado - {ema_5m_desc}")
+            else:
+                confidence += 3.0
+                met.append(f"Paso 5: Rompimiento sin RCC")
         else:
             failed.append(f"Paso 5: {ema_5m_desc}")
 
@@ -1207,6 +1346,11 @@ class WhiteStrategy(BaseStrategy):
         if ema_2m_break:
             confidence += 5.0
             met.append(f"Paso 5b: Confirmacion EMA 2M - {ema_2m_desc}")
+
+        # TradingLab: RSI divergence bonus
+        has_div, div_bonus = _check_rsi_divergence(analysis, direction)
+        if has_div:
+            confidence += div_bonus
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -1407,6 +1551,15 @@ class BlackStrategy(BaseStrategy):
         else:
             return None
 
+        # TradingLab: Volume confirmation on breakout
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
+        if not vol_ok:
+            return None  # No entry without volume confirmation
+
+        # TradingLab: EMA 8 Weekly trend filter
+        if not _check_weekly_ema8_filter(analysis, direction):
+            return None  # Don't trade against weekly trend
+
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
             return None
@@ -1451,13 +1604,22 @@ class BlackStrategy(BaseStrategy):
             confidence += 5.0
             met.append("Paso 5d: Consolidacion detectada (DOJI = compresion/indecision)")
 
-        # --- Paso 6: Ejecutar en rompimiento 5M ---
+        # --- Paso 6: Ejecutar en rompimiento 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         if ema_5m_break:
-            confidence += 10.0
-            met.append(f"Paso 6: Rompimiento 5M confirmado - {ema_5m_desc}")
+            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                confidence += 10.0
+                met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
+            else:
+                confidence += 3.0
+                met.append(f"Paso 6: Rompimiento sin RCC")
         else:
             failed.append(f"Paso 6: Sin rompimiento 5M - {ema_5m_desc}")
+
+        # TradingLab: RSI divergence bonus
+        has_div, div_bonus = _check_rsi_divergence(analysis, direction)
+        if has_div:
+            confidence += div_bonus
 
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -1658,6 +1820,15 @@ class GreenStrategy(BaseStrategy):
         if direction is None:
             return None
 
+        # TradingLab: Volume confirmation on breakout
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
+        if not vol_ok:
+            return None  # No entry without volume confirmation
+
+        # TradingLab: EMA 8 Weekly trend filter
+        if not _check_weekly_ema8_filter(analysis, direction):
+            return None  # Don't trade against weekly trend
+
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
             return None
@@ -1687,20 +1858,27 @@ class GreenStrategy(BaseStrategy):
             confidence += 5.0
             met.append("Paso 4b: Desaceleracion confirma fin de patron")
 
-        # --- Paso 5: Entrada en 15M (primer rompimiento + confirmacion) ---
-        # Usamos EMA M5 como proxy de 15M (el sistema calcula M5 y M2)
-        # En un sistema real, se usaria M15 directamente
+        # TradingLab: RSI divergence bonus
+        has_div, div_bonus = _check_rsi_divergence(analysis, direction)
+        if has_div:
+            confidence += div_bonus
+
+        # --- Paso 5: Entrada en 15M (RCC: Ruptura + Cierre + Confirmación) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         ema_5m_20_break, ema_5m_20_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
 
         if ema_5m_break and ema_5m_20_break:
-            confidence += 15.0
-            met.append(f"Paso 5: Rompimiento confirmado en marco bajo (EMA 5 y EMA 20 de M5)")
+            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                confidence += 15.0
+                met.append(f"Paso 5: RCC confirmado (EMA 5 + EMA 20 de M5)")
+            else:
+                confidence += 8.0
+                met.append(f"Paso 5: Rompimiento doble sin RCC")
         elif ema_5m_break:
-            confidence += 8.0
+            confidence += 5.0
             met.append(f"Paso 5: Rompimiento parcial - {ema_5m_desc}")
         else:
-            failed.append(f"Paso 5: Sin rompimiento en marco bajo - {ema_5m_desc}")
+            failed.append(f"Paso 5: Sin rompimiento - {ema_5m_desc}")
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)

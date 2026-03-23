@@ -165,9 +165,16 @@ app = FastAPI(
 )
 
 # CORS for frontend (React Native / Expo Web / Electron / Remote)
+# Allow same-origin (static frontend served by this backend) + localhost dev
+_cors_origins = [
+    "https://n8n-neontrade-ai.zb12wf.easypanel.host",
+    "http://localhost:8000",
+    "http://localhost:19006",  # Expo Web dev server
+    "http://localhost:3000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
@@ -202,6 +209,13 @@ async def websocket_endpoint(websocket: WebSocket):
     - {"action": "set_mode", "mode": "AUTO"|"MANUAL"}
     - {"action": "subscribe", "instruments": ["EUR_USD", ...]}
     """
+    # Authenticate WebSocket via query param: /ws?api_key=...
+    if security_config.auth_enabled and security_config.api_keys:
+        api_key = websocket.query_params.get("api_key", "")
+        if not security_config.validate_key(api_key):
+            await websocket.close(code=4001, reason="Invalid API key")
+            return
+
     await ws_manager.connect(websocket)
 
     try:

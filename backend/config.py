@@ -79,8 +79,8 @@ class Settings(BaseSettings):
     # Correlated pairs risk reduction
     correlated_risk_factor: float = 0.75  # 0.75% each instead of 1%
 
-    # Minimum reward:risk ratio to TP1
-    min_rr_ratio: float = 0.80
+    # Minimum reward:risk ratio to TP1 (TradingLab: 2:1 minimum, 3:1 preferred)
+    min_rr_ratio: float = 2.0
 
     # Position management
     move_sl_to_be_at: float = 0.50  # Move SL to BE when price is 50% to TP1

@@ -15,7 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL } from '../services/api';
+import { API_URL, authFetch } from '../services/api';
 
 // Types
 interface PendingSetup {
@@ -68,7 +68,7 @@ export default function ManualModeScreen() {
   const fetchSetups = useCallback(async () => {
     try {
       setError(null);
-      const res = await fetch(`${API_URL}/api/v1/pending-setups`);
+      const res = await authFetch(`${API_URL}/api/v1/pending-setups`);
       if (!res.ok) throw new Error('Error al cargar');
       const data = await res.json();
       setSetups(data);
@@ -95,7 +95,7 @@ export default function ManualModeScreen() {
   const approveSetup = async (id: string) => {
     try {
       setActionLoading(`approve-${id}`);
-      const res = await fetch(`${API_URL}/api/v1/pending-setups/${id}/approve`, {
+      const res = await authFetch(`${API_URL}/api/v1/pending-setups/${id}/approve`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -111,7 +111,7 @@ export default function ManualModeScreen() {
   const rejectSetup = async (id: string) => {
     try {
       setActionLoading(`reject-${id}`);
-      const res = await fetch(`${API_URL}/api/v1/pending-setups/${id}/reject`, {
+      const res = await authFetch(`${API_URL}/api/v1/pending-setups/${id}/reject`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -135,7 +135,7 @@ export default function ManualModeScreen() {
           onPress: async () => {
             try {
               setActionLoading('approve-all');
-              const res = await fetch(`${API_URL}/api/v1/pending-setups/approve-all`, {
+              const res = await authFetch(`${API_URL}/api/v1/pending-setups/approve-all`, {
                 method: 'POST',
               });
               if (res.ok) {
@@ -167,7 +167,7 @@ export default function ManualModeScreen() {
               // Reject each setup individually
               await Promise.all(
                 setups.map((s) =>
-                  fetch(`${API_URL}/api/v1/pending-setups/${s.id}/reject`, {
+                  authFetch(`${API_URL}/api/v1/pending-setups/${s.id}/reject`, {
                     method: 'POST',
                   })
                 )

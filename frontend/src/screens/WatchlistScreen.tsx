@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
+import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
 
 interface WatchlistItem {
   instrument: string;
@@ -33,7 +33,7 @@ export default function WatchlistScreen() {
     const fetchWatchlist = async () => {
       try {
         setError(null);
-        const res = await fetch(`${API_URL}/api/v1/watchlist`);
+        const res = await authFetch(`${API_URL}/api/v1/watchlist`);
         if (!res.ok) throw new Error('Error del servidor');
         const data = await res.json();
         setWatchlist(data);

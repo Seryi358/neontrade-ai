@@ -21,6 +21,9 @@ frontend/builds/
 frontend/.expo/
 *.tsbuildinfo
 
+# ── Backend static (built frontend) ─────────────────────────
+backend/static/
+
 # ── Database & Data ──────────────────────────────────────────
 data/*.db
 data/*.db-shm

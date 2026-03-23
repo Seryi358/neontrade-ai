@@ -16,7 +16,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
+import { API_URL, authFetch, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ export default function ChartScreen() {
   useEffect(() => {
     const loadWatchlist = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/watchlist`);
+        const res = await authFetch(`${API_URL}/api/v1/watchlist`);
         if (!res.ok) return;
         const data = await res.json();
         setWatchlist(Array.isArray(data) ? data : []);
@@ -140,11 +140,11 @@ export default function ChartScreen() {
     setError(null);
     try {
       const [candlesRes, priceRes, analysisRes] = await Promise.all([
-        fetch(
+        authFetch(
           `${API_URL}/api/v1/candles/${selectedInstrument}?granularity=${GRANULARITY_MAP[timeframe]}&count=${CANDLE_COUNT + 50}`
         ),
-        fetch(`${API_URL}/api/v1/price/${selectedInstrument}`),
-        fetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`),
+        authFetch(`${API_URL}/api/v1/price/${selectedInstrument}`),
+        authFetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`),
       ]);
 
       if (candlesRes.ok) {

@@ -287,6 +287,54 @@ async def health():
     }
 
 
+# ── Serve Frontend (Expo Web static build) ──────────────────────
+# In Docker the frontend is at /app/static. Locally it's at ../frontend/dist.
+_static_dir = os.path.join(os.path.dirname(__file__), "static")
+if not os.path.isdir(_static_dir):
+    _static_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+
+if os.path.isdir(_static_dir):
+    from fastapi.responses import HTMLResponse, FileResponse
+
+    # Read index.html once and inject API key for auto-auth
+    _index_html_path = os.path.join(_static_dir, "index.html")
+    _index_html_raw = ""
+    if os.path.isfile(_index_html_path):
+        with open(_index_html_path, "r") as f:
+            _index_html_raw = f.read()
+
+    def _get_index_html() -> str:
+        """Return index.html with auto-injected API key for same-origin auth."""
+        api_key = settings.api_secret_key or ""
+        injection = (
+            f'<script>window.__NEONTRADE_API_KEY__="{api_key}";</script>'
+            if api_key else ""
+        )
+        return _index_html_raw.replace("</head>", f"{injection}</head>")
+
+    # Serve static assets (JS, CSS, fonts, images)
+    _expo_dir = os.path.join(_static_dir, "_expo")
+    _assets_dir = os.path.join(_static_dir, "assets")
+    if os.path.isdir(_expo_dir):
+        app.mount("/_expo", StaticFiles(directory=_expo_dir), name="expo_static")
+    if os.path.isdir(_assets_dir):
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="frontend_assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Serve the SPA index.html for any non-API route (catch-all)."""
+        # Check if the requested file exists in static dir
+        file_path = os.path.join(_static_dir, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # Otherwise serve index.html with injected API key
+        return HTMLResponse(_get_index_html())
+
+    logger.info(f"Frontend served from: {_static_dir}")
+else:
+    logger.warning("No frontend build found — API-only mode")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

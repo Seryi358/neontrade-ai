@@ -15,7 +15,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
+import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ export default function AnalysisScreen() {
   useEffect(() => {
     const loadWatchlist = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/watchlist`);
+        const res = await authFetch(`${API_URL}/api/v1/watchlist`);
         if (!res.ok) return;
         const data = await res.json();
         setWatchlist(Array.isArray(data) ? data : []);
@@ -117,7 +117,7 @@ export default function AnalysisScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`);
+      const res = await authFetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       // If backend returned a "no data yet" placeholder, show waiting message
@@ -147,8 +147,8 @@ export default function AnalysisScreen() {
     setRefreshing(true);
     try {
       const [wlRes, anRes] = await Promise.all([
-        fetch(`${API_URL}/api/v1/watchlist`),
-        selectedInstrument ? fetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`) : Promise.resolve(null),
+        authFetch(`${API_URL}/api/v1/watchlist`),
+        selectedInstrument ? authFetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`) : Promise.resolve(null),
       ]);
       if (wlRes.ok) {
         const wlData = await wlRes.json();

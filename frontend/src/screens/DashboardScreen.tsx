@@ -12,7 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL } from '../services/api';
+import { API_URL, authFetch } from '../services/api';
 
 // Types
 interface AccountData {
@@ -54,8 +54,8 @@ export default function DashboardScreen() {
     try {
       setError(null);
       const [accountRes, statusRes] = await Promise.all([
-        fetch(`${API_URL}/api/v1/account`),
-        fetch(`${API_URL}/api/v1/status`),
+        authFetch(`${API_URL}/api/v1/account`),
+        authFetch(`${API_URL}/api/v1/status`),
       ]);
       if (!accountRes.ok || !statusRes.ok) throw new Error('Error del servidor');
       setAccount(await accountRes.json());

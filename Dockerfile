@@ -1,10 +1,19 @@
+FROM node:20-slim AS frontend-build
+
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --legacy-peer-deps
+COPY frontend/ .
+RUN npx expo export --platform web
+
+# ── Backend + serve frontend ──────────────────────────────────
 FROM python:3.12-slim
 
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
+    gcc curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for caching
@@ -13,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY backend/ .
+
+# Copy pre-built frontend into /app/static
+COPY --from=frontend-build /frontend/dist /app/static
 
 # Create directories
 RUN mkdir -p logs data

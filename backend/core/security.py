@@ -184,11 +184,19 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # 1. Always add security headers
-        # 2. Skip auth for public endpoints and WebSocket upgrades
-        is_public = path in PUBLIC_ENDPOINTS or path.startswith("/docs") or path.startswith("/redoc")
+        # 2. Skip auth for public endpoints, static assets, and WebSocket upgrades
+        is_public = (
+            path in PUBLIC_ENDPOINTS
+            or path.startswith("/docs")
+            or path.startswith("/redoc")
+            or path.startswith("/_expo")
+            or path.startswith("/assets")
+        )
         is_websocket = request.headers.get("upgrade", "").lower() == "websocket"
+        # Serve frontend SPA for non-API paths (no auth needed for UI)
+        is_frontend = not path.startswith("/api/") and not path.startswith("/ws") and not is_public
 
-        if not is_public and not is_websocket:
+        if not is_public and not is_websocket and not is_frontend:
             # IP whitelist check
             if not self.config.check_ip(client_ip):
                 logger.warning("Blocked request from non-whitelisted IP: {}", client_ip)
@@ -227,11 +235,15 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
         # Add security headers to all responses
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
+        # Cache-Control: don't cache API responses, but allow caching for static assets
+        if path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        elif path.startswith("/_expo") or path.startswith("/assets"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
 
         return response
 

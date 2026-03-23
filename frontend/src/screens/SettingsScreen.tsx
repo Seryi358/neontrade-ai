@@ -17,7 +17,7 @@ import {
   TextInput,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, setBackendUrl, resetBackendUrl } from '../services/api';
+import { api, API_URL, authFetch, setBackendUrl, resetBackendUrl, setApiKey, clearApiKey } from '../services/api';
 
 // Types
 interface ModeData {
@@ -101,17 +101,22 @@ export default function SettingsScreen() {
   const [backendUrl, setBackendUrlState] = useState(API_URL);
   const [editingBackendUrl, setEditingBackendUrl] = useState(false);
   const [backendUrlDraft, setBackendUrlDraft] = useState(API_URL);
+  const [apiKeyValue, setApiKeyValue] = useState(() => {
+    try { return window.localStorage.getItem('neontrade_api_key') || ''; } catch { return ''; }
+  });
+  const [editingApiKey, setEditingApiKey] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
       setError(null);
       const [modeRes, brokerRes, statusRes, stratRes, riskRes, alertRes] = await Promise.all([
-        fetch(`${API_URL}/api/v1/mode`),
-        fetch(`${API_URL}/api/v1/broker`),
-        fetch(`${API_URL}/api/v1/status`),
-        fetch(`${API_URL}/api/v1/strategies/config`),
-        fetch(`${API_URL}/api/v1/risk-config`).catch(() => null),
-        fetch(`${API_URL}/api/v1/alerts/config`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/mode`),
+        authFetch(`${API_URL}/api/v1/broker`),
+        authFetch(`${API_URL}/api/v1/status`),
+        authFetch(`${API_URL}/api/v1/strategies/config`),
+        authFetch(`${API_URL}/api/v1/risk-config`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/alerts/config`).catch(() => null),
       ]);
 
       if (modeRes.ok) {
@@ -158,7 +163,7 @@ export default function SettingsScreen() {
     const newMode = mode === 'AUTO' ? 'MANUAL' : 'AUTO';
     try {
       setActionLoading('mode');
-      const res = await fetch(`${API_URL}/api/v1/mode`, {
+      const res = await authFetch(`${API_URL}/api/v1/mode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: newMode }),
@@ -176,7 +181,7 @@ export default function SettingsScreen() {
   const startEngine = async () => {
     try {
       setActionLoading('start');
-      const res = await fetch(`${API_URL}/api/v1/engine/start`, { method: 'POST' });
+      const res = await authFetch(`${API_URL}/api/v1/engine/start`, { method: 'POST' });
       if (res.ok) {
         setEngineRunning(true);
       }
@@ -190,7 +195,7 @@ export default function SettingsScreen() {
   const stopEngine = async () => {
     try {
       setActionLoading('stop');
-      const res = await fetch(`${API_URL}/api/v1/engine/stop`, { method: 'POST' });
+      const res = await authFetch(`${API_URL}/api/v1/engine/stop`, { method: 'POST' });
       if (res.ok) {
         setEngineRunning(false);
       }
@@ -213,7 +218,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               setActionLoading('emergency');
-              await fetch(`${API_URL}/api/v1/emergency/close-all`, { method: 'POST' });
+              await authFetch(`${API_URL}/api/v1/emergency/close-all`, { method: 'POST' });
               await fetchData();
             } catch (err) {
               console.error('Emergency close failed:', err);
@@ -233,7 +238,7 @@ export default function SettingsScreen() {
     const isPercentField = ['risk_day_trading', 'risk_scalping', 'risk_swing', 'max_total_risk', 'move_sl_to_be_at'].includes(field);
     const apiValue = isPercentField ? numValue / 100 : numValue;
     try {
-      const res = await fetch(`${API_URL}/api/v1/risk-config`, {
+      const res = await authFetch(`${API_URL}/api/v1/risk-config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: apiValue }),
@@ -284,7 +289,7 @@ export default function SettingsScreen() {
     setStrategyConfig(newConfig);
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/strategies/config`, {
+      const res = await authFetch(`${API_URL}/api/v1/strategies/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newConfig),
@@ -661,6 +666,65 @@ export default function SettingsScreen() {
             <Text style={{ color: theme.colors.neonPink, fontSize: 12 }}>Restaurar a localhost</Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      {/* API Key Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>API KEY</Text>
+        <Text style={{ color: theme.colors.textSecondary, fontSize: 11, marginBottom: 8 }}>
+          Requerida para conectar al servidor remoto
+        </Text>
+        <View style={styles.configRow}>
+          <Text style={styles.configLabel}>Key</Text>
+          {editingApiKey ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+              <TextInput
+                style={[styles.configValue, { borderBottomWidth: 1, borderColor: theme.colors.neonCyan, minWidth: 200, textAlign: 'right', fontSize: 11 }]}
+                value={apiKeyDraft}
+                onChangeText={setApiKeyDraft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={false}
+                placeholder="nt_..."
+                placeholderTextColor={theme.colors.textSecondary}
+              />
+              <TouchableOpacity
+                style={{ marginLeft: 8, backgroundColor: theme.colors.neonCyan, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
+                onPress={() => {
+                  if (apiKeyDraft && apiKeyDraft.startsWith('nt_')) {
+                    setApiKey(apiKeyDraft);
+                    setApiKeyValue(apiKeyDraft);
+                    setEditingApiKey(false);
+                    Alert.alert('API Key', 'Key guardada. Las peticiones ahora incluyen autenticacion.');
+                  } else {
+                    Alert.alert('Error', 'API Key debe empezar con nt_');
+                  }
+                }}
+              >
+                <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontSize: 12 }}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => { setApiKeyDraft(apiKeyValue); setEditingApiKey(true); }}>
+              <Text style={[styles.configValue, { color: apiKeyValue ? theme.colors.neonGreen : theme.colors.neonPink }]}>
+                {apiKeyValue ? apiKeyValue.slice(0, 8) + '...' + apiKeyValue.slice(-4) : 'No configurada'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {apiKeyValue ? (
+          <TouchableOpacity
+            style={{ marginTop: 8, alignSelf: 'flex-end' }}
+            onPress={() => {
+              clearApiKey();
+              setApiKeyValue('');
+              setEditingApiKey(false);
+              Alert.alert('API Key', 'Key eliminada.');
+            }}
+          >
+            <Text style={{ color: theme.colors.neonPink, fontSize: 12 }}>Eliminar Key</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* Connection Status Card */}

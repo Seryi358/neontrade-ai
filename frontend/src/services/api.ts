@@ -4,8 +4,9 @@
  */
 
 // ── Configuration ────────────────────────────────────────────────
-// Backend URL: local by default, configurable for remote VPS deployment.
-// Set via localStorage 'neontrade_backend_url' or Electron env.
+// Backend URL: auto-detected from window.location when served from
+// the same origin (EasyPanel/Docker), configurable via localStorage
+// or Electron env variable for other setups.
 const DEFAULT_URL = 'http://localhost:8000';
 
 function getBaseUrl(): string {
@@ -22,7 +23,16 @@ function getBaseUrl(): string {
   if (typeof window !== 'undefined' && (window as any).__NEONTRADE_API_HOST__) {
     return `http://${(window as any).__NEONTRADE_API_HOST__}`;
   }
-  // 3. Default: local backend
+  // 3. Auto-detect: if served from a non-localhost origin (EasyPanel/VPS),
+  //    use that origin as the API base URL (same-origin deployment)
+  if (typeof window !== 'undefined' && window.location) {
+    const { hostname, protocol, port } = window.location;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      const base = `${protocol}//${hostname}${port ? ':' + port : ''}`;
+      return base;
+    }
+  }
+  // 4. Default: local backend
   return DEFAULT_URL;
 }
 
@@ -54,12 +64,18 @@ export function resetBackendUrl(): void {
 }
 
 // ── API Key for authenticated requests ──────────────────────────
-// Stored in localStorage so the Electron app remembers it across sessions.
+// Priority: 1) localStorage (user-set), 2) injected by backend (same-origin), 3) empty
 function getApiKey(): string {
   if (typeof window !== 'undefined') {
     try {
-      return window.localStorage.getItem('neontrade_api_key') || '';
-    } catch { return ''; }
+      const saved = window.localStorage.getItem('neontrade_api_key');
+      if (saved) return saved;
+    } catch {}
+    // Auto-injected by backend when served from same origin (EasyPanel/Docker)
+    try {
+      const injected = (window as any).__NEONTRADE_API_KEY__;
+      if (injected) return injected;
+    } catch {}
   }
   return '';
 }
@@ -74,6 +90,26 @@ export function clearApiKey(): void {
   if (typeof window !== 'undefined') {
     window.localStorage.removeItem('neontrade_api_key');
   }
+}
+
+/**
+ * Authenticated fetch - drop-in replacement for window.fetch
+ * that automatically includes the X-API-Key header.
+ */
+export function authFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
+  const key = getApiKey();
+  const headers: Record<string, string> = {};
+  if (init?.headers) {
+    if (init.headers instanceof Headers) {
+      init.headers.forEach((v, k) => { headers[k] = v; });
+    } else if (Array.isArray(init.headers)) {
+      init.headers.forEach(([k, v]) => { headers[k] = v; });
+    } else {
+      Object.assign(headers, init.headers);
+    }
+  }
+  if (key) headers['X-API-Key'] = key;
+  return fetch(input, { ...init, headers });
 }
 
 // ── Request timeout ──────────────────────────────────────────────

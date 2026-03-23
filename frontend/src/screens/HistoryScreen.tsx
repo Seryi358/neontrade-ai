@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL } from '../services/api';
+import { API_URL, authFetch } from '../services/api';
 
 // Types
 interface Trade {
@@ -72,8 +72,8 @@ export default function HistoryScreen() {
       setError(null);
       const strategyParam = activeFilter !== 'ALL' ? `&strategy=${activeFilter}` : '';
       const [tradesRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/api/v1/history?limit=50${strategyParam}`),
-        fetch(`${API_URL}/api/v1/history/stats?days=30`),
+        authFetch(`${API_URL}/api/v1/history?limit=50${strategyParam}`),
+        authFetch(`${API_URL}/api/v1/history/stats?days=30`),
       ]);
 
       if (!tradesRes.ok || !statsRes.ok) {

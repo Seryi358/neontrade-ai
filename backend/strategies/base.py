@@ -41,6 +41,13 @@ class StrategyColor(Enum):
     WHITE = "WHITE"
 
 
+class EntryType(Enum):
+    """TradingLab entry types (Market, Limit, Stop)."""
+    MARKET = "MARKET"   # Execute at current price
+    LIMIT = "LIMIT"     # Place limit order at confluence zone
+    STOP = "STOP"       # Place stop order above/below level
+
+
 @dataclass
 class SetupSignal:
     """Senal de setup detectada por una estrategia."""
@@ -60,6 +67,10 @@ class SetupSignal:
     risk_reward_ratio: float = 0.0  # R:R calculado
     conditions_met: List[str] = field(default_factory=list)
     conditions_failed: List[str] = field(default_factory=list)
+    entry_type: str = "MARKET"     # MARKET, LIMIT, or STOP
+    limit_price: Optional[float] = None  # Price for limit/stop orders
+    confluence_score: int = 0      # Positive confluence points count
+    anti_confluence_score: int = 0  # Negative confluence points count
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +328,228 @@ def _check_weekly_ema8_filter(analysis, direction: str) -> bool:
         return current_price <= ema_w8
 
 
+def _check_smc_confluence(analysis, direction: str, entry_price: float) -> tuple[bool, float, str]:
+    """
+    Check Smart Money Concepts confluence: Order Blocks, FVG, BOS/CHOCH.
+    These are already calculated in market_analyzer but not used in strategies.
+    Returns (has_confluence, bonus_points, description).
+    """
+    bonus = 0.0
+    details = []
+
+    # Order Blocks - price near a bullish/bearish OB
+    for ob in analysis.order_blocks:
+        ob_type = ob.get("type", "")
+        ob_high = ob.get("high", 0)
+        ob_low = ob.get("low", 0)
+        if ob_high == 0 or ob_low == 0:
+            continue
+        ob_mid = (ob_high + ob_low) / 2
+        tolerance = abs(ob_high - ob_low) * 1.5  # 1.5x the OB size
+
+        if direction == "BUY" and ob_type == "bullish":
+            if ob_low - tolerance <= entry_price <= ob_high + tolerance:
+                bonus += 8.0
+                details.append(f"Order Block alcista ({ob_low:.5f}-{ob_high:.5f})")
+                break
+        elif direction == "SELL" and ob_type == "bearish":
+            if ob_low - tolerance <= entry_price <= ob_high + tolerance:
+                bonus += 8.0
+                details.append(f"Order Block bajista ({ob_low:.5f}-{ob_high:.5f})")
+                break
+
+    # Fair Value Gaps - price near FVG midpoint
+    fvgs = analysis.key_levels.get("fvg", [])
+    if fvgs and entry_price:
+        for fvg_mid in fvgs[-10:]:  # Check recent FVGs
+            tolerance = entry_price * 0.003  # 0.3%
+            if abs(entry_price - fvg_mid) < tolerance:
+                bonus += 5.0
+                details.append(f"Fair Value Gap cerca ({fvg_mid:.5f})")
+                break
+
+    # BOS/CHOCH - recent structure break confirming direction
+    for sb in analysis.structure_breaks[-5:]:
+        sb_type = sb.get("type", "")
+        sb_dir = sb.get("direction", "")
+        if direction == "BUY" and sb_dir == "bullish":
+            if sb_type == "BOS":
+                bonus += 5.0
+                details.append(f"BOS alcista confirmado")
+            elif sb_type == "CHOCH":
+                bonus += 7.0
+                details.append(f"CHOCH alcista (cambio de caracter)")
+            break
+        elif direction == "SELL" and sb_dir == "bearish":
+            if sb_type == "BOS":
+                bonus += 5.0
+                details.append(f"BOS bajista confirmado")
+            elif sb_type == "CHOCH":
+                bonus += 7.0
+                details.append(f"CHOCH bajista (cambio de caracter)")
+            break
+
+    has = bonus > 0
+    desc = "SMC: " + ", ".join(details) if details else "Sin confluencia SMC"
+    return has, bonus, desc
+
+
+def _count_confluence_points(
+    analysis: AnalysisResult, direction: str, entry_price: float
+) -> Tuple[int, int, List[str], List[str]]:
+    """
+    TradingLab: Count positive and negative confluence points between HTF and LTF.
+    Returns (positive_count, negative_count, positive_details, negative_details).
+    """
+    pos_pts = 0
+    neg_pts = 0
+    pos_details: List[str] = []
+    neg_details: List[str] = []
+
+    # 1. HTF trend alignment
+    if analysis.htf_trend.value == ("bullish" if direction == "BUY" else "bearish"):
+        pos_pts += 1
+        pos_details.append("Tendencia HTF a favor")
+    elif analysis.htf_trend.value != "ranging":
+        neg_pts += 1
+        neg_details.append("Tendencia HTF en contra")
+
+    # 2. LTF trend alignment
+    if analysis.ltf_trend.value == ("bullish" if direction == "BUY" else "bearish"):
+        pos_pts += 1
+        pos_details.append("Tendencia LTF a favor")
+    elif analysis.ltf_trend.value != "ranging":
+        neg_pts += 1
+        neg_details.append("Tendencia LTF en contra")
+
+    # 3. HTF/LTF convergence
+    if analysis.htf_ltf_convergence:
+        pos_pts += 1
+        pos_details.append("Convergencia HTF/LTF")
+    else:
+        neg_pts += 1
+        neg_details.append("Divergencia HTF/LTF")
+
+    # 4. EMA 8 Weekly filter
+    if _check_weekly_ema8_filter(analysis, direction):
+        pos_pts += 1
+        pos_details.append("EMA 8 semanal a favor")
+    else:
+        neg_pts += 1
+        neg_details.append("EMA 8 semanal en contra")
+
+    # 5. Fibonacci zone
+    fib_ok, _ = _fib_zone_check(analysis, entry_price, direction)
+    if fib_ok:
+        pos_pts += 1
+        pos_details.append("Precio en zona Fibonacci")
+
+    # 6. RSI condition
+    rsi_d = analysis.rsi_values.get("D", 50)
+    if direction == "BUY" and rsi_d < 40:
+        pos_pts += 1
+        pos_details.append(f"RSI diario favorable ({rsi_d:.0f})")
+    elif direction == "SELL" and rsi_d > 60:
+        pos_pts += 1
+        pos_details.append(f"RSI diario favorable ({rsi_d:.0f})")
+    elif direction == "BUY" and rsi_d > 70:
+        neg_pts += 1
+        neg_details.append(f"RSI diario sobrecomprado ({rsi_d:.0f})")
+    elif direction == "SELL" and rsi_d < 30:
+        neg_pts += 1
+        neg_details.append(f"RSI diario sobrevendido ({rsi_d:.0f})")
+
+    # 7. Volume confirmation
+    vol_ok, vol_ratio = _check_volume_confirmation(analysis, "H1")
+    if vol_ok and vol_ratio > 1.2:
+        pos_pts += 1
+        pos_details.append(f"Volumen alto ({vol_ratio:.1f}x)")
+    elif not vol_ok:
+        neg_pts += 1
+        neg_details.append("Volumen bajo")
+
+    # 8. Reversal pattern
+    has_rev, _ = _has_reversal_pattern(analysis, direction)
+    if has_rev:
+        pos_pts += 1
+        pos_details.append("Patron de velas a favor")
+
+    # 9. MACD alignment
+    macd_h1 = analysis.macd_values.get("H1", {})
+    if macd_h1:
+        if direction == "BUY" and macd_h1.get("bullish", False):
+            pos_pts += 1
+            pos_details.append("MACD H1 alcista")
+        elif direction == "SELL" and not macd_h1.get("bullish", True):
+            pos_pts += 1
+            pos_details.append("MACD H1 bajista")
+        else:
+            neg_pts += 1
+            neg_details.append("MACD H1 en contra")
+
+    # 10. SMA 200 position
+    sma_d200 = analysis.sma_d200
+    if sma_d200 and entry_price:
+        if direction == "BUY" and entry_price > sma_d200:
+            pos_pts += 1
+            pos_details.append("Precio sobre SMA 200 D")
+        elif direction == "SELL" and entry_price < sma_d200:
+            pos_pts += 1
+            pos_details.append("Precio bajo SMA 200 D")
+        else:
+            neg_pts += 1
+            neg_details.append("SMA 200 D en contra")
+
+    return pos_pts, neg_pts, pos_details, neg_details
+
+
+def _check_limit_entry_confluence(
+    analysis: AnalysisResult, direction: str, entry_price: float
+) -> Tuple[bool, Optional[float], str]:
+    """
+    TradingLab Limit Entry: requires 3-level confluence (Fibonacci + EMA + S/R/FVG).
+    Returns (should_use_limit, limit_price, description).
+    """
+    if not entry_price:
+        return False, None, ""
+
+    tolerance = entry_price * 0.003  # 0.3%
+    confluence_levels: List[Tuple[float, str]] = []
+
+    # Check Fibonacci levels near price
+    for fib_key in ("0.382", "0.5", "0.618"):
+        fib_val = analysis.fibonacci_levels.get(fib_key)
+        if fib_val and abs(entry_price - fib_val) < tolerance:
+            confluence_levels.append((fib_val, f"Fib {fib_key}"))
+
+    # Check EMAs near price
+    for ema_key in ("EMA_H1_50", "EMA_H4_50", "EMA_H4_20"):
+        ema_v = _ema_val(analysis, ema_key)
+        if ema_v and abs(entry_price - ema_v) < tolerance:
+            confluence_levels.append((ema_v, ema_key))
+
+    # Check S/R levels near price
+    levels_key = "supports" if direction == "BUY" else "resistances"
+    for level in analysis.key_levels.get(levels_key, []):
+        if abs(entry_price - level) < tolerance:
+            confluence_levels.append((level, "S/R diario"))
+            break
+
+    # Check FVG near price
+    for fvg_mid in analysis.key_levels.get("fvg", [])[-10:]:
+        if abs(entry_price - fvg_mid) < tolerance:
+            confluence_levels.append((fvg_mid, "FVG"))
+            break
+
+    if len(confluence_levels) >= 3:
+        # Calculate optimal limit price as average of confluences
+        avg_price = sum(p for p, _ in confluence_levels) / len(confluence_levels)
+        names = ", ".join(n for _, n in confluence_levels[:4])
+        return True, avg_price, f"Limit entry: {len(confluence_levels)} niveles ({names})"
+
+    return False, None, ""
+
+
 def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
     """
     Clasifica la variante Blue (A, B, C) revisando condiciones en 4H.
@@ -403,10 +636,46 @@ class BaseStrategy(ABC):
             signal.confidence = min(100.0, signal.confidence + htf_score)
             signal.conditions_met = htf_met + signal.conditions_met
             signal.conditions_failed = htf_failed + signal.conditions_failed
+
+            # TradingLab: Count positive/negative confluence points
+            pos_pts, neg_pts, pos_details, neg_details = _count_confluence_points(
+                analysis, signal.direction, signal.entry_price
+            )
+            signal.confluence_score = pos_pts
+            signal.anti_confluence_score = neg_pts
+            # Bonus for high confluence
+            if pos_pts >= 7:
+                signal.confidence = min(100.0, signal.confidence + 10.0)
+                signal.conditions_met.append(
+                    f"Alta confluencia: {pos_pts} puntos positivos vs {neg_pts} negativos"
+                )
+            elif pos_pts >= 5:
+                signal.confidence = min(100.0, signal.confidence + 5.0)
+                signal.conditions_met.append(
+                    f"Confluencia moderada: {pos_pts}+ vs {neg_pts}-"
+                )
+            if neg_pts >= 5:
+                signal.confidence = max(0.0, signal.confidence - 10.0)
+                signal.conditions_failed.append(
+                    f"Muchos puntos negativos: {neg_pts} (detalles: {', '.join(neg_details[:3])})"
+                )
+
+            # TradingLab: Check for limit entry opportunity (3-level confluence)
+            limit_ok, limit_price, limit_desc = _check_limit_entry_confluence(
+                analysis, signal.direction, signal.entry_price
+            )
+            if limit_ok and limit_price:
+                signal.entry_type = "LIMIT"
+                signal.limit_price = limit_price
+                signal.confidence = min(100.0, signal.confidence + 5.0)
+                signal.conditions_met.append(limit_desc)
+
             logger.info(
                 f"[{self.color.value}] SETUP detectado {analysis.instrument} "
                 f"| {signal.direction} | Confianza: {signal.confidence:.0f}% "
-                f"| Variante: {signal.strategy_variant}"
+                f"| Variante: {signal.strategy_variant} "
+                f"| Confluencia: +{pos_pts}/-{neg_pts} "
+                f"| Entrada: {signal.entry_type}"
             )
         return signal
 
@@ -585,6 +854,12 @@ class BlueStrategy(BaseStrategy):
         if has_div:
             confidence += div_bonus
 
+        # TradingLab SMC: Order Block / FVG / BOS confluence
+        smc_ok, smc_bonus, smc_desc = _check_smc_confluence(analysis, direction, entry_price)
+        if smc_ok:
+            confidence += smc_bonus
+            met.append(f"SMC: {smc_desc}")
+
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
         tp_levels = self.get_tp_levels(analysis, direction, entry_price)
@@ -670,8 +945,10 @@ class BlueStrategy(BaseStrategy):
             return max(candidates)
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
-        """TP en EMA 50 4H."""
+        """TP1 en EMA 50 4H. TP_max en siguiente resistencia/soporte mas alla de TP1."""
         ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
+        resistances = analysis.key_levels.get("resistances", [])
+        supports = analysis.key_levels.get("supports", [])
 
         result: Dict[str, float] = {}
         if ema_4h_50 and ema_4h_50 > 0:
@@ -679,15 +956,25 @@ class BlueStrategy(BaseStrategy):
         else:
             # Fallback: resistencia/soporte mas cercano
             if direction == "BUY":
-                resistances = analysis.key_levels.get("resistances", [])
                 above = [r for r in resistances if r > entry_price]
                 if above:
                     result["tp1"] = min(above)
             else:
-                supports = analysis.key_levels.get("supports", [])
                 below = [s for s in supports if s < entry_price]
                 if below:
                     result["tp1"] = max(below)
+
+        # TP_max: next resistance/support beyond TP1
+        tp1 = result.get("tp1")
+        if tp1:
+            if direction == "BUY":
+                above_tp1 = sorted([r for r in resistances if r > tp1])
+                if above_tp1:
+                    result["tp_max"] = above_tp1[0]
+            else:
+                below_tp1 = sorted([s for s in supports if s < tp1], reverse=True)
+                if below_tp1:
+                    result["tp_max"] = below_tp1[0]
 
         return result
 
@@ -846,6 +1133,12 @@ class RedStrategy(BaseStrategy):
         has_div, div_bonus = _check_rsi_divergence(analysis, direction)
         if has_div:
             confidence += div_bonus
+
+        # TradingLab SMC: Order Block / FVG / BOS confluence
+        smc_ok, smc_bonus, smc_desc = _check_smc_confluence(analysis, direction, entry_price)
+        if smc_ok:
+            confidence += smc_bonus
+            met.append(f"SMC: {smc_desc}")
 
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -1116,6 +1409,12 @@ class PinkStrategy(BaseStrategy):
         if has_div:
             confidence += div_bonus
 
+        # TradingLab SMC: Order Block / FVG / BOS confluence
+        smc_ok, smc_bonus, smc_desc = _check_smc_confluence(analysis, direction, entry_price)
+        if smc_ok:
+            confidence += smc_bonus
+            met.append(f"SMC: {smc_desc}")
+
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
         tp_levels = self.get_tp_levels(analysis, direction, entry_price)
@@ -1352,6 +1651,12 @@ class WhiteStrategy(BaseStrategy):
         if has_div:
             confidence += div_bonus
 
+        # TradingLab SMC: Order Block / FVG / BOS confluence
+        smc_ok, smc_bonus, smc_desc = _check_smc_confluence(analysis, direction, entry_price)
+        if smc_ok:
+            confidence += smc_bonus
+            met.append(f"SMC: {smc_desc}")
+
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
         tp_levels = self.get_tp_levels(analysis, direction, entry_price)
@@ -1422,7 +1727,8 @@ class WhiteStrategy(BaseStrategy):
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
-        """TP en el nivel objetivo de Pink (extremo del swing previo)."""
+        """TP en el nivel objetivo de Pink (extremo del swing previo).
+        TP_max = maximum/minimum of 4H impulse (approx via EMA H4 values or S/R levels)."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
         result: Dict[str, float] = {}
@@ -1441,6 +1747,21 @@ class WhiteStrategy(BaseStrategy):
                 result["tp1"] = sorted_below[0]
                 if len(sorted_below) > 1:
                     result["tp_max"] = sorted_below[1]
+
+        # TP_max override: use max/min of 4H impulse if available from EMA values
+        # Approximate the 4H impulse extreme using the highest/lowest EMA H4 values
+        ema_h4_50 = _ema_val(analysis, "EMA_H4_50")
+        ema_h4_20 = _ema_val(analysis, "EMA_H4_20")
+        if ema_h4_50 and ema_h4_20:
+            if direction == "BUY":
+                # Impulse max: estimate using the spread between fast and slow EMA
+                impulse_max = ema_h4_20 + abs(ema_h4_20 - ema_h4_50) * 2.0
+                if "tp_max" not in result or impulse_max > result.get("tp_max", 0):
+                    result["tp_max"] = impulse_max
+            else:
+                impulse_min = ema_h4_20 - abs(ema_h4_20 - ema_h4_50) * 2.0
+                if "tp_max" not in result or impulse_min < result.get("tp_max", float("inf")):
+                    result["tp_max"] = impulse_min
 
         return result
 
@@ -1620,6 +1941,12 @@ class BlackStrategy(BaseStrategy):
         has_div, div_bonus = _check_rsi_divergence(analysis, direction)
         if has_div:
             confidence += div_bonus
+
+        # TradingLab SMC: Order Block / FVG / BOS confluence
+        smc_ok, smc_bonus, smc_desc = _check_smc_confluence(analysis, direction, entry_price)
+        if smc_ok:
+            confidence += smc_bonus
+            met.append(f"SMC: {smc_desc}")
 
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -1863,6 +2190,12 @@ class GreenStrategy(BaseStrategy):
         if has_div:
             confidence += div_bonus
 
+        # TradingLab SMC: Order Block / FVG / BOS confluence
+        smc_ok, smc_bonus, smc_desc = _check_smc_confluence(analysis, direction, entry_price)
+        if smc_ok:
+            confidence += smc_bonus
+            met.append(f"SMC: {smc_desc}")
+
         # --- Paso 5: Entrada en 15M (RCC: Ruptura + Cierre + Confirmación) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         ema_5m_20_break, ema_5m_20_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
@@ -1993,13 +2326,13 @@ class GreenStrategy(BaseStrategy):
             if above:
                 result["tp1"] = above[0]  # Primer nivel de resistencia
                 if len(above) > 1:
-                    result["tp_max"] = above[-1]  # El mas lejano para maximo R:R
+                    result["tp_max"] = above[1]  # Segundo nivel diario S/R (daily previous high)
         else:
             below = sorted([s for s in supports if s < entry_price], reverse=True)
             if below:
                 result["tp1"] = below[0]  # Primer nivel de soporte
                 if len(below) > 1:
-                    result["tp_max"] = below[-1]  # El mas lejano
+                    result["tp_max"] = below[1]  # Segundo nivel diario S/R (daily previous low)
 
         # Tambien considerar extensiones Fibonacci para TP_max
         fib_1272 = analysis.fibonacci_levels.get("1.272")

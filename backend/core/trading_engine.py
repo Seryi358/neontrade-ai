@@ -442,6 +442,9 @@ class TradingEngine:
                 self._daily_summary_sent_date = now.date()
                 asyncio.create_task(self._send_daily_summary())
 
+        # Monthly ASR (After Session Review) on the 1st at ~08:00 UTC
+        await self._maybe_send_monthly_asr(now)
+
         if market_open:
             # Check Friday close rule
             if self._should_close_friday(now):
@@ -514,6 +517,29 @@ class TradingEngine:
             logger.debug(f"Equity snapshot failed (non-critical): {e}")
 
     # ── Market Hours ─────────────────────────────────────────────
+
+    def _get_session_quality(self, now: datetime) -> tuple:
+        """
+        Return (session_name, quality_score) based on current UTC hour.
+
+        High-liquidity sessions produce better setups:
+        - OVERLAP (London+NY, 12:00-16:00 UTC): 1.0
+        - LONDON (08:00-12:00 UTC): 0.9
+        - NEW_YORK (16:00-21:00 UTC): 0.8
+        - ASIAN (00:00-08:00 UTC): 0.5
+        - OFF_HOURS: 0.3
+        """
+        hour = now.hour
+        if 12 <= hour < 16:
+            return ("OVERLAP", 1.0)
+        elif 8 <= hour < 12:
+            return ("LONDON", 0.9)
+        elif 16 <= hour < 21:
+            return ("NEW_YORK", 0.8)
+        elif 0 <= hour < 8:
+            return ("ASIAN", 0.5)
+        else:
+            return ("OFF_HOURS", 0.3)
 
     def _is_market_open(self, now: datetime) -> bool:
         """Check if forex market is open (Mon-Fri, trading hours)."""
@@ -707,6 +733,15 @@ class TradingEngine:
                 setup = await self._detect_setup(analysis)
                 if setup:
                     self._daily_setups_found += 1
+
+                    # Log session quality for the detected setup
+                    now_utc = datetime.now(timezone.utc)
+                    session_name, session_quality = self._get_session_quality(now_utc)
+                    logger.info(
+                        f"Setup on {instrument} during {session_name} session "
+                        f"(quality={session_quality:.1f})"
+                    )
+
                     # Re-generate explanation with the setup signal context
                     # (setup is TradeRisk, not SetupSignal, so we pass what we can)
                     await self._handle_setup(setup, analysis, explanation)
@@ -805,6 +840,8 @@ class TradingEngine:
             reward_risk_ratio=rr,
             entry_price=signal.entry_price,
             direction=signal.direction,
+            entry_type=getattr(signal, 'entry_type', 'MARKET'),
+            limit_price=getattr(signal, 'limit_price', None),
         )
 
     def _calculate_sl_tp(
@@ -967,10 +1004,15 @@ class TradingEngine:
     # ── Trade Execution ──────────────────────────────────────────
 
     async def _execute_setup(self, setup: TradeRisk):
-        """Execute a validated trading setup (AUTO mode)."""
+        """Execute a validated trading setup (AUTO mode).
+        Supports MARKET and LIMIT entry types from TradingLab."""
+        entry_type = getattr(setup, 'entry_type', 'MARKET')
+        limit_price = getattr(setup, 'limit_price', None)
+
         logger.info("=" * 50)
         logger.info(f"EXECUTING TRADE: {setup.direction} {setup.instrument}")
-        logger.info(f"  Entry: {setup.entry_price:.5f}")
+        logger.info(f"  Entry Type: {entry_type}")
+        logger.info(f"  Entry: {setup.entry_price:.5f}" + (f" (Limit: {limit_price:.5f})" if limit_price else ""))
         logger.info(f"  SL: {setup.stop_loss:.5f}")
         logger.info(f"  TP1: {setup.take_profit_1:.5f}")
         logger.info(f"  Units: {setup.units}")
@@ -980,12 +1022,24 @@ class TradingEngine:
         logger.info("=" * 50)
 
         try:
-            result = await self.broker.place_market_order(
-                instrument=setup.instrument,
-                units=setup.units,
-                stop_loss=setup.stop_loss,
-                take_profit=setup.take_profit_1,
-            )
+            # TradingLab: Support limit entries for confluence zones
+            if entry_type == "LIMIT" and limit_price and hasattr(self.broker, 'place_limit_order'):
+                result = await self.broker.place_limit_order(
+                    instrument=setup.instrument,
+                    units=setup.units,
+                    price=limit_price,
+                    stop_loss=setup.stop_loss,
+                    take_profit=setup.take_profit_1,
+                )
+                logger.info(f"Limit order placed at {limit_price:.5f} for {setup.instrument}")
+            else:
+                # Default: market order
+                result = await self.broker.place_market_order(
+                    instrument=setup.instrument,
+                    units=setup.units,
+                    stop_loss=setup.stop_loss,
+                    take_profit=setup.take_profit_1,
+                )
 
             # result is now an OrderResult dataclass
             if not result.success:
@@ -1174,6 +1228,74 @@ class TradingEngine:
                     )
             except Exception as e:
                 logger.warning(f"AI daily report failed: {e}")
+
+    # ── Monthly ASR ────────────────────────────────────────────
+
+    async def _maybe_send_monthly_asr(self, now: datetime):
+        """Send monthly ASR (After Session Review) on the 1st of each month."""
+        if now.day != 1 or now.hour != 8 or now.minute > 2:
+            return
+        if not self._db or not self.alert_manager:
+            return
+        if hasattr(self, '_monthly_asr_sent') and self._monthly_asr_sent == now.strftime("%Y-%m"):
+            return
+
+        self._monthly_asr_sent = now.strftime("%Y-%m")
+
+        try:
+            # Get last month's trades from DB
+            first_of_this = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_month_end = first_of_this - timedelta(seconds=1)
+            last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            trades = await self._db.get_trades_between(
+                last_month_start.isoformat(),
+                last_month_end.isoformat(),
+            )
+
+            if not trades:
+                logger.info("Monthly ASR: No trades last month")
+                return
+
+            # Calculate stats
+            total = len(trades)
+            wins = sum(1 for t in trades if t.get("pnl", 0) > 0)
+            losses = total - wins
+            win_rate = (wins / total * 100) if total > 0 else 0
+            total_pnl = sum(t.get("pnl", 0) for t in trades)
+            avg_rr = sum(t.get("risk_reward_ratio", 0) for t in trades) / max(total, 1)
+
+            # Best strategy
+            strategy_counts = {}
+            for t in trades:
+                s = t.get("strategy", "UNKNOWN")
+                if s not in strategy_counts:
+                    strategy_counts[s] = {"count": 0, "pnl": 0}
+                strategy_counts[s]["count"] += 1
+                strategy_counts[s]["pnl"] += t.get("pnl", 0)
+
+            best_strategy = max(strategy_counts.items(), key=lambda x: x[1]["pnl"])[0] if strategy_counts else "N/A"
+
+            month_name = last_month_start.strftime("%B %Y")
+
+            report = (
+                f"REPORTE MENSUAL ASR -- {month_name}\n\n"
+                f"Total trades: {total}\n"
+                f"Ganados: {wins} | Perdidos: {losses}\n"
+                f"Win Rate: {win_rate:.1f}%\n"
+                f"PnL Total: ${total_pnl:.2f}\n"
+                f"R:R Promedio: {avg_rr:.2f}\n"
+                f"Mejor estrategia: {best_strategy}\n\n"
+                f"Estrategias:\n"
+            )
+            for s, data in sorted(strategy_counts.items(), key=lambda x: -x[1]["pnl"]):
+                report += f"  {s}: {data['count']} trades, PnL ${data['pnl']:.2f}\n"
+
+            await self.alert_manager.send_engine_status("MONTHLY_ASR", report)
+            logger.info(f"Monthly ASR sent for {month_name}")
+
+        except Exception as e:
+            logger.error(f"Monthly ASR failed: {e}")
 
     # ── Daily Heartbeat ─────────────────────────────────────────
 

@@ -18,6 +18,7 @@ LTF Analysis (4H, 1H, 15m, 5m, 2m):
 
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 import pandas as pd
 import numpy as np
@@ -76,6 +77,10 @@ class AnalysisResult:
     last_candles: Dict[str, List[Dict]] = field(default_factory=dict)
     # Current price (latest ask/bid midpoint from M5 close)
     current_price: Optional[float] = None
+    # Active trading session (ASIAN, LONDON, OVERLAP, NEW_YORK, OFF_HOURS)
+    session: Optional[str] = None
+    # Elliott Wave detail from daily candle analysis
+    elliott_wave_detail: Dict[str, Any] = field(default_factory=dict)
 
 
 class MarketAnalyzer:
@@ -224,6 +229,14 @@ class MarketAnalyzer:
         m5_df = candles.get("M5", pd.DataFrame())
         current_price = float(m5_df.iloc[-1]["close"]) if not m5_df.empty else None
 
+        # Step 18: Trading session detection
+        session = self._detect_session()
+
+        # Step 19: Elliott Wave counting from daily candles
+        elliott_wave_detail = self._count_elliott_waves(
+            candles.get("D", pd.DataFrame())
+        )
+
         return AnalysisResult(
             instrument=instrument,
             htf_trend=htf_trend,
@@ -247,6 +260,8 @@ class MarketAnalyzer:
             sma_d200=sma_d200_val,
             last_candles=last_candles,
             current_price=current_price,
+            session=session,
+            elliott_wave_detail=elliott_wave_detail,
         )
 
     def _candles_to_dataframe(self, candles) -> pd.DataFrame:
@@ -842,3 +857,188 @@ class MarketAnalyzer:
                     })
 
         return breaks[-10:]
+
+    # ── Trading Session Detection ─────────────────────────────────────
+
+    def _detect_session(self) -> str:
+        """
+        Return the currently active trading session based on UTC hour.
+
+        Sessions:
+          ASIAN     : 00:00-08:00 UTC (Tokyo/Sydney)
+          LONDON    : 08:00-12:00 UTC
+          OVERLAP   : 12:00-16:00 UTC (London+NY overlap - highest volatility)
+          NEW_YORK  : 16:00-21:00 UTC
+          OFF_HOURS : 21:00-00:00 UTC
+        """
+        utc_hour = datetime.now(timezone.utc).hour
+
+        if 0 <= utc_hour < 8:
+            return "ASIAN"
+        elif 8 <= utc_hour < 12:
+            return "LONDON"
+        elif 12 <= utc_hour < 16:
+            return "OVERLAP"
+        elif 16 <= utc_hour < 21:
+            return "NEW_YORK"
+        else:
+            return "OFF_HOURS"
+
+    # ── Basic Elliott Wave Counting ───────────────────────────────────
+
+    def _count_elliott_waves(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Estimate the current Elliott Wave position from daily candles.
+
+        Algorithm:
+        1. Find swing highs and lows (5-bar pivots).
+        2. Determine major trend direction from swing points.
+        3. Count alternating impulse / correction legs:
+           - Uptrend: HH + HL = impulse, LH + LL = correction
+           - Downtrend: LL + LH = impulse, HL + HH = correction
+        4. Map wave count to strategy colour suggestion:
+           Wave 1  -> BLACK   (first impulse after reversal)
+           Wave 2  -> BLUE    (first correction, 1-2 setup)
+           Wave 3  -> RED     (strongest impulse, 2-3 setup)
+           Wave 4  -> PINK    (second correction, 4->5 setup)
+           Wave 5  -> WHITE/GREEN (final impulse)
+           A/B/C   -> corrective strategy mapping
+
+        Returns dict with wave_count, phase, suggested_strategy.
+        """
+        if df.empty or len(df) < 30:
+            return {}
+
+        data = df.reset_index(drop=True)
+
+        # ── Step 1: Find swing highs and lows (5-bar pivots) ──
+        swing_highs: List[Tuple[int, float]] = []
+        swing_lows: List[Tuple[int, float]] = []
+
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                data["high"].iloc[i] > data["high"].iloc[i - 2] and
+                data["high"].iloc[i] > data["high"].iloc[i + 1] and
+                data["high"].iloc[i] > data["high"].iloc[i + 2]):
+                swing_highs.append((i, float(data["high"].iloc[i])))
+
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                data["low"].iloc[i] < data["low"].iloc[i - 2] and
+                data["low"].iloc[i] < data["low"].iloc[i + 1] and
+                data["low"].iloc[i] < data["low"].iloc[i + 2]):
+                swing_lows.append((i, float(data["low"].iloc[i])))
+
+        if len(swing_highs) < 3 or len(swing_lows) < 3:
+            return {}
+
+        # ── Step 2: Merge swing points chronologically ──
+        swings: List[Tuple[int, float, str]] = []
+        for idx, val in swing_highs:
+            swings.append((idx, val, "H"))
+        for idx, val in swing_lows:
+            swings.append((idx, val, "L"))
+        swings.sort(key=lambda s: s[0])
+
+        # Remove consecutive same-type entries (keep extreme)
+        filtered: List[Tuple[int, float, str]] = [swings[0]]
+        for s in swings[1:]:
+            if s[2] == filtered[-1][2]:
+                # Same type: keep the more extreme value
+                if s[2] == "H" and s[1] > filtered[-1][1]:
+                    filtered[-1] = s
+                elif s[2] == "L" and s[1] < filtered[-1][1]:
+                    filtered[-1] = s
+            else:
+                filtered.append(s)
+
+        if len(filtered) < 5:
+            return {}
+
+        # ── Step 3: Determine trend direction from recent swings ──
+        recent = filtered[-6:]  # last ~3 pairs of H/L
+        highs_in_recent = [v for _, v, t in recent if t == "H"]
+        lows_in_recent = [v for _, v, t in recent if t == "L"]
+
+        uptrend = False
+        downtrend = False
+
+        if len(highs_in_recent) >= 2 and len(lows_in_recent) >= 2:
+            hh = highs_in_recent[-1] > highs_in_recent[-2]
+            hl = lows_in_recent[-1] > lows_in_recent[-2]
+            ll = lows_in_recent[-1] < lows_in_recent[-2]
+            lh = highs_in_recent[-1] < highs_in_recent[-2]
+
+            if hh and hl:
+                uptrend = True
+            elif ll and lh:
+                downtrend = True
+
+        # ── Step 4: Count waves ──
+        # Walk through filtered swings and count alternating impulse/correction
+        # legs relative to the detected trend.
+        wave_count = 0
+        phase = "impulse"
+        prev_swing = filtered[0]
+        in_impulse = True
+
+        for s in filtered[1:]:
+            if uptrend or (not downtrend):
+                # Uptrend logic (default when ranging)
+                if s[2] == "H" and in_impulse:
+                    if s[1] >= prev_swing[1]:
+                        # Impulse leg continues / completes
+                        wave_count += 1
+                        in_impulse = False  # next expect correction
+                elif s[2] == "L" and not in_impulse:
+                    # Correction leg
+                    wave_count += 1
+                    in_impulse = True  # next expect impulse
+                    if wave_count > 5:
+                        # Switch to corrective phase
+                        phase = "corrective"
+            else:
+                # Downtrend logic (mirrored)
+                if s[2] == "L" and in_impulse:
+                    if s[1] <= prev_swing[1]:
+                        wave_count += 1
+                        in_impulse = False
+                elif s[2] == "H" and not in_impulse:
+                    wave_count += 1
+                    in_impulse = True
+                    if wave_count > 5:
+                        phase = "corrective"
+
+            prev_swing = s
+
+        # ── Step 5: Map to Elliott label and strategy colour ──
+        strategy_map_impulse = {
+            1: "BLACK",
+            2: "BLUE",
+            3: "RED",
+            4: "PINK",
+            5: "WHITE/GREEN",
+        }
+        strategy_map_corrective = {
+            "A": "BLACK",
+            "B": "BLUE",
+            "C": "RED",
+        }
+
+        if phase == "impulse":
+            # Clamp to 1-5 range
+            effective_wave = max(1, min(wave_count, 5))
+            wave_label = str(effective_wave)
+            suggested = strategy_map_impulse.get(effective_wave, "BLACK")
+        else:
+            # Corrective: waves beyond 5 map to A, B, C
+            corrective_idx = (wave_count - 5) if wave_count > 5 else wave_count
+            corrective_idx = max(1, min(corrective_idx, 3))
+            labels = {1: "A", 2: "B", 3: "C"}
+            wave_label = labels.get(corrective_idx, "A")
+            suggested = strategy_map_corrective.get(wave_label, "BLACK")
+
+        return {
+            "wave_count": wave_label,
+            "phase": phase,
+            "suggested_strategy": suggested,
+        }

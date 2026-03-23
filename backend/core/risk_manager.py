@@ -58,6 +58,8 @@ class TradeRisk:
     reward_risk_ratio: float
     entry_price: float
     direction: str  # "BUY" or "SELL"
+    entry_type: str = "MARKET"  # MARKET, LIMIT, or STOP
+    limit_price: Optional[float] = None  # Price for limit/stop orders
 
 
 @dataclass

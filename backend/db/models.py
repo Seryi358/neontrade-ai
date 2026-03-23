@@ -231,6 +231,17 @@ class TradeDatabase:
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
+    async def get_trades_between(self, start_iso: str, end_iso: str) -> list:
+        """Get trades between two ISO datetime strings."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM trades WHERE opened_at >= ? AND opened_at <= ? ORDER BY opened_at",
+                (start_iso, end_iso),
+            )
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
     # ── Daily Stats ───────────────────────────────────────────────
 
     async def get_daily_stats(self, date: str) -> dict:

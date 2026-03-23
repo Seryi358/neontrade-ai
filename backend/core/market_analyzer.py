@@ -81,6 +81,10 @@ class AnalysisResult:
     session: Optional[str] = None
     # Elliott Wave detail from daily candle analysis
     elliott_wave_detail: Dict[str, Any] = field(default_factory=dict)
+    # Pivot Points (P, S1, S2, R1, R2) from daily data
+    pivot_points: Dict[str, float] = field(default_factory=dict)
+    # Premium/Discount zone: "premium", "discount", "equilibrium", or None
+    premium_discount_zone: Optional[str] = None
 
 
 class MarketAnalyzer:
@@ -237,6 +241,16 @@ class MarketAnalyzer:
             candles.get("D", pd.DataFrame())
         )
 
+        # Step 20: Pivot Points from daily candles
+        pivot_points = self._calculate_pivot_points(
+            candles.get("D", pd.DataFrame())
+        )
+
+        # Step 21: Premium/Discount zone detection
+        premium_discount_zone = self._detect_premium_discount(
+            candles.get("D", pd.DataFrame()), current_price
+        )
+
         return AnalysisResult(
             instrument=instrument,
             htf_trend=htf_trend,
@@ -262,6 +276,8 @@ class MarketAnalyzer:
             current_price=current_price,
             session=session,
             elliott_wave_detail=elliott_wave_detail,
+            pivot_points=pivot_points,
+            premium_discount_zone=premium_discount_zone,
         )
 
     def _candles_to_dataframe(self, candles) -> pd.DataFrame:
@@ -1042,3 +1058,78 @@ class MarketAnalyzer:
             "phase": phase,
             "suggested_strategy": suggested,
         }
+
+    # ── Pivot Points (TradingLab ch12) ─────────────────────────────────
+
+    def _calculate_pivot_points(self, df: pd.DataFrame) -> Dict[str, float]:
+        """
+        Calculate Standard Pivot Points from the previous daily candle.
+
+        P  = (H + L + C) / 3
+        R1 = 2*P - L
+        S1 = 2*P - H
+        R2 = P + (H - L)
+        S2 = P - (H - L)
+
+        These act as intraday S/R levels used by institutional traders.
+        """
+        if df.empty or len(df) < 2:
+            return {}
+
+        # Use the last completed daily candle (second-to-last row)
+        prev = df.iloc[-2]
+        h = float(prev["high"])
+        l = float(prev["low"])
+        c = float(prev["close"])
+
+        p = (h + l + c) / 3.0
+        r1 = 2.0 * p - l
+        s1 = 2.0 * p - h
+        r2 = p + (h - l)
+        s2 = p - (h - l)
+
+        return {
+            "P": round(p, 5),
+            "R1": round(r1, 5),
+            "R2": round(r2, 5),
+            "S1": round(s1, 5),
+            "S2": round(s2, 5),
+        }
+
+    # ── Premium / Discount Zone Detection (TradingLab SMC) ────────────
+
+    def _detect_premium_discount(
+        self, df: pd.DataFrame, current_price: Optional[float]
+    ) -> Optional[str]:
+        """
+        Detect whether price is in the Premium, Discount, or Equilibrium zone.
+
+        From TradingLab SMC:
+        - Use the recent daily swing range (high to low over last 20-60 candles).
+        - Divide into three zones:
+          * Premium  : upper 33% of range (favor SELL setups)
+          * Equilibrium: middle 34% (neutral)
+          * Discount : lower 33% of range (favor BUY setups)
+
+        Returns "premium", "discount", "equilibrium", or None.
+        """
+        if df.empty or len(df) < 20 or current_price is None:
+            return None
+
+        recent = df.tail(60)
+        swing_high = float(recent["high"].max())
+        swing_low = float(recent["low"].min())
+        rng = swing_high - swing_low
+
+        if rng <= 0:
+            return None
+
+        # Calculate position within the range (0.0 = swing low, 1.0 = swing high)
+        position = (current_price - swing_low) / rng
+
+        if position >= 0.667:
+            return "premium"
+        elif position <= 0.333:
+            return "discount"
+        else:
+            return "equilibrium"

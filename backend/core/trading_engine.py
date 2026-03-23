@@ -197,6 +197,12 @@ class TradingEngine:
         # Equity snapshot tracking (record every 10 minutes)
         self._last_equity_snapshot: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
+        # Reentry tracking: instrument -> {"tp1_time": datetime, "direction": str, "count": int}
+        # TradingLab rule: after TP1 hit, allow one reentry in same direction
+        # if pullback to EMA occurs within 30 minutes and new RCC forms
+        self._reentry_candidates: Dict[str, Dict] = {}
+        self._max_reentries_per_setup: int = 1
+
         # Daily activity counters (reset each day) — proves the app was alive
         self._daily_scan_count: int = 0
         self._daily_setups_found: int = 0
@@ -586,6 +592,21 @@ class TradingEngine:
                     logger.info(
                         f"Position {tid} ({pos.instrument}) closed externally — removed from tracking"
                     )
+
+                    # TradingLab: Register reentry candidate if position was profitable
+                    # (TP1 was likely hit if it was in BEYOND_TP1 phase or profitable)
+                    if pos.phase in (PositionPhase.BEYOND_TP1, PositionPhase.TRAILING_TO_TP1):
+                        self._reentry_candidates[pos.instrument] = {
+                            "tp1_time": datetime.now(timezone.utc),
+                            "direction": pos.direction,
+                            "count": 0,
+                            "entry_price": pos.entry_price,
+                        }
+                        logger.info(
+                            f"Reentry candidate registered: {pos.instrument} {pos.direction} "
+                            f"(TP1 reached, 30min window)"
+                        )
+
                     if self._ws_broadcast:
                         await self._ws_broadcast("trade_closed", {
                             "trade_id": tid,
@@ -716,6 +737,21 @@ class TradingEngine:
                     for pos in self.position_manager.positions.values()
                 ):
                     continue
+
+                # TradingLab: Check reentry opportunity after TP1
+                # Skip normal scan if we just handle reentry below
+                reentry_info = self._reentry_candidates.get(instrument)
+                if reentry_info and reentry_info.get("count", 0) < self._max_reentries_per_setup:
+                    tp1_time = reentry_info.get("tp1_time")
+                    now_utc = datetime.now(timezone.utc)
+                    # Reentry window: 30 minutes after TP1
+                    if tp1_time and (now_utc - tp1_time).total_seconds() < 1800:
+                        # Still in reentry window - normal scan will handle it
+                        # The setup detection will find a new entry if conditions hold
+                        pass
+                    else:
+                        # Reentry window expired, clear candidate
+                        del self._reentry_candidates[instrument]
 
                 # Run full analysis
                 analysis = await self.market_analyzer.full_analysis(instrument)
@@ -1103,6 +1139,16 @@ class TradingEngine:
                 )
                 self._daily_setups_executed += 1
                 logger.info(f"Trade {trade_id} opened and tracked")
+
+                # TradingLab: Track reentry count
+                if setup.instrument in self._reentry_candidates:
+                    self._reentry_candidates[setup.instrument]["count"] = (
+                        self._reentry_candidates[setup.instrument].get("count", 0) + 1
+                    )
+                    logger.info(
+                        f"Reentry #{self._reentry_candidates[setup.instrument]['count']} "
+                        f"executed for {setup.instrument}"
+                    )
 
                 # Send external alerts
                 if self.alert_manager:

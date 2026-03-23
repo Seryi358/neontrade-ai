@@ -328,6 +328,127 @@ def _check_weekly_ema8_filter(analysis, direction: str) -> bool:
         return current_price <= ema_w8
 
 
+def _check_premium_discount_zone(analysis, direction: str) -> tuple[bool, str]:
+    """
+    TradingLab SMC: Check if price is in the correct zone for the trade direction.
+    BUY should be in DISCOUNT zone, SELL in PREMIUM zone.
+    Returns (favorable, description).
+    """
+    zone = getattr(analysis, 'premium_discount_zone', None)
+    if zone is None:
+        return True, ""  # No data = don't block
+
+    if direction == "BUY" and zone == "discount":
+        return True, "Precio en zona de DESCUENTO (favorable para compra)"
+    elif direction == "SELL" and zone == "premium":
+        return True, "Precio en zona PREMIUM (favorable para venta)"
+    elif zone == "equilibrium":
+        return True, "Precio en zona de equilibrio (neutral)"
+    else:
+        return False, f"Precio en zona {zone} ({direction} desfavorable)"
+
+
+def _check_pivot_confluence(analysis, direction: str, entry_price: float) -> tuple[bool, float, str]:
+    """
+    Check if entry price is near a Pivot Point level (acts as S/R).
+    Returns (near_pivot, bonus_points, description).
+    """
+    pivots = getattr(analysis, 'pivot_points', {})
+    if not pivots or not entry_price:
+        return False, 0.0, ""
+
+    tolerance = entry_price * 0.002  # 0.2%
+    bonus = 0.0
+    details = []
+
+    for level_name, level_val in pivots.items():
+        if abs(entry_price - level_val) < tolerance:
+            # Near a pivot level
+            if direction == "BUY" and level_name.startswith("S"):
+                bonus += 5.0
+                details.append(f"Cerca de Pivot {level_name} ({level_val:.5f}) = soporte")
+            elif direction == "SELL" and level_name.startswith("R"):
+                bonus += 5.0
+                details.append(f"Cerca de Pivot {level_name} ({level_val:.5f}) = resistencia")
+            elif level_name == "P":
+                bonus += 3.0
+                details.append(f"Cerca de Pivot P ({level_val:.5f})")
+
+    has = bonus > 0
+    desc = "Pivots: " + ", ".join(details) if details else ""
+    return has, bonus, desc
+
+
+def _validate_elliott_fibonacci(analysis, direction: str) -> tuple[bool, str]:
+    """
+    TradingLab: Validate Elliott Wave position using Fibonacci rules.
+    - Wave 2 should retrace 38.2%-61.8% of Wave 1
+    - Wave 4 should retrace 23.6%-38.2% of Wave 3
+    - Wave 3 is never the shortest impulse wave
+    Returns (valid, description).
+    """
+    ew = getattr(analysis, 'elliott_wave_detail', {})
+    if not ew:
+        return True, ""  # No data = don't block
+
+    wave_label = ew.get("wave_count", "")
+    fib = analysis.fibonacci_levels
+    price = analysis.current_price
+
+    if not price or not fib:
+        return True, ""
+
+    fib_382 = fib.get("0.382")
+    fib_618 = fib.get("0.618")
+    fib_236 = fib.get("0.236")
+
+    if wave_label == "2" and fib_382 and fib_618:
+        # Wave 2: expect price in 38.2%-61.8% retracement zone
+        low = min(fib_382, fib_618)
+        high = max(fib_382, fib_618)
+        if low <= price <= high:
+            return True, f"Onda 2: Precio en zona Fib 38.2-61.8% (retroceso valido)"
+        else:
+            return False, f"Onda 2: Precio fuera de zona Fib 38.2-61.8%"
+
+    elif wave_label == "4" and fib_236 and fib_382:
+        # Wave 4: expect shallower retracement (23.6%-38.2%)
+        low = min(fib_236, fib_382)
+        high = max(fib_236, fib_382)
+        if low <= price <= high:
+            return True, f"Onda 4: Precio en zona Fib 23.6-38.2% (retroceso valido)"
+        else:
+            # Wave 4 can also go deeper, just warn
+            return True, f"Onda 4: Retroceso profundo (fuera de 23.6-38.2%)"
+
+    return True, ""
+
+
+def _check_minimum_candle_count(analysis, ema_key: str, direction: str, min_candles: int = 3) -> bool:
+    """
+    TradingLab: Before entering on a breakout, verify at least min_candles (3-5)
+    have formed after the initial break. Prevents entering on false breakouts.
+    Checks M5 last candles to see sustained break of the EMA.
+    """
+    ema_val = _ema_val(analysis, ema_key)
+    if ema_val is None:
+        return True  # No data = don't block
+
+    m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
+    if len(m5_candles) < min_candles:
+        return True  # Not enough data to check
+
+    # Count how many of the last N candles closed on the correct side
+    count = 0
+    for candle in m5_candles[-min_candles:]:
+        if direction == "BUY" and candle["close"] > ema_val:
+            count += 1
+        elif direction == "SELL" and candle["close"] < ema_val:
+            count += 1
+
+    return count >= min_candles
+
+
 def _check_smc_confluence(analysis, direction: str, entry_price: float) -> tuple[bool, float, str]:
     """
     Check Smart Money Concepts confluence: Order Blocks, FVG, BOS/CHOCH.
@@ -500,6 +621,30 @@ def _count_confluence_points(
             neg_pts += 1
             neg_details.append("SMA 200 D en contra")
 
+    # 11. Premium/Discount zone
+    pd_ok, pd_desc = _check_premium_discount_zone(analysis, direction)
+    if pd_ok and pd_desc:
+        pos_pts += 1
+        pos_details.append(pd_desc)
+    elif not pd_ok:
+        neg_pts += 1
+        neg_details.append(pd_desc)
+
+    # 12. Pivot Point confluence
+    piv_ok, piv_bonus, piv_desc = _check_pivot_confluence(analysis, direction, entry_price)
+    if piv_ok:
+        pos_pts += 1
+        pos_details.append(piv_desc)
+
+    # 13. Elliott Wave + Fibonacci validation
+    ew_ok, ew_desc = _validate_elliott_fibonacci(analysis, direction)
+    if ew_ok and ew_desc:
+        pos_pts += 1
+        pos_details.append(ew_desc)
+    elif not ew_ok:
+        neg_pts += 1
+        neg_details.append(ew_desc)
+
     return pos_pts, neg_pts, pos_details, neg_details
 
 
@@ -539,6 +684,13 @@ def _check_limit_entry_confluence(
     for fvg_mid in analysis.key_levels.get("fvg", [])[-10:]:
         if abs(entry_price - fvg_mid) < tolerance:
             confluence_levels.append((fvg_mid, "FVG"))
+            break
+
+    # Check Pivot Points near price
+    pivots = getattr(analysis, 'pivot_points', {})
+    for piv_name, piv_val in pivots.items():
+        if piv_val and abs(entry_price - piv_val) < tolerance:
+            confluence_levels.append((piv_val, f"Pivot {piv_name}"))
             break
 
     if len(confluence_levels) >= 3:
@@ -659,6 +811,38 @@ class BaseStrategy(ABC):
                 signal.conditions_failed.append(
                     f"Muchos puntos negativos: {neg_pts} (detalles: {', '.join(neg_details[:3])})"
                 )
+
+            # TradingLab: Pivot Point confluence bonus
+            piv_ok, piv_bonus, piv_desc = _check_pivot_confluence(
+                analysis, signal.direction, signal.entry_price
+            )
+            if piv_ok:
+                signal.confidence = min(100.0, signal.confidence + piv_bonus)
+                signal.conditions_met.append(piv_desc)
+
+            # TradingLab: Premium/Discount zone check
+            pd_ok, pd_desc = _check_premium_discount_zone(analysis, signal.direction)
+            if pd_ok and pd_desc:
+                signal.confidence = min(100.0, signal.confidence + 3.0)
+                signal.conditions_met.append(pd_desc)
+            elif not pd_ok:
+                signal.confidence = max(0.0, signal.confidence - 5.0)
+                signal.conditions_failed.append(pd_desc)
+
+            # TradingLab: Minimum candle count (3 candles sustaining breakout)
+            if not _check_minimum_candle_count(analysis, "EMA_M5_5", signal.direction, 3):
+                signal.confidence = max(0.0, signal.confidence - 8.0)
+                signal.conditions_failed.append(
+                    "Rompimiento reciente: menos de 3 velas confirmando"
+                )
+
+            # TradingLab: Elliott Wave + Fibonacci validation
+            ew_ok, ew_desc = _validate_elliott_fibonacci(analysis, signal.direction)
+            if not ew_ok:
+                signal.confidence = max(0.0, signal.confidence - 5.0)
+                signal.conditions_failed.append(ew_desc)
+            elif ew_desc:
+                signal.conditions_met.append(ew_desc)
 
             # TradingLab: Check for limit entry opportunity (3-level confluence)
             limit_ok, limit_price, limit_desc = _check_limit_entry_confluence(

@@ -79,8 +79,9 @@ class Settings(BaseSettings):
     # Correlated pairs risk reduction
     correlated_risk_factor: float = 0.75  # 0.75% each instead of 1%
 
-    # Minimum reward:risk ratio to TP1 (TradingLab: 2:1 minimum, 3:1 preferred)
-    min_rr_ratio: float = 2.0
+    # Minimum reward:risk ratio to TP1 (Trading Plan: 0.80 because win rate is 61%)
+    # BLACK strategy enforces its own minimum of 2.0 separately
+    min_rr_ratio: float = 0.80
 
     # Position management
     move_sl_to_be_at: float = 0.50  # Move SL to BE when price is 50% to TP1
@@ -119,6 +120,18 @@ class Settings(BaseSettings):
     # EMAs for Day Trading
     ema_fast: int = 2    # EMA 2 periods
     ema_slow: int = 5    # EMA 5 periods
+
+    # Scalping module (Workshop de Scalping)
+    scalping_enabled: bool = False  # Toggle scalping mode
+    scalping_max_daily_dd: float = 0.05  # 5% max daily drawdown
+    scalping_max_total_dd: float = 0.10  # 10% max total drawdown
+
+    # Funded account mode (Workshop de Cuentas Fondeadas)
+    funded_account_mode: bool = False  # Enable funded account constraints
+    funded_max_daily_dd: float = 0.05  # 5% max daily drawdown
+    funded_max_total_dd: float = 0.10  # 10% max total drawdown
+    funded_no_overnight: bool = True   # Close all positions before session end
+    funded_no_news_trading: bool = True  # No trading around news events
 
     # Forex pairs watchlist (from FOREX.txt)
     forex_watchlist: List[str] = [

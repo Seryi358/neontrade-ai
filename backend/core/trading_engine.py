@@ -27,6 +27,7 @@ from core.position_manager import PositionManager, ManagedPosition, PositionPhas
 from core.market_analyzer import MarketAnalyzer, AnalysisResult, Trend
 from core.explanation_engine import ExplanationEngine, StrategyExplanation
 from core.news_filter import NewsFilter
+from core.trade_journal import TradeJournal
 from strategies.base import get_best_setup, SetupSignal
 from config import settings
 
@@ -41,6 +42,12 @@ try:
     _AI_AVAILABLE = bool(settings.openai_api_key)
 except ImportError:
     _AI_AVAILABLE = False
+
+try:
+    from core.scalping_engine import ScalpingAnalyzer, ScalpingData
+    _SCALPING_AVAILABLE = True
+except ImportError:
+    _SCALPING_AVAILABLE = False
 
 
 # ── Trading Mode ──────────────────────────────────────────────────
@@ -190,6 +197,9 @@ class TradingEngine:
         # Database reference (injected by main.py after DB init)
         self._db = None
 
+        # Trade journal (initialized with actual balance in start())
+        self.trade_journal: Optional[TradeJournal] = None
+
         # Notification queue for Electron native notifications
         self._notifications: List[Dict] = []
         self._max_notifications = 100
@@ -210,6 +220,22 @@ class TradingEngine:
         self._daily_setups_skipped_ai: int = 0
         self._daily_errors: int = 0
         self._daily_counter_date: str = ""  # YYYY-MM-DD of current counters
+
+        # ── Scalping Module (Workshop de Scalping) ──
+        self.scalping_analyzer: Optional['ScalpingAnalyzer'] = None
+        if settings.scalping_enabled and _SCALPING_AVAILABLE:
+            self.scalping_analyzer = ScalpingAnalyzer(self.broker)
+            logger.info("Scalping module ENABLED — compressed timeframes active")
+        elif settings.scalping_enabled and not _SCALPING_AVAILABLE:
+            logger.warning("Scalping enabled in config but module not available")
+
+        # Scalping drawdown tracking
+        self._scalping_daily_dd: float = 0.0  # Today's scalping P&L as fraction of balance
+        self._scalping_dd_date: str = ""       # YYYY-MM-DD for daily DD reset
+        self._scalping_total_dd: float = 0.0   # Total scalping drawdown from peak
+        self._scalping_peak_balance: float = 0.0  # Peak balance for total DD calc
+        # Scalping scan interval: 30 seconds (faster than normal 120s)
+        self._scalping_scan_interval: int = 30
 
     # ── Notifications ──────────────────────────────────────────────
 
@@ -296,6 +322,23 @@ class TradingEngine:
             logger.info(
                 f"{len(self.pending_setups)} pending setups remain from MANUAL mode"
             )
+
+    def toggle_scalping(self, enabled: bool):
+        """Enable or disable scalping mode at runtime."""
+        settings.scalping_enabled = enabled
+        if enabled and _SCALPING_AVAILABLE:
+            if self.scalping_analyzer is None:
+                self.scalping_analyzer = ScalpingAnalyzer(self.broker)
+            # Use faster scan interval for scalping
+            self._scan_interval = self._scalping_scan_interval
+            logger.info(
+                f"Scalping ENABLED — scan interval set to {self._scalping_scan_interval}s"
+            )
+        else:
+            # Restore normal scan interval
+            self._scan_interval = 120
+            if not enabled:
+                logger.info("Scalping DISABLED — scan interval restored to 120s")
 
     def get_pending_setups(self) -> List[dict]:
         """Get all pending (non-expired) setups as dicts."""
@@ -384,6 +427,11 @@ class TradingEngine:
             self.risk_manager._current_balance = balance
             self.risk_manager._peak_balance = balance
             logger.info(f"Risk manager initialized: peak_balance={balance}")
+
+            # Initialize trade journal with actual balance
+            if self.trade_journal is None:
+                self.trade_journal = TradeJournal(initial_capital=balance)
+                logger.info(f"Trade journal initialized: initial_capital={balance}")
         except Exception as e:
             logger.error(f"Failed to connect to broker: {e}")
             return
@@ -457,9 +505,21 @@ class TradingEngine:
                 await self._handle_friday_close()
                 return
 
+            # Funded account: close all positions at trading_end_hour every day
+            if settings.funded_account_mode and settings.funded_no_overnight:
+                if now.hour >= settings.trading_end_hour:
+                    await self._handle_funded_overnight_close()
+                    return
+
             # Check economic calendar for upcoming news
             has_news, news_desc = await self.news_filter.has_upcoming_news()
             if has_news:
+                # Funded account: block ALL trades during news, not just execution
+                if settings.funded_account_mode and settings.funded_no_news_trading:
+                    logger.info(
+                        f"Funded mode: news filter blocking ALL activity: {news_desc}"
+                    )
+                    return
                 logger.info(f"News filter active: {news_desc} — skipping trade execution")
                 # Still scan for analysis but don't execute
                 await self._scan_analysis_only()
@@ -573,6 +633,30 @@ class TradingEngine:
             self.position_manager.positions.clear()
             self.risk_manager._active_risks.clear()
 
+    async def _handle_funded_overnight_close(self):
+        """Close all positions at end of trading session (funded account rule)."""
+        open_trades = await self.broker.get_open_trades()
+        if open_trades:
+            logger.warning(
+                f"FUNDED OVERNIGHT CLOSE: Closing {len(open_trades)} open trades "
+                f"(no overnight holding)"
+            )
+            # Record PnL for each position before closing
+            for pos in list(self.position_manager.positions.values()):
+                try:
+                    price_data = await self.broker.get_current_price(pos.instrument)
+                    current_price = (
+                        price_data.bid if pos.direction == "BUY" else price_data.ask
+                    )
+                    pnl = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
+                    self.risk_manager.record_funded_pnl(pnl)
+                except Exception as e:
+                    logger.debug(f"Failed to calculate PnL for funded close: {e}")
+
+            await self.broker.close_all_trades()
+            self.position_manager.positions.clear()
+            self.risk_manager._active_risks.clear()
+
     # ── Position Sync ────────────────────────────────────────────
 
     async def _sync_positions_from_broker(self):
@@ -592,6 +676,23 @@ class TradingEngine:
                     logger.info(
                         f"Position {tid} ({pos.instrument}) closed externally — removed from tracking"
                     )
+
+                    # Record funded PnL from externally closed position
+                    if settings.funded_account_mode:
+                        try:
+                            price_data = await self.broker.get_current_price(pos.instrument)
+                            close_price = (
+                                price_data.bid if pos.direction == "BUY"
+                                else price_data.ask
+                            )
+                            pnl = (
+                                (close_price - pos.entry_price)
+                                if pos.direction == "BUY"
+                                else (pos.entry_price - close_price)
+                            )
+                            self.risk_manager.record_funded_pnl(pnl)
+                        except Exception as e:
+                            logger.debug(f"Failed to record funded PnL for {tid}: {e}")
 
                     # TradingLab: Register reentry candidate if position was profitable
                     # (TP1 was likely hit if it was in BEYOND_TP1 phase or profitable)
@@ -623,6 +724,31 @@ class TradingEngine:
                             })
                         except Exception:
                             pass
+
+                    # Record in trade journal
+                    if self.trade_journal:
+                        try:
+                            price_data = await self.broker.get_current_price(pos.instrument)
+                            close_price = (
+                                price_data.bid if pos.direction == "BUY"
+                                else price_data.ask
+                            )
+                            pnl_dollars = (
+                                (close_price - pos.entry_price)
+                                if pos.direction == "BUY"
+                                else (pos.entry_price - close_price)
+                            )
+                            self.trade_journal.record_trade(
+                                trade_id=tid,
+                                instrument=pos.instrument,
+                                pnl_dollars=pnl_dollars,
+                                entry_price=pos.entry_price,
+                                exit_price=close_price,
+                                strategy=getattr(pos, 'strategy', 'UNKNOWN'),
+                                direction=pos.direction,
+                            )
+                        except Exception as je:
+                            logger.debug(f"Trade journal record failed for {tid}: {je}")
 
                     # Send close alert
                     if self.alert_manager:
@@ -787,6 +913,122 @@ class TradingEngine:
                 logger.error(f"Error scanning {instrument}: {e}")
             # Throttle between pairs to avoid 429 rate limits from broker API
             await asyncio.sleep(1.5)
+
+        # ── Scalping scan (runs alongside normal scan if enabled) ──
+        if self.scalping_analyzer and settings.scalping_enabled:
+            await self._scan_scalping_setups()
+
+    async def _scan_scalping_setups(self):
+        """
+        Run scalping analysis on all watchlist pairs.
+        Uses compressed timeframes (H1/M15/M5/M1) and scalping risk rules.
+        Note: In scalping mode, _scan_interval should be set to
+        _scalping_scan_interval (30s) for faster reaction.
+        """
+        if not self._check_scalping_dd_limits():
+            logger.warning("Scalping: DD limits reached — scalping paused")
+            return
+
+        for instrument in settings.forex_watchlist:
+            try:
+                # Skip if already in a trade on this instrument
+                if any(
+                    pos.instrument == instrument
+                    for pos in self.position_manager.positions.values()
+                ):
+                    continue
+
+                # Check if we can take more risk (scalping uses 0.5%)
+                if not self.risk_manager.can_take_trade(
+                    TradingStyle.SCALPING, instrument
+                ):
+                    continue
+
+                # Run scalping analysis
+                scalp_data = await self.scalping_analyzer.analyze_scalping(instrument)
+
+                # Use the existing day-trading analysis if available
+                base_analysis = self._last_scan_results.get(instrument)
+                if base_analysis is None:
+                    # Need at least a basic analysis for key levels / patterns
+                    base_analysis = await self.market_analyzer.full_analysis(instrument)
+                    self._last_scan_results[instrument] = base_analysis
+
+                # Detect scalping setup
+                signal = self.scalping_analyzer.detect_scalping_setup(
+                    base_analysis, scalp_data
+                )
+                if signal:
+                    self._daily_setups_found += 1
+                    # Convert signal to TradeRisk via _detect_setup
+                    setup = await self._detect_setup(base_analysis)
+                    if setup:
+                        explanation = self._latest_explanations.get(instrument)
+                        if explanation is None:
+                            explanation = self.explanation_engine.generate_full_analysis(
+                                instrument=instrument,
+                                analysis_result=base_analysis,
+                                setup_signal=None,
+                            )
+                        await self._handle_setup(setup, base_analysis, explanation)
+
+            except Exception as e:
+                self._daily_errors += 1
+                logger.error(f"Scalping scan error for {instrument}: {e}")
+            await asyncio.sleep(1.0)
+
+    def _check_scalping_dd_limits(self) -> bool:
+        """
+        Check scalping drawdown limits.
+        Returns False if daily DD > 5% or total DD > 10% (from config).
+        Resets daily DD counter at midnight UTC.
+        """
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # Reset daily DD at midnight
+        if self._scalping_dd_date != today:
+            self._scalping_daily_dd = 0.0
+            self._scalping_dd_date = today
+
+        # Initialize peak balance if not set
+        if self._scalping_peak_balance <= 0:
+            self._scalping_peak_balance = getattr(
+                self.risk_manager, '_current_balance', 0.0
+            ) or 0.0
+
+        # Update peak balance
+        current_balance = getattr(
+            self.risk_manager, '_current_balance', 0.0
+        ) or 0.0
+        if current_balance > self._scalping_peak_balance:
+            self._scalping_peak_balance = current_balance
+
+        # Calculate total DD from peak
+        if self._scalping_peak_balance > 0:
+            self._scalping_total_dd = (
+                (self._scalping_peak_balance - current_balance) /
+                self._scalping_peak_balance
+            )
+
+        # Check limits from config
+        max_daily_dd = settings.scalping_max_daily_dd  # default 0.05 (5%)
+        max_total_dd = settings.scalping_max_total_dd  # default 0.10 (10%)
+
+        if self._scalping_daily_dd > max_daily_dd:
+            logger.warning(
+                f"Scalping PAUSED: daily DD {self._scalping_daily_dd:.2%} "
+                f"> limit {max_daily_dd:.2%}"
+            )
+            return False
+
+        if self._scalping_total_dd > max_total_dd:
+            logger.warning(
+                f"Scalping PAUSED: total DD {self._scalping_total_dd:.2%} "
+                f"> limit {max_total_dd:.2%}"
+            )
+            return False
+
+        return True
 
     async def _detect_setup(self, analysis: AnalysisResult) -> Optional[TradeRisk]:
         """
@@ -1068,6 +1310,15 @@ class TradingEngine:
                     take_profit=setup.take_profit_1,
                 )
                 logger.info(f"Limit order placed at {limit_price:.5f} for {setup.instrument}")
+            elif entry_type == "STOP" and limit_price and hasattr(self.broker, 'place_stop_order'):
+                result = await self.broker.place_stop_order(
+                    instrument=setup.instrument,
+                    units=setup.units,
+                    stop_price=limit_price,
+                    stop_loss=setup.stop_loss,
+                    take_profit=setup.take_profit_1,
+                )
+                logger.info(f"Stop order placed at {limit_price:.5f} for {setup.instrument}")
             else:
                 # Default: market order
                 result = await self.broker.place_market_order(
@@ -1462,4 +1713,18 @@ class TradingEngine:
                 }
                 for inst, expl in self._latest_explanations.items()
             },
+            "scalping": {
+                "enabled": settings.scalping_enabled,
+                "available": _SCALPING_AVAILABLE,
+                "daily_dd": self._scalping_daily_dd,
+                "total_dd": self._scalping_total_dd,
+                "max_daily_dd": settings.scalping_max_daily_dd,
+                "max_total_dd": settings.scalping_max_total_dd,
+                "scan_interval": self._scalping_scan_interval,
+                "status": (
+                    self.scalping_analyzer.get_scalping_status()
+                    if self.scalping_analyzer else {}
+                ),
+            },
+            "journal": self.trade_journal.get_stats() if self.trade_journal else {},
         }

@@ -89,10 +89,19 @@ class AnalysisResult:
     volume_divergence: Optional[str] = None
     # Mitigation Blocks: order blocks that have been partially filled
     mitigation_blocks: List[Dict] = field(default_factory=list)
+    # Breaker Blocks: order blocks that price broke through (type flipped)
+    breaker_blocks: List[Dict] = field(default_factory=list)
+    # Power of Three / AMD: current session phase and direction bias
+    power_of_three: Dict[str, Any] = field(default_factory=dict)
+    # SMT Divergence: "bullish", "bearish", or None
+    smt_divergence: Optional[str] = None
 
 
 class MarketAnalyzer:
     """Multi-timeframe market analysis engine."""
+
+    # Class-level cache for SMT divergence: stores last swing high/low per instrument
+    _smt_cache: Dict[str, Dict] = {}
 
     def __init__(self, broker_client):
         self.broker = broker_client
@@ -265,6 +274,21 @@ class MarketAnalyzer:
             candles.get("H1", pd.DataFrame()), order_blocks
         )
 
+        # Step 24: Breaker Blocks (order blocks that price broke through)
+        breaker_blocks = self._detect_breaker_blocks(
+            candles.get("H1", pd.DataFrame()), order_blocks
+        )
+
+        # Step 25: Power of Three / AMD session phase detection
+        power_of_three = self._detect_power_of_three(
+            candles.get("H1", pd.DataFrame()), current_price
+        )
+
+        # Step 26: SMT Divergence (correlated asset swing comparison)
+        smt_divergence = self._detect_smt_divergence(
+            instrument, candles.get("H1", pd.DataFrame())
+        )
+
         return AnalysisResult(
             instrument=instrument,
             htf_trend=htf_trend,
@@ -294,6 +318,9 @@ class MarketAnalyzer:
             premium_discount_zone=premium_discount_zone,
             volume_divergence=volume_divergence,
             mitigation_blocks=mitigation_blocks,
+            breaker_blocks=breaker_blocks,
+            power_of_three=power_of_three,
+            smt_divergence=smt_divergence,
         )
 
     def _candles_to_dataframe(self, candles) -> pd.DataFrame:
@@ -1254,6 +1281,277 @@ class MarketAnalyzer:
                 })
 
         return mitigation_blocks[-10:]
+
+    # ── Breaker Block Detection (SMC Workshop) ──────────────────────────
+
+    def _detect_breaker_blocks(
+        self, df: pd.DataFrame, order_blocks: List[Dict]
+    ) -> List[Dict]:
+        """
+        Detect Breaker Blocks: order blocks that price BROKE THROUGH with a candle body.
+        When a bullish OB is broken to the downside, it flips to bearish (resistance).
+        When a bearish OB is broken to the upside, it flips to bullish (support).
+        """
+        if df.empty or not order_blocks:
+            return []
+
+        breaker_blocks = []
+        data = df.reset_index(drop=True)
+
+        for ob in order_blocks:
+            ob_idx = ob.get("index", 0)
+            ob_high = ob.get("high", 0)
+            ob_low = ob.get("low", 0)
+            ob_type = ob.get("type", "")
+
+            if ob_high == 0 or ob_low == 0:
+                continue
+
+            # Check if any subsequent candle's body broke through the OB
+            for j in range(ob_idx + 2, len(data)):
+                candle_open = float(data["open"].iloc[j])
+                candle_close = float(data["close"].iloc[j])
+                body_high = max(candle_open, candle_close)
+                body_low = min(candle_open, candle_close)
+
+                if ob_type == "bullish_ob":
+                    # Bullish OB broken: candle body closes below the OB low
+                    if body_low < ob_low and body_high < ob_low:
+                        # Entire body below OB low → broken through
+                        breaker_blocks.append({
+                            "type": "bearish",  # Flipped: was bullish, now resistance
+                            "high": ob_high,
+                            "low": ob_low,
+                            "mid": (ob_high + ob_low) / 2,
+                            "original_type": ob_type,
+                            "break_index": j,
+                        })
+                        break
+                elif ob_type == "bearish_ob":
+                    # Bearish OB broken: candle body closes above the OB high
+                    if body_low > ob_high and body_high > ob_high:
+                        # Entire body above OB high → broken through
+                        breaker_blocks.append({
+                            "type": "bullish",  # Flipped: was bearish, now support
+                            "high": ob_high,
+                            "low": ob_low,
+                            "mid": (ob_high + ob_low) / 2,
+                            "original_type": ob_type,
+                            "break_index": j,
+                        })
+                        break
+
+        return breaker_blocks[-10:]
+
+    # ── Power of Three / AMD Detection (SMC Workshop) ─────────────────
+
+    def _detect_power_of_three(
+        self, df: pd.DataFrame, current_price: Optional[float]
+    ) -> Dict[str, Any]:
+        """
+        Detect Power of Three (AMD) session phases:
+        - ASIAN (00:00-08:00 UTC) = Accumulation (lateral, low volatility)
+        - LONDON (08:00-12:00 UTC) = Manipulation (strong impulse, often fake)
+        - NY (12:00-21:00 UTC) = Distribution (real move direction)
+
+        Returns dict with phase, session, asian_range, direction_bias.
+        """
+        if df.empty or len(df) < 10:
+            return {}
+
+        session = self._detect_session()
+        data = df.copy()
+
+        # Ensure we have a time-based index
+        if not isinstance(data.index, pd.DatetimeIndex):
+            return {"phase": "unknown", "session": session}
+
+        # Get today's Asian session candles (00:00-08:00 UTC)
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        asian_end = now.replace(hour=8, minute=0, second=0, microsecond=0)
+
+        # Filter candles to today's Asian session
+        asian_candles = data[
+            (data.index >= today_start) & (data.index < asian_end)
+        ]
+
+        if asian_candles.empty:
+            # Try yesterday's Asian session if today's hasn't started yet
+            from datetime import timedelta
+            yesterday_start = today_start - timedelta(days=1)
+            yesterday_asian_end = asian_end - timedelta(days=1)
+            asian_candles = data[
+                (data.index >= yesterday_start) & (data.index < yesterday_asian_end)
+            ]
+
+        if asian_candles.empty:
+            return {"phase": "unknown", "session": session}
+
+        asian_high = float(asian_candles["high"].max())
+        asian_low = float(asian_candles["low"].min())
+        asian_range = asian_high - asian_low
+        asian_mid = (asian_high + asian_low) / 2
+
+        result: Dict[str, Any] = {
+            "session": session,
+            "asian_high": asian_high,
+            "asian_low": asian_low,
+            "asian_range": asian_range,
+            "direction_bias": None,
+        }
+
+        if session == "ASIAN":
+            result["phase"] = "accumulation"
+        elif session == "LONDON":
+            result["phase"] = "manipulation"
+            # Check if price broke the Asian range aggressively
+            if current_price is not None:
+                if current_price > asian_high:
+                    # London broke above Asian range → likely manipulation up
+                    # Real direction may be DOWN (manipulation = fake move)
+                    result["direction_bias"] = "bearish"
+                    result["manipulation_direction"] = "up"
+                elif current_price < asian_low:
+                    # London broke below Asian range → likely manipulation down
+                    # Real direction may be UP
+                    result["direction_bias"] = "bullish"
+                    result["manipulation_direction"] = "down"
+        elif session in ("OVERLAP", "NEW_YORK"):
+            result["phase"] = "distribution"
+            # Check if price reversed from London manipulation
+            # Get London candles (08:00-12:00 UTC)
+            london_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+            london_end = now.replace(hour=12, minute=0, second=0, microsecond=0)
+            london_candles = data[
+                (data.index >= london_start) & (data.index < london_end)
+            ]
+
+            if not london_candles.empty and current_price is not None:
+                london_high = float(london_candles["high"].max())
+                london_low = float(london_candles["low"].min())
+
+                # London went above Asian high, now NY reversing back down
+                if london_high > asian_high and current_price < asian_mid:
+                    result["direction_bias"] = "bearish"
+                # London went below Asian low, now NY reversing back up
+                elif london_low < asian_low and current_price > asian_mid:
+                    result["direction_bias"] = "bullish"
+                # NY continuing above Asian range (genuine breakout)
+                elif current_price > asian_high:
+                    result["direction_bias"] = "bullish"
+                # NY continuing below Asian range (genuine breakdown)
+                elif current_price < asian_low:
+                    result["direction_bias"] = "bearish"
+        else:
+            result["phase"] = "off_hours"
+
+        return result
+
+    # ── SMT Divergence Detection (SMC Workshop) ──────────────────────
+
+    def _detect_smt_divergence(
+        self, instrument: str, df: pd.DataFrame
+    ) -> Optional[str]:
+        """
+        Detect Smart Money Technique (SMT) divergence by comparing swing
+        highs/lows of correlated pairs.
+
+        When correlated assets make divergent swing structures, it signals
+        weakness in the current move:
+        - Instrument makes higher high but correlated pair doesn't → bearish
+        - Instrument makes lower low but correlated pair doesn't → bullish
+        """
+        if df.empty or len(df) < 20:
+            return None
+
+        data = df.reset_index(drop=True)
+
+        # Find recent swing highs and lows
+        swing_highs: List[Tuple[int, float]] = []
+        swing_lows: List[Tuple[int, float]] = []
+
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                data["high"].iloc[i] > data["high"].iloc[i + 1]):
+                swing_highs.append((i, float(data["high"].iloc[i])))
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                data["low"].iloc[i] < data["low"].iloc[i + 1]):
+                swing_lows.append((i, float(data["low"].iloc[i])))
+
+        if len(swing_highs) < 2 or len(swing_lows) < 2:
+            # Store what we have and return
+            MarketAnalyzer._smt_cache[instrument] = {
+                "last_swing_high": swing_highs[-1][1] if swing_highs else None,
+                "last_swing_low": swing_lows[-1][1] if swing_lows else None,
+                "prev_swing_high": swing_highs[-2][1] if len(swing_highs) >= 2 else None,
+                "prev_swing_low": swing_lows[-2][1] if len(swing_lows) >= 2 else None,
+            }
+            return None
+
+        # Store current instrument's swing data in class-level cache
+        current_data = {
+            "last_swing_high": swing_highs[-1][1],
+            "last_swing_low": swing_lows[-1][1],
+            "prev_swing_high": swing_highs[-2][1],
+            "prev_swing_low": swing_lows[-2][1],
+        }
+        MarketAnalyzer._smt_cache[instrument] = current_data
+
+        # Determine if current instrument made higher high or lower low
+        made_higher_high = current_data["last_swing_high"] > current_data["prev_swing_high"]
+        made_lower_low = current_data["last_swing_low"] < current_data["prev_swing_low"]
+
+        # Find correlated pair from config
+        try:
+            from config import settings
+            correlated_instruments = []
+            for group in settings.correlation_groups:
+                if instrument in group:
+                    correlated_instruments = [p for p in group if p != instrument]
+                    break
+        except Exception:
+            return None
+
+        if not correlated_instruments:
+            return None
+
+        # Check against cached data for correlated instruments
+        for corr_inst in correlated_instruments:
+            corr_data = MarketAnalyzer._smt_cache.get(corr_inst)
+            if not corr_data:
+                continue
+
+            corr_prev_high = corr_data.get("prev_swing_high")
+            corr_last_high = corr_data.get("last_swing_high")
+            corr_prev_low = corr_data.get("prev_swing_low")
+            corr_last_low = corr_data.get("last_swing_low")
+
+            if corr_prev_high is None or corr_last_high is None:
+                continue
+            if corr_prev_low is None or corr_last_low is None:
+                continue
+
+            corr_made_higher_high = corr_last_high > corr_prev_high
+            corr_made_lower_low = corr_last_low < corr_prev_low
+
+            # Bearish SMT: instrument makes higher high but correlated doesn't
+            if made_higher_high and not corr_made_higher_high:
+                logger.debug(
+                    f"SMT Divergence BEARISH: {instrument} made HH but "
+                    f"{corr_inst} did not"
+                )
+                return "bearish"
+
+            # Bullish SMT: instrument makes lower low but correlated doesn't
+            if made_lower_low and not corr_made_lower_low:
+                logger.debug(
+                    f"SMT Divergence BULLISH: {instrument} made LL but "
+                    f"{corr_inst} did not"
+                )
+                return "bullish"
+
+        return None
 
     # ── Premium / Discount Zone Detection (TradingLab SMC) ────────────
 

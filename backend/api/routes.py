@@ -1098,6 +1098,74 @@ async def run_backtest(request: BacktestRequest):
         raise HTTPException(500, f"Error en backtest: {str(e)}")
 
 
+# ── Scalping Module (Workshop de Scalping) ──────────────────────
+
+class ScalpingToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/scalping/toggle")
+async def toggle_scalping(request: ScalpingToggleRequest):
+    """Enable or disable scalping mode.
+
+    When enabled:
+    - Scan interval drops to 30s (from 120s)
+    - Strategies use compressed timeframes (H1/M15/M5/M1)
+    - Risk per trade is 0.5%
+    - Max daily DD: 5%, max total DD: 10%
+    """
+    from main import engine
+    if hasattr(engine, 'toggle_scalping'):
+        engine.toggle_scalping(request.enabled)
+        status = "activado" if request.enabled else "desactivado"
+        return {
+            "scalping_enabled": request.enabled,
+            "scan_interval": engine._scan_interval,
+            "message": f"Modo scalping {status}",
+        }
+    raise HTTPException(501, "Scalping module not available")
+
+
+@router.get("/scalping/status")
+async def get_scalping_status():
+    """Get current scalping module status.
+
+    Returns:
+    - enabled: whether scalping mode is active
+    - daily_dd: today's scalping drawdown as fraction
+    - total_dd: total scalping drawdown from peak
+    - limits: configured max daily and total DD
+    - setups_found: scalping setups detected this session
+    """
+    from main import engine
+    from config import settings
+
+    scalping_status = {}
+    if hasattr(engine, 'scalping_analyzer') and engine.scalping_analyzer:
+        scalping_status = engine.scalping_analyzer.get_scalping_status()
+
+    return {
+        "enabled": settings.scalping_enabled,
+        "daily_dd": getattr(engine, '_scalping_daily_dd', 0.0),
+        "total_dd": getattr(engine, '_scalping_total_dd', 0.0),
+        "max_daily_dd": settings.scalping_max_daily_dd,
+        "max_total_dd": settings.scalping_max_total_dd,
+        "scan_interval": getattr(engine, '_scan_interval', 120),
+        "scalping_scan_interval": getattr(engine, '_scalping_scan_interval', 30),
+        "dd_limits_ok": (
+            getattr(engine, '_scalping_daily_dd', 0.0) <= settings.scalping_max_daily_dd
+            and getattr(engine, '_scalping_total_dd', 0.0) <= settings.scalping_max_total_dd
+        ),
+        "timeframe_mapping": {
+            "direction": "H1 (replaces Daily)",
+            "structure": "M15 (replaces H4)",
+            "confirmation": "M5 (replaces H1)",
+            "execution": "M1 (replaces M5)",
+        },
+        **scalping_status,
+    }
+
+
 # ── Security Management ──────────────────────────────────────────
 
 @router.post("/security/generate-key")
@@ -1165,3 +1233,86 @@ async def revoke_api_key(key_hash_prefix: str):
             security_config.revoke_key(full_hash)
             return {"message": f"API key '{label}' revocada", "revoked": True}
     raise HTTPException(404, "API key no encontrada")
+
+
+# ── Funded Account Mode ──────────────────────────────────────────
+
+class FundedToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/funded/toggle")
+async def toggle_funded_mode(request: FundedToggleRequest):
+    """Enable or disable funded account mode."""
+    from config import settings as _settings
+    old_value = _settings.funded_account_mode
+    _settings.funded_account_mode = request.enabled
+    return {
+        "funded_account_mode": request.enabled,
+        "previous": old_value,
+        "message": (
+            "Modo cuenta fondeada ACTIVADO — DD diario y total limitados"
+            if request.enabled
+            else "Modo cuenta fondeada DESACTIVADO — operación normal"
+        ),
+    }
+
+
+@router.get("/funded/status")
+async def get_funded_status():
+    """Get funded account status including DD limits and usage."""
+    from main import engine
+    from config import settings as _settings
+    if engine is None:
+        return {"error": "Engine not initialized"}
+    try:
+        risk_mgr = engine.risk_manager
+        await risk_mgr.update_balance_tracking()
+        return risk_mgr.get_funded_status()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ── Trade Journal ──────────────────────────────────────────────────
+
+@router.get("/journal/stats")
+async def get_journal_stats():
+    """Get comprehensive trade journal statistics (TradingLab Registro de trades)."""
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        return {
+            "total_trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "break_evens": 0,
+            "win_rate": 0.0,
+            "win_rate_excl_be": 0.0,
+            "current_balance": 0.0,
+            "initial_capital": 0.0,
+            "peak_balance": 0.0,
+            "current_drawdown_pct": 0.0,
+            "max_drawdown_pct": 0.0,
+            "max_drawdown_dollars": 0.0,
+            "current_winning_streak": 0,
+            "max_winning_streak": 0,
+            "max_streak_pct": 0.0,
+            "avg_win_pct": 0.0,
+            "avg_loss_pct": 0.0,
+            "profit_factor": 0.0,
+            "monthly_returns": {},
+            "pnl_accumulated_pct": 0.0,
+            "message": "Trade journal not initialized - engine must be started first",
+        }
+    return engine.trade_journal.get_stats()
+
+
+@router.get("/journal/trades")
+async def get_journal_trades(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Get trade journal history with pagination."""
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        return []
+    return engine.trade_journal.get_trades(limit=limit, offset=offset)

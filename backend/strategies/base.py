@@ -449,9 +449,72 @@ def _check_minimum_candle_count(analysis, ema_key: str, direction: str, min_cand
     return count >= min_candles
 
 
+def _check_breaker_block_confluence(
+    analysis, direction: str, entry_price: float
+) -> tuple[bool, float, str]:
+    """
+    Check if entry price is near a Breaker Block (broken Order Block with flipped bias).
+    A breaker block that was bullish OB -> now bearish resistance (and vice versa).
+    Returns (near_breaker, bonus_points, description).
+    """
+    breaker_blocks = getattr(analysis, 'breaker_blocks', [])
+    if not breaker_blocks or not entry_price:
+        return False, 0.0, ""
+
+    for bb in breaker_blocks:
+        bb_type = bb.get("type", "")
+        bb_high = bb.get("high", 0)
+        bb_low = bb.get("low", 0)
+        if bb_high == 0 or bb_low == 0:
+            continue
+        tolerance = abs(bb_high - bb_low) * 1.5  # 1.5x the BB size
+
+        # Bullish breaker block = support (BUY near it)
+        if direction == "BUY" and bb_type == "bullish":
+            if bb_low - tolerance <= entry_price <= bb_high + tolerance:
+                return True, 6.0, f"Breaker Block alcista ({bb_low:.5f}-{bb_high:.5f})"
+        # Bearish breaker block = resistance (SELL near it)
+        elif direction == "SELL" and bb_type == "bearish":
+            if bb_low - tolerance <= entry_price <= bb_high + tolerance:
+                return True, 6.0, f"Breaker Block bajista ({bb_low:.5f}-{bb_high:.5f})"
+
+    return False, 0.0, ""
+
+
+def _check_power_of_three(analysis, direction: str) -> tuple[bool, str]:
+    """
+    Check Power of Three (AMD) session alignment with trade direction.
+    - Distribution phase + direction matches bias -> favorable
+    - Manipulation phase + direction AGAINST manipulation -> favorable (anticipating reversal)
+    Returns (favorable, description).
+    """
+    po3 = getattr(analysis, 'power_of_three', {})
+    if not po3:
+        return False, ""
+
+    phase = po3.get("phase", "")
+    bias = po3.get("direction_bias")
+
+    if phase == "distribution" and bias:
+        if (direction == "BUY" and bias == "bullish") or \
+           (direction == "SELL" and bias == "bearish"):
+            return True, f"Power of Three: fase distribucion, sesgo {bias} a favor"
+
+    if phase == "manipulation":
+        manip_dir = po3.get("manipulation_direction", "")
+        # If manipulation went up, anticipate real move is down -> SELL favorable
+        if manip_dir == "up" and direction == "SELL":
+            return True, "Power of Three: manipulacion alcista, anticipando reversal bajista"
+        # If manipulation went down, anticipate real move is up -> BUY favorable
+        elif manip_dir == "down" and direction == "BUY":
+            return True, "Power of Three: manipulacion bajista, anticipando reversal alcista"
+
+    return False, ""
+
+
 def _check_smc_confluence(analysis, direction: str, entry_price: float) -> tuple[bool, float, str]:
     """
-    Check Smart Money Concepts confluence: Order Blocks, FVG, BOS/CHOCH.
+    Check Smart Money Concepts confluence: Order Blocks, FVG, BOS/CHOCH, Breaker Blocks.
     These are already calculated in market_analyzer but not used in strategies.
     Returns (has_confluence, bonus_points, description).
     """
@@ -478,6 +541,12 @@ def _check_smc_confluence(analysis, direction: str, entry_price: float) -> tuple
                 bonus += 8.0
                 details.append(f"Order Block bajista ({ob_low:.5f}-{ob_high:.5f})")
                 break
+
+    # Breaker Blocks - price near a broken OB with flipped bias (+6 bonus)
+    bb_ok, bb_bonus, bb_desc = _check_breaker_block_confluence(analysis, direction, entry_price)
+    if bb_ok:
+        bonus += bb_bonus
+        details.append(bb_desc)
 
     # Fair Value Gaps - price near FVG midpoint
     fvgs = analysis.key_levels.get("fvg", [])
@@ -646,6 +715,23 @@ def _count_confluence_points(
         neg_pts += 1
         neg_details.append(ew_desc)
 
+    # 14. Power of Three / AMD session phase
+    po3_ok, po3_desc = _check_power_of_three(analysis, direction)
+    if po3_ok:
+        pos_pts += 1
+        pos_details.append(po3_desc)
+
+    # 15. SMT Divergence (correlated pair swing comparison)
+    smt_div = getattr(analysis, 'smt_divergence', None)
+    if smt_div:
+        expected = "bullish" if direction == "BUY" else "bearish"
+        if smt_div == expected:
+            pos_pts += 1
+            pos_details.append(f"SMT Divergencia {smt_div} a favor")
+        else:
+            neg_pts += 1
+            neg_details.append(f"SMT Divergencia {smt_div} en contra")
+
     return pos_pts, neg_pts, pos_details, neg_details
 
 
@@ -701,6 +787,106 @@ def _check_limit_entry_confluence(
         return True, avg_price, f"Limit entry: {len(confluence_levels)} niveles ({names})"
 
     return False, None, ""
+
+
+def _check_stop_entry_opportunity(
+    analysis: AnalysisResult, direction: str, entry_price: float
+) -> Tuple[bool, Optional[float], str]:
+    """
+    TradingLab Stop Entry: place a stop order above resistance (BUY) or below support (SELL)
+    that triggers automatically when price reaches the level.
+
+    Used when all timeframes align, there's strong momentum, and the trader wants
+    automatic entry on a breakout above/below a key level.
+
+    Conditions:
+    - HTF/LTF convergence must be True
+    - At least 2 confluence factors (S/R + one more)
+    - A clear S/R level ahead in the trade direction
+
+    For BUY: stop order placed slightly above the nearest resistance (price must break it).
+    For SELL: stop order placed slightly below the nearest support.
+
+    Returns (should_use_stop, stop_price, description).
+    """
+    if not entry_price:
+        return False, None, ""
+
+    # Condition 1: HTF/LTF convergence
+    if not analysis.htf_ltf_convergence:
+        return False, None, ""
+
+    # Condition 2: Check momentum via MACD and trend alignment
+    confluence_count = 0
+    details: List[str] = []
+
+    # Momentum: MACD H1 aligned with direction
+    macd_h1 = analysis.macd_values.get("H1", {})
+    if macd_h1:
+        macd_val = macd_h1.get("macd", 0)
+        if direction == "BUY" and macd_val > 0:
+            confluence_count += 1
+            details.append("MACD H1 momentum alcista")
+        elif direction == "SELL" and macd_val < 0:
+            confluence_count += 1
+            details.append("MACD H1 momentum bajista")
+
+    # Volume above average
+    vol_ok, vol_ratio = _check_volume_confirmation(analysis, "H1")
+    if vol_ok and vol_ratio > 1.0:
+        confluence_count += 1
+        details.append(f"Volumen favorable ({vol_ratio:.1f}x)")
+
+    # EMA 8 Weekly filter
+    if _check_weekly_ema8_filter(analysis, direction):
+        confluence_count += 1
+        details.append("EMA 8 semanal a favor")
+
+    # Need at least 2 confluence factors
+    if confluence_count < 2:
+        return False, None, ""
+
+    # Condition 3: Find a clear S/R level ahead
+    supports = analysis.key_levels.get("supports", [])
+    resistances = analysis.key_levels.get("resistances", [])
+
+    # Determine pip size for offset (slightly beyond the level)
+    pip = 0.01 if entry_price > 10 else 0.0001
+    offset = 5 * pip  # 5 pips beyond the level
+
+    if direction == "BUY":
+        # Find nearest resistance above current price
+        above_levels = [r for r in resistances if r > entry_price]
+        if not above_levels:
+            return False, None, ""
+        nearest_resistance = min(above_levels)
+        # Don't place stop too far away (max 1% from entry)
+        distance_pct = (nearest_resistance - entry_price) / entry_price
+        if distance_pct > 0.01:
+            return False, None, ""
+        stop_price = round(nearest_resistance + offset, 5)
+        desc = (
+            f"Stop entry BUY: orden sobre resistencia {nearest_resistance:.5f} "
+            f"(stop @ {stop_price:.5f}). Confluencia: {', '.join(details)}"
+        )
+        return True, stop_price, desc
+
+    else:  # SELL
+        # Find nearest support below current price
+        below_levels = [s for s in supports if s < entry_price]
+        if not below_levels:
+            return False, None, ""
+        nearest_support = max(below_levels)
+        # Don't place stop too far away (max 1% from entry)
+        distance_pct = (entry_price - nearest_support) / entry_price
+        if distance_pct > 0.01:
+            return False, None, ""
+        stop_price = round(nearest_support - offset, 5)
+        desc = (
+            f"Stop entry SELL: orden bajo soporte {nearest_support:.5f} "
+            f"(stop @ {stop_price:.5f}). Confluencia: {', '.join(details)}"
+        )
+        return True, stop_price, desc
 
 
 def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
@@ -921,6 +1107,18 @@ class BaseStrategy(ABC):
                     signal.limit_price = limit_price
                     signal.confidence = min(100.0, signal.confidence + 5.0)
                     signal.conditions_met.append(limit_desc)
+
+            # TradingLab: Check for stop entry opportunity (breakout above/below S/R)
+            # Only for strategies NOT already using limit entry
+            if signal.entry_type != "LIMIT":
+                stop_ok, stop_price, stop_desc = _check_stop_entry_opportunity(
+                    analysis, signal.direction, signal.entry_price
+                )
+                if stop_ok and stop_price:
+                    signal.entry_type = "STOP"
+                    signal.limit_price = stop_price
+                    signal.confidence = min(100.0, signal.confidence + 3.0)
+                    signal.conditions_met.append(stop_desc)
 
             logger.info(
                 f"[{self.color.value}] SETUP detectado {analysis.instrument} "
@@ -2729,10 +2927,99 @@ def detect_all_setups(
     return signals
 
 
+def _apply_elliott_wave_priority(
+    analysis: AnalysisResult,
+    setups: List[SetupSignal],
+) -> List[SetupSignal]:
+    """
+    Re-score setups based on the current Elliott Wave phase.
+
+    From Trading Plan 2024:
+    - Wave 1: GREEN (Day) +10, BLACK (Swing) +8 — first impulse after reversal
+    - Wave 2: BLUE +8, conservative pullback (reduce tp_max)
+    - Wave 3: GREEN +10, RED +8, BLUE +5 — strongest impulse
+    - Wave 4: PINK +8, BLUE +5, conservative pullback
+    - Wave 5: GREEN +10, RED +5, PINK +5 — final impulse
+    - Wave A/B/C: BLACK +5 — corrective = counter-trend opportunity
+    """
+    if not setups:
+        return setups
+
+    ew = getattr(analysis, 'elliott_wave_detail', None) or {}
+    wave_count = str(ew.get("wave_count", "")).strip()
+
+    if not wave_count:
+        return setups
+
+    # Define confidence bonuses/penalties per wave
+    wave_bonuses: Dict[str, Dict[str, float]] = {
+        "1": {"GREEN": 10, "BLACK": 8},
+        "2": {"BLUE": 8},
+        "3": {"GREEN": 10, "RED": 8, "BLUE": 5},
+        "4": {"PINK": 8, "BLUE": 5},
+        "5": {"GREEN": 10, "RED": 5, "PINK": 5},
+        "A": {"BLACK": 5},
+        "B": {"BLACK": 5},
+        "C": {"BLACK": 5},
+    }
+
+    # Default penalty for strategies not prioritized in the current wave
+    default_penalty: Dict[str, float] = {
+        "1": -5,
+        "2": -5,
+        "3": 0,
+        "4": -5,
+        "5": 0,
+        "A": -3,
+        "B": -3,
+        "C": -3,
+    }
+
+    # Conservative waves reduce tp_max expectations
+    conservative_waves = {"2", "4"}
+
+    bonuses = wave_bonuses.get(wave_count, {})
+    penalty = default_penalty.get(wave_count, 0)
+
+    for setup in setups:
+        color = setup.strategy.value  # e.g. "GREEN", "BLUE", etc.
+        bonus = bonuses.get(color, penalty)
+        setup.confidence = max(0, min(100, setup.confidence + bonus))
+
+        # Add wave context to conditions_met for visibility
+        bonus_label = f"+{bonus}" if bonus >= 0 else str(bonus)
+        setup.conditions_met.append(
+            f"Elliott Wave {wave_count}: {color} priority {bonus_label}"
+        )
+
+        # For conservative waves, reduce tp_max to encourage smaller targets
+        if wave_count in conservative_waves and setup.take_profit_max is not None:
+            # Pull tp_max closer to tp1 (midpoint between tp1 and original tp_max)
+            midpoint = (setup.take_profit_1 + setup.take_profit_max) / 2.0
+            setup.take_profit_max = midpoint
+            setup.conditions_met.append(
+                f"Wave {wave_count} conservative: tp_max reduced to {midpoint:.5f}"
+            )
+
+    logger.info(
+        f"Elliott Wave priority applied (wave={wave_count}): "
+        f"bonuses={bonuses}, default_penalty={penalty}"
+    )
+
+    return setups
+
+
 def get_best_setup(
     analysis: AnalysisResult,
     enabled_strategies: Optional[Dict[str, object]] = None,
 ) -> Optional[SetupSignal]:
     """Retorna el mejor setup (mayor confianza) o None si no hay ninguno."""
     signals = detect_all_setups(analysis, enabled_strategies)
+
+    # Apply Elliott Wave prioritization before selecting the best
+    signals = _apply_elliott_wave_priority(analysis, signals)
+
+    # Re-sort after wave priority adjustments
+    signals.sort(key=lambda s: s.confidence, reverse=True)
+
     return signals[0] if signals else None

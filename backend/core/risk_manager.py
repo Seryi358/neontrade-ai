@@ -26,8 +26,9 @@ Scale-In Rule (Trading Plan):
 - Don't enter a subsequent trade unless Break Even is set on the first trade
 """
 
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass, field
 from loguru import logger
 from config import settings
@@ -87,6 +88,9 @@ class RiskManager:
         self._current_delta_risk: float = 0.0  # Additional risk from delta
         # Scale-in tracking: positions that have reached Break Even
         self._positions_at_be: set = set()  # trade_ids at BE or beyond
+        # Funded account tracking
+        self._funded_daily_pnl: float = 0.0
+        self._funded_daily_pnl_date: str = ""
 
     # ── Drawdown Management (ch18.7) ────────────────────────────────
 
@@ -286,6 +290,12 @@ class RiskManager:
 
     def can_take_trade(self, style: TradingStyle, instrument: str) -> bool:
         """Check if we can take a new trade without exceeding max risk."""
+        # Funded account check
+        funded_ok, funded_reason = self.check_funded_account_limits()
+        if not funded_ok:
+            logger.warning(f"Cannot take trade on {instrument}: {funded_reason}")
+            return False
+
         # Scale-in check
         if not self.can_scale_in(instrument):
             return False
@@ -442,6 +452,93 @@ class RiskManager:
             )
         # Clean up BE tracking
         self._positions_at_be.discard(trade_id)
+
+    # ── Funded Account Mode (Workshop Cuentas Fondeadas) ────────
+
+    def check_funded_account_limits(self) -> Tuple[bool, str]:
+        """
+        Check funded account drawdown limits.
+        Returns (can_trade, reason).
+        If funded mode is off, always returns (True, "").
+        """
+        if not settings.funded_account_mode:
+            return (True, "")
+
+        # Reset daily PnL tracker if the day changed
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if self._funded_daily_pnl_date != today:
+            self._funded_daily_pnl = 0.0
+            self._funded_daily_pnl_date = today
+
+        # Check daily DD: realized daily loss vs max daily DD
+        if self._current_balance > 0:
+            daily_dd_limit = settings.funded_max_daily_dd * self._current_balance
+            if self._funded_daily_pnl < 0 and abs(self._funded_daily_pnl) >= daily_dd_limit:
+                return (
+                    False,
+                    f"Funded: daily DD limit reached "
+                    f"({abs(self._funded_daily_pnl):.2f} >= {daily_dd_limit:.2f})",
+                )
+
+        # Check total DD: overall drawdown vs funded max total DD
+        total_dd = self.get_current_drawdown()
+        if total_dd >= settings.funded_max_total_dd:
+            return (
+                False,
+                f"Funded: total DD limit reached "
+                f"({total_dd:.2%} >= {settings.funded_max_total_dd:.2%})",
+            )
+
+        return (True, "")
+
+    def record_funded_pnl(self, pnl_amount: float):
+        """
+        Accumulate daily P&L for funded account tracking.
+        Called when a trade closes.
+        """
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if self._funded_daily_pnl_date != today:
+            self._funded_daily_pnl = 0.0
+            self._funded_daily_pnl_date = today
+
+        self._funded_daily_pnl += pnl_amount
+        logger.info(
+            f"Funded PnL updated: {pnl_amount:+.2f} | "
+            f"Daily total: {self._funded_daily_pnl:+.2f}"
+        )
+
+    def get_funded_status(self) -> Dict:
+        """Get funded account status for API."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if self._funded_daily_pnl_date != today:
+            daily_pnl = 0.0
+        else:
+            daily_pnl = self._funded_daily_pnl
+
+        daily_dd_limit = (
+            settings.funded_max_daily_dd * self._current_balance
+            if self._current_balance > 0 else 0.0
+        )
+        total_dd = self.get_current_drawdown()
+
+        can_trade, reason = self.check_funded_account_limits()
+
+        return {
+            "enabled": settings.funded_account_mode,
+            "can_trade": can_trade,
+            "blocked_reason": reason,
+            "daily_pnl": round(daily_pnl, 2),
+            "daily_dd_used_pct": round(
+                (abs(daily_pnl) / daily_dd_limit * 100) if daily_dd_limit > 0 and daily_pnl < 0 else 0.0,
+                2,
+            ),
+            "daily_dd_limit": round(settings.funded_max_daily_dd * 100, 2),
+            "daily_dd_limit_amount": round(daily_dd_limit, 2),
+            "total_dd_pct": round(total_dd * 100, 2),
+            "total_dd_limit": round(settings.funded_max_total_dd * 100, 2),
+            "no_overnight": settings.funded_no_overnight,
+            "no_news_trading": settings.funded_no_news_trading,
+        }
 
     def get_risk_status(self) -> Dict:
         """Get comprehensive risk status for API/frontend."""

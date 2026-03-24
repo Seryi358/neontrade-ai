@@ -518,6 +518,70 @@ class CapitalClient(BaseBroker):
             logger.error(f"Limit order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
 
+    async def place_stop_order(
+        self,
+        instrument: str,
+        units: int,
+        stop_price: float,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        expiry_hours: int = 24,
+    ) -> OrderResult:
+        """Place a stop order that triggers when price reaches the stop level.
+        BUY stop: placed above current price (breakout above resistance).
+        SELL stop: placed below current price (breakdown below support).
+        units > 0 = BUY, units < 0 = SELL.
+        """
+        epic = await self._resolve_epic(instrument)
+        direction = "BUY" if units > 0 else "SELL"
+        size = abs(units)
+
+        expiry = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours))
+        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%S")
+
+        order_data: Dict[str, Any] = {
+            "epic": epic,
+            "direction": direction,
+            "size": size,
+            "level": stop_price,
+            "type": "STOP",
+            "goodTillDate": expiry_str,
+        }
+
+        if stop_loss is not None:
+            order_data["stopLevel"] = stop_loss
+        if take_profit is not None:
+            order_data["profitLevel"] = take_profit
+
+        try:
+            resp = await self._post("/api/v1/workingorders", json_data=order_data)
+            raw = resp.json()
+            deal_ref = raw.get("dealReference")
+
+            logger.info(
+                f"Stop order placed: {instrument} {direction} @ {stop_price} | "
+                f"{size} units | SL={stop_loss} TP={take_profit} | Ref={deal_ref}"
+            )
+
+            if deal_ref:
+                return await self._confirm_deal(deal_ref, units)
+
+            return OrderResult(
+                success=True,
+                trade_id=deal_ref,
+                units=units,
+                raw_response=raw,
+            )
+
+        except httpx.HTTPStatusError as e:
+            error_msg = str(e)
+            try:
+                error_msg = e.response.json().get("errorCode", error_msg)
+            except Exception:
+                pass
+            logger.error(f"Stop order failed: {error_msg}")
+            return OrderResult(success=False, units=units, error=error_msg)
+
     async def _confirm_deal(self, deal_reference: str, units: int) -> OrderResult:
         """Confirm a deal was executed using the dealReference."""
         await asyncio.sleep(0.5)  # Brief delay for deal processing

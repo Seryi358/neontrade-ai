@@ -17,6 +17,7 @@ LTF Analysis (4H, 1H, 15m, 5m, 2m):
 """
 
 from typing import Any, Dict, List, Optional, Tuple
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -129,6 +130,8 @@ class MarketAnalyzer:
             except Exception as e:
                 logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
                 candles[tf] = pd.DataFrame()
+            # Throttle between timeframe fetches to avoid broker rate limits
+            await asyncio.sleep(0.3)
 
         # Step 2: HTF Analysis
         htf_trend = self._detect_trend(candles.get("W", pd.DataFrame()))

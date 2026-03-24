@@ -243,6 +243,9 @@ export const api = {
   // Strategies Info
   getStrategies: () => apiGet<any[]>('/api/v1/strategies'),
 
+  // Diagnostic
+  getDiagnostic: () => apiGet<any>('/api/v1/diagnostic'),
+
   // Security
   getSecurityStatus: () => apiGet<any>('/api/v1/security/status'),
   generateApiKey: (label = 'electron') => apiPost<any>(`/api/v1/security/generate-key?label=${label}`),

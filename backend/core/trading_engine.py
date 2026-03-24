@@ -30,6 +30,7 @@ from core.news_filter import NewsFilter
 from core.trade_journal import TradeJournal
 from strategies.base import get_best_setup, SetupSignal
 from config import settings
+from core.resilience import broker_circuit_breaker
 
 try:
     from core.alerts import AlertManager, AlertConfig
@@ -490,6 +491,18 @@ class TradingEngine:
         # Initial scan on startup — run regardless of market hours
         # so that analysis data is available immediately for the UI
         logger.info("Running initial scan (ignoring market hours)...")
+
+        # Reset circuit breaker before scan so stale failures don't cascade
+        broker_circuit_breaker.reset()
+
+        # Pre-resolve all instrument epics (with throttling) to avoid
+        # burst API calls during the scan
+        if hasattr(self.broker, 'warm_epic_cache'):
+            try:
+                await self.broker.warm_epic_cache(settings.forex_watchlist)
+            except Exception as e:
+                logger.warning(f"Epic cache warmup failed (non-critical): {e}")
+
         try:
             await self._initial_scan()
         except Exception as e:
@@ -974,7 +987,14 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"Initial scan failed for {instrument}: {e}")
             # Throttle between pairs to avoid 429 rate limits from broker API
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(2.0)
+
+            # Broadcast progress via WebSocket so frontend knows scan is active
+            if self._ws_broadcast:
+                try:
+                    await self._ws_broadcast("engine_status", self.get_status())
+                except Exception:
+                    pass
 
         logger.info(
             f"Initial scan complete: {len(self._last_scan_results)}/{len(settings.forex_watchlist)} pairs analyzed, "
@@ -986,6 +1006,9 @@ class TradingEngine:
     async def _scan_for_setups(self):
         """Scan all watchlist pairs for trading setups."""
         self._daily_scan_count += 1
+        # Reset circuit breaker at start of each scan cycle
+        if broker_circuit_breaker.is_open:
+            broker_circuit_breaker.reset()
         for instrument in settings.forex_watchlist:
             try:
                 # Check if we can take more risk

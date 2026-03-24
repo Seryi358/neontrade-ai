@@ -123,6 +123,14 @@ class CircuitBreaker:
                 f"Blocking calls for {self.recovery_timeout}s"
             )
 
+    def reset(self):
+        """Reset circuit breaker to CLOSED state (e.g. before a new scan cycle)."""
+        self._state = self.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = 0
+        self._success_count = 0
+        logger.info(f"[CircuitBreaker:{self.name}] -> RESET to CLOSED")
+
     @property
     def is_open(self) -> bool:
         return self.state == self.OPEN
@@ -157,8 +165,8 @@ class TTLCache:
 
 # ── Global instances ──────────────────────────────────────────────
 broker_circuit_breaker = CircuitBreaker(
-    failure_threshold=5,
-    recovery_timeout=60.0,
+    failure_threshold=50,
+    recovery_timeout=30.0,
     name="broker",
 )
 

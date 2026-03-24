@@ -1063,6 +1063,42 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
+      {/* Diagnostic Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>DIAGNOSTICO DEL BROKER</Text>
+        <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.mono, marginBottom: 8 }}>
+          Prueba paso a paso la conexion con el broker
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: theme.colors.neonCyan, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4, alignSelf: 'flex-start' }}
+          onPress={async () => {
+            setActionLoading('diagnostic');
+            try {
+              const res = await authFetch(`${API_URL}/api/v1/diagnostic`);
+              if (res.ok) {
+                const data = await res.json();
+                const stepLines = (data.steps || []).map((s: any) =>
+                  `${s.ok ? '✓' : '✗'} ${s.step}: ${s.detail}${s.sample ? '\n  ' + JSON.stringify(s.sample).slice(0, 200) : ''}`
+                ).join('\n');
+                Alert.alert('Diagnostico', stepLines || 'Sin resultados');
+              } else {
+                Alert.alert('Error', `HTTP ${res.status}`);
+              }
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Fallo la conexion');
+            } finally {
+              setActionLoading(null);
+            }
+          }}
+        >
+          {actionLoading === 'diagnostic' ? (
+            <ActivityIndicator size="small" color={theme.colors.background} />
+          ) : (
+            <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontFamily: theme.fonts.mono, fontSize: 12 }}>EJECUTAR DIAGNOSTICO</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
       <View style={{ height: theme.spacing.xl }} />
     </ScrollView>
   );

@@ -144,39 +144,71 @@ class CapitalClient(BaseBroker):
             "Content-Type": "application/json",
         }
 
-    @retry_async(max_retries=3, base_delay=0.5, exceptions=(httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException))
     async def _get(self, path: str, params: Optional[Dict] = None) -> Dict:
-        """Authenticated GET request with retry."""
+        """Authenticated GET request with retry and circuit breaker."""
         if broker_circuit_breaker.is_open:
             raise ConnectionError("Circuit breaker OPEN - broker unavailable")
         await self._ensure_session()
-        try:
-            resp = await self._client.get(
-                path, headers=self._auth_headers(), params=params,
-            )
-            resp.raise_for_status()
-            broker_circuit_breaker.record_success()
-            return resp.json()
-        except Exception as e:
-            broker_circuit_breaker.record_failure()
-            raise
+        last_exc = None
+        for attempt in range(4):  # 1 initial + 3 retries
+            try:
+                resp = await self._client.get(
+                    path, headers=self._auth_headers(), params=params,
+                )
+                resp.raise_for_status()
+                broker_circuit_breaker.record_success()
+                return resp.json()
+            except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+                last_exc = e
+                # Check for 429 Rate Limit — respect Retry-After header
+                retry_after = None
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+                    retry_after_hdr = e.response.headers.get('Retry-After')
+                    if retry_after_hdr:
+                        try:
+                            retry_after = float(retry_after_hdr)
+                        except (ValueError, TypeError):
+                            retry_after = None
+                if attempt < 3:
+                    delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 10.0)
+                    logger.debug(f"[_get] {path} attempt {attempt+1}/4 failed: {e}. Retry in {delay:.1f}s")
+                    await asyncio.sleep(delay)
+                    # Re-check session in case it expired
+                    await self._ensure_session()
+            except Exception as e:
+                # Non-retryable error
+                broker_circuit_breaker.record_failure()
+                raise
+        # All retries exhausted — record ONE failure to circuit breaker
+        broker_circuit_breaker.record_failure()
+        raise last_exc
 
-    @retry_async(max_retries=2, base_delay=0.5, exceptions=(httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException))
     async def _post(self, path: str, json_data: Optional[Dict] = None) -> httpx.Response:
-        """Authenticated POST request with retry."""
+        """Authenticated POST request with retry and circuit breaker."""
         if broker_circuit_breaker.is_open:
             raise ConnectionError("Circuit breaker OPEN - broker unavailable")
         await self._ensure_session()
-        try:
-            resp = await self._client.post(
-                path, headers=self._auth_headers(), json=json_data or {},
-            )
-            resp.raise_for_status()
-            broker_circuit_breaker.record_success()
-            return resp
-        except Exception as e:
-            broker_circuit_breaker.record_failure()
-            raise
+        last_exc = None
+        for attempt in range(3):  # 1 initial + 2 retries
+            try:
+                resp = await self._client.post(
+                    path, headers=self._auth_headers(), json=json_data or {},
+                )
+                resp.raise_for_status()
+                broker_circuit_breaker.record_success()
+                return resp
+            except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+                last_exc = e
+                if attempt < 2:
+                    delay = min(0.5 * (2 ** attempt), 10.0)
+                    logger.debug(f"[_post] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
+                    await asyncio.sleep(delay)
+                    await self._ensure_session()
+            except Exception as e:
+                broker_circuit_breaker.record_failure()
+                raise
+        broker_circuit_breaker.record_failure()
+        raise last_exc
 
     @retry_async(max_retries=2, base_delay=0.5, exceptions=(httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException))
     async def _put(self, path: str, json_data: Optional[Dict] = None) -> httpx.Response:
@@ -256,6 +288,22 @@ class CapitalClient(BaseBroker):
         self._epic_cache[instrument] = epic_guess
         return epic_guess
 
+    async def warm_epic_cache(self, instruments: List[str]) -> None:
+        """Pre-resolve all instrument epics with throttling.
+        Call this BEFORE the initial scan to avoid burst API calls
+        from interleaved search + candle requests."""
+        uncached = [i for i in instruments if i not in self._epic_cache]
+        if not uncached:
+            return
+        logger.info(f"Warming epic cache for {len(uncached)} instruments...")
+        for inst in uncached:
+            try:
+                await self._resolve_epic(inst)
+            except Exception as e:
+                logger.debug(f"Epic warmup failed for {inst}: {e}")
+            await asyncio.sleep(0.5)
+        logger.info(f"Epic cache warmed: {len(self._epic_cache)} instruments cached")
+
     def _denormalize_instrument(self, epic: str) -> str:
         """Convert Capital.com epic back to our format (e.g., EURUSD -> EUR_USD)."""
         # Reverse lookup from cache
@@ -329,7 +377,11 @@ class CapitalClient(BaseBroker):
 
         for p in prices:
             # Capital.com returns separate bid/ask OHLC - use mid
-            snap_time = p.get("snapshotTime", "")
+            # Normalize time format: "2024/01/15 14:00:00" -> "2024-01-15T14:00:00Z"
+            raw_time = p.get("snapshotTime", "")
+            snap_time = raw_time.replace("/", "-").replace(" ", "T")
+            if snap_time and not snap_time.endswith("Z"):
+                snap_time += "Z"
             # Use bid prices (or average bid/ask)
             o_data = p.get("openPrice", {})
             h_data = p.get("highPrice", {})

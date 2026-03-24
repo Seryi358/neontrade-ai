@@ -121,6 +121,119 @@ async def get_daily_activity():
     }
 
 
+# ── Broker Diagnostic ──────────────────────────────────────────────
+
+@router.get("/diagnostic")
+async def run_diagnostic():
+    """
+    Step-by-step broker diagnostic. Tests session, epic resolution, and candle fetch.
+    Use this to debug why data is empty.
+    """
+    from main import engine
+    from core.resilience import broker_circuit_breaker
+    broker = engine.broker
+    results = {
+        "engine_running": engine._running,
+        "startup_error": engine._startup_error,
+        "scanned_instruments": len(engine._last_scan_results),
+        "broker_type": getattr(broker, 'broker_type', None),
+        "circuit_breaker": {
+            "state": broker_circuit_breaker.state,
+            "failure_count": broker_circuit_breaker._failure_count,
+            "threshold": broker_circuit_breaker.failure_threshold,
+        },
+        "steps": [],
+    }
+    if results["broker_type"]:
+        results["broker_type"] = results["broker_type"].value
+
+    # Step 1: Session
+    try:
+        await broker._ensure_session()
+        cst = getattr(broker, '_cst', None)
+        sec_tok = getattr(broker, '_security_token', None)
+        results["steps"].append({
+            "step": "1_session",
+            "ok": bool(cst and sec_tok),
+            "detail": f"CST={'SET' if cst else 'EMPTY'}, SecurityToken={'SET' if sec_tok else 'EMPTY'}",
+        })
+    except Exception as e:
+        results["steps"].append({"step": "1_session", "ok": False, "detail": str(e)})
+        return results
+
+    # Step 2: Account
+    try:
+        summary = await broker.get_account_summary()
+        results["steps"].append({
+            "step": "2_account",
+            "ok": True,
+            "detail": f"Balance: {summary.balance} {summary.currency}",
+        })
+    except Exception as e:
+        results["steps"].append({"step": "2_account", "ok": False, "detail": str(e)})
+
+    # Step 3: Resolve EUR_USD epic
+    epic = None
+    try:
+        epic = await broker._resolve_epic("EUR_USD")
+        results["steps"].append({
+            "step": "3_resolve_epic",
+            "ok": True,
+            "detail": f"EUR_USD -> '{epic}'",
+        })
+    except Exception as e:
+        results["steps"].append({"step": "3_resolve_epic", "ok": False, "detail": str(e)})
+
+    # Step 4: Fetch 5 candles (H1)
+    try:
+        candles = await broker.get_candles("EUR_USD", "H1", 5)
+        if candles:
+            last = candles[-1]
+            results["steps"].append({
+                "step": "4_candles_H1",
+                "ok": True,
+                "detail": f"{len(candles)} candles. Last: O={last.open} H={last.high} L={last.low} C={last.close} T={last.time}",
+            })
+        else:
+            results["steps"].append({
+                "step": "4_candles_H1",
+                "ok": False,
+                "detail": "Empty candle list returned (0 candles)",
+            })
+    except Exception as e:
+        results["steps"].append({"step": "4_candles_H1", "ok": False, "detail": str(e)})
+
+    # Step 5: Raw API response for debugging
+    try:
+        if epic:
+            raw = await broker._get(f"/api/v1/prices/{epic}", params={
+                "resolution": "HOUR",
+                "max": 2,
+            })
+            prices = raw.get("prices", [])
+            results["steps"].append({
+                "step": "5_raw_api",
+                "ok": len(prices) > 0,
+                "detail": f"{len(prices)} raw prices. Keys: {list(raw.keys())}",
+                "sample": prices[0] if prices else raw,
+            })
+    except Exception as e:
+        results["steps"].append({"step": "5_raw_api", "ok": False, "detail": str(e)})
+
+    # Step 6: Check scan results
+    scan_sample = {}
+    for inst, analysis in list(engine._last_scan_results.items())[:3]:
+        scan_sample[inst] = {"score": analysis.score, "htf_trend": analysis.htf_trend.value}
+    results["steps"].append({
+        "step": "6_scan_results",
+        "ok": len(engine._last_scan_results) > 0,
+        "detail": f"{len(engine._last_scan_results)} instruments scanned",
+        "sample": scan_sample,
+    })
+
+    return results
+
+
 # ── Trading Mode ──────────────────────────────────────────────────
 
 @router.get("/mode")

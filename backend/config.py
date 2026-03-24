@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     capital_password: str = ""
     capital_identifier: str = ""  # email address
     capital_environment: str = "demo"  # "demo" or "live"
+    capital_account_id: str = ""  # specific account ID (empty = auto-detect real account)
 
     # OANDA (alternative)
     oanda_api_key: str = ""
@@ -70,26 +71,43 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/trading.db"
 
     # ── Trading Plan Rules (from TradingLab Course) ──────────────
-    # Risk per trade by style
-    risk_day_trading: float = 0.01        # 1%
+    # ── TradingLab recommends starting with BLUE + RED only.
+    # ── All other strategies should be enabled only after mastering these two.
+    # ── "Con que seáis bueno con una sola estrategia ya es suficiente para
+    # ──  empezar a operar e incluso fondearos y vivir del trading" — Alex
+
+    # Trading style: "day_trading" (default), "scalping", "swing"
+    trading_style: str = "day_trading"
+
+    # Risk per trade by style (ch18.3 Regla del 1%)
+    risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # 0.5%
     risk_swing: float = 0.03             # 3%
-    max_total_risk: float = 0.07          # 7% max simultaneous
+    max_total_risk: float = 0.07          # 7% max simultaneous open risk
 
-    # Correlated pairs risk reduction
-    correlated_risk_factor: float = 0.75  # 0.75% each instead of 1%
+    # Correlated pairs risk reduction (ch18.3)
+    # e.g., AUD/JPY + AUD/CAD → 0.75% each instead of 1% + 1%
+    correlated_risk_factor: float = 0.75
 
-    # Minimum reward:risk ratio to TP1 (Trading Plan: 0.80 because win rate is 61%)
-    # BLACK strategy enforces its own minimum of 2.0 separately
+    # Minimum reward:risk ratio to TP1 (ch22.1 Trading Plan)
+    # 0.80 based on Alex's 61% win rate. If your win rate is <50%, use 1.0+
+    # BLACK and GREEN enforce their own minimum of 2.0 separately
     min_rr_ratio: float = 0.80
+    min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R
+    min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R
 
-    # Position management
-    move_sl_to_be_at: float = 0.50  # Move SL to BE when price is 50% to TP1
-    scale_in_require_be: bool = True  # No new trade unless BE set on existing (Trading Plan)
+    # Position management (ch21 Avanzado)
+    move_sl_to_be_at: float = 0.50   # Move SL to BE when price is 50% to TP1
+    scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
+    partial_taking: bool = False      # Alex does NOT take partials — prefers quick exit at TP1
+    # SL management style: "ema" (recommended), "price_action" (subjective, not recommended)
+    sl_management_style: str = "ema"
 
-    # Drawdown-based risk adjustment (from TradingLab ch18.7)
-    # Methods: "fixed_1pct" (always 1%), "variable" (win-rate based), "fixed_levels"
-    drawdown_method: str = "fixed_levels"
+    # Drawdown-based risk adjustment (ch18.7)
+    # Methods: "fixed_1pct" (always 1%, recommended for beginners),
+    #          "variable" (win-rate based, most professional),
+    #          "fixed_levels" (step-down at DD thresholds, most conservative)
+    drawdown_method: str = "fixed_1pct"
     # Fixed levels: reduce risk at these drawdown thresholds
     drawdown_level_1: float = 0.0412  # -4.12% DD -> 0.75% risk
     drawdown_level_2: float = 0.0618  # -6.18% DD -> 0.50% risk
@@ -97,14 +115,16 @@ class Settings(BaseSettings):
     drawdown_risk_1: float = 0.0075   # 0.75% at level 1
     drawdown_risk_2: float = 0.005    # 0.50% at level 2
     drawdown_risk_3: float = 0.0025   # 0.25% at level 3
+    # Minimum risk floor (never go below this regardless of drawdown)
+    drawdown_min_risk: float = 0.005  # 0.5% absolute floor
 
-    # Delta risk algorithm (from TradingLab ch18.8)
-    # Increase risk during winning streaks
-    delta_enabled: bool = False       # Disabled by default (conservative)
+    # Delta risk algorithm (ch18.8) — increase risk during winning streaks
+    # Disabled by default (beginners should use fixed 1% until profitable)
+    delta_enabled: bool = False
     delta_parameter: float = 0.60     # 0.20-0.90, 0.60 recommended
     delta_max_risk: float = 0.03      # Max risk increase cap (3%)
 
-    # Trading hours (UTC) - London + New York sessions
+    # Trading hours (UTC) - London + New York sessions only
     trading_start_hour: int = 7    # 07:00 UTC (London open)
     trading_end_hour: int = 21     # 21:00 UTC (NY close)
 
@@ -113,29 +133,47 @@ class Settings(BaseSettings):
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
     avoid_news_minutes_after: int = 15   # Don't trade 15 min after major news
 
-    # Timeframes
-    htf_timeframes: List[str] = ["W", "D"]         # Weekly, Daily
+    # Timeframes — Day Trading (default)
+    htf_timeframes: List[str] = ["W", "D"]
     ltf_timeframes: List[str] = ["H4", "H1", "M15", "M5", "M2"]
 
-    # EMAs for Day Trading
-    ema_fast: int = 2    # EMA 2 periods
-    ema_slow: int = 5    # EMA 5 periods
+    # EMAs for Day Trading execution (ch21 Avanzado)
+    ema_fast: int = 2    # EMA 2 periods (shortest, for aggressive trailing)
+    ema_slow: int = 5    # EMA 5 periods (for short-term trailing)
+    # Key structural EMAs (used by all strategies)
+    ema_1h: int = 50     # EMA 50 on 1H — BLUE pullback zone
+    ema_4h: int = 50     # EMA 50 on 4H — RED pullback zone, BLUE TP
+    ema_daily: int = 20  # EMA 20 on Daily — trend filter
+    sma_daily: int = 200 # SMA 200 on Daily — long-term trend filter
 
     # Scalping module (Workshop de Scalping)
-    scalping_enabled: bool = False  # Toggle scalping mode
+    # TradingLab: scalping is the RISKIEST style — master day trading first.
+    # RED is the recommended strategy for scalping. Avoid BLUE in scalping
+    # (15M-to-5M ratio is 3x, making ruptures too similar between timeframes).
+    scalping_enabled: bool = False
     scalping_max_daily_dd: float = 0.05  # 5% max daily drawdown
     scalping_max_total_dd: float = 0.10  # 10% max total drawdown
 
     # Funded account mode (Workshop de Cuentas Fondeadas)
-    funded_account_mode: bool = False  # Enable funded account constraints
+    # Only enable after 3 consecutive months of profitability
+    funded_account_mode: bool = False
     funded_max_daily_dd: float = 0.05  # 5% max daily drawdown
     funded_max_total_dd: float = 0.10  # 10% max total drawdown
     funded_no_overnight: bool = True   # Close all positions before session end
     funded_no_news_trading: bool = True  # No trading around news events
 
-    # Forex pairs watchlist (from FOREX.txt)
+    # ── Discretion Level (ch22.1 Trading Plan) ──────────────────
+    # Beginners: 100% precision, 0% discretion. Follow the plan exactly.
+    # Alex (experienced): 80% precision, 20% discretion.
+    discretion_pct: float = 0.0  # 0% discretion for beginners
+
+    # ── Forex Watchlist (from FOREX.txt) ──────────────────────────
+    # TradingLab focus: "mercado de Divisas (including indices and metals)"
+    # Commodities are NOT the primary focus and should be avoided by beginners.
+    # Exotics: USD exotics are better than EUR exotics (more volume, better
+    # pattern respect). Alex pruned EUR exotics over time.
     forex_watchlist: List[str] = [
-        # Principales USD
+        # Principales USD (7 pairs — the core)
         "AUD_USD", "EUR_USD", "GBP_USD", "NZD_USD",
         "USD_CAD", "USD_CHF", "USD_JPY",
         # Principales EUR
@@ -144,13 +182,13 @@ class Settings(BaseSettings):
         "AUD_CAD", "CAD_CHF", "EUR_CAD", "GBP_CAD", "NZD_CAD",
         # Principales JPY
         "AUD_JPY", "CAD_JPY", "CHF_JPY", "GBP_JPY", "NZD_JPY",
-        # Otros
+        # Otros cruces
         "AUD_CHF", "AUD_NZD", "GBP_AUD", "GBP_CHF", "GBP_NZD", "NZD_CHF",
-        # Metales (from FOREX.txt)
+        # Metales (included in forex per TradingLab — treated as currencies)
         "XAU_USD", "XAG_USD",
     ]
 
-    # Correlation pairs map (pairs that tend to move together)
+    # Correlation pairs map (TradingLab: enter with 0.75% each if correlated)
     correlation_groups: List[List[str]] = [
         ["AUD_USD", "NZD_USD"],
         ["AUD_JPY", "AUD_CAD", "AUD_NZD", "AUD_CHF"],
@@ -160,58 +198,57 @@ class Settings(BaseSettings):
         ["XAU_USD", "XAG_USD"],
     ]
 
-    # ── Extended Watchlists (from TradingLab course files) ──────────
-    # These contain ALL instruments from the course. The active watchlist
-    # is forex_watchlist by default; extended lists are available for
-    # backtesting, analysis, and when using brokers that support them.
+    # ── Extended Watchlists ────────────────────────────────────────
+    # Available for backtesting and when using brokers that support them.
+    # NOT active by default per TradingLab recommendation to focus.
 
-    # Additional forex pairs (exotics + metals/indices from FOREX.txt)
+    # Exotic forex — USD exotics kept (better volume), EUR exotics pruned
     forex_exotic_watchlist: List[str] = [
-        # Exotic EUR
-        "EUR_CNH", "EUR_MXN", "EUR_NOK", "EUR_SGD", "EUR_ZAR",
-        # Exotic USD
+        # Exotic USD (more volume = better pattern respect — Alex keeps these)
         "USD_CNH", "USD_CZK", "USD_HUF", "USD_MXN", "USD_NOK",
         "USD_PLN", "USD_SEK", "USD_SGD", "USD_TRY", "USD_ZAR",
-        # Metals & Indices (from FOREX.txt)
+        # Exotic EUR (reduced — worse than USD exotics per Alex)
+        "EUR_MXN", "EUR_NOK", "EUR_ZAR",
+        # Precious metals (beyond Gold/Silver)
         "XPD_USD", "XPT_USD",
     ]
 
+    # Commodities — NOT recommended by TradingLab for primary trading.
+    # Available only for backtesting/analysis.
     commodities_watchlist: List[str] = [
-        # Energy
         "BCO_USD", "WTICO_USD", "NATGAS_USD",
-        # Agricultural
         "WHEAT_USD", "CORN_USD", "SOYBN_USD", "SUGAR_USD",
-        # Metals (already in forex: XAU, XAG)
         "XPT_USD", "XPD_USD", "XCU_USD",
     ]
 
+    # Indices — from FOREX.txt (US500, SX5E, US2000)
     indices_watchlist: List[str] = [
-        # US
         "US30_USD", "US2000_USD", "NAS100_USD", "SPX500_USD",
-        # Europe
         "DE30_EUR", "FR40_EUR", "UK100_GBP",
-        # Asia/Pacific
         "JP225_USD", "AU200_AUD", "HK33_HKD", "CN50_USD",
     ]
 
+    # Crypto — separate allocation per Trading Plan (10% of trading capital)
     crypto_watchlist: List[str] = [
-        # Top crypto pairs (from CRYPTO USDT.txt - most liquid only)
+        # TradingLab allocation: 70% BTC, 20% ETH, 10% altcoins
         "BTC_USD", "ETH_USD", "SOL_USD", "ADA_USD", "DOT_USD",
         "LINK_USD", "AVAX_USD", "MATIC_USD", "UNI_USD", "ATOM_USD",
         "XRP_USD", "DOGE_USD", "LTC_USD", "BNB_USD", "FTM_USD",
         "ALGO_USD", "XLM_USD", "EOS_USD", "XTZ_USD", "VET_USD",
     ]
 
-    # Which watchlist categories are active (toggle in UI)
-    active_watchlist_categories: List[str] = ["forex"]  # Options: forex, forex_exotic, commodities, indices, crypto
+    # Active categories — only forex by default (TradingLab: focus on divisas)
+    # Options: forex, forex_exotic, commodities, indices, crypto
+    active_watchlist_categories: List[str] = ["forex"]
 
-    # Capital allocation per Trading Plan
+    # ── Capital Allocation (ch18.5 + Trading Plan) ────────────────
+    # Alex's split: 80% trading, 20% long-term investment
     allocation_trading_pct: float = 0.80     # 80% in trading accounts
     allocation_forex_pct: float = 0.90       # 90% forex/indices/metals
     allocation_crypto_pct: float = 0.10      # 10% crypto
     allocation_investment_pct: float = 0.20  # 20% long-term
-    allocation_investment_stocks: float = 0.80  # 80% stocks
-    allocation_investment_crypto: float = 0.20  # 20% crypto
+    allocation_investment_stocks: float = 0.80  # 80% stocks/ETFs (70% VT/S&P500, 30% sectors)
+    allocation_investment_crypto: float = 0.20  # 20% crypto (70% BTC, 20% ETH, 10% alts)
 
     # Extended correlation groups
     indices_correlation_groups: List[List[str]] = [

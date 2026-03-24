@@ -111,6 +111,7 @@ def _create_broker():
             password=settings.capital_password,
             identifier=settings.capital_identifier,
             environment=settings.capital_environment,
+            account_id=settings.capital_account_id or None,
         )
     else:
         from broker.oanda_client import OandaClient
@@ -285,9 +286,14 @@ class TradingEngine:
 
     # ── Strategy Selection ────────────────────────────────────────
 
+    # TradingLab: start with BLUE + RED only. "La BLUE es la más fácil de
+    # ejecutar" and "La RED es la más fácil y sencilla de operar".
+    # Enable PINK, WHITE, BLACK, GREEN only after mastering BLUE + RED.
+    # BLUE_A is the most effective (highest win rate), BLUE_B most common.
     _DEFAULT_STRATEGY_CONFIG: Dict[str, bool] = {
         "BLUE": True, "BLUE_A": True, "BLUE_B": True, "BLUE_C": True,
-        "RED": True, "PINK": True, "WHITE": True, "BLACK": True, "GREEN": True,
+        "RED": True,
+        "PINK": False, "WHITE": False, "BLACK": False, "GREEN": False,
     }
 
     def _load_strategy_config(self) -> Dict[str, bool]:

@@ -2466,8 +2466,8 @@ class BlackStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            # BLACK requiere MINIMO 2:1 o min_rr_ratio (el mayor de los dos)
-            black_min_rr = max(2.0, settings.min_rr_ratio)
+            # BLACK requiere MINIMO 2:1 (contratendencia = mayor riesgo, mejor R:R)
+            black_min_rr = max(settings.min_rr_black, settings.min_rr_ratio)
             if rr < black_min_rr:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (BLACK requiere MINIMO {black_min_rr}:1)")
                 return None
@@ -2742,8 +2742,8 @@ class GreenStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            # GREEN busca minimo 2:1 o min_rr_ratio (el mayor de los dos)
-            green_min_rr = max(2.0, settings.min_rr_ratio)
+            # GREEN busca minimo 2:1 (potencial hasta 10:1 R:R)
+            green_min_rr = max(settings.min_rr_green, settings.min_rr_ratio)
             if rr < green_min_rr:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (Green busca minimo {green_min_rr}:1, ideal 5-10:1)")
                 return None

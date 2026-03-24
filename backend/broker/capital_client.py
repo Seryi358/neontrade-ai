@@ -61,12 +61,14 @@ class CapitalClient(BaseBroker):
         password: str,
         identifier: str,
         environment: str = "demo",
+        account_id: Optional[str] = None,
     ):
         super().__init__(BrokerType.CAPITAL)
 
         self.api_key = api_key
         self.password = password
         self.identifier = identifier  # email address
+        self._target_account_id = account_id  # specific account to use (None = auto-detect live)
 
         # Base URL
         if environment == "live":
@@ -78,6 +80,7 @@ class CapitalClient(BaseBroker):
         self._cst: Optional[str] = None
         self._security_token: Optional[str] = None
         self._session_time: Optional[datetime] = None
+        self._active_account_id: Optional[str] = None
 
         # HTTP client
         self._client = httpx.AsyncClient(
@@ -102,7 +105,7 @@ class CapitalClient(BaseBroker):
         await self._create_session()
 
     async def _create_session(self):
-        """Authenticate and get CST + X-SECURITY-TOKEN."""
+        """Authenticate, get CST + X-SECURITY-TOKEN, and switch to the correct account."""
         try:
             resp = await self._client.post(
                 "/api/v1/session",
@@ -121,6 +124,9 @@ class CapitalClient(BaseBroker):
 
             logger.info("Capital.com session created successfully")
 
+            # Switch to the correct account (avoid demo account)
+            await self._select_account()
+
         except httpx.HTTPStatusError as e:
             # Clear stale tokens on auth failure
             self._cst = None
@@ -134,6 +140,70 @@ class CapitalClient(BaseBroker):
                 pass
             logger.error(f"Capital.com session failed: {error_msg}")
             raise ConnectionError(f"Capital.com auth failed: {error_msg}")
+
+    async def _select_account(self):
+        """Select the correct trading account after login.
+        Capital.com creates both a live and a demo sub-account.
+        The session may default to the demo one (marked 'preferred').
+        We auto-detect the real account by picking the one with the
+        lowest balance (the user's actual deposit, not virtual funds).
+        """
+        try:
+            resp = await self._client.get(
+                "/api/v1/accounts", headers=self._auth_headers()
+            )
+            resp.raise_for_status()
+            accounts = resp.json().get("accounts", [])
+
+            if not accounts:
+                return
+
+            # If a specific account ID was configured, use it
+            if self._target_account_id:
+                target = self._target_account_id
+            else:
+                # Auto-detect: the real account typically has the smaller balance
+                # (user deposit vs. virtual demo funds like ~$60k)
+                # If there's only one account, use it
+                if len(accounts) == 1:
+                    target = accounts[0]["accountId"]
+                else:
+                    # Sort by balance ascending — the real account has less money
+                    sorted_accts = sorted(
+                        accounts,
+                        key=lambda a: float(a.get("balance", {}).get("balance", 0)),
+                    )
+                    target = sorted_accts[0]["accountId"]
+                    real_bal = float(sorted_accts[0].get("balance", {}).get("balance", 0))
+                    demo_bal = float(sorted_accts[-1].get("balance", {}).get("balance", 0))
+                    logger.info(
+                        f"Detected {len(accounts)} sub-accounts: "
+                        f"real=${real_bal:,.2f}, demo=${demo_bal:,.2f}"
+                    )
+
+            # Check if we're already on the right account
+            session_resp = await self._client.get(
+                "/api/v1/session", headers=self._auth_headers()
+            )
+            session_resp.raise_for_status()
+            current_acct = session_resp.json().get("accountId")
+
+            if current_acct != target:
+                # Switch to the correct account
+                switch_resp = await self._client.put(
+                    "/api/v1/session",
+                    headers=self._auth_headers(),
+                    json={"accountId": target},
+                )
+                switch_resp.raise_for_status()
+                logger.info(f"Switched to account {target}")
+            else:
+                logger.info(f"Already on correct account {target}")
+
+            self._active_account_id = target
+
+        except Exception as e:
+            logger.warning(f"Account selection failed (will use default): {e}")
 
     def _auth_headers(self) -> Dict[str, str]:
         """Get authentication headers for API requests."""
@@ -320,13 +390,19 @@ class CapitalClient(BaseBroker):
     # ── Account ──────────────────────────────────────────────────
 
     async def get_account_summary(self) -> AccountSummary:
-        """Get account balance, equity, margin, etc."""
+        """Get account balance, equity, margin, etc. Uses the active account."""
         data = await self._get("/api/v1/accounts")
         accounts = data.get("accounts", [])
         if not accounts:
             raise ValueError("No accounts found")
 
-        acct = accounts[0]  # Use first account
+        # Find the active account by ID, fallback to first
+        acct = accounts[0]
+        if self._active_account_id:
+            for a in accounts:
+                if a.get("accountId") == self._active_account_id:
+                    acct = a
+                    break
         balance = float(acct.get("balance", {}).get("balance", 0))
         deposit = float(acct.get("balance", {}).get("deposit", 0))
         pnl = float(acct.get("balance", {}).get("profitLoss", 0))
@@ -456,13 +532,14 @@ class CapitalClient(BaseBroker):
     async def place_market_order(
         self,
         instrument: str,
-        units: int,
+        units: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
     ) -> OrderResult:
         """
         Place a market order.
         units > 0 = BUY, units < 0 = SELL
+        Capital.com accepts fractional sizes (e.g., 0.001 for crypto).
         """
         epic = await self._resolve_epic(instrument)
         direction = "BUY" if units > 0 else "SELL"
@@ -751,13 +828,28 @@ class CapitalClient(BaseBroker):
     # ── Instrument Info ──────────────────────────────────────────
 
     async def get_instrument_info(self, instrument: str) -> Dict[str, Any]:
-        """Get instrument details from market search."""
+        """Get instrument details using resolved epic (spot preferred)."""
         epic = await self._resolve_epic(instrument)
+        try:
+            # Use the specific market detail endpoint with resolved epic
+            data = await self._get(f"/api/v1/markets/{epic}")
+            result = data.get("instrument", {})
+            # Merge dealing rules and snapshot into result for convenience
+            result["dealingRules"] = data.get("dealingRules", {})
+            result["snapshot"] = data.get("snapshot", {})
+            result["epic"] = epic
+            return result
+        except Exception:
+            pass
+        # Fallback to search
         try:
             data = await self._get("/api/v1/markets", params={
                 "searchTerm": instrument.replace("_", "/"),
-                "limit": 1,
+                "limit": 10,
             })
+            for m in data.get("markets", []):
+                if m.get("epic") == epic:
+                    return m
             markets = data.get("markets", [])
             if markets:
                 return markets[0]

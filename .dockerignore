@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Node modules (frontend rebuilds in Docker)
+frontend/node_modules
+frontend/.expo
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+
+# Environment (injected via EasyPanel env vars)
+backend/.env
+
+# Data & logs (persisted via volumes)
+backend/data/*.db
+backend/data/*.json
+backend/logs/
+
+# Test files
+backend/test_*.py
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys (sensitive)
+backend/keys/

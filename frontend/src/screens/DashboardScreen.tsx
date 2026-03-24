@@ -63,12 +63,22 @@ export default function DashboardScreen() {
     try {
       setError(null);
       const [accountRes, statusRes] = await Promise.all([
-        authFetch(`${API_URL}/api/v1/account`),
-        authFetch(`${API_URL}/api/v1/status`),
+        authFetch(`${API_URL}/api/v1/account`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/status`).catch(() => null),
       ]);
-      if (!accountRes.ok || !statusRes.ok) throw new Error('Error del servidor');
-      setAccount(await accountRes.json());
-      setStatus(await statusRes.json());
+      if (statusRes?.ok) {
+        const statusData = await statusRes.json();
+        setStatus(statusData);
+        // Show broker connection error if engine isn't running
+        if (!statusData.running && statusData.startup_error) {
+          setError(`Broker: ${statusData.startup_error.slice(0, 80)}`);
+        }
+      }
+      if (accountRes?.ok) {
+        setAccount(await accountRes.json());
+      } else if (!accountRes) {
+        setError('No se pudo conectar al servidor');
+      }
     } catch (err) {
       console.error('Failed to fetch data:', err);
       setError('Error al cargar datos');

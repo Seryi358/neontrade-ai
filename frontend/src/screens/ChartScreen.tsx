@@ -198,6 +198,7 @@ export default function ChartScreen() {
   const ema20SeriesRef = useRef<any>(null);
   const ema50SeriesRef = useRef<any>(null);
   const priceLinesRef = useRef<any[]>([]);
+  const chartCleanupRef = useRef<(() => void) | null>(null);
 
   // ── Data Fetching ───────────────────────────────────────────────────────
 
@@ -302,21 +303,27 @@ export default function ChartScreen() {
 
   // ── TradingView Chart (Web) ─────────────────────────────────────────────
 
-  // Initialize the chart once when the container mounts
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !createChart || !chartContainerRef.current) return;
-
-    // Clean up previous chart
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
+  // Initialize chart via callback ref — fires when the div actually mounts in the DOM.
+  // This fixes the timing issue where useEffect([]) ran before the div existed.
+  const initChartRef = useCallback((el: HTMLDivElement | null) => {
+    // Cleanup previous instance
+    if (chartCleanupRef.current) {
+      chartCleanupRef.current();
+      chartCleanupRef.current = null;
     }
 
-    const container = chartContainerRef.current;
-    const chartWidth = container.clientWidth || SCREEN_WIDTH - 32;
+    if (!el) {
+      chartContainerRef.current = null;
+      return;
+    }
+    if (Platform.OS !== 'web' || !createChart) return;
+
+    chartContainerRef.current = el;
+
+    const chartWidth = el.clientWidth || SCREEN_WIDTH - 32;
     const chartHeight = Math.min(SCREEN_HEIGHT * 0.55, 500);
 
-    const chart = createChart(container, {
+    const chart = createChart(el, {
       width: chartWidth,
       height: chartHeight,
       layout: {
@@ -414,19 +421,33 @@ export default function ChartScreen() {
 
     // Handle resize
     const handleResize = () => {
-      if (chartRef.current && container) {
+      if (chartRef.current && el) {
         chartRef.current.applyOptions({
-          width: container.clientWidth,
+          width: el.clientWidth,
         });
       }
     };
     window.addEventListener('resize', handleResize);
 
-    return () => {
+    // Store cleanup for later
+    chartCleanupRef.current = () => {
       window.removeEventListener('resize', handleResize);
       if (chartRef.current) {
         chartRef.current.remove();
         chartRef.current = null;
+      }
+      candlestickSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+      ema20SeriesRef.current = null;
+      ema50SeriesRef.current = null;
+    };
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (chartCleanupRef.current) {
+        chartCleanupRef.current();
       }
     };
   }, []);
@@ -722,11 +743,7 @@ export default function ChartScreen() {
     return (
       <View style={styles.tvChartWrapper}>
         <div
-          ref={(el: HTMLDivElement | null) => {
-            if (el && !chartContainerRef.current) {
-              chartContainerRef.current = el;
-            }
-          }}
+          ref={initChartRef}
           style={{
             width: '100%',
             height: chartHeightPx,

@@ -52,6 +52,8 @@ class TradeJournal:
         exit_price: float,
         strategy: str,
         direction: str,
+        is_discretionary: bool = False,
+        discretionary_notes: str = "",
     ):
         """Record a completed trade into the journal."""
         now = datetime.now(timezone.utc)
@@ -137,6 +139,9 @@ class TradeJournal:
             "emotional_notes_pre": "",    # Before/during analysis
             "emotional_notes_during": "",  # While position is open
             "emotional_notes_post": "",    # After trade closes
+            # Discretionary tracking (Trading Plan: 80% decisions from backtesting/data)
+            "is_discretionary": is_discretionary,
+            "discretionary_notes": discretionary_notes,
         }
 
         self._trades.append(trade_record)
@@ -176,6 +181,11 @@ class TradeJournal:
                 "pnl_accumulated_pct": 0.0,
                 "accumulator": self._accumulator,
                 "dd_by_year": self._dd_by_year,
+                "discretionary_count": 0,
+                "systematic_count": 0,
+                "discretionary_ratio_pct": 0.0,
+                "discretionary_win_rate": 0.0,
+                "systematic_win_rate": 0.0,
             }
 
         wins = [t for t in self._trades if t["result"] == "TP"]
@@ -243,6 +253,38 @@ class TradeJournal:
             / self._initial_capital * 100
         ) if self._initial_capital > 0 else 0.0
 
+        # Discretionary vs systematic breakdown
+        # (Trading Plan: 80% decisions based on backtesting and objective data)
+        discretionary_trades = [
+            t for t in self._trades if t.get("is_discretionary", False)
+        ]
+        systematic_trades = [
+            t for t in self._trades if not t.get("is_discretionary", False)
+        ]
+        disc_count = len(discretionary_trades)
+        sys_count = len(systematic_trades)
+        discretionary_ratio_pct = (
+            (disc_count / total * 100) if total > 0 else 0.0
+        )
+
+        disc_wins = [t for t in discretionary_trades if t["result"] == "TP"]
+        disc_total_decisive = len([
+            t for t in discretionary_trades if t["result"] in ("TP", "SL")
+        ])
+        discretionary_win_rate = (
+            (len(disc_wins) / disc_total_decisive * 100)
+            if disc_total_decisive > 0 else 0.0
+        )
+
+        sys_wins = [t for t in systematic_trades if t["result"] == "TP"]
+        sys_total_decisive = len([
+            t for t in systematic_trades if t["result"] in ("TP", "SL")
+        ])
+        systematic_win_rate = (
+            (len(sys_wins) / sys_total_decisive * 100)
+            if sys_total_decisive > 0 else 0.0
+        )
+
         return {
             "total_trades": total,
             "wins": win_count,
@@ -266,6 +308,11 @@ class TradeJournal:
             "pnl_accumulated_pct": round(pnl_accumulated_pct, 4),
             "accumulator": round(self._accumulator, 6),  # Compound growth factor
             "dd_by_year": self._dd_by_year,
+            "discretionary_count": disc_count,
+            "systematic_count": sys_count,
+            "discretionary_ratio_pct": round(discretionary_ratio_pct, 2),
+            "discretionary_win_rate": round(discretionary_win_rate, 2),
+            "systematic_win_rate": round(systematic_win_rate, 2),
         }
 
     # ── Trade History ─────────────────────────────────────────────
@@ -274,6 +321,34 @@ class TradeJournal:
         """Return trade history with pagination, most recent first."""
         sorted_trades = list(reversed(self._trades))
         return sorted_trades[offset:offset + limit]
+
+    # ── Discretionary Tracking ─────────────────────────────────────
+
+    def mark_trade_discretionary(self, trade_id: str, notes: str = "") -> bool:
+        """Mark a trade as discretionary with optional notes.
+
+        Trading Plan objective: 80% decisions based on backtesting and objective data.
+        Each discretionary decision should be annotated to analyze patterns.
+
+        Args:
+            trade_id: The unique trade identifier.
+            notes: Explanation of why the discretionary decision was made.
+
+        Returns:
+            True if the trade was found and updated, False otherwise.
+        """
+        for trade in self._trades:
+            if trade["trade_id"] == trade_id:
+                trade["is_discretionary"] = True
+                trade["discretionary_notes"] = notes
+                self._save()
+                logger.info(
+                    f"Trade {trade_id} marked as discretionary"
+                    f"{': ' + notes if notes else ''}"
+                )
+                return True
+        logger.warning(f"Trade {trade_id} not found for discretionary marking")
+        return False
 
     # ── Classification ────────────────────────────────────────────
 
@@ -319,6 +394,10 @@ class TradeJournal:
                 with open(self._data_path, "r") as f:
                     data = json.load(f)
                 self._trades = data.get("trades", [])
+                # Backfill discretionary fields for trades saved before this feature
+                for trade in self._trades:
+                    trade.setdefault("is_discretionary", False)
+                    trade.setdefault("discretionary_notes", "")
                 self._current_balance = data.get("current_balance", self._initial_capital)
                 self._peak_balance = data.get("peak_balance", self._initial_capital)
                 self._max_drawdown_pct = data.get("max_drawdown_pct", 0.0)

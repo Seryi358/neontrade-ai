@@ -14,9 +14,11 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
+  Linking,
+  Alert,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, authFetch } from '../services/api';
+import { API_URL, authFetch, api, STRATEGY_COLORS } from '../services/api';
 
 // Types
 interface JournalStats {
@@ -60,6 +62,20 @@ interface JournalTrade {
   emotional_notes_pre: string;
   emotional_notes_during: string;
   emotional_notes_post: string;
+  is_discretionary?: boolean;
+  discretionary_notes?: string;
+  _screenshots?: string[];
+}
+
+interface MonthlyReport {
+  month: string;
+  win_rate: number;
+  profit_factor: number;
+  total_trades: number;
+  by_strategy?: Record<string, { trades: number; pnl: number; win_rate: number }>;
+  recommendations?: string[];
+  best_strategy?: string;
+  worst_strategy?: string;
 }
 
 const MONTH_LABELS: Record<string, string> = {
@@ -101,6 +117,11 @@ export default function JournalScreen() {
   const [expandedTrade, setExpandedTrade] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<Record<string, { pre: string; during: string; post: string }>>({});
   const [savingNotes, setSavingNotes] = useState<string | null>(null);
+  const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const fetchData = useCallback(async () => {
     try {
@@ -191,6 +212,72 @@ export default function JournalScreen() {
       setSavingNotes(null);
     }
   };
+
+  const generateMonthlyReview = async () => {
+    try {
+      setLoadingReport(true);
+      const report: MonthlyReport = await api.generateMonthlyReview(currentMonth);
+      setMonthlyReport(report);
+    } catch (err) {
+      console.error('Failed to generate monthly review:', err);
+      Alert.alert('Error', 'No se pudo generar el review mensual');
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  const loadMonthlyReview = async () => {
+    try {
+      const report: MonthlyReport = await api.getMonthlyReview(currentMonth);
+      setMonthlyReport(report);
+    } catch {
+      // No report yet for this month — that's fine
+    }
+  };
+
+  useEffect(() => {
+    loadMonthlyReview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleDiscretionary = async (tradeId: string) => {
+    const trade = trades.find((t) => t.trade_id === tradeId);
+    if (!trade) return;
+
+    const newValue = !trade.is_discretionary;
+    try {
+      await api.markTradeDiscretionary(tradeId, trade.discretionary_notes || '');
+      setTrades((prev) =>
+        prev.map((t) =>
+          t.trade_id === tradeId ? { ...t, is_discretionary: newValue } : t,
+        ),
+      );
+    } catch (err) {
+      console.error('Failed to toggle discretionary:', err);
+    }
+  };
+
+  const openScreenshots = async (tradeId: string) => {
+    try {
+      const data = await api.getTradeScreenshots(tradeId);
+      const files: string[] = data.files || data.screenshots || [];
+      if (files.length === 0) {
+        Alert.alert('Screenshots', 'No hay screenshots disponibles');
+        return;
+      }
+      // Open the first screenshot URL
+      const url = api.getScreenshotUrl(tradeId, files[0]);
+      await Linking.openURL(url);
+    } catch (err) {
+      console.error('Failed to open screenshots:', err);
+    }
+  };
+
+  // Compute discretionary ratio
+  const discretionaryCount = trades.filter((t) => t.is_discretionary).length;
+  const discretionaryRatio = trades.length > 0
+    ? ((discretionaryCount / trades.length) * 100).toFixed(1)
+    : '0.0';
 
   const formatDate = (dateStr: string) => {
     try {
@@ -326,6 +413,23 @@ export default function JournalScreen() {
               {stats.accumulator.toFixed(2)}
             </Text>
           </View>
+        </View>
+
+        {/* Row 5: DISCRETIONARY RATIO */}
+        <View style={styles.statsRow}>
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>DISCRECIONAL</Text>
+            <Text style={[styles.statValueSm, { color: '#ffb800' }]}>
+              {discretionaryRatio}%
+            </Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>DISC. TRADES</Text>
+            <Text style={[styles.statValueSm, { color: '#ffb800' }]}>
+              {discretionaryCount}/{trades.length}
+            </Text>
+          </View>
+          <View style={styles.stat} />
         </View>
       </View>
     );
@@ -504,6 +608,29 @@ export default function JournalScreen() {
         {isExpanded && notes && (
           <View style={styles.notesContainer}>
             <View style={styles.notesDivider} />
+
+            {/* Discretionary flag */}
+            <TouchableOpacity
+              style={[
+                styles.discretionaryBtn,
+                item.is_discretionary && styles.discretionaryBtnActive,
+              ]}
+              onPress={() => toggleDiscretionary(item.trade_id)}
+            >
+              <Text style={styles.discretionaryBtnText}>
+                {item.is_discretionary ? '◆ DISCRECIONAL' : '○ SISTEMÁTICO'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Screenshots */}
+            {item._screenshots && item._screenshots.length > 0 && (
+              <TouchableOpacity onPress={() => openScreenshots(item.trade_id)}>
+                <Text style={[styles.statLabel, { color: '#00f0ff', marginBottom: 8 }]}>
+                  📸 {item._screenshots.length} screenshot(s)
+                </Text>
+              </TouchableOpacity>
+            )}
+
             <Text style={styles.notesTitle}>NOTAS EMOCIONALES</Text>
 
             <Text style={styles.noteLabel}>PRE-TRADE</Text>
@@ -599,12 +726,88 @@ export default function JournalScreen() {
     );
   }
 
+  // ── Monthly Review Card ──────────────────────────────────────────
+  const renderMonthlyReview = () => {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>MONTHLY REVIEW</Text>
+
+        {/* Generate button */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={generateMonthlyReview}
+          disabled={loadingReport}
+        >
+          {loadingReport ? (
+            <ActivityIndicator size="small" color="#00f0ff" />
+          ) : (
+            <Text style={styles.actionButtonText}>GENERATE {currentMonth}</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Show report data if loaded */}
+        {monthlyReport && (
+          <View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Win Rate</Text>
+              <Text style={styles.statValue}>
+                {(monthlyReport.win_rate * 100).toFixed(1)}%
+              </Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Profit Factor</Text>
+              <Text style={styles.statValue}>
+                {monthlyReport.profit_factor.toFixed(2)}
+              </Text>
+            </View>
+            {monthlyReport.best_strategy && (
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Best Strategy</Text>
+                <Text style={[styles.statValue, { color: '#00ff88' }]}>
+                  {monthlyReport.best_strategy}
+                </Text>
+              </View>
+            )}
+            {monthlyReport.worst_strategy && (
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Worst Strategy</Text>
+                <Text style={[styles.statValue, { color: '#ff2e63' }]}>
+                  {monthlyReport.worst_strategy}
+                </Text>
+              </View>
+            )}
+
+            {/* Strategy breakdown */}
+            {Object.entries(monthlyReport.by_strategy || {}).map(([name, data]: [string, any]) => (
+              <View key={name} style={styles.reviewStrategy}>
+                <Text style={[styles.statLabel, { color: STRATEGY_COLORS[name] || '#8892a0' }]}>
+                  {name}
+                </Text>
+                <Text style={styles.statValue}>
+                  {data.trades} trades | ${data.pnl?.toFixed(2)}
+                </Text>
+              </View>
+            ))}
+
+            {/* Recommendations */}
+            {monthlyReport.recommendations?.map((rec: string, i: number) => (
+              <Text key={i} style={styles.recommendationText}>
+                → {rec}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   // ── Main Render ─────────────────────────────────────────────────
   const ListHeader = () => (
     <View>
       {renderStatsCard()}
       {renderMonthlyReturns()}
       {renderDDHistorico()}
+      {renderMonthlyReview()}
       {renderCounterBar()}
       <Text style={styles.sectionTitle}>ULTIMOS TRADES</Text>
     </View>
@@ -977,6 +1180,59 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
     letterSpacing: 1,
     opacity: 0.7,
+  },
+  // Discretionary toggle
+  discretionaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#2a2445',
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  discretionaryBtnActive: {
+    borderColor: '#ffb800',
+    backgroundColor: 'rgba(255, 184, 0, 0.15)',
+  },
+  discretionaryBtnText: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 12,
+    color: '#8892a0',
+  },
+  // Monthly review action button
+  actionButton: {
+    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: '#00f0ff',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  actionButtonText: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 14,
+    color: '#00f0ff',
+    fontWeight: 'bold',
+  },
+  // Strategy row in monthly review
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  reviewStrategy: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  recommendationText: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 12,
+    color: '#ffb800',
+    marginTop: 4,
   },
   // Empty state
   emptyContainer: {

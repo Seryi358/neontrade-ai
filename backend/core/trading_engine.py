@@ -49,6 +49,18 @@ try:
 except ImportError:
     _SCALPING_AVAILABLE = False
 
+try:
+    from core.screenshot_generator import TradeScreenshotGenerator
+    _SCREENSHOTS_AVAILABLE = True
+except ImportError:
+    _SCREENSHOTS_AVAILABLE = False
+
+try:
+    from core.monthly_review import MonthlyReviewGenerator
+    _MONTHLY_REVIEW_AVAILABLE = True
+except ImportError:
+    _MONTHLY_REVIEW_AVAILABLE = False
+
 
 # ── Trading Mode ──────────────────────────────────────────────────
 
@@ -199,6 +211,12 @@ class TradingEngine:
 
         # Trade journal (initialized with actual balance in start())
         self.trade_journal: Optional[TradeJournal] = None
+
+        # Screenshot generator (Trading Plan: "Take screenshots of every executed trade")
+        self.screenshot_generator = TradeScreenshotGenerator() if _SCREENSHOTS_AVAILABLE else None
+
+        # Monthly review generator
+        self.monthly_review = MonthlyReviewGenerator() if _MONTHLY_REVIEW_AVAILABLE else None
 
         # Notification queue for Electron native notifications
         self._notifications: List[Dict] = []
@@ -836,6 +854,21 @@ class TradingEngine:
                             )
                         except Exception as je:
                             logger.debug(f"Trade journal record failed for {tid}: {je}")
+
+                    # Screenshot on trade close
+                    if self.screenshot_generator:
+                        try:
+                            await self.screenshot_generator.capture_trade_close(
+                                trade_id=tid,
+                                instrument=pos.instrument,
+                                direction=pos.direction,
+                                entry_price=pos.entry_price,
+                                close_price=close_price,
+                                pnl_pct=round(pnl_dollars / pos.entry_price * 100, 2) if pos.entry_price else 0,
+                                result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
+                            )
+                        except Exception:
+                            pass
 
                     # Send close alert
                     if self.alert_manager:
@@ -1477,6 +1510,31 @@ class TradingEngine:
                 )
                 self._daily_setups_executed += 1
                 logger.info(f"Trade {trade_id} opened and tracked")
+
+                # Screenshot on trade open (Trading Plan rule)
+                if self.screenshot_generator:
+                    try:
+                        candles = None
+                        ema_vals = None
+                        if setup.instrument in self._last_scan_results:
+                            analysis = self._last_scan_results[setup.instrument]
+                            candles = getattr(analysis, 'candles_m5', None) or getattr(analysis, 'last_candles', {}).get('M5')
+                            ema_vals = getattr(analysis, 'ema_values', None)
+                        await self.screenshot_generator.capture_trade_open(
+                            trade_id=trade_id,
+                            instrument=setup.instrument,
+                            direction=setup.direction,
+                            entry_price=setup.entry_price,
+                            sl=setup.stop_loss,
+                            tp1=setup.take_profit_1,
+                            tp_max=setup.take_profit_max,
+                            strategy=getattr(setup, '_strategy_name', 'DETECTED'),
+                            confidence=setup.reward_risk_ratio * 33,
+                            candles=candles,
+                            ema_values=ema_vals,
+                        )
+                    except Exception as ss_err:
+                        logger.debug(f"Screenshot capture failed (non-critical): {ss_err}")
 
                 # TradingLab: Track reentry count
                 if setup.instrument in self._reentry_candidates:

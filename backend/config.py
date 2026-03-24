@@ -160,6 +160,72 @@ class Settings(BaseSettings):
         ["XAU_USD", "XAG_USD"],
     ]
 
+    # ── Extended Watchlists (from TradingLab course files) ──────────
+    # These contain ALL instruments from the course. The active watchlist
+    # is forex_watchlist by default; extended lists are available for
+    # backtesting, analysis, and when using brokers that support them.
+
+    # Additional forex pairs (exotics + metals/indices from FOREX.txt)
+    forex_exotic_watchlist: List[str] = [
+        # Exotic EUR
+        "EUR_CNH", "EUR_MXN", "EUR_NOK", "EUR_SGD", "EUR_ZAR",
+        # Exotic USD
+        "USD_CNH", "USD_CZK", "USD_HUF", "USD_MXN", "USD_NOK",
+        "USD_PLN", "USD_SEK", "USD_SGD", "USD_TRY", "USD_ZAR",
+        # Metals & Indices (from FOREX.txt)
+        "XPD_USD", "XPT_USD",
+    ]
+
+    commodities_watchlist: List[str] = [
+        # Energy
+        "BCO_USD", "WTICO_USD", "NATGAS_USD",
+        # Agricultural
+        "WHEAT_USD", "CORN_USD", "SOYBN_USD", "SUGAR_USD",
+        # Metals (already in forex: XAU, XAG)
+        "XPT_USD", "XPD_USD", "XCU_USD",
+    ]
+
+    indices_watchlist: List[str] = [
+        # US
+        "US30_USD", "US2000_USD", "NAS100_USD", "SPX500_USD",
+        # Europe
+        "DE30_EUR", "FR40_EUR", "UK100_GBP",
+        # Asia/Pacific
+        "JP225_USD", "AU200_AUD", "HK33_HKD", "CN50_USD",
+    ]
+
+    crypto_watchlist: List[str] = [
+        # Top crypto pairs (from CRYPTO USDT.txt - most liquid only)
+        "BTC_USD", "ETH_USD", "SOL_USD", "ADA_USD", "DOT_USD",
+        "LINK_USD", "AVAX_USD", "MATIC_USD", "UNI_USD", "ATOM_USD",
+        "XRP_USD", "DOGE_USD", "LTC_USD", "BNB_USD", "FTM_USD",
+        "ALGO_USD", "XLM_USD", "EOS_USD", "XTZ_USD", "VET_USD",
+    ]
+
+    # Which watchlist categories are active (toggle in UI)
+    active_watchlist_categories: List[str] = ["forex"]  # Options: forex, forex_exotic, commodities, indices, crypto
+
+    # Capital allocation per Trading Plan
+    allocation_trading_pct: float = 0.80     # 80% in trading accounts
+    allocation_forex_pct: float = 0.90       # 90% forex/indices/metals
+    allocation_crypto_pct: float = 0.10      # 10% crypto
+    allocation_investment_pct: float = 0.20  # 20% long-term
+    allocation_investment_stocks: float = 0.80  # 80% stocks
+    allocation_investment_crypto: float = 0.20  # 20% crypto
+
+    # Extended correlation groups
+    indices_correlation_groups: List[List[str]] = [
+        ["US30_USD", "SPX500_USD", "NAS100_USD"],
+        ["DE30_EUR", "FR40_EUR"],
+        ["JP225_USD", "AU200_AUD"],
+    ]
+
+    crypto_correlation_groups: List[List[str]] = [
+        ["BTC_USD", "ETH_USD"],
+        ["SOL_USD", "AVAX_USD", "FTM_USD"],
+        ["ADA_USD", "DOT_USD", "ATOM_USD"],
+    ]
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

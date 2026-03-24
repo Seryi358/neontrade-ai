@@ -110,6 +110,8 @@ export default function SettingsScreen() {
   });
   const [editingApiKey, setEditingApiKey] = useState(false);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [watchlistCategories, setWatchlistCategories] = useState<string[]>(['forex']);
+  const [watchlistInfo, setWatchlistInfo] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -157,6 +159,11 @@ export default function SettingsScreen() {
         setFundedEnabled(fd.enabled);
         setFundedStatus(fd);
       }
+      try {
+        const wlData = await api.getWatchlistCategories();
+        setWatchlistCategories(wlData.active_categories || ['forex']);
+        setWatchlistInfo(wlData.available || {});
+      } catch {}
     } catch (err) {
       console.error('Failed to fetch settings:', err);
       setError('No se pudo conectar al servidor');
@@ -356,6 +363,20 @@ export default function SettingsScreen() {
     } catch (err) {
       console.error('Failed to update strategy config:', err);
       setStrategyConfig(prevConfig);
+    }
+  };
+
+  const toggleWatchlistCategory = async (category: string) => {
+    try {
+      const updated = watchlistCategories.includes(category)
+        ? watchlistCategories.filter((c: string) => c !== category)
+        : [...watchlistCategories, category];
+      // Don't allow empty
+      if (updated.length === 0) return;
+      await api.updateWatchlistCategories(updated);
+      setWatchlistCategories(updated);
+    } catch (e: any) {
+      // handle error
     }
   };
 
@@ -628,6 +649,48 @@ export default function SettingsScreen() {
             )}
           </View>
         ))}
+      </View>
+
+      {/* ── WATCHLISTS (TradingLab) ───────────────────────── */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>WATCHLISTS</Text>
+        <Text style={styles.cardSubtitle}>Categorías de instrumentos del curso TradingLab</Text>
+
+        {[
+          { key: 'forex', label: 'FOREX (Principales)', icon: '💱' },
+          { key: 'forex_exotic', label: 'FOREX (Exóticos)', icon: '🌍' },
+          { key: 'commodities', label: 'COMMODITIES', icon: '🛢️' },
+          { key: 'indices', label: 'ÍNDICES', icon: '📊' },
+          { key: 'crypto', label: 'CRYPTO', icon: '₿' },
+        ].map(cat => {
+          const info = watchlistInfo?.[cat.key];
+          const isActive = watchlistCategories.includes(cat.key);
+          return (
+            <View key={cat.key} style={styles.watchlistRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.strategyLabel, isActive && { color: '#00f0ff' }]}>
+                  {cat.icon} {cat.label}
+                </Text>
+                <Text style={styles.watchlistCount}>
+                  {info?.count || 0} instrumentos
+                </Text>
+              </View>
+              <Switch
+                value={isActive}
+                onValueChange={() => toggleWatchlistCategory(cat.key)}
+                trackColor={{ false: '#2a2445', true: 'rgba(0, 240, 255, 0.3)' }}
+                thumbColor={isActive ? '#00f0ff' : '#555'}
+              />
+            </View>
+          );
+        })}
+
+        <View style={styles.totalInstruments}>
+          <Text style={styles.configValue}>
+            Total activo: {watchlistCategories.reduce((sum: number, cat: string) =>
+              sum + (watchlistInfo?.[cat]?.count || 0), 0)} instrumentos
+          </Text>
+        </View>
       </View>
 
       {/* Risk Management Card (Editable) */}
@@ -1317,5 +1380,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.neonPink,
     letterSpacing: 2,
+  },
+  // Watchlist card
+  cardSubtitle: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.sm,
+    letterSpacing: 1,
+  },
+  watchlistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1530',
+  },
+  watchlistCount: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 11,
+    color: '#8892a0',
+    marginTop: 2,
+  },
+  totalInstruments: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2445',
+    alignItems: 'center',
   },
 });

@@ -248,6 +248,29 @@ export const api = {
   generateApiKey: (label = 'electron') => apiPost<any>(`/api/v1/security/generate-key?label=${label}`),
   updateSecurity: (config: any) => apiPut<any>('/api/v1/security/config', config),
   revokeApiKey: (hashPrefix: string) => apiDelete<any>(`/api/v1/security/revoke-key/${hashPrefix}`),
+
+  // Watchlist Categories (TradingLab extended watchlists)
+  getWatchlistCategories: () => apiGet<any>('/api/v1/watchlist/categories'),
+  updateWatchlistCategories: (categories: string[]) =>
+    apiPut<any>('/api/v1/watchlist/categories', { categories }),
+  getFullWatchlist: () => apiGet<any>('/api/v1/watchlist/full'),
+
+  // Screenshots (Trading Plan: capture every trade)
+  getTradeScreenshots: (tradeId: string) => apiGet<any>(`/api/v1/screenshots/${tradeId}`),
+  getScreenshotUrl: (tradeId: string, filename: string) =>
+    `${API_URL}/api/v1/screenshots/${tradeId}/image/${filename}`,
+
+  // Monthly Review (Trading Plan: monthly trade review)
+  listMonthlyReviews: () => apiGet<any>('/api/v1/monthly-review'),
+  getMonthlyReview: (month: string) => apiGet<any>(`/api/v1/monthly-review/${month}`),
+  generateMonthlyReview: (month: string) =>
+    apiPost<any>(`/api/v1/monthly-review/generate?month=${month}`),
+
+  // Discretionary Trade Tracking
+  markTradeDiscretionary: (tradeId: string, notes: string) =>
+    apiPut<any>(`/api/v1/journal/trades/${tradeId}/discretionary`, {
+      is_discretionary: true, discretionary_notes: notes,
+    }),
 };
 
 // ── Shared Constants ─────────────────────────────────────────────

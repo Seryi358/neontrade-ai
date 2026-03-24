@@ -1344,3 +1344,186 @@ async def get_journal_trades(
     if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
         return []
     return engine.trade_journal.get_trades(limit=limit, offset=offset)
+
+
+# ── Watchlist Categories ────────────────────────────────────────────
+
+class WatchlistCategoriesRequest(BaseModel):
+    categories: List[str]  # ["forex", "forex_exotic", "commodities", "indices", "crypto"]
+
+
+@router.get("/watchlist/categories")
+async def get_watchlist_categories():
+    """Get available watchlist categories and their instruments."""
+    from config import settings
+    return {
+        "active_categories": settings.active_watchlist_categories,
+        "available": {
+            "forex": {"count": len(settings.forex_watchlist), "instruments": settings.forex_watchlist},
+            "forex_exotic": {"count": len(settings.forex_exotic_watchlist), "instruments": settings.forex_exotic_watchlist},
+            "commodities": {"count": len(settings.commodities_watchlist), "instruments": settings.commodities_watchlist},
+            "indices": {"count": len(settings.indices_watchlist), "instruments": settings.indices_watchlist},
+            "crypto": {"count": len(settings.crypto_watchlist), "instruments": settings.crypto_watchlist},
+        },
+        "allocation": {
+            "trading_pct": settings.allocation_trading_pct,
+            "forex_pct": settings.allocation_forex_pct,
+            "crypto_pct": settings.allocation_crypto_pct,
+        }
+    }
+
+
+@router.put("/watchlist/categories")
+async def update_watchlist_categories(req: WatchlistCategoriesRequest):
+    """Update active watchlist categories."""
+    from config import settings
+    valid = {"forex", "forex_exotic", "commodities", "indices", "crypto"}
+    for cat in req.categories:
+        if cat not in valid:
+            raise HTTPException(400, f"Invalid category: {cat}. Valid: {', '.join(valid)}")
+    settings.active_watchlist_categories = req.categories
+    # Persist to risk_config.json
+    import json, os
+    risk_path = os.path.join("data", "risk_config.json")
+    overrides = {}
+    if os.path.exists(risk_path):
+        try:
+            with open(risk_path) as f:
+                overrides = json.load(f)
+        except Exception:
+            pass
+    overrides["active_watchlist_categories"] = req.categories
+    os.makedirs("data", exist_ok=True)
+    with open(risk_path, "w") as f:
+        json.dump(overrides, f, indent=2)
+    return {"status": "updated", "active_categories": req.categories}
+
+
+@router.get("/watchlist/full")
+async def get_full_watchlist():
+    """Get the combined active watchlist based on enabled categories."""
+    from config import settings
+    instruments = []
+    category_map = {
+        "forex": settings.forex_watchlist,
+        "forex_exotic": settings.forex_exotic_watchlist,
+        "commodities": settings.commodities_watchlist,
+        "indices": settings.indices_watchlist,
+        "crypto": settings.crypto_watchlist,
+    }
+    for cat in settings.active_watchlist_categories:
+        if cat in category_map:
+            instruments.extend(category_map[cat])
+    # Deduplicate preserving order
+    seen = set()
+    unique = []
+    for inst in instruments:
+        if inst not in seen:
+            seen.add(inst)
+            unique.append(inst)
+    return {"instruments": unique, "count": len(unique)}
+
+
+# ── Trade Screenshots ──────────────────────────────────────────────
+
+@router.get("/screenshots/{trade_id}")
+async def get_trade_screenshots(trade_id: str):
+    """Get screenshot file paths for a trade."""
+    from main import engine
+    if engine is None or engine.screenshot_generator is None:
+        return {"screenshots": [], "message": "Screenshot generator not available"}
+    paths = engine.screenshot_generator.get_screenshot_path(trade_id)
+    return {"trade_id": trade_id, "screenshots": paths}
+
+
+@router.get("/screenshots/{trade_id}/image/{filename}")
+async def get_screenshot_image(trade_id: str, filename: str):
+    """Serve a screenshot image file."""
+    from fastapi.responses import FileResponse
+    import os
+    # Security: only allow alphanumeric + underscores + dashes + dots
+    import re
+    if not re.match(r'^[\w\-\.]+$', filename):
+        raise HTTPException(400, "Invalid filename")
+    filepath = os.path.join("data", "screenshots", filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(404, "Screenshot not found")
+    return FileResponse(filepath, media_type="image/png")
+
+
+# ── Monthly Review ─────────────────────────────────────────────────
+
+@router.post("/monthly-review/generate")
+async def generate_monthly_review(month: str = Query(..., description="YYYY-MM format")):
+    """Generate a monthly review report for the specified month."""
+    from main import engine
+    import re
+    if not re.match(r'^\d{4}-\d{2}$', month):
+        raise HTTPException(400, "Month must be in YYYY-MM format")
+    if engine is None:
+        raise HTTPException(503, "Engine not initialized")
+
+    # Get trades for the month from journal
+    all_trades = []
+    if hasattr(engine, 'trade_journal') and engine.trade_journal:
+        all_trades = engine.trade_journal.get_trades(limit=9999)
+
+    # Filter trades for the requested month
+    month_trades = []
+    for t in all_trades:
+        ts = t.get("timestamp", t.get("open_time", ""))
+        if isinstance(ts, str) and ts.startswith(month):
+            month_trades.append(t)
+
+    if not hasattr(engine, 'monthly_review') or engine.monthly_review is None:
+        raise HTTPException(503, "Monthly review generator not available")
+
+    report = engine.monthly_review.generate_report(
+        trades=month_trades,
+        month=month,
+    )
+    return report.to_dict()
+
+
+@router.get("/monthly-review/{month}")
+async def get_monthly_review(month: str):
+    """Get a previously generated monthly review."""
+    from main import engine
+    if engine is None or not hasattr(engine, 'monthly_review') or engine.monthly_review is None:
+        raise HTTPException(503, "Monthly review not available")
+    report = engine.monthly_review.load_report(month)
+    if not report:
+        raise HTTPException(404, f"No report found for {month}")
+    return report
+
+
+@router.get("/monthly-review")
+async def list_monthly_reviews():
+    """List all available monthly reviews."""
+    from main import engine
+    if engine is None or not hasattr(engine, 'monthly_review') or engine.monthly_review is None:
+        return {"reports": []}
+    return {"reports": engine.monthly_review.list_reports()}
+
+
+# ── Discretionary Trade Tracking ───────────────────────────────────
+
+class DiscretionaryRequest(BaseModel):
+    is_discretionary: bool = True
+    discretionary_notes: Optional[str] = ""
+
+
+@router.put("/journal/trades/{trade_id}/discretionary")
+async def mark_trade_discretionary(trade_id: str, req: DiscretionaryRequest):
+    """Mark a trade as discretionary with notes. Trading Plan: annotate discretionary decisions."""
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        raise HTTPException(503, "Trade journal not available")
+
+    success = engine.trade_journal.mark_trade_discretionary(
+        trade_id=trade_id,
+        notes=req.discretionary_notes or "",
+    )
+    if not success:
+        raise HTTPException(404, f"Trade {trade_id} not found")
+    return {"status": "updated", "trade_id": trade_id, "is_discretionary": req.is_discretionary}

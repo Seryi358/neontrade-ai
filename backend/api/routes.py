@@ -61,6 +61,8 @@ class EngineStatusResponse(BaseModel):
     pending_setups: int
     total_risk: float
     watchlist_count: int
+    startup_error: str = ""
+    scanned_instruments: int = 0
 
 
 # ── Engine Status ─────────────────────────────────────────────────
@@ -84,6 +86,8 @@ async def get_status():
         pending_setups=len(pending),
         total_risk=status["total_risk"],
         watchlist_count=status["watchlist_count"],
+        startup_error=status.get("startup_error", ""),
+        scanned_instruments=status.get("scanned_instruments", 0),
     )
 
 
@@ -225,6 +229,15 @@ async def get_analysis(instrument: str):
     from main import engine
     results = engine._last_scan_results
     if instrument not in results:
+        # Build a descriptive message depending on engine state
+        if not engine._running and engine._startup_error:
+            msg = f"Motor detenido — error de broker: {engine._startup_error[:100]}"
+        elif not engine._running:
+            msg = "Motor no iniciado — esperando conexión al broker..."
+        elif len(results) == 0:
+            msg = "Escaneo inicial en progreso — analizando pares..."
+        else:
+            msg = f"Análisis no disponible para {instrument} — esperando próximo escaneo"
         # Return a default empty analysis instead of 404
         return {
             "instrument": instrument,
@@ -238,7 +251,7 @@ async def get_analysis(instrument: str):
             "fibonacci": {},
             "patterns": [],
             "elliott_wave": None,
-            "message": "Análisis no disponible — esperando próximo escaneo",
+            "message": msg,
         }
 
     analysis = results[instrument]
@@ -391,6 +404,7 @@ async def start_engine():
     from main import engine
     import asyncio
     if not engine._running:
+        engine._startup_error = ""  # Clear previous error
         asyncio.create_task(engine.start())
         return {"status": "starting", "message": "Motor de trading iniciando..."}
     return {"status": "already_running", "message": "El motor ya está en ejecución"}
@@ -619,8 +633,13 @@ async def get_candles(
             }
             for c in candles
         ]
+    except ConnectionError as e:
+        raise HTTPException(503, f"Broker desconectado: {str(e)}")
     except Exception as e:
-        raise HTTPException(500, f"Error al obtener velas: {str(e)}")
+        error_msg = str(e)
+        if "auth" in error_msg.lower() or "session" in error_msg.lower():
+            raise HTTPException(503, f"Error de autenticación con broker: {error_msg}")
+        raise HTTPException(500, f"Error al obtener velas: {error_msg}")
 
 
 @router.get("/price/{instrument}")

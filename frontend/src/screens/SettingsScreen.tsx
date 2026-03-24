@@ -92,6 +92,7 @@ export default function SettingsScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [engineStatus, setEngineStatus] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [riskConfig, setRiskConfig] = useState<Record<string, number>>({});
@@ -106,10 +107,18 @@ export default function SettingsScreen() {
   const [editingBackendUrl, setEditingBackendUrl] = useState(false);
   const [backendUrlDraft, setBackendUrlDraft] = useState(API_URL);
   const [apiKeyValue, setApiKeyValue] = useState(() => {
-    try { return window.localStorage.getItem('neontrade_api_key') || ''; } catch { return ''; }
+    try {
+      // Check localStorage first, then injected key from backend (same-origin deploy)
+      const stored = window.localStorage.getItem('neontrade_api_key');
+      if (stored) return stored;
+      const injected = (window as any).__NEONTRADE_API_KEY__;
+      if (injected) return injected;
+      return '';
+    } catch { return ''; }
   });
   const [editingApiKey, setEditingApiKey] = useState(false);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [securityStatus, setSecurityStatus] = useState<any>(null);
   const [watchlistCategories, setWatchlistCategories] = useState<string[]>(['forex']);
   const [watchlistInfo, setWatchlistInfo] = useState<any>(null);
 
@@ -138,6 +147,7 @@ export default function SettingsScreen() {
       if (statusRes.ok) {
         const statusData = await statusRes.json();
         setEngineRunning(statusData.running);
+        setEngineStatus(statusData);
       }
       if (stratRes.ok) {
         const stratData: StrategyConfig = await stratRes.json();
@@ -163,6 +173,10 @@ export default function SettingsScreen() {
         const wlData = await api.getWatchlistCategories();
         setWatchlistCategories(wlData.active_categories || ['forex']);
         setWatchlistInfo(wlData.available || {});
+      } catch {}
+      try {
+        const secData = await api.getSecurityStatus();
+        setSecurityStatus(secData);
       } catch {}
     } catch (err) {
       console.error('Failed to fetch settings:', err);
@@ -908,8 +922,31 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>API KEY</Text>
         <Text style={{ color: theme.colors.textSecondary, fontSize: 11, marginBottom: 8 }}>
-          Requerida para conectar al servidor remoto
+          {securityStatus && !securityStatus.auth_enabled
+            ? 'Autenticacion deshabilitada en el servidor'
+            : securityStatus && securityStatus.api_keys_count === 0
+              ? 'Acceso abierto (sin keys configuradas) — primera ejecucion'
+              : 'Requerida para conectar al servidor remoto'}
         </Text>
+        {/* Auth status badge */}
+        {securityStatus && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{
+              width: 8, height: 8, borderRadius: 4, marginRight: 6,
+              backgroundColor: !securityStatus.auth_enabled || securityStatus.api_keys_count === 0
+                ? theme.colors.neonGreen : apiKeyValue ? theme.colors.neonGreen : theme.colors.neonPink,
+            }} />
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.mono }}>
+              {!securityStatus.auth_enabled
+                ? 'AUTH DESHABILITADA'
+                : securityStatus.api_keys_count === 0
+                  ? 'ACCESO ABIERTO'
+                  : apiKeyValue
+                    ? 'AUTENTICADA'
+                    : 'KEY REQUERIDA'}
+            </Text>
+          </View>
+        )}
         <View style={styles.configRow}>
           <Text style={styles.configLabel}>Key</Text>
           {editingApiKey ? (
@@ -942,8 +979,20 @@ export default function SettingsScreen() {
             </View>
           ) : (
             <TouchableOpacity onPress={() => { setApiKeyDraft(apiKeyValue); setEditingApiKey(true); }}>
-              <Text style={[styles.configValue, { color: apiKeyValue ? theme.colors.neonGreen : theme.colors.neonPink }]}>
-                {apiKeyValue ? apiKeyValue.slice(0, 8) + '...' + apiKeyValue.slice(-4) : 'No configurada'}
+              <Text style={[styles.configValue, {
+                color: apiKeyValue
+                  ? theme.colors.neonGreen
+                  : (securityStatus && (securityStatus.api_keys_count === 0 || !securityStatus.auth_enabled))
+                    ? theme.colors.neonCyan
+                    : theme.colors.neonPink,
+              }]}>
+                {apiKeyValue
+                  ? apiKeyValue.slice(0, 8) + '...' + apiKeyValue.slice(-4)
+                  : (securityStatus && !securityStatus.auth_enabled)
+                    ? 'No requerida'
+                    : (securityStatus && securityStatus.api_keys_count === 0)
+                      ? 'Acceso abierto'
+                      : 'No configurada'}
               </Text>
             </TouchableOpacity>
           )}
@@ -967,6 +1016,15 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>ESTADO DE CONEXION</Text>
         <View style={styles.configRow}>
+          <Text style={styles.configLabel}>Motor</Text>
+          <Text style={[
+            styles.configValue,
+            engineRunning ? styles.profit : styles.loss,
+          ]}>
+            {engineRunning ? '● Ejecutando' : '○ Detenido'}
+          </Text>
+        </View>
+        <View style={styles.configRow}>
           <Text style={styles.configLabel}>Broker</Text>
           <Text style={[
             styles.configValue,
@@ -975,12 +1033,34 @@ export default function SettingsScreen() {
             {broker?.connected ? '● Conectado' : '○ Desconectado'}
           </Text>
         </View>
+        {engineStatus?.scanned_instruments != null && (
+          <View style={styles.configRow}>
+            <Text style={styles.configLabel}>Escaneados</Text>
+            <Text style={styles.configValue}>
+              {engineStatus.scanned_instruments}/{engineStatus.watchlist_count || 0}
+            </Text>
+          </View>
+        )}
         <View style={styles.configRow}>
           <Text style={styles.configLabel}>API</Text>
           <Text style={[styles.configValue, styles.profit]}>
             ● Activa
           </Text>
         </View>
+        {engineStatus?.startup_error ? (
+          <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(255,46,99,0.1)', borderRadius: 4, borderWidth: 1, borderColor: theme.colors.neonRed }}>
+            <Text style={{ color: theme.colors.neonRed, fontFamily: theme.fonts.mono, fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ERROR DE CONEXION</Text>
+            <Text style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 10 }} numberOfLines={3}>
+              {engineStatus.startup_error}
+            </Text>
+            <TouchableOpacity
+              style={{ marginTop: 6, alignSelf: 'flex-start' }}
+              onPress={startEngine}
+            >
+              <Text style={{ color: theme.colors.neonCyan, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 1 }}>REINTENTAR CONEXION</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
 
       <View style={{ height: theme.spacing.xl }} />

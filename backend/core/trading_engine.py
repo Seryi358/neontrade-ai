@@ -202,6 +202,7 @@ class TradingEngine:
         self._scan_interval = 120  # seconds (2 minutes)
         self._last_scan_results: Dict[str, AnalysisResult] = {}
         self._latest_explanations: Dict[str, StrategyExplanation] = {}
+        self._startup_error: str = ""  # Last broker connection error (for diagnostics)
 
         # WebSocket broadcast callback (set externally when WS is connected)
         self._ws_broadcast: Optional[Callable] = None
@@ -433,25 +434,41 @@ class TradingEngine:
         logger.info(f"  Mode: {self.mode.value}")
         logger.info("=" * 60)
 
-        # Validate connection
-        try:
-            summary = await self.broker.get_account_summary()
-            balance = summary.balance
-            currency = summary.currency
-            broker_name = self.broker.broker_type.value.upper()
-            logger.info(f"Connected to {broker_name} | Balance: {balance} {currency}")
-            logger.info(f"Broker: {broker_name} | Environment: {settings.active_broker}")
-            # Initialize risk manager with actual balance (fixes drawdown tracking)
-            self.risk_manager._current_balance = balance
-            self.risk_manager._peak_balance = balance
-            logger.info(f"Risk manager initialized: peak_balance={balance}")
+        # Validate connection (retry up to 5 times with exponential backoff)
+        max_retries = 5
+        retry_delay = 10
+        connected = False
+        for attempt in range(1, max_retries + 1):
+            try:
+                summary = await self.broker.get_account_summary()
+                balance = summary.balance
+                currency = summary.currency
+                broker_name = self.broker.broker_type.value.upper()
+                logger.info(f"Connected to {broker_name} | Balance: {balance} {currency}")
+                logger.info(f"Broker: {broker_name} | Environment: {settings.active_broker}")
+                # Initialize risk manager with actual balance (fixes drawdown tracking)
+                self.risk_manager._current_balance = balance
+                self.risk_manager._peak_balance = balance
+                logger.info(f"Risk manager initialized: peak_balance={balance}")
 
-            # Initialize trade journal with actual balance
-            if self.trade_journal is None:
-                self.trade_journal = TradeJournal(initial_capital=balance)
-                logger.info(f"Trade journal initialized: initial_capital={balance}")
-        except Exception as e:
-            logger.error(f"Failed to connect to broker: {e}")
+                # Initialize trade journal with actual balance
+                if self.trade_journal is None:
+                    self.trade_journal = TradeJournal(initial_capital=balance)
+                    logger.info(f"Trade journal initialized: initial_capital={balance}")
+                self._startup_error = ""
+                connected = True
+                break
+            except Exception as e:
+                self._startup_error = str(e)
+                logger.error(f"Broker connection failed (attempt {attempt}/{max_retries}): {e}")
+                if attempt < max_retries:
+                    logger.info(f"Retrying in {retry_delay}s...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 60)
+
+        if not connected:
+            logger.error("All broker connection attempts failed. Engine will NOT start.")
+            logger.error(f"Last error: {self._startup_error}")
             return
 
         self._running = True
@@ -1862,6 +1879,8 @@ class TradingEngine:
 
         return {
             "running": self._running,
+            "startup_error": self._startup_error,
+            "scanned_instruments": len(self._last_scan_results),
             "mode": self.mode.value,
             "open_positions": len(self.position_manager.positions),
             "total_risk": self.risk_manager.get_current_total_risk(),

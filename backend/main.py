@@ -166,6 +166,7 @@ app = FastAPI(
 
 # CORS for frontend (React Native / Expo Web / Electron / Remote)
 # Allow same-origin (static frontend served by this backend) + localhost dev
+# Also allow all origins for EasyPanel deploys where the URL varies
 _cors_origins = [
     "https://n8n-neontrade-ai.zb12wf.easypanel.host",
     "http://localhost:8000",
@@ -174,9 +175,9 @@ _cors_origins = [
 ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_origins=["*"],  # Allow any origin (API key auth handles security)
+    allow_credentials=False,  # Using X-API-Key header, not cookies
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 

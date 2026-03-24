@@ -244,6 +244,9 @@ export default function ChartScreen() {
       if (candlesRes.ok) {
         const candleData = await candlesRes.json();
         setCandles(Array.isArray(candleData) ? candleData : candleData.candles || []);
+      } else {
+        const errData = await candlesRes.json().catch(() => ({ detail: '' }));
+        setError(errData.detail || `Error al cargar velas (HTTP ${candlesRes.status})`);
       }
       if (priceRes.ok) {
         setPrice(await priceRes.json());

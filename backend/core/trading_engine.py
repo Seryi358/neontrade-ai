@@ -534,6 +534,31 @@ class TradingEngine:
             # Step 0b: Sync positions from broker (detect external closes)
             await self._sync_positions_from_broker()
 
+            # Step 0c: Close existing positions threatened by upcoming high-impact news
+            # Trading Plan: 'Cerrar trades antes de noticias importantes'
+            if self.news_filter and self.position_manager.positions:
+                for trade_id, pos in list(self.position_manager.positions.items()):
+                    try:
+                        should_close, reason = await self.news_filter.should_close_for_news(pos.instrument)
+                        if should_close:
+                            await self.broker.close_trade(pos.trade_id)
+                            self.position_manager.remove_position(pos.trade_id)
+                            self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
+                            logger.warning(f"News close: Closed {pos.instrument} — {reason}")
+                            # Send alert
+                            if self.alert_manager:
+                                try:
+                                    await self.alert_manager.send_trade_closed(
+                                        instrument=pos.instrument,
+                                        pnl=0.0,
+                                        pips=0.0,
+                                        reason=f"Closed before news: {reason}",
+                                    )
+                                except Exception:
+                                    pass
+                    except Exception as e:
+                        logger.error(f"News close failed for {trade_id}: {e}")
+
             # Step 1: Update position management for open trades
             await self._manage_open_positions()
 
@@ -623,15 +648,77 @@ class TradingEngine:
                 now.hour >= settings.close_before_friday_hour)
 
     async def _handle_friday_close(self):
-        """Close all positions before Friday market close."""
+        """Close only positions near SL or TP before Friday market close (Trading Plan rule).
+        'Cerrar trades que estén cerca de SL o TP antes del cierre del viernes'
+        A position is 'near' when price is within 30% of the entry-SL or entry-TP distance."""
         open_trades = await self.broker.get_open_trades()
-        if open_trades:
-            logger.warning(
-                f"FRIDAY CLOSE: Closing {len(open_trades)} open trades"
-            )
-            await self.broker.close_all_trades()
-            self.position_manager.positions.clear()
-            self.risk_manager._active_risks.clear()
+        if not open_trades:
+            return
+
+        closed = 0
+        kept = 0
+        for trade in open_trades:
+            should_close = False
+            close_reason = ""
+
+            entry = getattr(trade, 'entry_price', None)
+            current = getattr(trade, 'current_price', None)
+            sl = getattr(trade, 'stop_loss', None)
+            tp = getattr(trade, 'take_profit', None)
+
+            # If we lack price data, skip (don't close blindly)
+            if entry is None or current is None:
+                kept += 1
+                logger.info(f"Friday: Keeping {getattr(trade, 'instrument', '?')} (missing price data)")
+                continue
+
+            # Check if near SL
+            if sl is not None and entry:
+                sl_distance = abs(entry - sl)
+                current_to_sl = abs(current - sl)
+                if sl_distance > 0 and current_to_sl <= sl_distance * 0.30:
+                    should_close = True
+                    close_reason = "SL"
+
+            # Check if near TP
+            if tp is not None and entry:
+                tp_distance = abs(tp - entry)
+                current_to_tp = abs(current - tp)
+                if tp_distance > 0 and current_to_tp <= tp_distance * 0.30:
+                    should_close = True
+                    close_reason = "TP" if not close_reason else "SL+TP"
+
+            instrument = getattr(trade, 'instrument', '?')
+            trade_id = getattr(trade, 'trade_id', None)
+
+            if should_close:
+                try:
+                    await self.broker.close_trade(trade_id)
+                    # Clean up internal tracking
+                    pos = self.position_manager.positions.pop(trade_id, None)
+                    if pos:
+                        self.risk_manager.unregister_trade(trade_id, pos.instrument)
+                    closed += 1
+                    logger.info(f"Friday close: Closed {instrument} (near {close_reason})")
+                except Exception as e:
+                    logger.error(f"Friday close failed for {trade_id}: {e}")
+            else:
+                kept += 1
+                logger.info(f"Friday: Keeping {instrument} (not near SL/TP)")
+
+        if closed > 0:
+            logger.warning(f"FRIDAY CLOSE: Closed {closed} trades near SL/TP, kept {kept}")
+            # Send alert about Friday closures
+            if self.alert_manager:
+                try:
+                    await self.alert_manager.send_engine_status(
+                        "FRIDAY_CLOSE",
+                        f"Closed {closed} positions near SL/TP before weekend. Kept {kept} running.",
+                    )
+                except Exception:
+                    pass
+        elif kept > 0:
+            logger.info(f"Friday: All {kept} positions are mid-range — keeping through weekend")
 
     async def _handle_funded_overnight_close(self):
         """Close all positions at end of trading session (funded account rule)."""
@@ -1607,18 +1694,38 @@ class TradingEngine:
             self._daily_errors = 0
             self._daily_counter_date = today
 
+    def _build_presession_checklist(self, session_label: str) -> str:
+        """Build the pre-session checklist based on the Psychology Manual.
+        Used for both morning and NY session notifications."""
+        return (
+            f"\n<b>--- Checklist Pre-Sesión ({session_label}) ---</b>\n"
+            f"1. ¿Has meditado 10 minutos? (Ejercicio 2: Meditación)\n"
+            f"2. ¿Estás en estado emocional estable? (No operes estresado)\n"
+            f"3. ¿Has revisado el calendario económico? (Noticias de hoy)\n"
+            f"4. ¿Has verificado las posiciones abiertas? (Revisar SL/TP)\n"
+            f"5. Recuerda: 3-5 respiraciones profundas antes de cada trade (Ejercicio 3)\n"
+        )
+
     async def _maybe_send_morning_heartbeat(self, now: datetime):
         """
-        Send a 'proof of life' email at ~8:00 UTC (3am Colombia) every day.
-        This way the user knows the app is alive even if 0 trades happen.
+        Send a 'proof of life' email at ~8:00 UTC (3am Colombia) every day,
+        including the pre-session psychological checklist (Psychology Manual).
+        Also sends a NY session checklist at ~13:00 UTC.
         """
-        if now.hour != 8 or now.minute >= 3:
-            return
-        if hasattr(self, '_heartbeat_sent_date') and self._heartbeat_sent_date == now.date():
-            return
+        # ── Morning heartbeat at 08:00 UTC ──
+        if now.hour == 8 and now.minute < 3:
+            if not (hasattr(self, '_heartbeat_sent_date') and self._heartbeat_sent_date == now.date()):
+                self._heartbeat_sent_date = now.date()
+                await self._send_heartbeat_with_checklist(now, "Mañana / London Open")
 
-        self._heartbeat_sent_date = now.date()
+        # ── NY session checklist at 13:00 UTC ──
+        if now.hour == 13 and now.minute < 3:
+            if not (hasattr(self, '_ny_checklist_sent_date') and self._ny_checklist_sent_date == now.date()):
+                self._ny_checklist_sent_date = now.date()
+                await self._send_presession_checklist_alert(now, "Sesión New York")
 
+    async def _send_heartbeat_with_checklist(self, now: datetime, session_label: str):
+        """Send the morning heartbeat email with pre-session checklist."""
         if not self.alert_manager:
             return
 
@@ -1636,6 +1743,8 @@ class TradingEngine:
             mode = self.mode.value.upper()
             strategies_on = sum(1 for v in self._enabled_strategies.values() if v)
 
+            checklist = self._build_presession_checklist(session_label)
+
             body = (
                 f"<b>NeonTrade AI is ALIVE and running.</b>\n\n"
                 f"<b>Balance:</b> {balance_str}\n"
@@ -1645,6 +1754,7 @@ class TradingEngine:
                 f"<b>Pairs Analyzed:</b> {pairs_analyzed}\n"
                 f"<b>Strategies Active:</b> {strategies_on}/9\n"
                 f"<b>Scan Interval:</b> {self._scan_interval}s\n\n"
+                f"{checklist}\n"
                 f"<i>Trading hours: 07:00-21:00 UTC. You'll get a summary at 21:00 UTC.</i>"
             )
 
@@ -1653,9 +1763,35 @@ class TradingEngine:
                 f"NeonTrade AI - Morning Heartbeat ({now.strftime('%Y-%m-%d')})",
                 body,
             )
-            logger.info("Morning heartbeat email sent")
+            logger.info("Morning heartbeat email sent (with pre-session checklist)")
         except Exception as e:
             logger.warning(f"Failed to send morning heartbeat: {e}")
+
+    async def _send_presession_checklist_alert(self, now: datetime, session_label: str):
+        """Send a pre-session checklist notification before NY session (13:00 UTC).
+        Psychology Manual: checklist both in the morning AND before NY session."""
+        if not self.alert_manager:
+            return
+
+        try:
+            open_positions = len(self.position_manager.positions)
+            checklist = self._build_presession_checklist(session_label)
+
+            body = (
+                f"<b>Pre-Session Checklist - {session_label}</b>\n\n"
+                f"<b>Posiciones abiertas:</b> {open_positions}\n"
+                f"{checklist}\n"
+                f"<i>La sesión NY (13:00-21:00 UTC) es de alta volatilidad. Mantén disciplina.</i>"
+            )
+
+            await self.alert_manager.send_alert(
+                "presession_checklist",
+                f"NeonTrade AI - Checklist {session_label} ({now.strftime('%Y-%m-%d')})",
+                body,
+            )
+            logger.info(f"Pre-session checklist sent for {session_label}")
+        except Exception as e:
+            logger.warning(f"Failed to send pre-session checklist: {e}")
 
     # ── Status ───────────────────────────────────────────────────
 

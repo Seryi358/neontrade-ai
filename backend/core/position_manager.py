@@ -38,9 +38,6 @@ class ManagedPosition:
     phase: PositionPhase = PositionPhase.INITIAL
     highest_price: float = 0.0    # For BUY: highest since entry
     lowest_price: float = float('inf')  # For SELL: lowest since entry
-    # Fibonacci extension partial close tracking
-    fib_partial_1272_closed: bool = False  # 25% closed at Fib 1.272
-    fib_partial_1618_closed: bool = False  # 25% closed at Fib 1.618
 
 
 class PositionManager:
@@ -177,22 +174,15 @@ class PositionManager:
         Phase 4: Trail SL using EMA 5 on M5 timeframe.
         EMA acts as dynamic support/resistance — SL follows it toward TP1.
         """
-        # Check if TP1 has been reached → partial close 50% and move to aggressive
+        # Check if TP1 has been reached → switch to aggressive trailing (no partial close)
+        # Trading Plan: "No partial profits: No se toman parciales de ganancia"
         tp1_reached = (
             (pos.direction == "BUY" and current_price >= pos.take_profit_1) or
             (pos.direction == "SELL" and current_price <= pos.take_profit_1)
         )
         if tp1_reached:
-            # Partial close: close 50% of position at TP1
-            if not getattr(pos, '_tp1_partial_closed', False):
-                try:
-                    await self.broker.close_trade_partial(pos.trade_id, percent=50)
-                    pos._tp1_partial_closed = True
-                    logger.info(f"{pos.trade_id}: TP1 REACHED — closed 50% of position")
-                except Exception as e:
-                    logger.warning(f"{pos.trade_id}: Partial close at TP1 failed: {e}")
             pos.phase = PositionPhase.BEYOND_TP1
-            logger.info(f"{pos.trade_id}: TP1 REACHED -> Phase AGGRESSIVE")
+            logger.info(f"{pos.trade_id}: TP1 REACHED -> Phase AGGRESSIVE (EMA 2 M5 trailing)")
             return
 
         # Get EMA values for this instrument
@@ -227,13 +217,9 @@ class PositionManager:
         """
         Phase 5: Beyond TP1 - Short Term Aggressive management.
         Use EMA 2 on M5 for tight trailing — maximize profit beyond TP1.
-        Fibonacci extension partial closes at 1.272 and 1.618 levels.
-        Close remaining position if TP_max is reached.
+        Trading Plan: No partial profits. Only full close at TP_max or via trailing SL.
         """
-        # Fibonacci extension partial closes (TradingLab)
-        await self._check_fib_extension_closes(pos, current_price)
-
-        # Check if TP_max has been reached → close remaining position entirely
+        # Check if TP_max has been reached → close full position
         if pos.take_profit_max:
             tp_max_reached = (
                 (pos.direction == "BUY" and current_price >= pos.take_profit_max) or
@@ -301,62 +287,6 @@ class PositionManager:
             if new_sl < pos.current_sl:
                 await self._update_sl(pos, new_sl)
                 logger.debug(f"{pos.trade_id}: Fallback trail SL -> {new_sl:.5f}")
-
-    async def _check_fib_extension_closes(self, pos: ManagedPosition, current_price: float):
-        """
-        TradingLab: Partial close at Fibonacci extension levels beyond TP1.
-        - At Fib 1.272 extension: close 25% of remaining position
-        - At Fib 1.618 extension: close 25% of remaining position
-        This locks in profits while letting the rest run to TP_max.
-        """
-        if not pos.take_profit_1 or not pos.entry_price:
-            return
-
-        # Calculate Fibonacci extension levels from entry to TP1
-        risk = abs(pos.take_profit_1 - pos.entry_price)
-        if risk <= 0:
-            return
-
-        if pos.direction == "BUY":
-            fib_1272 = pos.entry_price + risk * 1.272
-            fib_1618 = pos.entry_price + risk * 1.618
-        else:
-            fib_1272 = pos.entry_price - risk * 1.272
-            fib_1618 = pos.entry_price - risk * 1.618
-
-        # Check Fib 1.272 partial close
-        if not pos.fib_partial_1272_closed:
-            hit = (
-                (pos.direction == "BUY" and current_price >= fib_1272) or
-                (pos.direction == "SELL" and current_price <= fib_1272)
-            )
-            if hit:
-                try:
-                    await self.broker.close_trade_partial(pos.trade_id, percent=25)
-                    pos.fib_partial_1272_closed = True
-                    logger.info(
-                        f"{pos.trade_id}: Fib 1.272 ({fib_1272:.5f}) reached — "
-                        f"closed 25% of remaining position"
-                    )
-                except Exception as e:
-                    logger.warning(f"{pos.trade_id}: Fib 1.272 partial close failed: {e}")
-
-        # Check Fib 1.618 partial close
-        if not pos.fib_partial_1618_closed and pos.fib_partial_1272_closed:
-            hit = (
-                (pos.direction == "BUY" and current_price >= fib_1618) or
-                (pos.direction == "SELL" and current_price <= fib_1618)
-            )
-            if hit:
-                try:
-                    await self.broker.close_trade_partial(pos.trade_id, percent=25)
-                    pos.fib_partial_1618_closed = True
-                    logger.info(
-                        f"{pos.trade_id}: Fib 1.618 ({fib_1618:.5f}) reached — "
-                        f"closed 25% of remaining position"
-                    )
-                except Exception as e:
-                    logger.warning(f"{pos.trade_id}: Fib 1.618 partial close failed: {e}")
 
     async def _update_sl(self, pos: ManagedPosition, new_sl: float):
         """Update stop loss on the broker."""

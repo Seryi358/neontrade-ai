@@ -1306,6 +1306,34 @@ async def get_journal_stats():
     return engine.trade_journal.get_stats()
 
 
+class EmotionalNotesRequest(BaseModel):
+    emotional_notes_pre: Optional[str] = None
+    emotional_notes_during: Optional[str] = None
+    emotional_notes_post: Optional[str] = None
+
+
+@router.put("/journal/trades/{trade_id}/emotional-notes")
+async def update_emotional_notes(trade_id: str, req: EmotionalNotesRequest):
+    """Update emotional journal notes for a trade (Psychology Manual)."""
+    from main import engine
+    if not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        raise HTTPException(503, "Trade journal not initialized")
+
+    # Find and update the trade
+    for trade in engine.trade_journal._trades:
+        if trade.get("trade_id") == trade_id:
+            if req.emotional_notes_pre is not None:
+                trade["emotional_notes_pre"] = req.emotional_notes_pre
+            if req.emotional_notes_during is not None:
+                trade["emotional_notes_during"] = req.emotional_notes_during
+            if req.emotional_notes_post is not None:
+                trade["emotional_notes_post"] = req.emotional_notes_post
+            engine.trade_journal._save()
+            return {"status": "updated", "trade_id": trade_id}
+
+    raise HTTPException(404, f"Trade {trade_id} not found")
+
+
 @router.get("/journal/trades")
 async def get_journal_trades(
     limit: int = Query(50, ge=1, le=500),

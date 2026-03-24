@@ -98,6 +98,10 @@ export default function SettingsScreen() {
   const [alertConfig, setAlertConfig] = useState<Record<string, any>>({});
   const [editingRisk, setEditingRisk] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [scalpingEnabled, setScalpingEnabled] = useState(false);
+  const [scalpingStatus, setScalpingStatus] = useState<any>(null);
+  const [fundedEnabled, setFundedEnabled] = useState(false);
+  const [fundedStatus, setFundedStatus] = useState<any>(null);
   const [backendUrl, setBackendUrlState] = useState(API_URL);
   const [editingBackendUrl, setEditingBackendUrl] = useState(false);
   const [backendUrlDraft, setBackendUrlDraft] = useState(API_URL);
@@ -110,13 +114,15 @@ export default function SettingsScreen() {
   const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const [modeRes, brokerRes, statusRes, stratRes, riskRes, alertRes] = await Promise.all([
+      const [modeRes, brokerRes, statusRes, stratRes, riskRes, alertRes, scalpingRes, fundedRes] = await Promise.all([
         authFetch(`${API_URL}/api/v1/mode`),
         authFetch(`${API_URL}/api/v1/broker`),
         authFetch(`${API_URL}/api/v1/status`),
         authFetch(`${API_URL}/api/v1/strategies/config`),
         authFetch(`${API_URL}/api/v1/risk-config`).catch(() => null),
         authFetch(`${API_URL}/api/v1/alerts/config`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/scalping/status`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/funded/status`).catch(() => null),
       ]);
 
       if (modeRes.ok) {
@@ -140,6 +146,16 @@ export default function SettingsScreen() {
       }
       if (alertRes?.ok) {
         setAlertConfig(await alertRes.json());
+      }
+      if (scalpingRes?.ok) {
+        const sd = await scalpingRes.json();
+        setScalpingEnabled(sd.enabled);
+        setScalpingStatus(sd);
+      }
+      if (fundedRes?.ok) {
+        const fd = await fundedRes.json();
+        setFundedEnabled(fd.enabled);
+        setFundedStatus(fd);
       }
     } catch (err) {
       console.error('Failed to fetch settings:', err);
@@ -173,6 +189,48 @@ export default function SettingsScreen() {
       }
     } catch (err) {
       console.error('Failed to toggle mode:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const toggleScalping = async () => {
+    const newVal = !scalpingEnabled;
+    try {
+      setActionLoading('scalping');
+      const res = await authFetch(`${API_URL}/api/v1/scalping/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newVal }),
+      });
+      if (res.ok) {
+        setScalpingEnabled(newVal);
+        const sd = await authFetch(`${API_URL}/api/v1/scalping/status`);
+        if (sd.ok) setScalpingStatus(await sd.json());
+      }
+    } catch (err) {
+      console.error('Failed to toggle scalping:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const toggleFunded = async () => {
+    const newVal = !fundedEnabled;
+    try {
+      setActionLoading('funded');
+      const res = await authFetch(`${API_URL}/api/v1/funded/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newVal }),
+      });
+      if (res.ok) {
+        setFundedEnabled(newVal);
+        const fd = await authFetch(`${API_URL}/api/v1/funded/status`);
+        if (fd.ok) setFundedStatus(await fd.json());
+      }
+    } catch (err) {
+      console.error('Failed to toggle funded:', err);
     } finally {
       setActionLoading(null);
     }
@@ -357,6 +415,115 @@ export default function SettingsScreen() {
             : 'NeonTrade te sugiere operaciones y tu decides si ejecutar o no'
           }
         </Text>
+      </View>
+
+      {/* Scalping Module Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>MODULO SCALPING</Text>
+        <Text style={styles.strategyHint}>
+          Workshop de Scalping — Temporalidades comprimidas H1→M15→M5→M1
+        </Text>
+        <View style={styles.modeRow}>
+          <View style={styles.modeInfo}>
+            <View style={[
+              styles.modeIndicator,
+              { backgroundColor: scalpingEnabled ? theme.colors.neonYellow : theme.colors.textMuted },
+            ]} />
+            <Text style={[styles.modeLabel, { fontSize: 16 }]}>
+              {scalpingEnabled ? 'ACTIVO' : 'INACTIVO'}
+            </Text>
+          </View>
+          <Switch
+            value={scalpingEnabled}
+            onValueChange={toggleScalping}
+            trackColor={{ false: theme.colors.backgroundLight, true: 'rgba(255, 184, 0, 0.3)' }}
+            thumbColor={scalpingEnabled ? theme.colors.neonYellow : theme.colors.textMuted}
+            disabled={actionLoading === 'scalping'}
+          />
+        </View>
+        {scalpingEnabled && scalpingStatus && (
+          <View style={{ marginTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }}>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>Riesgo/Trade</Text>
+              <Text style={styles.configValue}>0.5%</Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Diario Max</Text>
+              <Text style={[styles.configValue, { color: theme.colors.neonYellow }]}>5%</Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Total Max</Text>
+              <Text style={[styles.configValue, { color: theme.colors.neonYellow }]}>10%</Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>Intervalo Scan</Text>
+              <Text style={styles.configValue}>30s</Text>
+            </View>
+            <View style={{ marginTop: theme.spacing.sm }}>
+              <Text style={{ fontFamily: theme.fonts.mono, fontSize: 9, color: theme.colors.textMuted, letterSpacing: 1 }}>
+                MAPEO: D→H1 | H4→M15 | H1→M5 | M5→M1
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Funded Account Mode Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>CUENTA FONDEADA</Text>
+        <Text style={styles.strategyHint}>
+          Workshop Cuentas Fondeadas — Limites estrictos de drawdown
+        </Text>
+        <View style={styles.modeRow}>
+          <View style={styles.modeInfo}>
+            <View style={[
+              styles.modeIndicator,
+              { backgroundColor: fundedEnabled ? theme.colors.neonOrange : theme.colors.textMuted },
+            ]} />
+            <Text style={[styles.modeLabel, { fontSize: 16 }]}>
+              {fundedEnabled ? 'ACTIVO' : 'INACTIVO'}
+            </Text>
+          </View>
+          <Switch
+            value={fundedEnabled}
+            onValueChange={toggleFunded}
+            trackColor={{ false: theme.colors.backgroundLight, true: 'rgba(255, 107, 53, 0.3)' }}
+            thumbColor={fundedEnabled ? theme.colors.neonOrange : theme.colors.textMuted}
+            disabled={actionLoading === 'funded'}
+          />
+        </View>
+        {fundedEnabled && fundedStatus && (
+          <View style={{ marginTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }}>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Diario Max</Text>
+              <Text style={[styles.configValue, { color: theme.colors.neonOrange }]}>
+                {((fundedStatus.daily_dd_limit || 0.05) * 100).toFixed(0)}%
+              </Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Diario Actual</Text>
+              <Text style={[styles.configValue,
+                Math.abs(fundedStatus.daily_pnl_pct || 0) > 3 ? styles.loss : styles.profit
+              ]}>
+                {((fundedStatus.daily_pnl_pct || 0) * 100).toFixed(2)}%
+              </Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Total Max</Text>
+              <Text style={[styles.configValue, { color: theme.colors.neonOrange }]}>
+                {((fundedStatus.total_dd_limit || 0.10) * 100).toFixed(0)}%
+              </Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>No Overnight</Text>
+              <Text style={styles.configValue}>{fundedStatus.no_overnight ? 'Si' : 'No'}</Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>No News Trading</Text>
+              <Text style={styles.configValue}>{fundedStatus.no_news_trading ? 'Si' : 'No'}</Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Strategy Selection Card */}

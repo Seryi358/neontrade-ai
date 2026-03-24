@@ -1414,17 +1414,24 @@ class BlueStrategy(BaseStrategy):
                 if below:
                     result["tp1"] = max(below)
 
-        # TP_max: next resistance/support beyond TP1
+        # BLUE TP_max = EMA 4H (Trading Plan rule: "BLUE: TP maximo = EMA 4H")
         tp1 = result.get("tp1")
         if tp1:
-            if direction == "BUY":
-                above_tp1 = sorted([r for r in resistances if r > tp1])
-                if above_tp1:
-                    result["tp_max"] = above_tp1[0]
+            ema_h4 = _ema_val(analysis, "EMA_H4_50") or _ema_val(analysis, "EMA_H4_20")
+            if ema_h4 and direction == "BUY" and ema_h4 > tp1:
+                result["tp_max"] = ema_h4
+            elif ema_h4 and direction == "SELL" and ema_h4 < tp1:
+                result["tp_max"] = ema_h4
             else:
-                below_tp1 = sorted([s for s in supports if s < tp1], reverse=True)
-                if below_tp1:
-                    result["tp_max"] = below_tp1[0]
+                # Fallback to next S/R if EMA H4 not usable
+                if direction == "BUY":
+                    above_tp1 = sorted([r for r in resistances if r > tp1])
+                    if above_tp1:
+                        result["tp_max"] = above_tp1[0]
+                else:
+                    below_tp1 = sorted([s for s in supports if s < tp1], reverse=True)
+                    if below_tp1:
+                        result["tp_max"] = below_tp1[0]
 
         return result
 
@@ -1691,13 +1698,27 @@ class RedStrategy(BaseStrategy):
             if below:
                 result["tp1"] = max(below)
 
-        # Extension Fibonacci
+        # RED TP_max = Fibonacci extension 1.0 (Trading Plan: "RED con HTF a favor: extension de Fibonacci de 1")
+        tp1 = result.get("tp1")
+        fib_100 = analysis.fibonacci_levels.get("1.0")
         fib_1272 = analysis.fibonacci_levels.get("1.272")
-        fib_1618 = analysis.fibonacci_levels.get("1.618")
-        if fib_1272:
-            result["tp_max"] = fib_1272
-        if fib_1618:
-            result["tp_max"] = fib_1618  # Preferimos el mas ambicioso
+        if fib_100 and tp1:
+            if direction == "BUY" and fib_100 > tp1:
+                result["tp_max"] = fib_100
+            elif direction == "SELL" and fib_100 < tp1:
+                result["tp_max"] = fib_100
+            elif fib_1272:
+                # Fallback to 1.272 if 1.0 is not beyond TP1
+                if direction == "BUY" and fib_1272 > (tp1 or 0):
+                    result["tp_max"] = fib_1272
+                elif direction == "SELL" and fib_1272 < (tp1 or float("inf")):
+                    result["tp_max"] = fib_1272
+        elif fib_1272 and tp1:
+            # Fallback: use 1.272 only if 1.0 is not available
+            if direction == "BUY" and fib_1272 > tp1:
+                result["tp_max"] = fib_1272
+            elif direction == "SELL" and fib_1272 < tp1:
+                result["tp_max"] = fib_1272
 
         return result
 
@@ -2202,7 +2223,7 @@ class WhiteStrategy(BaseStrategy):
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
         """TP en el nivel objetivo de Pink (extremo del swing previo).
-        TP_max = maximum/minimum of 4H impulse (approx via EMA H4 values or S/R levels)."""
+        TP_max = alto/bajo del impulso de 4H (Trading Plan: "WHITE: TP maximo = alto/bajo del impulso de 4H")."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
         result: Dict[str, float] = {}
@@ -2212,30 +2233,40 @@ class WhiteStrategy(BaseStrategy):
             if above:
                 sorted_above = sorted(above)
                 result["tp1"] = sorted_above[0]
-                if len(sorted_above) > 1:
-                    result["tp_max"] = sorted_above[1]
         else:
             below = [s for s in supports if s < entry_price]
             if below:
                 sorted_below = sorted(below, reverse=True)
                 result["tp1"] = sorted_below[0]
-                if len(sorted_below) > 1:
-                    result["tp_max"] = sorted_below[1]
 
-        # TP_max override: use max/min of 4H impulse if available from EMA values
-        # Approximate the 4H impulse extreme using the highest/lowest EMA H4 values
-        ema_h4_50 = _ema_val(analysis, "EMA_H4_50")
-        ema_h4_20 = _ema_val(analysis, "EMA_H4_20")
-        if ema_h4_50 and ema_h4_20:
+        # WHITE TP_max = H4 impulse high/low (Trading Plan rule)
+        # Use the highest resistance / lowest support from key_levels as the H4 impulse extreme
+        tp1 = result.get("tp1")
+        if tp1:
             if direction == "BUY":
-                # Impulse max: estimate using the spread between fast and slow EMA
-                impulse_max = ema_h4_20 + abs(ema_h4_20 - ema_h4_50) * 2.0
-                if "tp_max" not in result or impulse_max > result.get("tp_max", 0):
-                    result["tp_max"] = impulse_max
+                # H4 impulse high: highest resistance above TP1
+                above_tp1 = [r for r in resistances if r > tp1]
+                if above_tp1:
+                    result["tp_max"] = max(above_tp1)
             else:
-                impulse_min = ema_h4_20 - abs(ema_h4_20 - ema_h4_50) * 2.0
-                if "tp_max" not in result or impulse_min < result.get("tp_max", float("inf")):
-                    result["tp_max"] = impulse_min
+                # H4 impulse low: lowest support below TP1
+                below_tp1 = [s for s in supports if s < tp1]
+                if below_tp1:
+                    result["tp_max"] = min(below_tp1)
+
+        # Fallback: EMA H4 approximation if no S/R levels found for tp_max
+        if "tp_max" not in result and tp1:
+            ema_h4_50 = _ema_val(analysis, "EMA_H4_50")
+            ema_h4_20 = _ema_val(analysis, "EMA_H4_20")
+            if ema_h4_50 and ema_h4_20:
+                if direction == "BUY":
+                    impulse_max = ema_h4_20 + abs(ema_h4_20 - ema_h4_50) * 2.0
+                    if impulse_max > tp1:
+                        result["tp_max"] = impulse_max
+                else:
+                    impulse_min = ema_h4_20 - abs(ema_h4_20 - ema_h4_50) * 2.0
+                    if impulse_min < tp1:
+                        result["tp_max"] = impulse_min
 
         return result
 

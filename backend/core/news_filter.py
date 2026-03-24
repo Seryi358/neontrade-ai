@@ -116,6 +116,38 @@ class NewsFilter:
 
         return False, None
 
+    async def should_close_for_news(self, instrument: str) -> Tuple[bool, str]:
+        """Check if an existing position on this instrument should be closed due to upcoming news.
+        Trading Plan: 'Cerrar trades antes de noticias importantes'
+        Only triggers for HIGH impact events within the danger window."""
+        now = datetime.now(timezone.utc)
+
+        # Refresh calendar cache once per day
+        today = now.strftime("%Y-%m-%d")
+        if self._cache_date != today:
+            await self._refresh_calendar(now)
+            self._cache_date = today
+
+        currencies = self._extract_currencies(instrument)
+
+        for event in self._cached_events:
+            if event.impact != "high":
+                continue
+            # Check if this event affects the instrument
+            if event.currency.upper() not in currencies:
+                continue
+            minutes_until = (event.time - now).total_seconds() / 60
+            if 0 < minutes_until <= self.minutes_before:
+                return True, f"High-impact news: {event.title} in {int(minutes_until)}min"
+
+        return False, ""
+
+    @staticmethod
+    def _extract_currencies(instrument: str) -> set:
+        """Extract the two currency codes from a pair name like 'EUR_USD' -> {'EUR', 'USD'}."""
+        parts = instrument.replace("/", "_").split("_")
+        return {p.upper() for p in parts if len(p) == 3}
+
     async def get_todays_events(self) -> List[dict]:
         """Get all events for today (for the frontend calendar view)."""
         now = datetime.now(timezone.utc)

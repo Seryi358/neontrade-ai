@@ -312,7 +312,9 @@ def _detect_head_and_shoulders(
         trough1_data = data.iloc[ls_idx:h_idx + 1]
         trough2_data = data.iloc[h_idx:rs_idx + 1]
         trough1 = trough1_data["low"].min() if not trough1_data.empty else 0
+        trough1_idx = trough1_data["low"].idxmin() if not trough1_data.empty else ls_idx
         trough2 = trough2_data["low"].min() if not trough2_data.empty else 0
+        trough2_idx = trough2_data["low"].idxmin() if not trough2_data.empty else rs_idx
         neckline = (trough1 + trough2) / 2
 
         pattern_height = h_price - neckline
@@ -328,15 +330,33 @@ def _detect_head_and_shoulders(
         if abs(rs_price - ls_price) < tol * 0.3:
             confidence += 10.0
 
+        # Calculate neckline slope for type classification (Gráficas de Patrones.pdf)
+        neckline_slope = (trough2 - trough1) / max(1, trough2_idx - trough1_idx)
+        slope_pct = neckline_slope / neckline * 100 if neckline > 0 else 0
+
+        # Classify neckline type
+        if abs(slope_pct) < 0.5:  # Nearly flat
+            neckline_type = 1  # Tipo 1: Plano
+            type_desc = "neckline plano"
+        elif neckline_slope > 0:  # Ascending
+            neckline_type = 2  # Tipo 2: Ascendente (less bearish)
+            type_desc = "neckline ascendente (menos bajista)"
+            confidence -= 5  # Less reliable per course
+        else:  # Descending
+            neckline_type = 3  # Tipo 3: Descendente (most bearish, most reliable)
+            type_desc = "neckline descendente (más bajista y confiable)"
+            confidence += 5  # More reliable per course
+
         return ChartPattern(
-            name="HEAD_AND_SHOULDERS",
+            name=f"HEAD_AND_SHOULDERS_TYPE_{neckline_type}",
             direction="bearish",
             confidence=min(confidence, 95.0),
             start_idx=ls_idx,
             end_idx=len(data) - 1,
             neckline=neckline,
             target=target,
-            description=f"Hombro-Cabeza-Hombro: Cabeza {h_price:.5f}, "
+            description=f"Hombro-Cabeza-Hombro (Tipo {neckline_type}, {type_desc}): "
+                        f"Cabeza {h_price:.5f}, "
                         f"Hombros {ls_price:.5f}/{rs_price:.5f}. "
                         f"Cuello: {neckline:.5f}. Objetivo: {target:.5f}",
         )
@@ -378,7 +398,9 @@ def _detect_inverse_head_and_shoulders(
         peak1_data = data.iloc[ls_idx:h_idx + 1]
         peak2_data = data.iloc[h_idx:rs_idx + 1]
         peak1 = peak1_data["high"].max() if not peak1_data.empty else 0
+        peak1_idx = peak1_data["high"].idxmax() if not peak1_data.empty else ls_idx
         peak2 = peak2_data["high"].max() if not peak2_data.empty else 0
+        peak2_idx = peak2_data["high"].idxmax() if not peak2_data.empty else rs_idx
         neckline = (peak1 + peak2) / 2
 
         pattern_height = neckline - h_price
@@ -394,15 +416,33 @@ def _detect_inverse_head_and_shoulders(
         if abs(rs_price - ls_price) < tol * 0.3:
             confidence += 10.0
 
+        # Calculate neckline slope for type classification (Gráficas de Patrones.pdf)
+        neckline_slope = (peak2 - peak1) / max(1, peak2_idx - peak1_idx)
+        slope_pct = neckline_slope / neckline * 100 if neckline > 0 else 0
+
+        # Classify neckline type (inverted logic for Inverse H&S)
+        if abs(slope_pct) < 0.5:  # Nearly flat
+            neckline_type = 1  # Tipo 1: Plano
+            type_desc = "neckline plano"
+        elif neckline_slope > 0:  # Ascending - more bullish and reliable for inverse
+            neckline_type = 2  # Tipo 2: Ascendente (more bullish)
+            type_desc = "neckline ascendente (más alcista y confiable)"
+            confidence += 5  # More reliable per course
+        else:  # Descending - less bullish for inverse
+            neckline_type = 3  # Tipo 3: Descendente (less bullish)
+            type_desc = "neckline descendente (menos alcista)"
+            confidence -= 5  # Less reliable per course
+
         return ChartPattern(
-            name="INVERSE_HEAD_AND_SHOULDERS",
+            name=f"INVERSE_HEAD_AND_SHOULDERS_TYPE_{neckline_type}",
             direction="bullish",
             confidence=min(confidence, 95.0),
             start_idx=ls_idx,
             end_idx=len(data) - 1,
             neckline=neckline,
             target=target,
-            description=f"HCH Invertido: Cabeza {h_price:.5f}, "
+            description=f"HCH Invertido (Tipo {neckline_type}, {type_desc}): "
+                        f"Cabeza {h_price:.5f}, "
                         f"Hombros {ls_price:.5f}/{rs_price:.5f}. "
                         f"Cuello: {neckline:.5f}. Objetivo: {target:.5f}",
         )
@@ -569,17 +609,37 @@ def _detect_symmetrical_triangle(
     if len(recent_highs) >= 3 and len(recent_lows) >= 3:
         confidence += 10.0
 
+    # Determine triangle type: continuation vs reversal (Gráficas de Patrones.pdf)
+    # Estimate the apex (convergence point) from the trendlines
+    end_idx = len(data) - 1
+    high_idx_span = recent_highs[-1][0] - recent_highs[0][0]
+    low_idx_span = recent_lows[-1][0] - recent_lows[0][0]
+    avg_span = max(1, (high_idx_span + low_idx_span) / 2)
+    # How far into the triangle has the pattern developed?
+    triangle_progress = (end_idx - start_idx) / max(1, avg_span) if avg_span > 0 else 0
+
+    direction_es = "alcista" if prior_trend == "bullish" else "bajista"
+
+    if triangle_progress > 0.67:  # Past 2/3 - more likely reversal
+        pattern_name = "REVERSAL_TRIANGLE"
+        description = (f"Triángulo de reversión {direction_es} — se desarrolló más allá "
+                       f"de 2/3 del patrón, sugiere cambio de tendencia. "
+                       f"Objetivo: {target:.5f}")
+    else:  # Breaks around 2/3 - continuation
+        pattern_name = "CONTINUATION_TRIANGLE"
+        description = (f"Triángulo de continuación {direction_es} — ruptura en ~2/3 "
+                       f"del patrón, confirma tendencia dominante. "
+                       f"Objetivo: {target:.5f}")
+
     return ChartPattern(
-        name="SYMMETRICAL_TRIANGLE",
+        name=pattern_name,
         direction=prior_trend,
         confidence=min(confidence, 90.0),
         start_idx=start_idx,
-        end_idx=len(data) - 1,
+        end_idx=end_idx,
         neckline=midpoint,
         target=target,
-        description=f"Triangulo Simetrico: Maximos descendentes y minimos ascendentes. "
-                    f"Tendencia previa: {'alcista' if prior_trend == 'bullish' else 'bajista'}. "
-                    f"Objetivo: {target:.5f}",
+        description=description,
     )
 
 
@@ -1062,8 +1122,10 @@ def get_pattern_names() -> List[str]:
     """Return list of all detectable pattern names."""
     return [
         "DOUBLE_TOP", "DOUBLE_BOTTOM",
-        "HEAD_AND_SHOULDERS", "INVERSE_HEAD_AND_SHOULDERS",
-        "ASCENDING_TRIANGLE", "DESCENDING_TRIANGLE", "SYMMETRICAL_TRIANGLE",
+        "HEAD_AND_SHOULDERS_TYPE_1", "HEAD_AND_SHOULDERS_TYPE_2", "HEAD_AND_SHOULDERS_TYPE_3",
+        "INVERSE_HEAD_AND_SHOULDERS_TYPE_1", "INVERSE_HEAD_AND_SHOULDERS_TYPE_2", "INVERSE_HEAD_AND_SHOULDERS_TYPE_3",
+        "ASCENDING_TRIANGLE", "DESCENDING_TRIANGLE",
+        "CONTINUATION_TRIANGLE", "REVERSAL_TRIANGLE",
         "RISING_WEDGE", "FALLING_WEDGE",
         "BULL_FLAG", "BEAR_FLAG",
         "CUP_AND_HANDLE",

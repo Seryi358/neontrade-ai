@@ -141,11 +141,13 @@ class Settings(BaseSettings):
         # Principales EUR
         "EUR_AUD", "EUR_CHF", "EUR_GBP", "EUR_JPY", "EUR_NZD",
         # Principales CAD
-        "AUD_CAD", "EUR_CAD", "GBP_CAD", "NZD_CAD",
+        "AUD_CAD", "CAD_CHF", "EUR_CAD", "GBP_CAD", "NZD_CAD",
         # Principales JPY
         "AUD_JPY", "CAD_JPY", "CHF_JPY", "GBP_JPY", "NZD_JPY",
         # Otros
         "AUD_CHF", "AUD_NZD", "GBP_AUD", "GBP_CHF", "GBP_NZD", "NZD_CHF",
+        # Metales (from FOREX.txt)
+        "XAU_USD", "XAG_USD",
     ]
 
     # Correlation pairs map (pairs that tend to move together)
@@ -155,6 +157,7 @@ class Settings(BaseSettings):
         ["EUR_USD", "GBP_USD"],
         ["USD_CHF", "USD_CAD"],
         ["EUR_JPY", "GBP_JPY", "CAD_JPY"],
+        ["XAU_USD", "XAG_USD"],
     ]
 
     class Config:

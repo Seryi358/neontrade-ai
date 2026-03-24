@@ -49,6 +49,7 @@ import AnalysisScreen from './src/screens/AnalysisScreen';
 import ManualModeScreen from './src/screens/ManualModeScreen';
 import WatchlistScreen from './src/screens/WatchlistScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
+import JournalScreen from './src/screens/JournalScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -164,6 +165,16 @@ export default function App() {
             tabBarLabel: 'HIST',
             tabBarIcon: ({ focused }) => (
               <TabIcon label="▤" focused={focused} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Journal"
+          component={JournalScreen}
+          options={{
+            tabBarLabel: 'JOURNAL',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon label="◆" focused={focused} />
             ),
           }}
         />

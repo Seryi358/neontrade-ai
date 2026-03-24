@@ -85,7 +85,10 @@ class RiskManager:
         # Delta algorithm tracking
         self._trade_history: List[TradeResult] = []
         self._accumulated_gain: float = 0.0  # Running gain since last risk increase
+        self._delta_accumulated_gain: float = 0.0  # Alias used by delta bonus
         self._current_delta_risk: float = 0.0  # Additional risk from delta
+        # Historical max drawdown tracking (for variable DD and delta algorithms)
+        self._max_historical_dd: float = 0.0
         # Scale-in tracking: positions that have reached Break Even
         self._positions_at_be: set = set()  # trade_ids at BE or beyond
         # Funded account tracking
@@ -106,12 +109,25 @@ class RiskManager:
         if self._current_balance > self._peak_balance:
             self._peak_balance = self._current_balance
 
+        # Track historical max drawdown for variable DD and delta algorithms
+        current_dd = self.get_current_drawdown()
+        self._max_historical_dd = max(self._max_historical_dd, current_dd)
+
     def get_current_drawdown(self) -> float:
         """Get current drawdown as a positive decimal (e.g., 0.05 = 5% DD)."""
         if self._peak_balance <= 0:
             return 0.0
         dd = (self._peak_balance - self._current_balance) / self._peak_balance
         return max(0.0, dd)
+
+    def _calculate_recent_win_rate(self) -> float:
+        """Calculate win rate from the last 50 trades."""
+        if not self._trade_history:
+            return 0.5  # Default when no history
+        recent = self._trade_history[-50:]
+        total = len(recent)
+        wins = sum(1 for t in recent if t.is_win)
+        return wins / total if total > 0 else 0.5
 
     def _get_drawdown_adjusted_risk(self, base_risk: float) -> float:
         """
@@ -129,17 +145,29 @@ class RiskManager:
         dd = self.get_current_drawdown()
 
         if method == "variable":
-            # Variable method: reduce proportionally based on win rate
-            if not self._trade_history:
+            # Variable method from TradingLab Excel (Drawdown- sheet)
+            # Uses winrate x base_risk x multiplier at each DD level
+            win_rate = self._calculate_recent_win_rate()
+            # Need historical max DD to determine levels
+            max_dd_hist = self._max_historical_dd or dd or 0.05  # fallback 5%
+
+            if max_dd_hist <= 0:
                 return base_risk
-            wins = sum(1 for t in self._trade_history[-50:] if t.is_win)
-            total = min(len(self._trade_history), 50)
-            win_rate = wins / total if total > 0 else 0.5
-            # Below 40% win rate, reduce risk proportionally
-            if win_rate < 0.40:
-                factor = win_rate / 0.40  # 0.0 - 1.0
-                return base_risk * max(0.25, factor)
-            return base_risk
+
+            # Determine which level we're at based on DD relative to historical max
+            dd_ratio = dd / max_dd_hist if max_dd_hist > 0 else 0
+
+            if dd_ratio >= 1.0:  # At or beyond max DD
+                adjusted = win_rate * base_risk * 1.0
+            elif dd_ratio >= 0.75:  # Level 2
+                adjusted = win_rate * base_risk * 1.33
+            elif dd_ratio >= 0.50:  # Level 1
+                adjusted = win_rate * base_risk * 1.66
+            else:  # No significant DD
+                return base_risk
+
+            # Minimum 25% of base risk
+            return max(adjusted, base_risk * 0.25)
 
         if method == "fixed_levels":
             # Fixed levels from Trading Plan spreadsheet
@@ -170,42 +198,43 @@ class RiskManager:
     # ── Delta Risk Algorithm (ch18.8) ───────────────────────────────
 
     def _get_delta_bonus(self, base_risk: float) -> float:
-        """
-        Calculate additional risk from delta algorithm during winning streaks.
-        From TradingLab ch18.8:
-        - Delta 0.60: need ~5.56% accumulated gain to increase from 1% to 1.5%
-        - Formula: next_level_gain = (base_risk * 0.5) / delta_parameter
-        """
+        """Delta risk algorithm from TradingLab Excel (Delta+ sheet).
+        Increases risk during winning streaks using fixed levels."""
         if not settings.delta_enabled:
             return 0.0
 
-        if self._accumulated_gain <= 0:
+        # Calculate accumulated gain from winning streak
+        accumulated = self._delta_accumulated_gain
+        if accumulated <= 0:
             return 0.0
 
-        delta = settings.delta_parameter
-        if delta <= 0:
+        # Delta parameter determines how quickly we advance levels
+        delta = settings.delta_parameter  # 0.6 recommended
+        max_dd = self._max_historical_dd or 0.05  # fallback
+        delta_threshold = max_dd * delta  # gain needed per level
+
+        if delta_threshold <= 0:
             return 0.0
 
-        # Each level adds 0.5% risk
-        risk_increment = base_risk * 0.5
-        gain_per_level = risk_increment / delta
+        # Determine current level based on accumulated gains
+        level = min(int(accumulated / delta_threshold), 4)
 
-        # How many levels have we earned
-        levels = int(self._accumulated_gain / gain_per_level)
-        bonus = levels * risk_increment
+        # Fixed risk levels from Excel (Delta+ sheet)
+        # Level 0 = base, Level 1 = 1.0%, Level 2 = 1.5%, Level 3 = 2.0%, Level 4 = 3.0%
+        level_risks = {
+            0: base_risk,           # 1.0% (no bonus)
+            1: 0.010,               # 1.0%
+            2: 0.015,               # 1.5%
+            3: 0.020,               # 2.0%
+            4: 0.030,               # 3.0%
+        }
 
-        # Cap at max delta risk
-        bonus = min(bonus, settings.delta_max_risk - base_risk)
-        bonus = max(0.0, bonus)
+        target_risk = level_risks.get(level, base_risk)
+        bonus = max(0, target_risk - base_risk)
 
-        if bonus > 0:
-            logger.info(
-                f"Delta algorithm: +{bonus:.2%} risk bonus "
-                f"(accumulated gain: {self._accumulated_gain:.2%}, "
-                f"levels: {levels})"
-            )
-
-        return bonus
+        # Cap at delta_max_risk
+        max_bonus = settings.delta_max_risk - base_risk
+        return min(bonus, max(0, max_bonus))
 
     def record_trade_result(self, trade_id: str, instrument: str, pnl_percent: float):
         """
@@ -222,10 +251,12 @@ class RiskManager:
 
         # Update accumulated gain for delta
         self._accumulated_gain += pnl_percent
+        self._delta_accumulated_gain += pnl_percent
 
         # Reset accumulated gain on loss (delta resets on losing trade)
         if pnl_percent < 0:
             self._accumulated_gain = 0.0
+            self._delta_accumulated_gain = 0.0
             self._current_delta_risk = 0.0
             logger.info("Delta algorithm: reset after losing trade")
 

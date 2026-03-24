@@ -37,6 +37,8 @@ class TradeJournal:
         self._max_winning_streak = 0
         self._max_streak_pct = 0.0  # cumulative % of the max winning streak
         self._trade_counter = 0
+        self._accumulator = 1.0  # Compound growth tracker (Excel column O)
+        self._dd_by_year: Dict[str, float] = {}  # year -> max DD that year
         self._load()
 
     # ── Record a completed trade ──────────────────────────────────
@@ -102,6 +104,15 @@ class TradeJournal:
             / self._initial_capital * 100
         ) if self._initial_capital > 0 else 0.0
 
+        # Compound accumulator (Registro de trades.xlsx column O)
+        self._accumulator = (pnl_pct / 100 * self._accumulator) + self._accumulator
+
+        # Historical DD by year tracking
+        year = now.strftime("%Y")
+        if year not in self._dd_by_year:
+            self._dd_by_year[year] = 0.0
+        self._dd_by_year[year] = max(self._dd_by_year[year], abs(drawdown_pct))
+
         trade_record = {
             "trade_number": self._trade_counter,
             "trade_id": trade_id,
@@ -121,6 +132,11 @@ class TradeJournal:
             "drawdown_dollars": round(drawdown_dollars, 2),
             "pnl_accumulated_pct": round(pnl_accumulated_pct, 4),
             "winning_streak": self._current_winning_streak,
+            "accumulator": round(self._accumulator, 6),
+            # Emotional journal fields (Psychology Manual - 3-moment journaling)
+            "emotional_notes_pre": "",    # Before/during analysis
+            "emotional_notes_during": "",  # While position is open
+            "emotional_notes_post": "",    # After trade closes
         }
 
         self._trades.append(trade_record)
@@ -158,6 +174,8 @@ class TradeJournal:
                 "profit_factor": 0.0,
                 "monthly_returns": {},
                 "pnl_accumulated_pct": 0.0,
+                "accumulator": self._accumulator,
+                "dd_by_year": self._dd_by_year,
             }
 
         wins = [t for t in self._trades if t["result"] == "TP"]
@@ -246,6 +264,8 @@ class TradeJournal:
             "profit_factor": round(profit_factor, 2) if profit_factor != float('inf') else 999.99,
             "monthly_returns": monthly_returns_pct,
             "pnl_accumulated_pct": round(pnl_accumulated_pct, 4),
+            "accumulator": round(self._accumulator, 6),  # Compound growth factor
+            "dd_by_year": self._dd_by_year,
         }
 
     # ── Trade History ─────────────────────────────────────────────
@@ -283,6 +303,8 @@ class TradeJournal:
                 "max_winning_streak": self._max_winning_streak,
                 "max_streak_pct": self._max_streak_pct,
                 "trade_counter": self._trade_counter,
+                "accumulator": self._accumulator,
+                "dd_by_year": self._dd_by_year,
                 "trades": self._trades,
             }
             with open(self._data_path, "w") as f:
@@ -305,6 +327,8 @@ class TradeJournal:
                 self._max_winning_streak = data.get("max_winning_streak", 0)
                 self._max_streak_pct = data.get("max_streak_pct", 0.0)
                 self._trade_counter = data.get("trade_counter", len(self._trades))
+                self._accumulator = data.get("accumulator", 1.0)
+                self._dd_by_year = data.get("dd_by_year", {})
                 self._current_streak_pct = 0.0
                 logger.info(
                     f"Trade journal loaded: {len(self._trades)} trades, "

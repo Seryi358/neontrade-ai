@@ -1234,7 +1234,7 @@ class TradingEngine:
                     f"AI validation for {signal.instrument}: "
                     f"Score={ai_score} Rec={ai_rec} — {ai_reason}"
                 )
-                if ai_rec == "SKIP" and ai_score < 40:
+                if ai_rec == "SKIP":
                     logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
                     self._daily_setups_skipped_ai += 1
                     return None
@@ -1464,6 +1464,15 @@ class TradingEngine:
         logger.info(f"  Risk: {setup.risk_percent:.2%}")
         logger.info(f"  Mode: {self.mode.value}")
         logger.info("=" * 50)
+
+        # Safety net: reject if TP is on the wrong side of entry
+        effective_entry = limit_price or setup.entry_price
+        if setup.direction == "BUY" and setup.take_profit_1 <= effective_entry:
+            logger.error(f"REJECTED {setup.instrument}: TP1 ({setup.take_profit_1:.5f}) <= entry ({effective_entry:.5f}) for BUY")
+            return None
+        if setup.direction == "SELL" and setup.take_profit_1 >= effective_entry:
+            logger.error(f"REJECTED {setup.instrument}: TP1 ({setup.take_profit_1:.5f}) >= entry ({effective_entry:.5f}) for SELL")
+            return None
 
         try:
             # TradingLab: Support limit entries for confluence zones
@@ -1700,12 +1709,13 @@ class TradingEngine:
                 except Exception:
                     pass
                 report = await self.ai_analyzer.generate_daily_report(
-                    trades=today_trades,
+                    trades_today=today_trades,
                     account_summary={"balance": account.balance, "currency": account.currency} if account else {},
                     scan_results={
                         inst: {"score": r.score, "htf_trend": r.htf_trend.value}
                         for inst, r in self._last_scan_results.items()
                     },
+                    pending_setups=[],
                 )
                 # Send AI report via email
                 if self.alert_manager:

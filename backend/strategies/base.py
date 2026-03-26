@@ -1319,6 +1319,14 @@ class BlueStrategy(BaseStrategy):
             failed.append("Paso 7: No se pudo calcular SL o TP")
             return None
 
+        # Validar que TP esté en el lado correcto de la entrada
+        if direction == "BUY" and tp1 <= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar encima de entrada ({entry_price:.5f}) para BUY")
+            return None
+        if direction == "SELL" and tp1 >= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar debajo de entrada ({entry_price:.5f}) para SELL")
+            return None
+
         # Validar R:R minimo (config: min_rr_ratio para Blue)
         risk = abs(entry_price - sl)
         reward = abs(tp1 - entry_price)
@@ -1402,8 +1410,13 @@ class BlueStrategy(BaseStrategy):
 
         result: Dict[str, float] = {}
         if ema_4h_50 and ema_4h_50 > 0:
-            result["tp1"] = ema_4h_50
-        else:
+            # Only use EMA as TP if it's on the correct side of entry
+            if direction == "BUY" and ema_4h_50 > entry_price:
+                result["tp1"] = ema_4h_50
+            elif direction == "SELL" and ema_4h_50 < entry_price:
+                result["tp1"] = ema_4h_50
+
+        if "tp1" not in result:
             # Fallback: resistencia/soporte mas cercano
             if direction == "BUY":
                 above = [r for r in resistances if r > entry_price]
@@ -2546,8 +2559,13 @@ class BlackStrategy(BaseStrategy):
         result: Dict[str, float] = {}
 
         if ema_4h_50 and ema_4h_50 > 0:
-            result["tp1"] = ema_4h_50
-        else:
+            # Only use EMA as TP if it's on the correct side of entry
+            if direction == "BUY" and ema_4h_50 > entry_price:
+                result["tp1"] = ema_4h_50
+            elif direction == "SELL" and ema_4h_50 < entry_price:
+                result["tp1"] = ema_4h_50
+
+        if "tp1" not in result:
             # Fallback: nivel S/R intermedio
             supports = analysis.key_levels.get("supports", [])
             resistances = analysis.key_levels.get("resistances", [])

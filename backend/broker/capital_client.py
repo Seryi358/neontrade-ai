@@ -82,6 +82,9 @@ class CapitalClient(BaseBroker):
         self._session_time: Optional[datetime] = None
         self._active_account_id: Optional[str] = None
 
+        # Session lock to prevent concurrent session creation
+        self._session_lock = asyncio.Lock()
+
         # HTTP client
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
@@ -95,14 +98,15 @@ class CapitalClient(BaseBroker):
 
     async def _ensure_session(self):
         """Create or refresh session if needed (expires after 10 min)."""
-        now = datetime.now(timezone.utc)
+        async with self._session_lock:
+            now = datetime.now(timezone.utc)
 
-        # Session valid for ~9 min (refresh before 10 min expiry)
-        if (self._cst and self._security_token and self._session_time
-                and (now - self._session_time) < timedelta(minutes=9)):
-            return
+            # Session valid for ~9 min (refresh before 10 min expiry)
+            if (self._cst and self._security_token and self._session_time
+                    and (now - self._session_time) < timedelta(minutes=9)):
+                return
 
-        await self._create_session()
+            await self._create_session()
 
     async def _create_session(self):
         """Authenticate, get CST + X-SECURITY-TOKEN, and switch to the correct account."""
@@ -354,8 +358,7 @@ class CapitalClient(BaseBroker):
         except Exception as e:
             logger.debug(f"Market search failed for {instrument}: {e}")
 
-        # Fallback to our guess
-        self._epic_cache[instrument] = epic_guess
+        # Fallback to our guess (don't cache - might be wrong, retry next time)
         return epic_guess
 
     async def warm_epic_cache(self, instruments: List[str]) -> None:
@@ -557,7 +560,12 @@ class CapitalClient(BaseBroker):
             order_data["profitLevel"] = take_profit
 
         try:
-            resp = await self._post("/api/v1/positions", json_data=order_data)
+            # Single attempt only - retrying POST can duplicate orders
+            await self._ensure_session()
+            resp = await self._client.post(
+                "/api/v1/positions", headers=self._auth_headers(), json=order_data,
+            )
+            resp.raise_for_status()
             raw = resp.json()
 
             deal_ref = raw.get("dealReference")
@@ -619,7 +627,12 @@ class CapitalClient(BaseBroker):
             order_data["profitLevel"] = take_profit
 
         try:
-            resp = await self._post("/api/v1/workingorders", json_data=order_data)
+            # Single attempt only - retrying POST can duplicate orders
+            await self._ensure_session()
+            resp = await self._client.post(
+                "/api/v1/workingorders", headers=self._auth_headers(), json=order_data,
+            )
+            resp.raise_for_status()
             raw = resp.json()
             deal_ref = raw.get("dealReference")
 
@@ -741,11 +754,12 @@ class CapitalClient(BaseBroker):
                     raw_response=data,
                 )
         except Exception as e:
-            logger.warning(f"Deal confirmation failed: {e}")
+            logger.error(f"Deal confirmation failed: {e}")
             return OrderResult(
-                success=True,  # Assume success if confirm endpoint fails
+                success=False,
                 trade_id=deal_reference,
                 units=units,
+                error=f"Deal confirmation failed: {e}",
             )
 
     # ── Trade Management ─────────────────────────────────────────
@@ -762,7 +776,7 @@ class CapitalClient(BaseBroker):
 
             direction = pos.get("direction", "BUY")
             size = float(pos.get("size", 0))
-            units = int(size) if direction == "BUY" else -int(size)
+            units = size if direction == "BUY" else -size
 
             entry = float(pos.get("level", 0))
             current_bid = float(market.get("bid", entry))
@@ -859,10 +873,17 @@ class CapitalClient(BaseBroker):
 
     async def get_pip_value(self, instrument: str) -> float:
         """Get the pip value for an instrument."""
-        # Standard forex pip values
         pair = instrument.upper().replace("/", "_")
         if "JPY" in pair:
             return 0.01
+        if pair in ("XAU_USD", "GOLD"):
+            return 0.1
+        if pair in ("XAG_USD", "SILVER"):
+            return 0.01
+        if any(pair.startswith(c) for c in ("BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC", "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB", "FTM", "ALGO", "XLM", "EOS", "XTZ", "VET")):
+            return 1.0
+        if any(pair.startswith(idx) for idx in ("US30", "US2000", "NAS100", "SPX500", "DE30", "FR40", "UK100", "JP225", "AU200", "HK33", "CN50")):
+            return 1.0
         return 0.0001
 
     # ── Cleanup ──────────────────────────────────────────────────

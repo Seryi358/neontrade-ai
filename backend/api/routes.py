@@ -319,7 +319,11 @@ async def reject_all_setups():
     from main import engine
     if hasattr(engine, 'pending_setups'):
         count = len(engine.pending_setups)
-        engine.pending_setups.clear()
+        for setup_id in list(engine.pending_setups.keys()):
+            try:
+                await engine.reject_setup(setup_id)
+            except Exception:
+                pass
         return {"status": "rejected_all", "count": count}
     return {"status": "ok", "count": 0}
 
@@ -537,10 +541,17 @@ async def emergency_close_all():
     from main import engine
     broker = engine.broker
     count = await broker.close_all_trades()
-    if hasattr(engine, 'position_manager'):
-        engine.position_manager.positions.clear()
-    if hasattr(engine, 'risk_manager'):
-        engine.risk_manager._active_risks.clear()
+    # Re-sync state from broker instead of blindly clearing
+    try:
+        open_trades = await broker.get_open_trades()
+        if not open_trades:
+            # Only clear internal state if broker confirms no open positions
+            if hasattr(engine, 'position_manager'):
+                engine.position_manager.positions.clear()
+            if hasattr(engine, 'risk_manager'):
+                engine.risk_manager._active_risks.clear()
+    except Exception:
+        pass  # Don't clear if we can't verify
     return {
         "status": "all_trades_closed",
         "count": count,
@@ -705,7 +716,7 @@ async def get_current_broker():
 
 @router.post("/broker")
 async def set_broker(request: BrokerSelectionRequest):
-    """Switch the active broker. Requires API credentials."""
+    """Switch the active broker. Requires restart to take effect."""
     supported = {"oanda", "capital", "ibkr"}
     if request.broker.lower() not in supported:
         raise HTTPException(
@@ -716,8 +727,8 @@ async def set_broker(request: BrokerSelectionRequest):
         )
     return {
         "broker": request.broker,
-        "status": "active",
-        "message": f"Broker {request.broker} configurado correctamente",
+        "status": "pending_restart",
+        "message": f"Broker {request.broker} seleccionado. Cambia ACTIVE_BROKER={request.broker.lower()} en las variables de entorno y haz re-deploy para aplicar.",
     }
 
 

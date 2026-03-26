@@ -319,12 +319,15 @@ if os.path.isdir(_static_dir):
             _index_html_raw = f.read()
 
     def _get_index_html() -> str:
-        """Return index.html with auto-injected API key for same-origin auth."""
+        """Return index.html with auto-injected API key for same-origin auth.
+        Key is base64-encoded to avoid plaintext exposure in HTML source."""
+        import base64
         api_key = settings.api_secret_key or ""
-        injection = (
-            f'<script>window.__NEONTRADE_API_KEY__="{api_key}";</script>'
-            if api_key else ""
-        )
+        if api_key:
+            encoded = base64.b64encode(api_key.encode()).decode()
+            injection = f'<script>window.__NEONTRADE_API_KEY__=atob("{encoded}");</script>'
+        else:
+            injection = ""
         return _index_html_raw.replace("</head>", f"{injection}</head>")
 
     # Serve static assets (JS, CSS, fonts, images)

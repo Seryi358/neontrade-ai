@@ -1383,7 +1383,7 @@ class BlueStrategy(BaseStrategy):
         resistances = analysis.key_levels.get("resistances", [])
 
         if direction == "BUY":
-            candidates = [fib_618] if fib_618 > 0 else []
+            candidates = [fib_618] if fib_618 > 0 and fib_618 < entry_price else []
             # Minimo anterior (soporte mas cercano por debajo)
             below = [s for s in supports if s < entry_price]
             if below:
@@ -1394,7 +1394,7 @@ class BlueStrategy(BaseStrategy):
             # El mas bajo de los dos (proteccion maxima)
             return min(candidates)
         else:  # SELL
-            candidates = [fib_618] if fib_618 > 0 else []
+            candidates = [fib_618] if fib_618 > 0 and fib_618 > entry_price else []
             above = [r for r in resistances if r > entry_price]
             if above:
                 candidates.append(min(above))
@@ -1618,6 +1618,14 @@ class RedStrategy(BaseStrategy):
 
         if sl == 0.0 or tp1 == 0.0:
             failed.append("Paso 7: No se pudo calcular SL o TP")
+            return None
+
+        # Validar que TP esté en el lado correcto de la entrada
+        if direction == "BUY" and tp1 <= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar encima de entrada ({entry_price:.5f}) para BUY")
+            return None
+        if direction == "SELL" and tp1 >= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar debajo de entrada ({entry_price:.5f}) para SELL")
             return None
 
         risk = abs(entry_price - sl)
@@ -1908,6 +1916,14 @@ class PinkStrategy(BaseStrategy):
             failed.append("Paso 6: No se pudo calcular SL o TP")
             return None
 
+        # Validar que TP esté en el lado correcto de la entrada
+        if direction == "BUY" and tp1 <= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar encima de entrada ({entry_price:.5f}) para BUY")
+            return None
+        if direction == "SELL" and tp1 >= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar debajo de entrada ({entry_price:.5f}) para SELL")
+            return None
+
         risk = abs(entry_price - sl)
         reward = abs(tp1 - entry_price)
         if risk > 0:
@@ -2162,6 +2178,14 @@ class WhiteStrategy(BaseStrategy):
             failed.append("Paso 6: No se pudo calcular SL o TP")
             return None
 
+        # Validar que TP esté en el lado correcto de la entrada
+        if direction == "BUY" and tp1 <= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar encima de entrada ({entry_price:.5f}) para BUY")
+            return None
+        if direction == "SELL" and tp1 >= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar debajo de entrada ({entry_price:.5f}) para SELL")
+            return None
+
         risk = abs(entry_price - sl)
         reward = abs(tp1 - entry_price)
         if risk > 0:
@@ -2395,9 +2419,8 @@ class BlackStrategy(BaseStrategy):
         if not vol_ok:
             return None  # No entry without volume confirmation
 
-        # TradingLab: EMA 8 Weekly trend filter
-        if not _check_weekly_ema8_filter(analysis, direction):
-            return None  # Don't trade against weekly trend
+        # BLACK es contratendencia: NO aplicar EMA 8 Weekly trend filter
+        # (filtrar por tendencia semanal bloquearía las señales contra-tendencia)
 
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
@@ -2473,6 +2496,14 @@ class BlackStrategy(BaseStrategy):
 
         if sl == 0.0 or tp1 == 0.0:
             failed.append("Paso 7: No se pudo calcular SL o TP")
+            return None
+
+        # Validar que TP esté en el lado correcto de la entrada
+        if direction == "BUY" and tp1 <= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar encima de entrada ({entry_price:.5f}) para BUY")
+            return None
+        if direction == "SELL" and tp1 >= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar debajo de entrada ({entry_price:.5f}) para SELL")
             return None
 
         risk = abs(entry_price - sl)
@@ -2754,6 +2785,14 @@ class GreenStrategy(BaseStrategy):
 
         if sl == 0.0 or tp1 == 0.0:
             failed.append("Paso 6: No se pudo calcular SL o TP")
+            return None
+
+        # Validar que TP esté en el lado correcto de la entrada
+        if direction == "BUY" and tp1 <= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar encima de entrada ({entry_price:.5f}) para BUY")
+            return None
+        if direction == "SELL" and tp1 >= entry_price:
+            failed.append(f"Paso 7: TP1 ({tp1:.5f}) debe estar debajo de entrada ({entry_price:.5f}) para SELL")
             return None
 
         risk = abs(entry_price - sl)

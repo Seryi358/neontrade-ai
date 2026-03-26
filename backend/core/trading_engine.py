@@ -545,7 +545,7 @@ class TradingEngine:
         await self._maybe_send_morning_heartbeat(now)
 
         # Daily summary: send at end of trading day (21:00 UTC) once
-        if now.hour == settings.trading_end_hour and now.minute < 3:
+        if now.hour == settings.trading_end_hour and now.minute < 10:
             if not hasattr(self, '_daily_summary_sent_date') or self._daily_summary_sent_date != now.date():
                 self._daily_summary_sent_date = now.date()
                 asyncio.create_task(self._send_daily_summary())
@@ -557,6 +557,8 @@ class TradingEngine:
             # Check Friday close rule
             if self._should_close_friday(now):
                 await self._handle_friday_close()
+                # Still manage open positions (trailing stop, BE) for any kept positions
+                await self._manage_open_positions()
                 return
 
             # Funded account: close all positions at trading_end_hour every day
@@ -630,6 +632,12 @@ class TradingEngine:
                 logger.debug("Off-hours analysis scan...")
                 await self._scan_analysis_only()
                 self._last_offhours_scan = now
+
+        # Cleanup expired reentry candidates
+        expired = [k for k, v in self._reentry_candidates.items()
+                   if (datetime.now(timezone.utc) - v["tp1_time"]).total_seconds() > 1800]
+        for k in expired:
+            del self._reentry_candidates[k]
 
     # ── Equity Snapshot ─────────────────────────────────────────
 
@@ -818,22 +826,26 @@ class TradingEngine:
                         f"Position {tid} ({pos.instrument}) closed externally — removed from tracking"
                     )
 
+                    # Fetch close price once for all downstream uses
+                    close_price = pos.entry_price  # default
+                    pnl_dollars = 0.0  # default
+                    try:
+                        price_data = await self.broker.get_current_price(pos.instrument)
+                        close_price = (
+                            price_data.bid if pos.direction == "BUY"
+                            else price_data.ask
+                        )
+                        pnl_dollars = (
+                            (close_price - pos.entry_price)
+                            if pos.direction == "BUY"
+                            else (pos.entry_price - close_price)
+                        )
+                    except Exception as e:
+                        logger.debug(f"Failed to get close price for {tid}: {e}")
+
                     # Record funded PnL from externally closed position
                     if settings.funded_account_mode:
-                        try:
-                            price_data = await self.broker.get_current_price(pos.instrument)
-                            close_price = (
-                                price_data.bid if pos.direction == "BUY"
-                                else price_data.ask
-                            )
-                            pnl = (
-                                (close_price - pos.entry_price)
-                                if pos.direction == "BUY"
-                                else (pos.entry_price - close_price)
-                            )
-                            self.risk_manager.record_funded_pnl(pnl)
-                        except Exception as e:
-                            logger.debug(f"Failed to record funded PnL for {tid}: {e}")
+                        self.risk_manager.record_funded_pnl(pnl_dollars)
 
                     # TradingLab: Register reentry candidate if position was profitable
                     # (TP1 was likely hit if it was in BEYOND_TP1 phase or profitable)
@@ -869,16 +881,6 @@ class TradingEngine:
                     # Record in trade journal
                     if self.trade_journal:
                         try:
-                            price_data = await self.broker.get_current_price(pos.instrument)
-                            close_price = (
-                                price_data.bid if pos.direction == "BUY"
-                                else price_data.ask
-                            )
-                            pnl_dollars = (
-                                (close_price - pos.entry_price)
-                                if pos.direction == "BUY"
-                                else (pos.entry_price - close_price)
-                            )
                             self.trade_journal.record_trade(
                                 trade_id=tid,
                                 instrument=pos.instrument,
@@ -911,7 +913,7 @@ class TradingEngine:
                         try:
                             await self.alert_manager.send_trade_closed(
                                 instrument=pos.instrument,
-                                pnl=0.0,
+                                pnl=pnl_dollars,
                                 pips=0.0,
                                 reason="Position closed externally (broker/SL/TP)",
                             )

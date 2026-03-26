@@ -3,7 +3,7 @@ NeonTrade AI - Economic Calendar / News Filter
 Checks for upcoming high-impact economic events to avoid trading during news.
 
 Data sources (in priority order):
-  1. FinnHub   - Free economic calendar API (primary)
+  1. FairEconomy  - Free ForexFactory calendar mirror (primary, no API key needed)
   2. Trading Economics - Free calendar scraping (secondary fallback)
   3. Known recurring events - Hard-coded NFP/CPI schedule (final fallback)
 
@@ -48,9 +48,13 @@ RECURRING_HIGH_IMPACT = [
 # Currencies in our watchlist
 WATCHED_CURRENCIES = {"USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"}
 
-# FinnHub impact values that map to our impact levels
-_FINNHUB_HIGH_IMPACT = {"high", "3"}
-_FINNHUB_MEDIUM_IMPACT = {"medium", "2"}
+# FairEconomy endpoints (ForexFactory mirror — free, no API key)
+_FAIRECONOMY_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+_FAIRECONOMY_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json"
+
+# FairEconomy impact values
+_FE_HIGH_IMPACT = {"High"}
+_FE_MEDIUM_IMPACT = {"Medium"}
 
 
 class NewsFilter:
@@ -65,7 +69,6 @@ class NewsFilter:
     ):
         self.minutes_before = minutes_before
         self.minutes_after = minutes_after
-        self.finnhub_key = finnhub_key
         self.newsapi_key = newsapi_key
         self._cached_events: List[NewsEvent] = []
         self._cache_date: Optional[str] = None
@@ -198,16 +201,15 @@ class NewsFilter:
         """Fetch today's economic calendar. Tries sources in priority order."""
         self._cached_events = []
 
-        # 1) PRIMARY: FinnHub
-        if self.finnhub_key:
-            try:
-                events = await self._fetch_from_finnhub(now)
-                if events:
-                    self._cached_events = events
-                    logger.info(f"Loaded {len(events)} news events from FinnHub for today")
-                    return
-            except Exception as e:
-                logger.debug(f"FinnHub calendar fetch failed: {e}")
+        # 1) PRIMARY: FairEconomy (ForexFactory mirror — free, no key)
+        try:
+            events = await self._fetch_from_faireconomy(now)
+            if events:
+                self._cached_events = events
+                logger.info(f"Loaded {len(events)} news events from FairEconomy for today")
+                return
+        except Exception as e:
+            logger.debug(f"FairEconomy calendar fetch failed: {e}")
 
         # 2) SECONDARY: Trading Economics
         try:
@@ -224,64 +226,84 @@ class NewsFilter:
         logger.info(f"Using {len(self._cached_events)} known recurring events as fallback")
 
     # ------------------------------------------------------------------
-    # Source 1: FinnHub (primary)
+    # Source 1: FairEconomy (primary — free, no API key)
     # ------------------------------------------------------------------
 
-    async def _fetch_from_finnhub(self, now: datetime) -> List[NewsEvent]:
+    async def _fetch_from_faireconomy(self, now: datetime) -> List[NewsEvent]:
         """
-        Fetch today's economic calendar from FinnHub.
+        Fetch economic calendar from FairEconomy (ForexFactory mirror).
 
-        Endpoint: GET https://finnhub.io/api/v1/calendar/economic
-        Requires a free API key from finnhub.io.
+        Endpoints (no API key required):
+          - This week: https://nfs.faireconomy.media/ff_calendar_thisweek.json
+          - Next week: https://nfs.faireconomy.media/ff_calendar_nextweek.json
+
+        Returns events for today only (filtered from the weekly data).
         """
         events: List[NewsEvent] = []
-        today = now.strftime("%Y-%m-%d")
+        today = now.date()
 
-        resp = await self._http.get(
-            "https://finnhub.io/api/v1/calendar/economic",
-            params={
-                "from": today,
-                "to": today,
-                "token": self.finnhub_key,
-            },
-        )
+        # Fetch this week's calendar
+        urls = [_FAIRECONOMY_THIS_WEEK]
+        # If it's Friday or later, also fetch next week for look-ahead
+        if now.weekday() >= 4:
+            urls.append(_FAIRECONOMY_NEXT_WEEK)
 
-        if resp.status_code != 200:
-            logger.debug(f"FinnHub returned status {resp.status_code}")
-            return []
+        for url in urls:
+            try:
+                resp = await self._http.get(
+                    url,
+                    headers={"User-Agent": "Mozilla/5.0 (compatible; NeonTradeAI/2.0)"},
+                )
+                if resp.status_code != 200:
+                    logger.debug(f"FairEconomy returned status {resp.status_code} for {url}")
+                    continue
 
-        data = resp.json()
-        calendar_items = data.get("economicCalendar", [])
+                data = resp.json()
 
-        for item in calendar_items:
-            # FinnHub impact field: 1 = low, 2 = medium, 3 = high
-            raw_impact = str(item.get("impact", "")).lower().strip()
+                for item in data:
+                    # Filter by impact: only high and medium
+                    raw_impact = item.get("impact", "Low")
+                    if raw_impact in _FE_HIGH_IMPACT:
+                        impact = "high"
+                    elif raw_impact in _FE_MEDIUM_IMPACT:
+                        impact = "medium"
+                    else:
+                        continue
 
-            if raw_impact in _FINNHUB_HIGH_IMPACT:
-                impact = "high"
-            elif raw_impact in _FINNHUB_MEDIUM_IMPACT:
-                impact = "medium"
-            else:
-                continue  # skip low-impact events
+                    # Filter by watched currencies
+                    currency = item.get("country", "").upper()
+                    if currency not in WATCHED_CURRENCIES:
+                        continue
 
-            country = item.get("country", "").upper()
-            # Map common FinnHub country codes to currency codes
-            currency = _country_to_currency(country)
-            if currency not in WATCHED_CURRENCIES:
+                    # Parse event time (ISO-8601 with timezone offset)
+                    date_str = item.get("date", "")
+                    if not date_str:
+                        continue
+
+                    try:
+                        event_time = datetime.fromisoformat(date_str)
+                        # Ensure timezone-aware (convert to UTC)
+                        if event_time.tzinfo is None:
+                            event_time = event_time.replace(tzinfo=timezone.utc)
+                        else:
+                            event_time = event_time.astimezone(timezone.utc)
+                    except (ValueError, AttributeError):
+                        continue
+
+                    # Only keep today's events
+                    if event_time.date() != today:
+                        continue
+
+                    events.append(NewsEvent(
+                        time=event_time,
+                        currency=currency,
+                        impact=impact,
+                        title=item.get("title", "Unknown"),
+                    ))
+
+            except Exception as e:
+                logger.debug(f"FairEconomy fetch error for {url}: {e}")
                 continue
-
-            # Parse event time -- FinnHub typically returns "YYYY-MM-DD HH:MM:SS" in UTC
-            event_time_str = item.get("time", "")
-            event_time = _parse_event_time(event_time_str, today)
-            if event_time is None:
-                continue
-
-            events.append(NewsEvent(
-                time=event_time,
-                currency=currency,
-                impact=impact,
-                title=item.get("event", "Unknown"),
-            ))
 
         return events
 
@@ -398,89 +420,3 @@ class NewsFilter:
             })
 
         return headlines
-
-
-# ======================================================================
-# Module-level helpers
-# ======================================================================
-
-# Common country-code -> currency mappings used by FinnHub
-_COUNTRY_CURRENCY_MAP = {
-    "US": "USD",
-    "USA": "USD",
-    "EU": "EUR",
-    "EMU": "EUR",
-    "EUROZONE": "EUR",
-    "GB": "GBP",
-    "UK": "GBP",
-    "JP": "JPY",
-    "AU": "AUD",
-    "NZ": "NZD",
-    "CA": "CAD",
-    "CH": "CHF",
-    # Extended -- FinnHub sometimes uses full names or ISO-2 codes
-    "UNITED STATES": "USD",
-    "UNITED KINGDOM": "GBP",
-    "JAPAN": "JPY",
-    "AUSTRALIA": "AUD",
-    "NEW ZEALAND": "NZD",
-    "CANADA": "CAD",
-    "SWITZERLAND": "CHF",
-}
-
-
-def _country_to_currency(country: str) -> str:
-    """Convert a FinnHub country field to a 3-letter currency code."""
-    return _COUNTRY_CURRENCY_MAP.get(country.upper().strip(), country.upper().strip())
-
-
-def _parse_event_time(time_str: str, date_fallback: str) -> Optional[datetime]:
-    """
-    Parse an event time string from FinnHub into a timezone-aware datetime.
-
-    FinnHub may return:
-      - "HH:MM:SS"         (time only, assume today's date)
-      - "YYYY-MM-DD HH:MM:SS"
-      - ISO-8601 variants
-
-    Returns None if parsing fails.
-    """
-    if not time_str:
-        return None
-
-    time_str = time_str.strip()
-
-    # Try full ISO-8601 / datetime first
-    for fmt in (
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M:%SZ",
-        "%Y-%m-%dT%H:%M:%S%z",
-    ):
-        try:
-            dt = datetime.strptime(time_str, fmt)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt
-        except ValueError:
-            continue
-
-    # Try time-only formats (prepend today's date)
-    for fmt in ("%H:%M:%S", "%H:%M"):
-        try:
-            t = datetime.strptime(time_str, fmt).time()
-            d = datetime.strptime(date_fallback, "%Y-%m-%d").date()
-            return datetime.combine(d, t, tzinfo=timezone.utc)
-        except ValueError:
-            continue
-
-    # Try fromisoformat as a last resort
-    try:
-        dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, AttributeError):
-        pass
-
-    return None

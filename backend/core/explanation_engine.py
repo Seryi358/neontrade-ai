@@ -94,19 +94,18 @@ class ExplanationEngine:
             conclusion=f"El gráfico diario muestra una tendencia {htf_trend_es} con condición {htf_cond_es}.",
         ))
 
-        # 4H analysis
-        ema_4h_20 = analysis_result.ema_values.get("EMA_H4_20", None)
+        # 4H analysis — Mentoría: solo EMA 50 en H4
         ema_4h_50 = analysis_result.ema_values.get("EMA_H4_50", None)
         h4_obs = []
-        if ema_4h_20 and ema_4h_50:
-            if ema_4h_20 > ema_4h_50:
-                h4_obs.append("EMA 20 por encima de EMA 50 en 4H (estructura alcista)")
+        if ema_4h_50 and analysis_result.current_price:
+            if analysis_result.current_price > ema_4h_50:
+                h4_obs.append("Precio por encima de EMA 50 en 4H (estructura alcista)")
             else:
-                h4_obs.append("EMA 20 por debajo de EMA 50 en 4H (estructura bajista)")
+                h4_obs.append("Precio por debajo de EMA 50 en 4H (estructura bajista)")
 
         tf_explanations.append(TimeframeExplanation(
             timeframe="4 Horas (H4)",
-            trend=f"EMAs: {'alcista' if ema_4h_20 and ema_4h_50 and ema_4h_20 > ema_4h_50 else 'bajista'}",
+            trend=f"EMA 50: {'alcista' if ema_4h_50 and analysis_result.current_price and analysis_result.current_price > ema_4h_50 else 'bajista'}",
             key_observations=h4_obs,
             levels=[f"EMA 50 4H: {ema_4h_50:.5f}" if ema_4h_50 else "EMA 50 4H: no disponible"],
             patterns=[],
@@ -115,7 +114,6 @@ class ExplanationEngine:
 
         # 1H analysis
         ltf_trend_es = self.TREND_DESC.get(analysis_result.ltf_trend.value, "desconocido")
-        ema_h1_20 = analysis_result.ema_values.get("EMA_H1_20", None)
         ema_h1_50 = analysis_result.ema_values.get("EMA_H1_50", None)
 
         tf_explanations.append(TimeframeExplanation(

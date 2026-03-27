@@ -3,12 +3,12 @@ NeonTrade AI - Estrategias de Trading
 Implementacion completa de las 6 estrategias del curso TradingLab.
 
 Estrategias (por color):
-- BLUE:  Cambio de tendencia en 1H (Onda Elliott 1-2) - 3 variantes A/B/C
-- RED:   Cambio de tendencia en 4H (Onda Elliott 2-3)
-- PINK:  Continuacion por patron correctivo (Onda Elliott 4->5)
-- WHITE: Continuacion post-Pink (Onda 3 de Onda 5)
-- BLACK: Contratendencia / Anticipacion (Onda Elliott 1) - Mayor riesgo, mejor R:R
-- GREEN: Direccion semanal + Patron diario + Entrada 15M - Mas lucrativa (hasta 10:1 R:R)
+- BLUE:  Cambio de tendencia en 1H (Onda Elliott 1-2) - 3 variantes A/B/C (ranking: A > B > C)
+- RED:   Cambio de tendencia en 4H (Onda Elliott 2-3) - Requiere AMBAS EMA 50 1H y 4H rotas
+- PINK:  Continuacion por patron correctivo (Onda Elliott 4->5) - 1H EMA 50 rota, 4H NO rota
+- WHITE: Continuacion post-Pink (Onda 3 de Onda 5) - Entradas mas ajustadas, mayor win rate que Pink
+- BLACK: Contratendencia ONLY (Onda Elliott 1) - Requiere RSI div H4 + S/R diario. Min R:R 2.0:1
+- GREEN: Direccion semanal + Patron diario + Entrada 15M - UNICA estrategia para crypto. Hasta 10:1 R:R
 
 Cada estrategia implementa:
 - check_htf_conditions: Condiciones de marcos temporales altos
@@ -97,13 +97,18 @@ def _nearest_above(values: List[float], ref: float) -> Optional[float]:
 
 def _fib_zone_check(analysis: AnalysisResult, price: float, direction: str) -> Tuple[bool, str]:
     """
-    Verifica si el precio esta en zona Fibonacci 0.382-0.618.
+    Verifica si el precio esta en zona Fibonacci 0.382-0.618 (golden zone).
+    Tambien reconoce 0.750 como zona extendida (menor probabilidad de continuacion).
+    TradingLab: Pullbacks a 0.382, 0.500, 0.618 son estandar.
+    Mas alla de 2/3 (0.618), la probabilidad de continuacion disminuye.
+    0.750 se usa como referencia de zona extendida.
     Retorna (bool, descripcion).
     """
     fib = analysis.fibonacci_levels
     fib_382 = fib.get("0.382")
     fib_618 = fib.get("0.618")
     fib_500 = fib.get("0.5")
+    fib_750 = fib.get("0.750") or fib.get("0.75")
 
     if fib_382 is None or fib_618 is None:
         return False, "No hay niveles Fibonacci disponibles"
@@ -114,6 +119,17 @@ def _fib_zone_check(analysis: AnalysisResult, price: float, direction: str) -> T
     in_zone = low <= price <= high
     if in_zone:
         return True, f"Precio {price:.5f} en zona Fib 0.382-0.618 ({low:.5f} - {high:.5f})"
+
+    # Check extended zone (0.618-0.750): still valid but lower probability
+    if fib_750 is not None:
+        ext_low = min(fib_618, fib_750)
+        ext_high = max(fib_618, fib_750)
+        if ext_low <= price <= ext_high:
+            return True, (
+                f"Precio {price:.5f} en zona Fib extendida 0.618-0.750 "
+                f"({ext_low:.5f} - {ext_high:.5f}) - probabilidad reducida"
+            )
+
     return False, f"Precio {price:.5f} fuera de zona Fib ({low:.5f} - {high:.5f})"
 
 
@@ -167,8 +183,8 @@ def _is_at_key_level(analysis: AnalysisResult, direction: str) -> Tuple[bool, fl
     supports = analysis.key_levels.get("supports", [])
     resistances = analysis.key_levels.get("resistances", [])
 
-    # Usamos la EMA H1 20 como proxy del precio actual si esta disponible
-    current_price = _ema_val(analysis, "EMA_H1_20")
+    # Usamos la EMA H1 50 como proxy del precio actual si esta disponible
+    current_price = _ema_val(analysis, "EMA_H1_50")
     if current_price is None:
         # Fallback: usar EMA M5 5
         current_price = _ema_val(analysis, "EMA_M5_5")
@@ -274,7 +290,7 @@ def _check_ema_pullback(analysis: AnalysisResult, ema_key: str, direction: str) 
 
 def _get_current_price_proxy(analysis: AnalysisResult) -> Optional[float]:
     """Mejor estimacion del precio actual usando EMAs de marcos bajos."""
-    for key in ("EMA_M5_2", "EMA_M5_5", "EMA_M2_2", "EMA_M2_5", "EMA_M5_20", "EMA_H1_20"):
+    for key in ("EMA_M5_2", "EMA_M5_5", "EMA_M2_2", "EMA_M2_5", "EMA_M5_20", "EMA_H1_50"):
         v = _ema_val(analysis, key)
         if v is not None:
             return v
@@ -755,7 +771,7 @@ def _check_limit_entry_confluence(
             confluence_levels.append((fib_val, f"Fib {fib_key}"))
 
     # Check EMAs near price
-    for ema_key in ("EMA_H1_50", "EMA_H4_50", "EMA_H4_20"):
+    for ema_key in ("EMA_H1_50", "EMA_H4_50"):
         ema_v = _ema_val(analysis, ema_key)
         if ema_v and abs(entry_price - ema_v) < tolerance:
             confluence_levels.append((ema_v, ema_key))
@@ -889,15 +905,31 @@ def _check_stop_entry_opportunity(
         return True, stop_price, desc
 
 
+# Crypto instrument prefixes (TradingLab: GREEN is the ONLY strategy for crypto)
+_CRYPTO_PREFIXES = (
+    "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
+    "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB",
+    "FTM", "ALGO", "XLM", "EOS", "XTZ", "VET",
+)
+
+
+def _is_crypto_instrument(instrument: str) -> bool:
+    """
+    Check if an instrument is a crypto pair.
+    TradingLab: GREEN is the ONLY strategy valid for crypto trading.
+    """
+    return any(instrument.upper().startswith(p) for p in _CRYPTO_PREFIXES)
+
+
 def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
     """
     Clasifica la variante Blue (A, B, C) revisando condiciones en 4H.
-    A: Doble suelo/techo antes de rompimiento (mas efectiva)
-    B: Sin patron, solo rompimiento (mas comun)
-    C: Rechazo de EMA 4H antes del pullback (mas riesgosa)
+    TradingLab confidence ranking: A > B > C
+    A: Double bottom/reversal pattern BEFORE breaking 1H EMA 50 (most effective, HIGHEST confidence bonus +10)
+    B: Simple impulse-pullback with no prior reversal pattern (neutral, no bonus)
+    C: Breaks 1H EMA 50 but rejects 4H EMA 50 BEFORE pullback (most restrictive, LOWEST confidence -5)
     """
     ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
-    ema_4h_20 = _ema_val(analysis, "EMA_H4_20")
     patterns = analysis.candlestick_patterns
 
     # Variante A: doble suelo/techo (detectamos por patrones de reversal repetidos)
@@ -1146,10 +1178,10 @@ class BlueStrategy(BaseStrategy):
     """
     BLUE Strategy - Cambio de Tendencia en 1H (Onda Elliott 1-2)
 
-    Tres variantes:
-    - Blue A: Doble suelo/techo antes del rompimiento (mas efectiva)
-    - Blue B: Sin patron, solo rompimiento (mas comun)
-    - Blue C: Rechazo de EMA 4H antes del pullback (mas riesgosa)
+    Tres variantes (confidence ranking: A > B > C):
+    - Blue A: Double bottom/reversal pattern BEFORE breaking 1H EMA 50 (most effective, +10 bonus)
+    - Blue B: Simple impulse-pullback with no prior reversal pattern (neutral, no bonus)
+    - Blue C: Breaks 1H EMA 50 but rejects 4H EMA 50 BEFORE pullback (most restrictive, -5 penalty)
 
     7 Pasos:
     1. Nivel S/R diario (soporte para long, resistencia para short)
@@ -1441,7 +1473,7 @@ class BlueStrategy(BaseStrategy):
         # BLUE TP_max = EMA 4H (Trading Plan rule: "BLUE: TP maximo = EMA 4H")
         tp1 = result.get("tp1")
         if tp1:
-            ema_h4 = _ema_val(analysis, "EMA_H4_50") or _ema_val(analysis, "EMA_H4_20")
+            ema_h4 = _ema_val(analysis, "EMA_H4_50")
             if ema_h4 and direction == "BUY" and ema_h4 > tp1:
                 result["tp_max"] = ema_h4
             elif ema_h4 and direction == "SELL" and ema_h4 < tp1:
@@ -1468,10 +1500,13 @@ class RedStrategy(BaseStrategy):
     """
     RED Strategy - Cambio de Tendencia en 4H (Onda Elliott 2-3)
 
+    TradingLab: RED requires BOTH 1H AND 4H EMA 50 broken.
+    Used for Wave 3 (target up to 1.618 extension) or Wave 5.
+
     7 Pasos:
     1. Nivel S/R diario
     2. Precio ataca y desacelera en diario
-    3. Bajar a 4H: cambio de tendencia confirmado (EMA 50 4H rota + maximos mas altos + diagonales)
+    3. AMBAS EMA 50 1H y EMA 50 4H rotas (maximos mas altos + diagonales)
     4. Bajar a 1H: pullback a EMA 50 1H + EMA 50 4H + Fibonacci
     5. Desaceleracion en 1H
     6. Bajar a 5M: ejecutar en rompimiento+cierre+confirmacion de diagonal
@@ -1514,13 +1549,25 @@ class RedStrategy(BaseStrategy):
         else:
             failed.append("Paso 2: Sin desaceleracion clara en diario")
 
-        # --- Paso 3: Cambio de tendencia en 4H (EMA 50 4H rota) ---
+        # --- Paso 3: Cambio de tendencia en 4H Y 1H (AMBAS EMA 50 rotas) ---
+        # TradingLab: RED requires BOTH 1H AND 4H EMA 50 broken.
+        # Used for Wave 3 (target up to 1.618 extension) or Wave 5.
         ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", direction)
-        if ema_4h_break:
-            score += 20.0
-            met.append(f"Paso 3: {ema_4h_desc}")
+        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", direction)
+
+        if ema_1h_break:
+            score += 10.0
+            met.append(f"Paso 3a: EMA 50 1H rota - {ema_1h_desc}")
         else:
-            failed.append(f"Paso 3: {ema_4h_desc}")
+            failed.append(f"Paso 3a: EMA 50 1H NO rota - {ema_1h_desc}")
+            # Sin rompimiento de EMA 50 1H, Red no es valida
+            return False, score, met, failed
+
+        if ema_4h_break:
+            score += 10.0
+            met.append(f"Paso 3b: EMA 50 4H rota - {ema_4h_desc}")
+        else:
+            failed.append(f"Paso 3b: EMA 50 4H NO rota - {ema_4h_desc}")
             # Sin rompimiento de EMA 50 4H, Red no es valida
             return False, score, met, failed
 
@@ -1757,10 +1804,13 @@ class PinkStrategy(BaseStrategy):
     """
     PINK Strategy - Continuacion por Patron Correctivo (Onda Elliott 4->5)
 
+    TradingLab key condition: 1H EMA 50 breaks BUT 4H EMA 50 does NOT break.
+    This differentiates PINK from RED (which requires BOTH 1H and 4H to break).
+
     6 Pasos:
     1. Nivel S/R diario O tendencia clara desarrollada
     2. Alineacion de tendencia en 4H y 1H
-    3. EMA 50 4H rota y luego pullback a ella (EMA 4H NO rota de vuelta)
+    3. EMA 50 1H rota PERO EMA 50 4H NO rota (condicion clave PINK)
     4. Bajar a 1H: EMA 50 1H se rompe PERO en patron correctivo (cuna/triangulo/canal)
     5. Ejecutar al FINAL del patron cuando 5M rompe (diagonal/patron en porcion final)
     6. SL debajo del minimo anterior (proteger el patron). TP en maximo anterior
@@ -1810,22 +1860,29 @@ class PinkStrategy(BaseStrategy):
             failed.append("Paso 2: Tendencia NO alineada entre 4H y 1H")
             # No es descalificante pero importante
 
-        # --- Paso 3: EMA 50 4H rota y luego pullback (EMA 4H NO rota de vuelta) ---
-        # La EMA 50 4H debe haber sido rota previamente (precio al lado correcto)
+        # --- Paso 3: PINK key condition ---
+        # TradingLab: 1H EMA 50 breaks BUT 4H EMA 50 does NOT break.
+        # This differentiates PINK from RED (which requires BOTH to break).
+        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", direction)
         ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", direction)
-        if ema_4h_break:
-            score += 15.0
-            met.append(f"Paso 3a: EMA 50 4H rota previamente - {ema_4h_desc}")
 
-            # Verificar que estamos en pullback (cerca de la EMA pero sin cruzarla de vuelta)
-            pb_ok, pb_desc = _check_ema_pullback(analysis, "EMA_H4_50", direction)
-            if pb_ok:
-                score += 10.0
-                met.append(f"Paso 3b: Pullback a EMA 50 4H - {pb_desc}")
-            else:
-                met.append("Paso 3b: No en pullback a EMA 4H (puede estar en impulso)")
+        # 1H EMA 50 must be broken (corrective pattern broke it)
+        if ema_1h_break:
+            score += 15.0
+            met.append(f"Paso 3a: EMA 50 1H rota - {ema_1h_desc}")
         else:
-            failed.append(f"Paso 3: EMA 50 4H NO rota - {ema_4h_desc}")
+            failed.append(f"Paso 3a: EMA 50 1H NO rota - {ema_1h_desc}")
+            return False, score, met, failed
+
+        # 4H EMA 50 must NOT be broken (if it were, this would be RED, not PINK)
+        if not ema_4h_break:
+            score += 10.0
+            met.append(f"Paso 3b: EMA 50 4H NO rota (condicion PINK) - {ema_4h_desc}")
+        else:
+            failed.append(
+                f"Paso 3b: EMA 50 4H ROTA - {ema_4h_desc} "
+                f"(esto es RED, no PINK)"
+            )
             return False, score, met, failed
 
         passed = score >= 25.0
@@ -2030,6 +2087,9 @@ class PinkStrategy(BaseStrategy):
 class WhiteStrategy(BaseStrategy):
     """
     WHITE Strategy - Continuacion Post-Pink (Onda 3 de Onda 5)
+
+    TradingLab: WHITE capitalizes on Wave 3 of Wave 5 (sub-structure).
+    Tighter entries and higher win rate than Pink.
 
     6 Pasos:
     1. Debe venir de un setup PINK completado
@@ -2303,19 +2363,14 @@ class WhiteStrategy(BaseStrategy):
                 if below_tp1:
                     result["tp_max"] = min(below_tp1)
 
-        # Fallback: EMA H4 approximation if no S/R levels found for tp_max
+        # Fallback: EMA H4 50 as tp_max if no S/R levels found
         if "tp_max" not in result and tp1:
             ema_h4_50 = _ema_val(analysis, "EMA_H4_50")
-            ema_h4_20 = _ema_val(analysis, "EMA_H4_20")
-            if ema_h4_50 and ema_h4_20:
-                if direction == "BUY":
-                    impulse_max = ema_h4_20 + abs(ema_h4_20 - ema_h4_50) * 2.0
-                    if impulse_max > tp1:
-                        result["tp_max"] = impulse_max
-                else:
-                    impulse_min = ema_h4_20 - abs(ema_h4_20 - ema_h4_50) * 2.0
-                    if impulse_min < tp1:
-                        result["tp_max"] = impulse_min
+            if ema_h4_50:
+                if direction == "BUY" and ema_h4_50 > tp1:
+                    result["tp_max"] = ema_h4_50
+                elif direction == "SELL" and ema_h4_50 < tp1:
+                    result["tp_max"] = ema_h4_50
 
         return result
 
@@ -2326,8 +2381,14 @@ class WhiteStrategy(BaseStrategy):
 
 class BlackStrategy(BaseStrategy):
     """
-    BLACK Strategy - Contratendencia / Anticipacion (Onda Elliott 1)
-    La mas riesgosa pero con mejor R:R promedio (2.80:1)
+    BLACK Strategy - Contratendencia ONLY / Anticipacion (Onda Elliott 1)
+    La mas riesgosa pero con mejor R:R promedio (~2.80:1)
+
+    TradingLab REQUIREMENTS:
+    - Counter-trend ONLY (trades against the current trend)
+    - Min R:R must be 2.0:1 (mentorship avg ~2.80:1)
+    - REQUIRES RSI divergence on H4 (non-negotiable)
+    - REQUIRES daily S/R level (non-negotiable)
 
     7 Pasos:
     1. Nivel S/R diario (OBLIGATORIO, no negociable)
@@ -2335,7 +2396,7 @@ class BlackStrategy(BaseStrategy):
     3. Desaceleracion/senales de reversal en diario
     4. 4H sobrecompra: precio lejos de EMA 50 4H + consolidacion/desaceleracion
     5. 1H: patron de reversal (triangulo/cuna). EMA 50 1H NO debe actuar como S/R dinamico.
-       Verificar divergencia RSI en 4H
+       Divergencia RSI en 4H (OBLIGATORIO)
     6. Esperar que el patron se complete, buscar patron de velas de reversal,
        luego ejecutar en rompimiento 5M
     7. SL encima del maximo anterior. TP en EMA 50 4H. R:R MINIMO de 2:1
@@ -2461,17 +2522,20 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 5b: {rev_desc}")
 
-        # RSI Divergence on H4 (REQUIRED confirmation for Black - ch15.14)
+        # RSI Divergence on H4 (REQUIRED for Black - TradingLab mentorship)
+        # TradingLab: BLACK requires RSI divergence on H4 as confirmation
         rsi_div = analysis.rsi_divergence
         if rsi_div:
             expected_div = "bullish" if direction == "BUY" else "bearish"
             if rsi_div == expected_div:
                 confidence += 15.0
-                met.append(f"Paso 5c: Divergencia RSI {rsi_div} detectada en 4H (CONFIRMACION)")
+                met.append(f"Paso 5c: Divergencia RSI {rsi_div} detectada en 4H (CONFIRMACION OBLIGATORIA)")
             else:
                 failed.append(f"Paso 5c: Divergencia RSI {rsi_div} no coincide con {direction}")
+                return None  # Wrong divergence direction = no Black trade
         else:
-            failed.append("Paso 5c: Sin divergencia RSI en 4H (confirmacion debil)")
+            failed.append("Paso 5c: Sin divergencia RSI en 4H (OBLIGATORIO para BLACK)")
+            return None  # No RSI divergence = no Black trade
 
         # Consolidacion (patron correctivo formandose)
         if "DOJI" in analysis.candlestick_patterns:
@@ -2640,6 +2704,12 @@ class GreenStrategy(BaseStrategy):
     """
     GREEN Strategy - Direccion Semanal + Patron Diario + Entrada 15M
     La mas lucrativa (hasta 10:1 R:R)
+    TradingLab: GREEN is the ONLY strategy valid for crypto trading.
+
+    Timeframes por estilo de trading:
+    - Swing:       Weekly (trend) -> Daily (pattern) -> 1H (diagonal) -> 15M (execution)
+    - Day Trading: 4H (trend) -> 1H (pattern) -> 15M (diagonal) -> 2M (execution)
+    - Scalping:    15M (trend) -> 5M (pattern) -> 1M (diagonal) -> 30s (execution)
 
     6 Pasos:
     1. Direccion de tendencia semanal (alcista/bajista)
@@ -2731,8 +2801,8 @@ class GreenStrategy(BaseStrategy):
         if direction is None:
             return None
 
-        # TradingLab: Volume confirmation on M15 (Green executes on 15M)
-        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M15")
+        # TradingLab: Volume confirmation (market_analyzer calculates for H1 and M5 only)
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
         if not vol_ok:
             return None  # No entry without volume confirmation
 
@@ -3025,8 +3095,21 @@ def detect_all_setups(
     """
     signals: List[SetupSignal] = []
 
+    # TradingLab: GREEN is the ONLY strategy for crypto instruments.
+    # Skip BLUE, RED, PINK, WHITE, BLACK for crypto.
+    is_crypto = _is_crypto_instrument(analysis.instrument)
+    if is_crypto:
+        logger.info(
+            f"[CRYPTO] {analysis.instrument} detected as crypto - "
+            f"only GREEN strategy will be evaluated"
+        )
+
     for strategy in ALL_STRATEGIES:
         color = strategy.color.value  # e.g. "BLUE", "RED"
+
+        # TradingLab: For crypto, only evaluate GREEN
+        if is_crypto and strategy.color != StrategyColor.GREEN:
+            continue
 
         # Filter by enabled strategies
         if enabled_strategies is not None:

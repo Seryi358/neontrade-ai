@@ -10,16 +10,46 @@ Data sources (in priority order):
 Supplementary:
   - NewsAPI.org - Forex news headlines for the UI (does NOT block trades)
 
-Rules from Trading Plan:
-- Don't trade 30 min before major news
-- Don't trade 15 min after major news
+Rules from Mentorship (style-dependent):
+- SCALPING:    Do NOT trade during news. Period. Spread and slippage make it
+               impossible. Block at least 60 min before and 60 min after.
+- DAY TRADING: Do not open new positions 30 min before / 15 min after.
+               Existing positions should be moved to break-even.
+- SWING:       Exercise extreme caution, but can potentially execute.
+               15 min before / 5 min after.
+
+Most Important Events (highest impact):
+- Interest Rates / FOMC / ECB / BOE decisions (8 times/year)
+- Unemployment Rate (monthly)
+- GDP (quarterly)
+- CPI / Inflation (monthly)
+- Non-Farm Payrolls (monthly)
 """
 
 import httpx
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
+from enum import Enum
 from loguru import logger
+
+
+class TradingStyle(str, Enum):
+    """Trading style — determines news-window strictness."""
+    SCALPING = "scalping"
+    DAY_TRADING = "day_trading"
+    SWING = "swing"
+
+
+# Per-style danger windows (minutes_before, minutes_after)
+NEWS_WINDOWS: Dict[TradingStyle, Tuple[int, int]] = {
+    # Mentorship: "Do NOT trade during news. Period." for scalping
+    TradingStyle.SCALPING: (60, 60),
+    # Mentorship: Don't open new positions; move existing to break-even
+    TradingStyle.DAY_TRADING: (30, 15),
+    # Mentorship: Exercise extreme caution but can potentially execute
+    TradingStyle.SWING: (15, 5),
+}
 
 
 @dataclass
@@ -31,6 +61,31 @@ class NewsEvent:
     title: str
 
 
+# Titles that mark the MOST important events from the mentorship.
+# These are the ones that move the market hardest and should never be ignored.
+CRITICAL_EVENT_KEYWORDS: List[str] = [
+    "interest rate",
+    "rate decision",
+    "fomc",
+    "ecb rate",
+    "boe rate",
+    "unemployment rate",
+    "gdp",
+    "cpi",
+    "inflation",
+    "non-farm payrolls",
+    "nonfarm payrolls",
+    "non farm payrolls",
+    "nfp",
+]
+
+
+def is_critical_event(title: str) -> bool:
+    """Return True if *title* matches one of the most-important mentorship events."""
+    lower = title.lower()
+    return any(kw in lower for kw in CRITICAL_EVENT_KEYWORDS)
+
+
 # Known recurring high-impact events and their typical UTC hours.
 # These happen on roughly predictable schedules.
 RECURRING_HIGH_IMPACT = [
@@ -39,6 +94,8 @@ RECURRING_HIGH_IMPACT = [
     {"currency": "USD", "title": "CPI", "day": "mid_month", "hour": 13, "minute": 30},
     {"currency": "USD", "title": "FOMC Rate Decision", "day": "fomc", "hour": 19, "minute": 0},
     {"currency": "USD", "title": "Fed Chair Press Conference", "day": "fomc", "hour": 19, "minute": 30},
+    {"currency": "USD", "title": "Unemployment Rate", "day": "first_friday", "hour": 13, "minute": 30},
+    {"currency": "USD", "title": "GDP", "day": "gdp", "hour": 13, "minute": 30},
     # EUR events
     {"currency": "EUR", "title": "ECB Rate Decision", "day": "ecb", "hour": 13, "minute": 15},
     # GBP events
@@ -58,17 +115,32 @@ _FE_MEDIUM_IMPACT = {"Medium"}
 
 
 class NewsFilter:
-    """Checks for upcoming high-impact news events."""
+    """Checks for upcoming high-impact news events.
+
+    The danger window around news is determined by the *trading_style*:
+      - SCALPING:    60 min before / 60 min after  (spread + slippage = impossible)
+      - DAY_TRADING: 30 min before / 15 min after  (no new positions; move to BE)
+      - SWING:       15 min before /  5 min after   (extreme caution)
+
+    You can also override the window via explicit *minutes_before* / *minutes_after*
+    parameters, but the recommended approach is to pass a *trading_style*.
+    """
 
     def __init__(
         self,
-        minutes_before: int = 30,
-        minutes_after: int = 15,
+        trading_style: TradingStyle = TradingStyle.DAY_TRADING,
+        minutes_before: Optional[int] = None,
+        minutes_after: Optional[int] = None,
         finnhub_key: str = "",
         newsapi_key: str = "",
     ):
-        self.minutes_before = minutes_before
-        self.minutes_after = minutes_after
+        self.trading_style = trading_style
+
+        # Use the style-specific window unless explicitly overridden
+        default_before, default_after = NEWS_WINDOWS[trading_style]
+        self.minutes_before = minutes_before if minutes_before is not None else default_before
+        self.minutes_after = minutes_after if minutes_after is not None else default_after
+
         self.newsapi_key = newsapi_key
         self._cached_events: List[NewsEvent] = []
         self._cache_date: Optional[str] = None
@@ -78,9 +150,23 @@ class NewsFilter:
     # Public API
     # ------------------------------------------------------------------
 
-    async def has_upcoming_news(self, instrument: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+    async def has_upcoming_news(
+        self,
+        instrument: Optional[str] = None,
+        trading_style: Optional[TradingStyle] = None,
+    ) -> Tuple[bool, Optional[str]]:
         """
         Check if there's a high-impact news event near the current time.
+
+        Parameters
+        ----------
+        instrument : str, optional
+            Currency pair (e.g. "EUR_USD").  When provided, only events
+            affecting those currencies are considered.
+        trading_style : TradingStyle, optional
+            Override the instance-level style for this single check.
+            Useful when the same NewsFilter serves multiple strategies.
+
         Returns (has_news, event_description).
         """
         now = datetime.now(timezone.utc)
@@ -90,6 +176,10 @@ class NewsFilter:
         if self._cache_date != today:
             await self._refresh_calendar(now)
             self._cache_date = today
+
+        # Resolve which window to use
+        style = trading_style or self.trading_style
+        win_before, win_after = NEWS_WINDOWS[style]
 
         # Filter by instrument currencies if provided
         currencies = WATCHED_CURRENCIES
@@ -109,20 +199,62 @@ class NewsFilter:
             time_since = (now - event.time).total_seconds() / 60
 
             # Within the danger zone?
-            if -self.minutes_after <= time_until <= self.minutes_before:
-                desc = f"{event.currency} {event.title} @ {event.time.strftime('%H:%M')} UTC"
+            if -win_after <= time_until <= win_before:
+                reason = self._style_reason(style, event)
+                desc = (
+                    f"[{style.value.upper()}] {event.currency} {event.title} "
+                    f"@ {event.time.strftime('%H:%M')} UTC — {reason}"
+                )
                 return True, desc
 
-            if 0 <= time_since <= self.minutes_after:
-                desc = f"{event.currency} {event.title} (just happened @ {event.time.strftime('%H:%M')} UTC)"
+            if 0 <= time_since <= win_after:
+                reason = self._style_reason(style, event)
+                desc = (
+                    f"[{style.value.upper()}] {event.currency} {event.title} "
+                    f"(just happened @ {event.time.strftime('%H:%M')} UTC) — {reason}"
+                )
                 return True, desc
 
         return False, None
 
-    async def should_close_for_news(self, instrument: str) -> Tuple[bool, str]:
-        """Check if an existing position on this instrument should be closed due to upcoming news.
+    # ------------------------------------------------------------------
+    # Style-specific advice string
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _style_reason(style: TradingStyle, event: NewsEvent) -> str:
+        """Return a human-readable reason why the filter blocked, per style."""
+        critical = is_critical_event(event.title)
+        if style == TradingStyle.SCALPING:
+            return (
+                "Do NOT trade during news (spread + slippage). "
+                "Scalping is blocked."
+            )
+        elif style == TradingStyle.DAY_TRADING:
+            extra = " This is a CRITICAL event." if critical else ""
+            return (
+                "No new positions. Move existing trades to break-even."
+                + extra
+            )
+        else:  # SWING
+            extra = " This is a CRITICAL event — consider staying out." if critical else ""
+            return "Exercise extreme caution." + extra
+
+    async def should_close_for_news(
+        self,
+        instrument: str,
+        trading_style: Optional[TradingStyle] = None,
+    ) -> Tuple[bool, str]:
+        """Check if an existing position on this instrument should be closed
+        (or moved to break-even) due to upcoming news.
+
         Trading Plan: 'Cerrar trades antes de noticias importantes'
-        Only triggers for HIGH impact events within the danger window."""
+        Only triggers for HIGH impact events within the danger window.
+
+        For SCALPING the recommendation is always to close.
+        For DAY_TRADING the recommendation is to move to break-even.
+        For SWING positions can generally stay open with caution.
+        """
         now = datetime.now(timezone.utc)
 
         # Refresh calendar cache once per day
@@ -130,6 +262,9 @@ class NewsFilter:
         if self._cache_date != today:
             await self._refresh_calendar(now)
             self._cache_date = today
+
+        style = trading_style or self.trading_style
+        win_before, _win_after = NEWS_WINDOWS[style]
 
         currencies = self._extract_currencies(instrument)
 
@@ -140,8 +275,11 @@ class NewsFilter:
             if event.currency.upper() not in currencies:
                 continue
             minutes_until = (event.time - now).total_seconds() / 60
-            if 0 < minutes_until <= self.minutes_before:
-                return True, f"High-impact news: {event.title} in {int(minutes_until)}min"
+            if 0 < minutes_until <= win_before:
+                reason = self._style_reason(style, event)
+                return True, (
+                    f"High-impact news: {event.title} in {int(minutes_until)}min — {reason}"
+                )
 
         return False, ""
 
@@ -355,12 +493,21 @@ class NewsFilter:
     # ------------------------------------------------------------------
 
     def _generate_known_events(self, now: datetime) -> List[NewsEvent]:
-        """Generate events from known recurring schedule as fallback."""
+        """Generate events from known recurring schedule as fallback.
+
+        Covers the five most-important mentorship events:
+          - Non-Farm Payrolls (first Friday)
+          - Unemployment Rate  (first Friday, same release as NFP)
+          - CPI / Inflation    (around 10th-14th)
+          - GDP                (around 25th-28th, quarterly)
+          - Interest Rate decisions are covered via FOMC/ECB/BOE entries
+            in RECURRING_HIGH_IMPACT but also generated here for safety.
+        """
         events = []
         today = now.date()
         weekday = now.weekday()  # 0=Monday
 
-        # NFP: First Friday of the month
+        # NFP + Unemployment Rate: First Friday of the month
         if weekday == 4 and today.day <= 7:
             events.append(NewsEvent(
                 time=datetime(today.year, today.month, today.day, 13, 30, tzinfo=timezone.utc),
@@ -368,14 +515,29 @@ class NewsFilter:
                 impact="high",
                 title="Non-Farm Payrolls (estimated)",
             ))
+            events.append(NewsEvent(
+                time=datetime(today.year, today.month, today.day, 13, 30, tzinfo=timezone.utc),
+                currency="USD",
+                impact="high",
+                title="Unemployment Rate (estimated)",
+            ))
 
-        # US CPI: Usually around 10th-14th of month
+        # US CPI / Inflation: Usually around 10th-14th of month
         if 10 <= today.day <= 14 and weekday < 5:
             events.append(NewsEvent(
                 time=datetime(today.year, today.month, today.day, 13, 30, tzinfo=timezone.utc),
                 currency="USD",
                 impact="high",
-                title="CPI (estimated window)",
+                title="CPI / Inflation (estimated window)",
+            ))
+
+        # US GDP: Quarterly, typically released around the 25th-28th
+        if 25 <= today.day <= 28 and weekday < 5 and today.month in (1, 4, 7, 10):
+            events.append(NewsEvent(
+                time=datetime(today.year, today.month, today.day, 13, 30, tzinfo=timezone.utc),
+                currency="USD",
+                impact="high",
+                title="GDP (estimated quarterly window)",
             ))
 
         return events

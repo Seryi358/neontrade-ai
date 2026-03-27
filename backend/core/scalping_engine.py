@@ -343,10 +343,8 @@ class ScalpingAnalyzer:
             ema_values["EMA_D_20"] = scalp_data.ema50_h1    # fallback
         if scalp_data.ema50_m15 is not None:
             ema_values["EMA_H4_50"] = scalp_data.ema50_m15  # M15 -> H4 slot
-            ema_values["EMA_H4_20"] = scalp_data.ema50_m15
         if scalp_data.ema50_m5 is not None:
             ema_values["EMA_H1_50"] = scalp_data.ema50_m5   # M5 -> H1 slot
-            ema_values["EMA_H1_20"] = scalp_data.ema50_m5
         if scalp_data.ema50_m1 is not None:
             ema_values["EMA_M5_20"] = scalp_data.ema50_m1   # M1 -> M5 slot
 

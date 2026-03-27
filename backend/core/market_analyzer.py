@@ -601,10 +601,10 @@ class MarketAnalyzer:
         """Calculate EMA values for multiple timeframes."""
         emas = {}
         ema_configs = {
-            "W": [8],
+            "W": [8, 50],
             "D": [20, 50],
-            "H4": [20, 50],
-            "H1": [20, 50],
+            "H4": [50],
+            "H1": [50],
             "M15": [5, 20, 50],
             "M5": [2, 5, 20, 50],
             "M2": [2, 5, 50],
@@ -638,10 +638,12 @@ class MarketAnalyzer:
             "0.382": swing_high - diff * 0.382,
             "0.5": swing_high - diff * 0.5,
             "0.618": swing_high - diff * 0.618,
-            "0.786": swing_high - diff * 0.786,
+            "0.750": swing_high - diff * 0.750,
             "1.0": swing_low,
-            "1.272": swing_low - diff * 0.272,  # Extension
-            "1.618": swing_low - diff * 0.618,  # Extension
+            "ext_0.618": swing_low - diff * 0.618,  # Extension
+            "ext_1.0": swing_low - diff * 1.0,  # Extension
+            "ext_1.272": swing_low - diff * 1.272,  # Extension
+            "ext_1.618": swing_low - diff * 1.618,  # Extension
         }
 
     def _detect_candlestick_patterns(self, df: pd.DataFrame) -> List[str]:

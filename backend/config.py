@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # 0.5%
-    risk_swing: float = 0.03             # 3%
+    risk_swing: float = 0.01             # Mentoría: 1% para todos los estilos
     max_total_risk: float = 0.07          # 7% max simultaneous open risk
 
     # Correlated pairs risk reduction (ch18.3)
@@ -90,9 +90,9 @@ class Settings(BaseSettings):
     correlated_risk_factor: float = 0.75
 
     # Minimum reward:risk ratio to TP1 (ch22.1 Trading Plan)
-    # 0.80 based on Alex's 61% win rate. If your win rate is <50%, use 1.0+
+    # Mentoría: R:R mínimo ~2.5:1 para principiantes
     # BLACK and GREEN enforce their own minimum of 2.0 separately
-    min_rr_ratio: float = 0.80
+    min_rr_ratio: float = 2.0
     min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R
 
@@ -109,9 +109,9 @@ class Settings(BaseSettings):
     #          "fixed_levels" (step-down at DD thresholds, most conservative)
     drawdown_method: str = "fixed_1pct"
     # Fixed levels: reduce risk at these drawdown thresholds
-    drawdown_level_1: float = 0.0412  # -4.12% DD -> 0.75% risk
-    drawdown_level_2: float = 0.0618  # -6.18% DD -> 0.50% risk
-    drawdown_level_3: float = 0.0824  # -8.24% DD -> 0.25% risk
+    drawdown_level_1: float = 0.05    # -5% DD -> 0.75% risk
+    drawdown_level_2: float = 0.075   # -7.5% DD -> 0.50% risk
+    drawdown_level_3: float = 0.10    # -10% DD -> 0.25% risk (funded account max)
     drawdown_risk_1: float = 0.0075   # 0.75% at level 1
     drawdown_risk_2: float = 0.005    # 0.50% at level 2
     drawdown_risk_3: float = 0.0025   # 0.25% at level 3
@@ -229,6 +229,8 @@ class Settings(BaseSettings):
     ]
 
     # Crypto — separate allocation per Trading Plan (10% of trading capital)
+    # Mentoría: GREEN es la ÚNICA estrategia para crypto
+    crypto_default_strategy: str = "GREEN"
     crypto_watchlist: List[str] = [
         # TradingLab allocation: 70% BTC, 20% ETH, 10% altcoins
         "BTC_USD", "ETH_USD", "SOL_USD", "ADA_USD", "DOT_USD",
@@ -242,11 +244,11 @@ class Settings(BaseSettings):
     active_watchlist_categories: List[str] = ["forex"]
 
     # ── Capital Allocation (ch18.5 + Trading Plan) ────────────────
-    # Alex's split: 80% trading, 20% long-term investment
-    allocation_trading_pct: float = 0.80     # 80% in trading accounts
-    allocation_forex_pct: float = 0.90       # 90% forex/indices/metals
-    allocation_crypto_pct: float = 0.10      # 10% crypto
-    allocation_investment_pct: float = 0.20  # 20% long-term
+    # Mentoría: 70% trading, 20% inversión, 10% cripto
+    allocation_trading_pct: float = 0.70     # 70% in trading accounts
+    allocation_forex_pct: float = 0.70       # 70% forex/indices/metals (within trading)
+    allocation_crypto_pct: float = 0.10      # 10% crypto (within trading)
+    allocation_investment_pct: float = 0.20  # 20% long-term (stocks/ETFs)
     allocation_investment_stocks: float = 0.80  # 80% stocks/ETFs (70% VT/S&P500, 30% sectors)
     allocation_investment_crypto: float = 0.20  # 20% crypto (70% BTC, 20% ETH, 10% alts)
 

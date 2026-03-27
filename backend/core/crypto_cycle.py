@@ -68,7 +68,18 @@ class CryptoCycleAnalyzer:
         return cycle
 
     async def _analyze_dominance(self, cycle: CryptoMarketCycle):
-        """Estimate BTC dominance trend from relative price performance."""
+        """Estimate BTC dominance (BTC.D) and trend from relative price performance.
+
+        BTC Dominance thresholds (from TradingLab mentorship):
+          - BTC.D > 50%: money primarily in Bitcoin, stability, low altcoin speculation
+          - BTC.D < 40%: increased altcoin interest, more speculation, potential altseason
+          - BTC.D 40-50%: neutral / transitional zone
+
+        Altcoin season definition: begins when >75 of the top 100 coins
+        outperform Bitcoin over the trailing period.  We approximate this
+        with relative BTC-vs-alts performance since we don't have a full
+        top-100 scanner here.
+        """
         if not self.broker:
             return
         try:
@@ -79,19 +90,39 @@ class CryptoCycleAnalyzer:
             if btc_candles and eth_candles and len(btc_candles) >= 20 and len(eth_candles) >= 20:
                 btc_perf_7d = (btc_candles[-1].close - btc_candles[-7].close) / btc_candles[-7].close
                 eth_perf_7d = (eth_candles[-1].close - eth_candles[-7].close) / eth_candles[-7].close
-                btc_perf_30d = (btc_candles[-1].close - btc_candles[0].close) / btc_candles[0].close
-                eth_perf_30d = (eth_candles[-1].close - eth_candles[0].close) / eth_candles[0].close
 
-                # If alts outperform BTC significantly, dominance is falling (altseason)
+                # Store on cycle object so get_dominance_transition() can access them
+                cycle._btc_perf_7d = btc_perf_7d
+                cycle._eth_perf_7d = eth_perf_7d
+
+                # Determine BTC dominance trend from relative performance.
+                # If alts outperform BTC significantly, dominance is falling.
                 if eth_perf_7d > btc_perf_7d + 0.03:  # ETH outperforms by 3%+
                     cycle.btc_dominance_trend = "falling"
-                    cycle.altcoin_season = True
                 elif btc_perf_7d > eth_perf_7d + 0.03:
                     cycle.btc_dominance_trend = "rising"
-                    cycle.altcoin_season = False
                 else:
                     cycle.btc_dominance_trend = "stable"
-                    cycle.altcoin_season = False
+
+                # If an actual BTC.D percentage is available, use mentorship thresholds.
+                if cycle.btc_dominance is not None:
+                    if cycle.btc_dominance > 50:
+                        # BTC.D > 50%: money in Bitcoin, low altcoin speculation
+                        cycle.btc_eth_trend = "btc_leading"
+                        cycle.altcoin_season = False
+                    elif cycle.btc_dominance < 40:
+                        # BTC.D < 40%: altcoin interest rising, potential altseason
+                        cycle.btc_eth_trend = "eth_leading"
+                        cycle.altcoin_season = True
+                    else:
+                        # BTC.D 40-50%: neutral / transitional zone
+                        cycle.btc_eth_trend = "neutral"
+                        cycle.altcoin_season = False
+                else:
+                    # Fallback: infer altcoin season from relative performance
+                    # (approximates the >75/100 coins outperforming BTC rule)
+                    cycle.altcoin_season = (cycle.btc_dominance_trend == "falling")
+
         except Exception as e:
             logger.debug(f"Dominance analysis failed: {e}")
 
@@ -104,15 +135,53 @@ class CryptoCycleAnalyzer:
             eth_price = await self.broker.get_current_price("ETH_USD")
             if btc_price and eth_price and eth_price.bid > 0:
                 cycle.btc_eth_ratio = btc_price.bid / eth_price.bid
-                # Compare with historical average (~15-20)
-                if cycle.btc_eth_ratio > 20:
-                    cycle.btc_eth_trend = "btc_leading"
-                elif cycle.btc_eth_ratio < 12:
-                    cycle.btc_eth_trend = "eth_leading"
-                else:
-                    cycle.btc_eth_trend = "neutral"
         except Exception as e:
             logger.debug(f"BTC/ETH analysis failed: {e}")
+
+    def get_dominance_transition(self, cycle: CryptoMarketCycle) -> Dict[str, str]:
+        """Determine altcoin outlook from BTC dominance trend + BTC price trend.
+
+        Dominance Transition Table (TradingLab mentorship):
+          BTC.D up   + BTC up     = Altcoins down
+          BTC.D up   + BTC down   = Altcoins down MUCH MORE
+          BTC.D down + BTC up     = Altcoins up significantly (altseason)
+          BTC.D down + BTC stable = Capital rotating to altcoins
+          BTC.D down + BTC down   = Rare, altcoins may still fall
+
+        Returns a dict with keys: dominance_trend, btc_trend, altcoin_outlook.
+        """
+        dom = cycle.btc_dominance_trend  # rising, falling, stable
+        # Determine BTC price trend from recent candles (7d performance)
+        btc_trend = "stable"
+        if hasattr(cycle, "_btc_perf_7d"):
+            perf = cycle._btc_perf_7d
+            if perf > 0.02:
+                btc_trend = "up"
+            elif perf < -0.02:
+                btc_trend = "down"
+
+        altcoin_outlook = "neutral"
+        if dom == "rising" and btc_trend == "up":
+            altcoin_outlook = "down"
+        elif dom == "rising" and btc_trend == "down":
+            altcoin_outlook = "down_much_more"
+        elif dom == "falling" and btc_trend == "up":
+            altcoin_outlook = "up_significantly"  # Altseason
+        elif dom == "falling" and btc_trend == "stable":
+            altcoin_outlook = "capital_rotating_to_alts"
+        elif dom == "falling" and btc_trend == "down":
+            altcoin_outlook = "rare_alts_may_fall"
+        elif dom == "rising" and btc_trend == "stable":
+            altcoin_outlook = "down"
+        # stable dominance cases
+        elif dom == "stable":
+            altcoin_outlook = "neutral"
+
+        return {
+            "dominance_trend": dom,
+            "btc_trend": btc_trend,
+            "altcoin_outlook": altcoin_outlook,
+        }
 
     def _analyze_halving_phase(self, cycle: CryptoMarketCycle):
         """Determine position in the BTC halving cycle."""
@@ -168,10 +237,16 @@ class CryptoCycleAnalyzer:
                 rs = avg_gain / avg_loss
                 rsi = 100 - (100 / (1 + rs))
             cycle.btc_rsi_14 = rsi
+            # NOTE: Standard RSI thresholds are 70 (overbought) and 30 (oversold).
+            # For BTC cycle analysis we use more extreme levels (>80 / <25) because
+            # crypto markets on higher-timeframe charts (2-week, monthly) routinely
+            # sustain RSI above 70 during bull runs and below 30 during prolonged
+            # bear markets.  The extreme thresholds filter out noise and only flag
+            # true cycle distribution tops and accumulation bottoms.
             if rsi > 80:
-                cycle.market_phase = "distribution"  # Potential top
+                cycle.market_phase = "distribution"  # Potential cycle top
             elif rsi < 25:
-                cycle.market_phase = "accumulation"  # Potential bottom
+                cycle.market_phase = "accumulation"  # Potential cycle bottom
         except Exception as e:
             logger.debug(f"RSI analysis failed: {e}")
 

@@ -275,7 +275,7 @@ class ExplanationEngine:
             "PINK": [
                 "1. Nivel de soporte/resistencia diario O tendencia desarrollada",
                 "2. Tendencia alineada en todas las temporalidades",
-                "3. EMA 50 4H rota + pullback hasta ella (sin romperla de vuelta)",
+                "3. Pullback hasta EMA 50 4H (la EMA 50 4H NO se rompe - si se rompiera seria RED, no PINK)",
                 "4. En 1H: EMA 50 rota en forma de patrón correctivo (cuña/triángulo/canal)",
                 "5. Ejecución al final del patrón cuando 5M rompe",
                 "6. SL debajo del mínimo anterior | TP en máximo anterior",

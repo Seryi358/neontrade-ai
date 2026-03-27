@@ -1038,8 +1038,8 @@ async def set_risk_config(request: RiskConfigRequest):
         updates["min_rr_ratio"] = request.min_rr_ratio
 
     if request.move_sl_to_be_at is not None:
-        if not (0.1 <= request.move_sl_to_be_at <= 0.9):
-            raise HTTPException(400, "move_sl_to_be_at debe estar entre 10% y 90%")
+        if not (0.001 <= request.move_sl_to_be_at <= 0.10):
+            raise HTTPException(400, "move_sl_to_be_at debe estar entre 0.1% y 10%")
         settings.move_sl_to_be_at = request.move_sl_to_be_at
         updates["move_sl_to_be_at"] = request.move_sl_to_be_at
 

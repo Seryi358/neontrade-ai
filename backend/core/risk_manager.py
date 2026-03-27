@@ -491,6 +491,13 @@ class RiskManager:
         if not settings.funded_account_mode:
             return (True, "")
 
+        # Block trading if balance is zero or negative
+        if self._current_balance <= 0:
+            return (
+                False,
+                f"Funded: balance is ${self._current_balance:.2f} — cannot trade",
+            )
+
         # Reset daily PnL tracker if the day changed
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if self._funded_daily_pnl_date != today:

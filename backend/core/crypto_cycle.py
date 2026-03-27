@@ -286,7 +286,7 @@ class CryptoCycleAnalyzer:
                 # begins a new uptrend in anticipation of the supply cut)
                 cycle.halving_phase = "pre_halving"
                 cycle.halving_phase_description = "Accumulation, price starts rising"
-                cycle.halving_sentiment = "slightly_bullish"
+                cycle.halving_sentiment = "bullish"
 
     async def _analyze_rsi(self, cycle: CryptoMarketCycle):
         """RSI 14 on BTC weekly for cycle top/bottom detection.

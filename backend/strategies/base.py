@@ -560,12 +560,12 @@ def _check_smc_confluence(analysis, direction: str, entry_price: float) -> tuple
         ob_mid = (ob_high + ob_low) / 2
         tolerance = abs(ob_high - ob_low) * 1.5  # 1.5x the OB size
 
-        if direction == "BUY" and ob_type == "bullish":
+        if direction == "BUY" and "bullish" in ob_type:
             if ob_low - tolerance <= entry_price <= ob_high + tolerance:
                 bonus += 8.0
                 details.append(f"Order Block alcista ({ob_low:.5f}-{ob_high:.5f})")
                 break
-        elif direction == "SELL" and ob_type == "bearish":
+        elif direction == "SELL" and "bearish" in ob_type:
             if ob_low - tolerance <= entry_price <= ob_high + tolerance:
                 bonus += 8.0
                 details.append(f"Order Block bajista ({ob_low:.5f}-{ob_high:.5f})")
@@ -1743,7 +1743,7 @@ class RedStrategy(BaseStrategy):
             confidence=confidence,
             reasoning=f"RED: 4H trend change confirmed. Pullback to EMA50 1H/4H + Fib. Entry on 5M diagonal break.",
             explanation_es=explanation_es,
-            elliott_wave_phase="Onda 2-3",
+            elliott_wave_phase="Onda 2->3 o 4->5",
             timeframes_analyzed=["D", "H4", "H1", "M5"],
             risk_reward_ratio=rr,
             conditions_met=met,
@@ -1880,9 +1880,11 @@ class PinkStrategy(BaseStrategy):
             # No es descalificante pero importante
 
         # --- Paso 3: PINK key condition ---
-        # TradingLab: 1H EMA 50 breaks BUT 4H EMA 50 does NOT break.
-        # This differentiates PINK from RED (which requires BOTH to break).
-        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", direction)
+        # TradingLab: 1H EMA 50 breaks AGAINST the trend direction (corrective pattern
+        # breaks it the wrong way). For BUY, price < EMA (broke below). For SELL, price > EMA.
+        # This differentiates PINK from RED (which requires BOTH to break WITH the trend).
+        opposite = "SELL" if direction == "BUY" else "BUY"
+        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", opposite)
         ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", direction)
 
         # 1H EMA 50 must be broken (corrective pattern broke it)
@@ -2075,12 +2077,12 @@ class PinkStrategy(BaseStrategy):
         if direction == "BUY":
             below = [s for s in supports if s < entry_price]
             if below:
-                return min(below)  # Protect previous low (furthest from entry)
+                return max(below)  # Nearest support below entry (tightest SL)
             return entry_price * 0.99
         else:
             above = [r for r in resistances if r > entry_price]
             if above:
-                return max(above)  # Protect previous high (furthest from entry)
+                return min(above)  # Nearest resistance above entry (tightest SL)
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2378,12 +2380,12 @@ class WhiteStrategy(BaseStrategy):
         if direction == "BUY":
             below = [s for s in supports if s < entry_price]
             if below:
-                return min(below)  # Protect previous low (furthest from entry)
+                return max(below)  # Nearest support below entry (tightest SL)
             return entry_price * 0.99
         else:
             above = [r for r in resistances if r > entry_price]
             if above:
-                return max(above)  # Protect previous high (furthest from entry)
+                return min(above)  # Nearest resistance above entry (tightest SL)
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2796,12 +2798,12 @@ class BlackStrategy(BaseStrategy):
         if direction == "BUY":
             below = [s for s in supports if s < entry_price]
             if below:
-                return min(below)  # Protect previous low (furthest from entry)
+                return max(below)  # Nearest support below entry (tightest SL)
             return entry_price * 0.985  # 1.5% fallback (tight for counter-trend)
         else:
             above = [r for r in resistances if r > entry_price]
             if above:
-                return max(above)  # Protect previous high (furthest from entry)
+                return min(above)  # Nearest resistance above entry (tightest SL)
             return entry_price * 1.015
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -3088,23 +3090,41 @@ class GreenStrategy(BaseStrategy):
                         met.append(f"Paso 5: Rompimiento estructural {sb_type} {sb_dir} (proxy para diagonal)")
                         break
 
-        # Fallback: EMA breaks on M15 only if no diagonal detected
+        # Fallback: EMA breaks if no diagonal detected.
+        # Day Trading mode: try M5 first (closest proxy to M2 which brokers don't provide),
+        # then fall back to M15 if M5 data isn't available.
         if not diagonal_breakout_detected:
-            ema_15m_break, ema_15m_desc = _check_ema_break(analysis, "EMA_M15_5", direction)
-            ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, "EMA_M15_20", direction)
+            # Try M5 EMAs first (proxy for M2 execution in Day Trading mode)
+            ema_m5_break, ema_m5_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
+            ema_m5_20_break, ema_m5_20_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
 
-            if ema_15m_break and ema_15m_20_break:
-                if _check_rcc_confirmation(analysis, "EMA_M15_5", direction):
-                    confidence += 10.0
-                    met.append(f"Paso 5: Fallback EMA - RCC confirmado (EMA 5 + EMA 20 de M15)")
+            if ema_m5_break and ema_m5_20_break:
+                if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                    confidence += 12.0
+                    met.append(f"Paso 5: M5 proxy (Day Trading) - RCC confirmado (EMA 5 + EMA 20 de M5)")
                 else:
-                    confidence += 5.0
-                    met.append(f"Paso 5: Fallback EMA - Rompimiento doble sin RCC")
-            elif ema_15m_break:
-                confidence += 3.0
-                met.append(f"Paso 5: Fallback EMA - Rompimiento parcial - {ema_15m_desc}")
+                    confidence += 7.0
+                    met.append(f"Paso 5: M5 proxy (Day Trading) - Rompimiento doble sin RCC")
+            elif ema_m5_break:
+                confidence += 4.0
+                met.append(f"Paso 5: M5 proxy (Day Trading) - Rompimiento parcial - {ema_m5_desc}")
             else:
-                failed.append(f"Paso 5: Sin rompimiento de diagonal ni EMA en 15M - {ema_15m_desc}")
+                # Fall back to M15 EMAs if M5 data not available or no break
+                ema_15m_break, ema_15m_desc = _check_ema_break(analysis, "EMA_M15_5", direction)
+                ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, "EMA_M15_20", direction)
+
+                if ema_15m_break and ema_15m_20_break:
+                    if _check_rcc_confirmation(analysis, "EMA_M15_5", direction):
+                        confidence += 10.0
+                        met.append(f"Paso 5: Fallback EMA - RCC confirmado (EMA 5 + EMA 20 de M15)")
+                    else:
+                        confidence += 5.0
+                        met.append(f"Paso 5: Fallback EMA - Rompimiento doble sin RCC")
+                elif ema_15m_break:
+                    confidence += 3.0
+                    met.append(f"Paso 5: Fallback EMA - Rompimiento parcial - {ema_15m_desc}")
+                else:
+                    failed.append(f"Paso 5: Sin rompimiento de diagonal ni EMA en M5/M15 - {ema_15m_desc}")
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)

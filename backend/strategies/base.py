@@ -290,7 +290,8 @@ def _check_ema_pullback(analysis: AnalysisResult, ema_key: str, direction: str) 
 
 def _get_current_price_proxy(analysis: AnalysisResult) -> Optional[float]:
     """Mejor estimacion del precio actual usando EMAs de marcos bajos."""
-    for key in ("EMA_M5_2", "EMA_M5_5", "EMA_M2_2", "EMA_M2_5", "EMA_M5_20", "EMA_H1_50"):
+    # M2 EMAs not available (broker API doesn't support M2 candles), using M5 instead
+    for key in ("EMA_M5_2", "EMA_M5_5", "EMA_M5_20", "EMA_H1_50"):
         v = _ema_val(analysis, key)
         if v is not None:
             return v
@@ -1311,7 +1312,8 @@ class BlueStrategy(BaseStrategy):
 
         # --- Paso 6: Entrada en 5M (RCC: Ruptura + Cierre + Confirmación) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M2_2", direction)
+        # M2 not available from broker API; use M5 EMA 2 as approximation
+        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_2", direction)
 
         if ema_5m_break:
             # TradingLab RCC: verify previous candle confirmed the breakout
@@ -2233,10 +2235,11 @@ class WhiteStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 5: {ema_5m_desc}")
 
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M2_2", direction)
+        # M2 not available from broker API; use M5 EMA 2 as approximation
+        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_2", direction)
         if ema_2m_break:
             confidence += 5.0
-            met.append(f"Paso 5b: Confirmacion EMA 2M - {ema_2m_desc}")
+            met.append(f"Paso 5b: Confirmacion EMA M5(2) - {ema_2m_desc}")
 
         # TradingLab: RSI divergence bonus
         has_div, div_bonus = _check_rsi_divergence(analysis, direction)

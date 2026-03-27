@@ -1136,17 +1136,45 @@ class TradingEngine:
                 )
                 if signal:
                     self._daily_setups_found += 1
-                    # Convert signal to TradeRisk via _detect_setup
-                    setup = await self._detect_setup(base_analysis)
-                    if setup:
-                        explanation = self._latest_explanations.get(instrument)
-                        if explanation is None:
-                            explanation = self.explanation_engine.generate_full_analysis(
-                                instrument=instrument,
-                                analysis_result=base_analysis,
-                                setup_signal=None,
-                            )
-                        await self._handle_setup(setup, base_analysis, explanation)
+
+                    # Convert scalping SetupSignal → TradeRisk directly
+                    # (skip _detect_setup which runs day-trading strategies)
+                    style = TradingStyle.SCALPING
+                    risk_percent = self.risk_manager.get_risk_for_style(style)
+                    units = await self.risk_manager.calculate_position_size(
+                        signal.instrument, style, signal.entry_price, signal.stop_loss
+                    )
+                    if units == 0:
+                        continue
+                    if signal.direction == "SELL":
+                        units = -abs(units)
+
+                    sl_distance = abs(signal.entry_price - signal.stop_loss)
+                    rr = abs(signal.take_profit_1 - signal.entry_price) / max(sl_distance, 0.00001)
+
+                    setup = TradeRisk(
+                        instrument=signal.instrument,
+                        style=style,
+                        risk_percent=risk_percent,
+                        units=units,
+                        stop_loss=signal.stop_loss,
+                        take_profit_1=signal.take_profit_1,
+                        take_profit_max=signal.take_profit_max,
+                        reward_risk_ratio=rr,
+                        entry_price=signal.entry_price,
+                        direction=signal.direction,
+                        entry_type=getattr(signal, 'entry_type', 'MARKET'),
+                        limit_price=getattr(signal, 'limit_price', None),
+                    )
+
+                    explanation = self._latest_explanations.get(instrument)
+                    if explanation is None:
+                        explanation = self.explanation_engine.generate_full_analysis(
+                            instrument=instrument,
+                            analysis_result=base_analysis,
+                            setup_signal=signal,
+                        )
+                    await self._handle_setup(setup, base_analysis, explanation)
 
             except Exception as e:
                 self._daily_errors += 1

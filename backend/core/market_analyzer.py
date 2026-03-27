@@ -608,7 +608,7 @@ class MarketAnalyzer:
             "H1": [50],
             "M15": [5, 20, 50],
             "M5": [2, 5, 20, 50],
-            "M2": [2, 5, 50],
+            # M2 removed: candles are never fetched (not supported by broker API)
             "M1": [50],  # EMA 50 for scalping CP/CPA management
         }
 

@@ -63,7 +63,7 @@ class BacktestConfig:
     spread_pips: float = 1.0
     enabled_strategies: Dict[str, bool] = field(default_factory=dict)
     # Optional: override minimum R:R filter
-    min_rr_ratio: float = 0.80
+    min_rr_ratio: float = 2.0
     # Maximum number of concurrent open positions
     max_concurrent_positions: int = 3
     # Cooldown bars after a trade closes before another can open
@@ -186,7 +186,7 @@ class _SimulatedPosition:
     # Phase thresholds (mirror position_manager.py constants)
     # ------------------------------------------------------------------
     _PHASE1_THRESHOLD = 0.20   # 20 % to TP1 -> move SL to structure
-    _BE_THRESHOLD = 0.50       # 50 % to TP1 -> break even
+    _BE_THRESHOLD = 0.50       # Backtester uses 50% to TP1 as BE trigger (simplified); live uses 1% unrealized profit
     _TRAILING_THRESHOLD = 0.70 # 70 % to TP1 -> start trailing
     _TRAIL_PCT = 0.40          # fallback trailing distance (% of TP dist)
     _AGGRESSIVE_TRAIL_PCT = 0.20

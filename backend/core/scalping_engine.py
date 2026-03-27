@@ -275,6 +275,9 @@ class ScalpingAnalyzer:
         signal.explanation_es = f"[SCALPING] {signal.explanation_es}"
         signal.timeframes_analyzed = ["H1", "M15", "M5", "M1"]
 
+        # Enforce 0.618 Fibonacci SL for scalping (mentorship rule)
+        signal = self._enforce_fibonacci_sl(signal, scalp_analysis)
+
         # Validate scalping-specific conditions
         if not self._validate_scalping_conditions(scalp_data, signal.direction):
             logger.debug(
@@ -464,6 +467,50 @@ class ScalpingAnalyzer:
                 return False
 
         return True
+
+    def _enforce_fibonacci_sl(
+        self, signal: SetupSignal, analysis: AnalysisResult
+    ) -> SetupSignal:
+        """
+        Enforce the 0.618 Fibonacci retracement level as SL for scalping.
+
+        The mentorship explicitly states that scalping SL should be placed
+        at the 0.618 Fibonacci level of the current swing. If the analysis
+        contains a valid 0.618 level, override the strategy-generated SL.
+        """
+        fib_618 = (analysis.fibonacci_levels or {}).get("0.618")
+        if fib_618 is None or fib_618 <= 0:
+            return signal
+
+        original_sl = signal.stop_loss
+
+        if signal.direction == "BUY":
+            # For BUY, SL must be below entry. Fib 0.618 should be below entry.
+            if fib_618 < signal.entry_price:
+                signal.stop_loss = fib_618
+            else:
+                return signal
+        else:  # SELL
+            # For SELL, SL must be above entry. Fib 0.618 should be above entry.
+            if fib_618 > signal.entry_price:
+                signal.stop_loss = fib_618
+            else:
+                return signal
+
+        if signal.stop_loss != original_sl:
+            # Recalculate R:R with the new SL
+            sl_distance = abs(signal.entry_price - signal.stop_loss)
+            tp_distance = abs(signal.take_profit_1 - signal.entry_price)
+            signal.risk_reward_ratio = (
+                tp_distance / sl_distance if sl_distance > 0 else 0.0
+            )
+            logger.info(
+                f"Scalping SL enforced to Fib 0.618 ({fib_618:.5f}) for "
+                f"{signal.instrument} {signal.direction} "
+                f"(was {original_sl:.5f}, R:R now {signal.risk_reward_ratio:.2f}:1)"
+            )
+
+        return signal
 
     # ── Exit Signal Detection ────────────────────────────────────────
 

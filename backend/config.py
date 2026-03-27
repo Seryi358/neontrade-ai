@@ -116,7 +116,7 @@ class Settings(BaseSettings):
     drawdown_risk_2: float = 0.005    # 0.50% at level 2
     drawdown_risk_3: float = 0.0025   # 0.25% at level 3
     # Minimum risk floor (never go below this regardless of drawdown)
-    drawdown_min_risk: float = 0.005  # 0.5% absolute floor
+    drawdown_min_risk: float = 0.0025  # 0.25% absolute floor
 
     # Delta risk algorithm (ch18.8) — increase risk during winning streaks
     # Disabled by default (beginners should use fixed 1% until profitable)
@@ -248,6 +248,7 @@ class Settings(BaseSettings):
     allocation_trading_pct: float = 0.70     # 70% in trading accounts
     allocation_forex_pct: float = 0.70       # 70% forex/indices/metals (within trading)
     allocation_crypto_pct: float = 0.10      # 10% crypto (within trading)
+    allocation_other_pct: float = 0.20       # Mentoría: 20% otros (índices, materias primas) dentro de trading
     allocation_investment_pct: float = 0.20  # 20% long-term (stocks/ETFs)
     allocation_investment_stocks: float = 0.80  # 80% stocks/ETFs (70% VT/S&P500, 30% sectors)
     allocation_investment_crypto: float = 0.20  # 20% crypto (70% BTC, 20% ETH, 10% alts)

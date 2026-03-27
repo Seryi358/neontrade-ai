@@ -399,7 +399,7 @@ def _validate_elliott_fibonacci(analysis, direction: str) -> tuple[bool, str]:
     """
     TradingLab: Validate Elliott Wave position using Fibonacci rules.
     - Wave 2 should retrace 38.2%-61.8% of Wave 1
-    - Wave 4 should retrace 23.6%-38.2% of Wave 3
+    - Wave 4 should retrace 23.6%-50.0% of Wave 3
     - Wave 3 is never the shortest impulse wave
     Returns (valid, description).
     """
@@ -415,8 +415,16 @@ def _validate_elliott_fibonacci(analysis, direction: str) -> tuple[bool, str]:
         return True, ""
 
     fib_382 = fib.get("0.382")
+    fib_500 = fib.get("0.5")
     fib_618 = fib.get("0.618")
-    fib_236 = fib.get("0.236")
+    fib_0 = fib.get("0.0")
+    fib_1 = fib.get("1.0")
+
+    # Compute 23.6% level from swing range (not stored in fib dict)
+    fib_236 = None
+    if fib_0 is not None and fib_1 is not None:
+        diff = abs(fib_0 - fib_1)
+        fib_236 = max(fib_0, fib_1) - diff * 0.236 if fib_0 > fib_1 else min(fib_0, fib_1) + diff * 0.236
 
     if wave_label == "2" and fib_382 and fib_618:
         # Wave 2: expect price in 38.2%-61.8% retracement zone
@@ -427,15 +435,15 @@ def _validate_elliott_fibonacci(analysis, direction: str) -> tuple[bool, str]:
         else:
             return False, f"Onda 2: Precio fuera de zona Fib 38.2-61.8%"
 
-    elif wave_label == "4" and fib_236 and fib_382:
-        # Wave 4: expect shallower retracement (23.6%-38.2%)
-        low = min(fib_236, fib_382)
-        high = max(fib_236, fib_382)
+    elif wave_label == "4" and fib_236 and fib_500:
+        # Wave 4: expect shallower retracement (23.6%-50.0%)
+        low = min(fib_236, fib_500)
+        high = max(fib_236, fib_500)
         if low <= price <= high:
-            return True, f"Onda 4: Precio en zona Fib 23.6-38.2% (retroceso valido)"
+            return True, f"Onda 4: Precio en zona Fib 23.6-50.0% (retroceso valido)"
         else:
             # Wave 4 can also go deeper, just warn
-            return True, f"Onda 4: Retroceso profundo (fuera de 23.6-38.2%)"
+            return True, f"Onda 4: Retroceso profundo (fuera de 23.6-50.0%)"
 
     return True, ""
 

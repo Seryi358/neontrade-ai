@@ -135,9 +135,9 @@ class TradingEngine:
             logger.warning("OpenAI analyzer not available — trading without AI validation")
         self.market_analyzer = MarketAnalyzer(self.broker)
         self.explanation_engine = ExplanationEngine()
+        news_style = "scalping" if settings.scalping_enabled else "day_trading"
         self.news_filter = NewsFilter(
-            minutes_before=settings.avoid_news_minutes_before,
-            minutes_after=settings.avoid_news_minutes_after,
+            trading_style=news_style,
             finnhub_key=getattr(settings, 'finnhub_api_key', ''),
             newsapi_key=getattr(settings, 'newsapi_key', ''),
         )

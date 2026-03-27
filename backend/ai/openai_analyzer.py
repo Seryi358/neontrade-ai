@@ -297,19 +297,12 @@ Scalping Rules:
 ═══════════════════════════════════════════════════════════════════
 
 Day Trading Position Management:
-- EMA 2 (M5): ultra-fast reaction — if price closes below/above, tighten SL immediately
-- EMA 5 (M5): confirmation of short-term direction — if price breaks and closes beyond, consider closing
-- Use EMA crossover (EMA 2 crossing EMA 5) as trailing stop trigger on M5
-
-Analysis EMAs:
-- EMA 20 (1H): intermediate trend filter; entries should be on the correct side
-- EMA 20 (4H): strategy target for BLUE variants (TP1 at EMA 4H)
+- EMA 50 on the management style timeframe (LP: Weekly/H4/M15, CP: H1/M15/M1, CPA: M15/M2/30s)
 - SMA 200 (H1): major trend filter from Scalping Workshop
 
 EMA Trailing Rules:
-- After entry: trail SL using EMA 5 on M5 (conservative)
-- After TP1 hit: switch to aggressive trailing using EMA 2 on M5
-- If EMA 2 and EMA 5 both break against position → close immediately
+- Trail SL using EMA 50 on the management style timeframe
+- If price closes beyond EMA 50 against position → close immediately
 
 ═══════════════════════════════════════════════════════════════════
                FIBONACCI LEVELS REFERENCE
@@ -319,17 +312,19 @@ Retracement Levels (Entry Zones):
 - 0.382: shallow retracement (strong trend) — aggressive entry
 - 0.500: equilibrium retracement — standard entry
 - 0.618: deep retracement (golden ratio) — conservative entry, last line of defense
+- 0.750: deep discount entry — used when structure supports a deeper pullback
+- 1.000: full retracement — invalidation level; break beyond signals trend failure
 - Golden zone: 0.382 to 0.618 is the OPTIMAL entry zone
 
 Extension Levels (Take Profit / Wave Targets):
+- 0.618: minor extension (conservative TP, Wave 4→5 projection)
 - 1.000: equal wave extension (Wave 5 = Wave 1 target)
 - 1.272: minor extension (conservative TP for Wave 3)
 - 1.618: golden extension (standard Wave 3 target, TP_max for most strategies)
-- 2.618: rare extended Wave 3 (only in very strong trends)
 
 Confluence Rule: an entry level must have AT LEAST 2 of these:
-- Fibonacci retracement level (0.382, 0.5, 0.618)
-- EMA (1H 20-period or 4H 20-period)
+- Fibonacci retracement level (0.382, 0.5, 0.618, 0.750, 1.000)
+- EMA 50 (1H or 4H)
 - S/R level, FVG, or Order Block
 
 ═══════════════════════════════════════════════════════════════════
@@ -339,20 +334,19 @@ Confluence Rule: an entry level must have AT LEAST 2 of these:
 Risk Per Trade:
 - Day Trading: 1% of account per trade
 - Scalping: 0.5% of account per trade
-- Swing Trading: 3% of account per trade
+- Swing Trading: 1% of account per trade
 - Maximum total risk at any time: 7% of account
 
 Minimum R:R Ratios:
-- All strategies: minimum 0.80:1 to TP1
+- All strategies: minimum 2.0:1 to TP1
 - BLACK strategy: minimum 2.0:1 (counter-trend requires higher R:R)
-- GREEN strategy: typically 3:1 to 10:1 (best R:R of all strategies)
+- GREEN strategy: minimum 2.0:1 (potential up to 10:1, best R:R of all strategies)
 
 Drawdown Management (Fixed Levels Method):
 - Normal: 1.0% risk per trade
-- At -4.12% drawdown: reduce to 0.75% risk per trade
-- At -6.18% drawdown: reduce to 0.50% risk per trade
-- At -8.24% drawdown: reduce to 0.25% risk per trade
-- At -10% or worse: STOP trading, reassess
+- At -5% drawdown: reduce to 0.75% risk per trade
+- At -7.5% drawdown: reduce to 0.50% risk per trade
+- At -10% drawdown: reduce to 0.25% risk per trade
 
 Delta Risk Algorithm (Winning Streaks):
 - Parameter: 0.60 (range 0.20-0.90, higher = more aggressive)
@@ -379,14 +373,14 @@ Phase 2 — SL_MOVED:
   This locks in partial protection without being at BE yet
 
 Phase 3 — BREAK_EVEN (BE):
-  Triggered when price reaches ~50% of the way to TP1
+  Triggered when unrealized profit reaches ~1% of account
   SL moved to entry price (zero-risk position)
   RULE: No new trades on the same or correlated pairs until BE is set on existing trade
 
 Phase 4 — TRAILING:
   Price approaching TP1
   SL trails using EMA 5 on M5
-  Partial close at TP1 (50% of position recommended)
+  No partial profit taking (as per TradingLab mentorship). Trail with EMA 50 on the appropriate timeframe per management style.
 
 Phase 5 — AGGRESSIVE (Beyond TP1):
   TP1 hit, trailing remaining position

@@ -137,6 +137,7 @@ class MarketAnalyzer:
             "H1": 200,   # ~8 days of 1H
             "M15": 200,  # ~2 days of 15m
             "M5": 200,   # ~17 hours of 5m
+            "M1": 200,   # ~3.3 hours, needed for scalping position management
             # M2 not supported by Capital.com API — M5 used as fallback
         }
 
@@ -608,6 +609,7 @@ class MarketAnalyzer:
             "M15": [5, 20, 50],
             "M5": [2, 5, 20, 50],
             "M2": [2, 5, 50],
+            "M1": [50],  # EMA 50 for scalping CP/CPA management
         }
 
         for tf, periods in ema_configs.items():
@@ -634,7 +636,6 @@ class MarketAnalyzer:
 
         return {
             "0.0": swing_high,
-            "0.236": swing_high - diff * 0.236,
             "0.382": swing_high - diff * 0.382,
             "0.5": swing_high - diff * 0.5,
             "0.618": swing_high - diff * 0.618,
@@ -1034,6 +1035,7 @@ class MarketAnalyzer:
                 data["close"].iloc[i-1] > data["open"].iloc[i-1]):  # previous bullish
                 impulse_size = data["open"].iloc[i] - data["close"].iloc[i]
                 ob_size = data["close"].iloc[i-1] - data["open"].iloc[i-1]
+                # Filtro de calidad: impulso mínimo 1.5x OB (no especificado en mentoría)
                 if impulse_size > ob_size * 1.5:
                     order_blocks.append({
                         "type": "bearish_ob",
@@ -1090,6 +1092,7 @@ class MarketAnalyzer:
                     "index": swing_highs[j][0],
                 })
             elif curr_high < prev_high * 0.998:
+                # Tolerancia implementación: 0.2% (mentoría no especifica tolerancia exacta)
                 # Potential CHOCH: lower high after uptrend
                 # Check if previous was making higher highs
                 if j >= 2 and swing_highs[j-1][1] > swing_highs[j-2][1]:
@@ -1115,6 +1118,7 @@ class MarketAnalyzer:
                     "index": swing_lows[j][0],
                 })
             elif curr_low > prev_low * 1.002:
+                # Tolerancia implementación: 0.2% (mentoría no especifica tolerancia exacta)
                 # Potential CHOCH: higher low after downtrend
                 if j >= 2 and swing_lows[j-1][1] < swing_lows[j-2][1]:
                     breaks.append({
@@ -1559,6 +1563,12 @@ class MarketAnalyzer:
         - ASIAN (00:00-08:00 UTC) = Accumulation (lateral, low volatility)
         - LONDON (08:00-12:00 UTC) = Manipulation (strong impulse, often fake)
         - NY (12:00-21:00 UTC) = Distribution (real move direction)
+
+        Nota: los horarios son aproximaciones para el patrón AMD.
+        Las sesiones reales varían con DST (EST/EDT):
+          Asian/Tokyo: ~00:00-09:00 UTC (EST) / ~23:00-08:00 UTC (EDT)
+          London: ~08:00-17:00 UTC (EST) / ~07:00-16:00 UTC (EDT)
+          New York: ~13:00-22:00 UTC (EST) / ~12:00-21:00 UTC (EDT)
 
         Returns dict with phase, session, asian_range, direction_bias.
         """

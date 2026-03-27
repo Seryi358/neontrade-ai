@@ -5,17 +5,17 @@ Implements all risk management rules from the TradingLab Trading Plan.
 Rules:
 - 1% risk per Day Trade
 - 0.5% risk per Scalping trade
-- 3% risk per Swing Trade
+- 1% risk per Swing Trade
 - Max 7% total risk at any time
 - Correlated pairs: 0.75% each instead of full risk
 - No trading before major news
 - Close positions before Friday market close
-- Minimum R:R ratio of 0.80 to TP1
+- Minimum R:R ratio of 2.0 to TP1
 
 Drawdown Management (ch18.7):
 - Fixed 1%: always use base risk
 - Variable: adjust based on win rate
-- Fixed levels: 1% -> 0.75% at -4.12% DD -> 0.50% at -6.18% DD -> 0.25% at -8.24% DD
+- Fixed levels: 1% -> 0.75% at -5% DD -> 0.50% at -7.5% DD -> 0.25% at -10% DD
 
 Delta Risk Algorithm (ch18.8):
 - Increase risk during winning streaks
@@ -438,7 +438,7 @@ class RiskManager:
     ) -> bool:
         """
         Validate that the trade meets minimum R:R ratio.
-        Minimum R:R to TP1 must be >= 0.80 (from Trading Plan).
+        Minimum R:R to TP1 must be >= 2.0 (from Trading Plan).
         """
         risk = abs(entry_price - stop_loss)
         reward = abs(take_profit_1 - entry_price)

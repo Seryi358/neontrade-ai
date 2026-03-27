@@ -69,11 +69,11 @@ _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
     # CP (Short-term): medium timeframes
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",
-    (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M5_50",  # M1 not available, using M5 as fallback
+    (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
     # CPA (Short-term Aggressive): tightest timeframes
     (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
     (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M2_50",
-    (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M5_50",  # M1 not available, using M5 as fallback
+    (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M1_50",
 }
 
 

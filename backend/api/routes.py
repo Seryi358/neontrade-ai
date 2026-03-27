@@ -831,7 +831,7 @@ async def get_strategies_info():
             "description": "Detecta cambios de tendencia en gráfico horario. 3 variantes (A/B/C). "
                            "TP en EMA 50 de 4H.",
             "wave": "Onda 1-2 de Elliott",
-            "risk_reward_avg": 1.5,
+            "risk_reward_avg": 1.65,
             "variants": ["BLUE_A (Doble suelo)", "BLUE_B (Estándar)", "BLUE_C (Rechazo EMA 4H)"],
             "steps": 7,
         },

@@ -22,6 +22,8 @@ class CryptoMarketCycle:
     btc_eth_ratio: Optional[float] = None  # BTC/ETH price ratio
     btc_eth_trend: str = "unknown"  # btc_leading, eth_leading, neutral
     halving_phase: str = "unknown"  # pre_halving, post_halving, mid_cycle
+    btc_rsi_14: Optional[float] = None  # RSI 14 on BTC daily
+    ema8_weekly_broken: bool = False  # True if BTC weekly close < EMA 8
     last_updated: Optional[str] = None
 
 
@@ -56,6 +58,8 @@ class CryptoCycleAnalyzer:
         await self._analyze_dominance(cycle)
         await self._analyze_btc_eth(cycle)
         self._analyze_halving_phase(cycle)
+        await self._analyze_rsi(cycle)
+        await self._check_ema8_weekly(cycle)
         self._determine_market_phase(cycle)
 
         cycle.last_updated = now.isoformat()
@@ -136,6 +140,60 @@ class CryptoCycleAnalyzer:
             else:
                 cycle.halving_phase = "pre_halving"  # 75-100%: pre-halving, often bear/accumulation
 
+    async def _analyze_rsi(self, cycle: CryptoMarketCycle):
+        """RSI 14 on BTC daily for cycle top/bottom detection."""
+        if not self.broker:
+            return
+        try:
+            candles = await self.broker.get_candles("BTC_USD", granularity="D", count=30)
+            if not candles or len(candles) < 15:
+                return
+            closes = [c.close for c in candles]
+            # Calculate RSI 14
+            gains, losses = [], []
+            for i in range(1, len(closes)):
+                diff = closes[i] - closes[i - 1]
+                gains.append(max(diff, 0))
+                losses.append(max(-diff, 0))
+            if len(gains) < 14:
+                return
+            avg_gain = sum(gains[:14]) / 14
+            avg_loss = sum(losses[:14]) / 14
+            for i in range(14, len(gains)):
+                avg_gain = (avg_gain * 13 + gains[i]) / 14
+                avg_loss = (avg_loss * 13 + losses[i]) / 14
+            if avg_loss == 0:
+                rsi = 100.0
+            else:
+                rs = avg_gain / avg_loss
+                rsi = 100 - (100 / (1 + rs))
+            cycle.btc_rsi_14 = rsi
+            if rsi > 80:
+                cycle.market_phase = "distribution"  # Potential top
+            elif rsi < 25:
+                cycle.market_phase = "accumulation"  # Potential bottom
+        except Exception as e:
+            logger.debug(f"RSI analysis failed: {e}")
+
+    async def _check_ema8_weekly(self, cycle: CryptoMarketCycle):
+        """Check if BTC weekly close broke below EMA 8 (bearish signal)."""
+        if not self.broker:
+            return
+        try:
+            candles = await self.broker.get_candles("BTC_USD", granularity="W", count=10)
+            if not candles or len(candles) < 9:
+                return
+            closes = [c.close for c in candles]
+            # EMA 8
+            ema = closes[0]
+            multiplier = 2 / (8 + 1)
+            for p in closes[1:]:
+                ema = (p - ema) * multiplier + ema
+            last_close = closes[-1]
+            cycle.ema8_weekly_broken = last_close < ema
+        except Exception as e:
+            logger.debug(f"EMA 8 weekly check failed: {e}")
+
     def _determine_market_phase(self, cycle: CryptoMarketCycle):
         """Determine overall market phase from combined signals."""
         signals = []
@@ -170,7 +228,10 @@ class CryptoCycleAnalyzer:
         cycle = await self.get_cycle_status()
         if cycle.market_phase == "bear_market":
             return False, f"Bear market detected (dominance={cycle.btc_dominance_trend}, halving={cycle.halving_phase})"
-        return True, f"Market phase: {cycle.market_phase}"
+        reason = f"Market phase: {cycle.market_phase}"
+        if cycle.ema8_weekly_broken:
+            reason += " | WARNING: BTC weekly close below EMA 8 (bearish signal)"
+        return True, reason
 
     async def close(self):
         await self._http.aclose()

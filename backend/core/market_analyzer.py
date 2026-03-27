@@ -327,11 +327,13 @@ class MarketAnalyzer:
             multiplier = 2 / (21 + 1)
             for price_val in weekly_closes[1:]:
                 ema_21 = (price_val - ema_21) * multiplier + ema_21
+            last_weekly_close = weekly_closes[-1]
             bmsb = {
                 "sma_20": sma_20,
                 "ema_21": ema_21,
-                "bullish": current_price > sma_20 and current_price > ema_21,
-                "bearish": current_price < sma_20 and current_price < ema_21,
+                "bullish": last_weekly_close > sma_20 and last_weekly_close > ema_21,
+                "bearish": last_weekly_close < sma_20 and last_weekly_close < ema_21,
+                "last_close": last_weekly_close,
             }
 
         # Step 29: Pi Cycle Top/Bottom - TradingLab Crypto Module 8
@@ -535,16 +537,33 @@ class MarketAnalyzer:
             for fvg in fvg_zones:
                 fvg_idx = fvg["index"]
                 for j in range(fvg_idx + 1, len(h1)):
+                    candle_low = float(h1["low"].iloc[j])
+                    candle_high = float(h1["high"].iloc[j])
+
                     if fvg["direction"] == "bullish":
                         # Bullish FVG filled if price comes back down through it
-                        if float(h1["low"].iloc[j]) <= fvg["low"]:
+                        if candle_low <= fvg["low"]:
                             fvg["filled"] = True
                             break
                     else:
                         # Bearish FVG filled if price comes back up through it
-                        if float(h1["high"].iloc[j]) >= fvg["high"]:
+                        if candle_high >= fvg["high"]:
                             fvg["filled"] = True
                             break
+
+                    # Check if price touched the start of the FVG (reaction point)
+                    if not fvg.get("reacted"):
+                        if fvg["direction"] == "bullish" and candle_low <= fvg["high"]:
+                            fvg["reacted"] = True
+                        elif fvg["direction"] == "bearish" and candle_high >= fvg["low"]:
+                            fvg["reacted"] = True
+
+                    # Check if price reached 50% (partial fill)
+                    if not fvg.get("partially_filled"):
+                        if fvg["direction"] == "bullish" and candle_low <= fvg["mid"]:
+                            fvg["partially_filled"] = True
+                        elif fvg["direction"] == "bearish" and candle_high >= fvg["mid"]:
+                            fvg["partially_filled"] = True
 
             # IFVG detection: inverted FVGs (FVG broken by candle body = flip direction)
             for fvg in fvg_zones:
@@ -1897,16 +1916,15 @@ class MarketAnalyzer:
         self, df: pd.DataFrame, current_price: Optional[float]
     ) -> Optional[str]:
         """
-        Detect whether price is in the Premium, Discount, or Equilibrium zone.
+        Detect whether price is in the Premium or Discount zone.
 
         From TradingLab SMC:
         - Use the recent daily swing range (high to low over last 20-60 candles).
-        - Divide into three zones:
-          * Premium  : upper 33% of range (favor SELL setups)
-          * Equilibrium: middle 34% (neutral)
-          * Discount : lower 33% of range (favor BUY setups)
+        - Binary split at 50% of the Fibonacci range:
+          * Premium  : above 50% (favor SELL setups)
+          * Discount : below 50% (favor BUY setups)
 
-        Returns "premium", "discount", "equilibrium", or None.
+        Returns "premium", "discount", or None.
         """
         if df.empty or len(df) < 20 or current_price is None:
             return None
@@ -1919,24 +1937,11 @@ class MarketAnalyzer:
         if rng <= 0:
             return None
 
-        # Use Fibonacci levels for zone classification:
+        # Binary split at 50% of swing range (Fibonacci midpoint)
         # position = 0.0 at swing_low, 1.0 at swing_high
-        # Fibonacci retracement measured from swing_high:
-        #   0.236 retracement = price near top (premium)
-        #   0.382 retracement = still premium
-        #   0.5   = equilibrium boundary
-        #   0.618 retracement = discount zone
-        #   0.786 retracement = deep discount
         position = (current_price - swing_low) / rng  # 0=low, 1=high
 
-        # Premium: above 50% Fib level (position > 0.5, near 0.236-0.382 retracement)
         if position > 0.5:
             return "premium"
-        # Deep discount: near 70-80% retracement (position < 0.2)
-        elif position < 0.2:
-            return "deep_discount"
-        # Discount: below 50% Fib level (near 0.618-0.786 retracement)
-        elif position <= 0.5:
-            return "discount"
         else:
-            return "equilibrium"
+            return "discount"

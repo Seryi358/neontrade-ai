@@ -2731,8 +2731,8 @@ class GreenStrategy(BaseStrategy):
         if direction is None:
             return None
 
-        # TradingLab: Volume confirmation on breakout
-        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
+        # TradingLab: Volume confirmation on M15 (Green executes on 15M)
+        vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M15")
         if not vol_ok:
             return None  # No entry without volume confirmation
 

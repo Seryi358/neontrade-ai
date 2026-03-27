@@ -259,17 +259,16 @@ class ScalpingAnalyzer:
             return None
 
         # Run strategy detection on the synthetic analysis
-        # TradingLab: Exclude BLUE from scalping — BLUE is a day-trading strategy
-        _scalp_exclude_variants = {"BLUE", "BLUE_A", "BLUE_B", "BLUE_C"}
         signal = get_best_setup(scalp_analysis)
         if signal is None:
             return None
 
-        if signal.strategy == StrategyColor.BLUE or signal.strategy_variant in _scalp_exclude_variants:
-            logger.debug(
-                f"Scalping: excluding {signal.strategy_variant} — BLUE not valid for scalping"
-            )
-            return None
+        # TradingLab: BLUE is complex in scalping but clean BLUEs can form
+        # Require higher confidence (80%+) instead of total exclusion
+        if signal.strategy == StrategyColor.BLUE or signal.strategy_variant in ("BLUE_A", "BLUE_B", "BLUE_C"):
+            if signal.confidence < 80:
+                logger.debug(f"Scalping: BLUE setup rejected (confidence {signal.confidence:.0f}% < 80%)")
+                return None
 
         # Tag as scalping setup
         signal.reasoning = f"[SCALPING] {signal.reasoning}"

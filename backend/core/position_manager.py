@@ -89,6 +89,8 @@ class ManagedPosition:
     current_sl: float
     take_profit_1: float
     take_profit_max: Optional[float] = None
+    units: int = 0                  # Position size (signed: +BUY, -SELL)
+    style: str = "day_trading"     # Trading style: "day_trading", "swing", "scalping"
     phase: PositionPhase = PositionPhase.INITIAL
     highest_price: float = 0.0    # For BUY: highest since entry
     lowest_price: float = float('inf')  # For SELL: lowest since entry

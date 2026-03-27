@@ -797,7 +797,8 @@ class TradingEngine:
                     current_price = (
                         price_data.bid if pos.direction == "BUY" else price_data.ask
                     )
-                    pnl = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
+                    price_diff = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
+                    pnl = price_diff * abs(pos.units) if pos.units != 0 else price_diff
                     self.risk_manager.record_funded_pnl(pnl)
                 except Exception as e:
                     logger.debug(f"Failed to calculate PnL for funded close: {e}")
@@ -835,17 +836,24 @@ class TradingEngine:
                             price_data.bid if pos.direction == "BUY"
                             else price_data.ask
                         )
-                        pnl_dollars = (
+                        price_diff = (
                             (close_price - pos.entry_price)
                             if pos.direction == "BUY"
                             else (pos.entry_price - close_price)
                         )
+                        pnl_dollars = price_diff * abs(pos.units) if pos.units != 0 else price_diff
                     except Exception as e:
                         logger.debug(f"Failed to get close price for {tid}: {e}")
 
                     # Record funded PnL from externally closed position
                     if settings.funded_account_mode:
                         self.risk_manager.record_funded_pnl(pnl_dollars)
+
+                    # Track scalping drawdown if this was a scalping trade
+                    if getattr(pos, 'style', '') == 'scalping' and pnl_dollars < 0:
+                        balance = getattr(self.risk_manager, '_current_balance', 0.0) or 0.0
+                        if balance > 0:
+                            self._scalping_daily_dd += abs(pnl_dollars) / balance
 
                     # TradingLab: Register reentry candidate if position was profitable
                     # (TP1 was likely hit if it was in BEYOND_TP1 phase or profitable)
@@ -1567,6 +1575,8 @@ class TradingEngine:
                     current_sl=setup.stop_loss,
                     take_profit_1=setup.take_profit_1,
                     take_profit_max=setup.take_profit_max,
+                    units=setup.units,
+                    style=setup.style.value if hasattr(setup.style, 'value') else str(setup.style),
                     highest_price=setup.entry_price,
                     lowest_price=setup.entry_price,
                 ))

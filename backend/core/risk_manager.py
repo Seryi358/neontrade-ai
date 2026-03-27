@@ -426,7 +426,7 @@ class RiskManager:
         logger.info(
             f"Position size for {instrument}: {units} units | "
             f"Balance: {balance:.2f} | Risk: {risk_percent:.2%} ({risk_amount:.2f}) | "
-            f"SL distance: {sl_pips:.1f} pips"
+            f"SL distance: {sl_distance:.5f}"
         )
         return units
 

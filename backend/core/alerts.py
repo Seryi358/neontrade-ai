@@ -211,7 +211,6 @@ class AlertManager:
         # Await all but swallow individual failures
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    @staticmethod
     async def _safe_send(self, coro):
         """Wrapper that catches and logs any exception from a send coroutine."""
         try:

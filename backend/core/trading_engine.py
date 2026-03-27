@@ -830,9 +830,12 @@ class TradingEngine:
                     logger.debug(f"Failed to calculate PnL for funded close: {e}")
 
             await self.broker.close_all_trades()
-            for trade_id in list(self.risk_manager._active_risks.keys()):
-                instrument = self.risk_manager._active_risks[trade_id].get("instrument", "")
-                self.risk_manager.unregister_trade(trade_id, instrument)
+            for key in list(self.risk_manager._active_risks.keys()):
+                # Keys are "instrument:trade_id" composites
+                parts = key.split(":", 1)
+                if len(parts) == 2:
+                    instrument, trade_id = parts[0], parts[1]
+                    self.risk_manager.unregister_trade(trade_id, instrument)
             self.position_manager.positions.clear()
 
     # ── Position Sync ────────────────────────────────────────────

@@ -46,7 +46,7 @@ class CryptoCycleAnalyzer:
     async def get_cycle_status(self) -> CryptoMarketCycle:
         """Get current crypto market cycle status. Cached for 1 hour."""
         now = datetime.now(timezone.utc)
-        if self._cache and self._cache_time and (now - self._cache_time).seconds < 3600:
+        if self._cache and self._cache_time and (now - self._cache_time).total_seconds() < 3600:
             return self._cache
 
         cycle = CryptoMarketCycle()

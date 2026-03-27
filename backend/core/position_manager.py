@@ -203,8 +203,8 @@ class PositionManager:
             trail_ema = emas.get("EMA_H1_50") or emas.get("EMA_H4_50")
             trail_label = "EMA50 crypto"
         else:
-            trail_ema = emas.get("EMA_M5_5")
-            trail_label = "EMA5 M5"
+            trail_ema = emas.get("EMA_M5_50")
+            trail_label = "EMA50 M5"
 
         if trail_ema is not None:
             # Trail SL to selected EMA (with small buffer)
@@ -262,8 +262,8 @@ class PositionManager:
             aggressive_ema = emas.get("EMA_M5_50") or emas.get("EMA_H1_50")
             aggressive_label = "EMA50 crypto"
         else:
-            aggressive_ema = emas.get("EMA_M5_2")
-            aggressive_label = "EMA2 M5"
+            aggressive_ema = emas.get("EMA_M5_50") or emas.get("EMA_M5_20")
+            aggressive_label = "EMA50 M5"
 
         if aggressive_ema is not None:
             # Aggressive trailing with selected EMA

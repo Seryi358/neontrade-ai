@@ -132,11 +132,12 @@ class MarketAnalyzer:
         candles = {}
         timeframes = {
             "W": 52,     # 1 year of weekly
-            "D": 120,    # ~6 months daily
+            "D": 500,    # ~2 years daily (covers Pi Cycle's 471 requirement)
             "H4": 200,   # ~33 days of 4H
             "H1": 200,   # ~8 days of 1H
             "M15": 200,  # ~2 days of 15m
             "M5": 200,   # ~17 hours of 5m
+            # M2 not supported by Capital.com API — M5 used as fallback
         }
 
         for tf, count in timeframes.items():
@@ -315,16 +316,16 @@ class MarketAnalyzer:
         key_levels["liquidity_pools"] = liquidity_pools
 
         # Step 28: BMSB (Bull Market Support Band) - TradingLab Crypto Module 8
-        # SMA 20 + EMA 21 on Daily
+        # SMA 20 + EMA 21 on Weekly
         bmsb = None
-        d_df = candles.get("D", pd.DataFrame())
-        if not d_df.empty and len(d_df) >= 21 and current_price is not None:
-            daily_closes = d_df["close"].tolist()
-            sma_20 = sum(daily_closes[-20:]) / 20
+        w_df = candles.get("W", pd.DataFrame())
+        if not w_df.empty and len(w_df) >= 21 and current_price is not None:
+            weekly_closes = w_df["close"].tolist()
+            sma_20 = sum(weekly_closes[-20:]) / 20
             # EMA 21
-            ema_21 = daily_closes[0]
+            ema_21 = weekly_closes[0]
             multiplier = 2 / (21 + 1)
-            for price_val in daily_closes[1:]:
+            for price_val in weekly_closes[1:]:
                 ema_21 = (price_val - ema_21) * multiplier + ema_21
             bmsb = {
                 "sma_20": sma_20,
@@ -337,8 +338,9 @@ class MarketAnalyzer:
         # Pi Cycle Top: SMA 111 crosses above 2x SMA 350
         # Pi Cycle Bottom: SMA 150 crosses below SMA 471
         pi_cycle = None
-        if not d_df.empty and len(d_df) >= 471:
-            daily_closes = d_df["close"].tolist()
+        daily_df = candles.get("D", pd.DataFrame())
+        if not daily_df.empty and len(daily_df) >= 471:
+            daily_closes = daily_df["close"].tolist()
             sma_111 = sum(daily_closes[-111:]) / 111
             sma_350 = sum(daily_closes[-350:]) / 350
             sma_350_2x = sma_350 * 2
@@ -584,7 +586,9 @@ class MarketAnalyzer:
             "D": [20, 50],
             "H4": [20, 50],
             "H1": [20, 50],
-            "M5": [2, 5, 20],
+            "M15": [5, 20, 50],
+            "M5": [2, 5, 20, 50],
+            "M2": [2, 5, 50],
         }
 
         for tf, periods in ema_configs.items():

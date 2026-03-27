@@ -217,16 +217,15 @@ class RiskManager:
             return 0.0
 
         # Determine current level based on accumulated gains
-        level = min(int(accumulated / delta_threshold), 4)
+        level = min(int(accumulated / delta_threshold), 3)
 
         # Fixed risk levels from Excel (Delta+ sheet)
-        # Level 0 = base, Level 1 = 1.0%, Level 2 = 1.5%, Level 3 = 2.0%, Level 4 = 3.0%
+        # Level 0 = base, Level 1 = 1.5%, Level 2 = 2.0%, Level 3 = 3.0%
         level_risks = {
             0: base_risk,           # 1.0% (no bonus)
-            1: 0.010,               # 1.0%
-            2: 0.015,               # 1.5%
-            3: 0.020,               # 2.0%
-            4: 0.030,               # 3.0%
+            1: 0.015,               # 1.5%
+            2: 0.020,               # 2.0%
+            3: 0.030,               # 3.0%
         }
 
         target_risk = level_risks.get(level, base_risk)

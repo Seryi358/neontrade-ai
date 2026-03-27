@@ -1299,6 +1299,13 @@ class BlueStrategy(BaseStrategy):
             confidence -= 5.0
             met.append("Variante C: Rechazo de EMA 4H (mas riesgosa)")
 
+        if variant == "BLUE_C":
+            # TradingLab: Blue C requires daily timeframe in our favor
+            htf_needed = "bullish" if direction == "BUY" else "bearish"
+            if analysis.htf_trend.value != htf_needed:
+                failed.append(f"Blue C requiere HTF a favor (necesita {htf_needed}, tiene {analysis.htf_trend.value})")
+                return None
+
         # TradingLab: RSI divergence bonus
         has_div, div_bonus = _check_rsi_divergence(analysis, direction)
         if has_div:
@@ -1987,7 +1994,7 @@ class PinkStrategy(BaseStrategy):
             if fib_618 > 0 and fib_618 < entry_price:
                 candidates.append(fib_618)
             if candidates:
-                return max(candidates)  # Prefer tighter SL (closest to entry)
+                return min(candidates)  # Protect previous low (furthest from entry)
             return entry_price * 0.99
         else:
             candidates = []
@@ -1997,7 +2004,7 @@ class PinkStrategy(BaseStrategy):
             if fib_618 > 0 and fib_618 > entry_price:
                 candidates.append(fib_618)
             if candidates:
-                return min(candidates)  # Prefer tighter SL
+                return max(candidates)  # Protect previous high (furthest from entry)
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2256,7 +2263,7 @@ class WhiteStrategy(BaseStrategy):
             if fib_618 > 0 and fib_618 < entry_price:
                 candidates.append(fib_618)
             if candidates:
-                return max(candidates)  # Prefer tighter SL
+                return min(candidates)  # Protect previous low (furthest from entry)
             return entry_price * 0.99
         else:
             candidates = []
@@ -2266,7 +2273,7 @@ class WhiteStrategy(BaseStrategy):
             if fib_618 > 0 and fib_618 > entry_price:
                 candidates.append(fib_618)
             if candidates:
-                return min(candidates)  # Prefer tighter SL
+                return max(candidates)  # Protect previous high (furthest from entry)
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2590,7 +2597,7 @@ class BlackStrategy(BaseStrategy):
             if fib_618 > 0 and fib_618 < entry_price:
                 candidates.append(fib_618)
             if candidates:
-                return max(candidates)  # Prefer tighter SL
+                return min(candidates)  # Protect previous low (furthest from entry)
             return entry_price * 0.985  # 1.5% fallback (tight for counter-trend)
         else:
             candidates = []
@@ -2600,7 +2607,7 @@ class BlackStrategy(BaseStrategy):
             if fib_618 > 0 and fib_618 > entry_price:
                 candidates.append(fib_618)
             if candidates:
-                return min(candidates)  # Prefer tighter SL
+                return max(candidates)  # Protect previous high (furthest from entry)
             return entry_price * 1.015
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2800,21 +2807,21 @@ class GreenStrategy(BaseStrategy):
             met.append(f"SMC: {smc_desc}")
 
         # --- Paso 5: Entrada en 15M (RCC: Ruptura + Cierre + Confirmación) ---
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
-        ema_5m_20_break, ema_5m_20_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+        ema_15m_break, ema_15m_desc = _check_ema_break(analysis, "EMA_M15_5", direction)
+        ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, "EMA_M15_20", direction)
 
-        if ema_5m_break and ema_5m_20_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+        if ema_15m_break and ema_15m_20_break:
+            if _check_rcc_confirmation(analysis, "EMA_M15_5", direction):
                 confidence += 15.0
-                met.append(f"Paso 5: RCC confirmado (EMA 5 + EMA 20 de M5)")
+                met.append(f"Paso 5: RCC confirmado (EMA 5 + EMA 20 de M15)")
             else:
                 confidence += 8.0
                 met.append(f"Paso 5: Rompimiento doble sin RCC")
-        elif ema_5m_break:
+        elif ema_15m_break:
             confidence += 5.0
-            met.append(f"Paso 5: Rompimiento parcial - {ema_5m_desc}")
+            met.append(f"Paso 5: Rompimiento parcial - {ema_15m_desc}")
         else:
-            failed.append(f"Paso 5: Sin rompimiento - {ema_5m_desc}")
+            failed.append(f"Paso 5: Sin rompimiento - {ema_15m_desc}")
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)

@@ -135,8 +135,12 @@ async def lifespan(app: FastAPI):
     engine_task.cancel()
     status_task.cancel()
 
-    broker = engine.broker
-    await broker.close()
+    try:
+        broker = engine.broker
+        if broker:
+            await broker.close()
+    except Exception as e:
+        logger.warning(f"Error closing broker: {e}")
 
     if db:
         await db.close()

@@ -319,9 +319,9 @@ async def reject_all_setups():
     from main import engine
     if hasattr(engine, 'pending_setups'):
         count = len(engine.pending_setups)
-        for setup_id in list(engine.pending_setups.keys()):
+        for setup in list(engine.pending_setups):
             try:
-                await engine.reject_setup(setup_id)
+                engine.reject_setup(setup.id)
             except Exception:
                 pass
         return {"status": "rejected_all", "count": count}

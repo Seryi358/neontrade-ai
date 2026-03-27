@@ -1594,7 +1594,7 @@ class TradingEngine:
                             tp1=setup.take_profit_1,
                             tp_max=setup.take_profit_max,
                             strategy=getattr(setup, '_strategy_name', 'DETECTED'),
-                            confidence=setup.reward_risk_ratio * 33,
+                            confidence=min(setup.reward_risk_ratio * 33 / 100, 1.0),
                             candles=candles,
                             ema_values=ema_vals,
                         )
@@ -1952,7 +1952,7 @@ class TradingEngine:
                     "convergence": result.htf_ltf_convergence,
                     "patterns": result.candlestick_patterns,
                 }
-                for inst, result in self._last_scan_results.items()
+                for inst, result in dict(self._last_scan_results).items()
             },
             "positions": {
                 tid: {

@@ -15,7 +15,7 @@ Generates comprehensive monthly reports with:
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from loguru import logger
 import json
@@ -136,7 +136,7 @@ class MonthlyReviewGenerator:
         """
         report = MonthlyReport(
             month=month,
-            generated_at=datetime.utcnow().isoformat(),
+            generated_at=datetime.now(timezone.utc).isoformat(),
         )
 
         if not trades:
@@ -386,7 +386,7 @@ class MonthlyReviewGenerator:
                     continue
         if isinstance(ts, (int, float)):
             try:
-                return datetime.utcfromtimestamp(ts)
+                return datetime.fromtimestamp(ts, tz=timezone.utc)
             except (OSError, ValueError, OverflowError):
                 pass
         return None

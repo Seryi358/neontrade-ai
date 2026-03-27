@@ -210,8 +210,8 @@ class PositionManager:
 
             price_data = current_prices[pos.instrument]
             current_price = (
-                price_data.bid if pos.direction == "SELL"
-                else price_data.ask
+                price_data.ask if pos.direction == "SELL"
+                else price_data.bid
             )
 
             # Update extreme prices

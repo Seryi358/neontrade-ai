@@ -403,18 +403,13 @@ class RiskManager:
             logger.error(f"Invalid pip value ({pip_value}) for {instrument}")
             return 0
 
-        # Calculate units
-        sl_pips = sl_distance / pip_value
-        if sl_pips <= 0:
-            logger.error(f"Invalid SL pips ({sl_pips}) for {instrument}")
+        # Mentoría TradingLab: Position Size = Risk Amount / SL Distance
+        # sl_distance is in price terms, units represent position size
+        if sl_distance <= 0:
+            logger.error(f"Invalid SL distance ({sl_distance}) for {instrument}")
             return 0
 
-        cost_per_unit = sl_pips * pip_value
-        if cost_per_unit <= 0:
-            logger.error(f"Invalid cost per unit for {instrument}")
-            return 0
-
-        units = int(risk_amount / cost_per_unit)
+        units = int(risk_amount / sl_distance)
 
         # Cap maximum position size to prevent broker rejections
         MAX_UNITS = 10_000_000

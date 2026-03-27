@@ -54,6 +54,8 @@ class TradeJournal:
         direction: str,
         is_discretionary: bool = False,
         discretionary_notes: str = "",
+        open_time: Optional[str] = None,
+        sl: Optional[float] = None,
     ):
         """Record a completed trade into the journal."""
         now = datetime.now(timezone.utc)
@@ -115,9 +117,23 @@ class TradeJournal:
             self._dd_by_year[year] = 0.0
         self._dd_by_year[year] = max(self._dd_by_year[year], abs(drawdown_pct))
 
+        # Calculate R:R achieved if SL is provided
+        rr_achieved = None
+        if sl is not None and entry_price and exit_price:
+            direction_upper = direction.upper()
+            if direction_upper == "BUY" and sl < entry_price:
+                risk = entry_price - sl
+                if risk > 0:
+                    rr_achieved = round((exit_price - entry_price) / risk, 4)
+            elif direction_upper == "SELL" and sl > entry_price:
+                risk = sl - entry_price
+                if risk > 0:
+                    rr_achieved = round((entry_price - exit_price) / risk, 4)
+
         trade_record = {
             "trade_number": self._trade_counter,
             "trade_id": trade_id,
+            "open_time": open_time,
             "date": now.isoformat(),
             "month": now.strftime("%Y-%m"),
             "instrument": instrument,
@@ -125,6 +141,8 @@ class TradeJournal:
             "strategy": strategy,
             "entry_price": entry_price,
             "exit_price": exit_price,
+            "sl": sl,
+            "rr_achieved": rr_achieved,
             "pnl_dollars": round(pnl_dollars, 2),
             "pnl_pct": round(pnl_pct, 4),
             "result": result,
@@ -394,10 +412,13 @@ class TradeJournal:
                 with open(self._data_path, "r") as f:
                     data = json.load(f)
                 self._trades = data.get("trades", [])
-                # Backfill discretionary fields for trades saved before this feature
+                # Backfill fields for trades saved before these features
                 for trade in self._trades:
                     trade.setdefault("is_discretionary", False)
                     trade.setdefault("discretionary_notes", "")
+                    trade.setdefault("open_time", None)
+                    trade.setdefault("rr_achieved", None)
+                    trade.setdefault("sl", None)
                 self._current_balance = data.get("current_balance", self._initial_capital)
                 self._peak_balance = data.get("peak_balance", self._initial_capital)
                 self._max_drawdown_pct = data.get("max_drawdown_pct", 0.0)

@@ -19,7 +19,7 @@ import {
   Platform,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, authFetch, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
+import { API_URL, authFetch, getScoreColor, getTrendColor, getTrendIcon, STRATEGY_COLORS } from '../services/api';
 
 // ─── TradingView lightweight-charts (web only) ─────────────────────────────
 let createChart: any;
@@ -139,13 +139,13 @@ const formatPrice = (price: number, instrument: string) => {
 const _strategyColor = (name: string | null): string | null => {
   if (!name) return null;
   const upper = name.toUpperCase();
-  if (upper.includes('BLUE')) return '#00f0ff';
-  if (upper.includes('RED')) return '#ff2e63';
-  if (upper.includes('GREEN')) return '#00ff88';
-  if (upper.includes('PINK')) return '#eb4eca';
-  if (upper.includes('WHITE')) return '#f0e6ff';
-  if (upper.includes('BLACK')) return '#888888';
-  return '#eb4eca';
+  if (upper.includes('BLUE')) return STRATEGY_COLORS.BLUE;
+  if (upper.includes('RED')) return STRATEGY_COLORS.RED;
+  if (upper.includes('GREEN')) return STRATEGY_COLORS.GREEN;
+  if (upper.includes('PINK')) return STRATEGY_COLORS.PINK;
+  if (upper.includes('WHITE')) return STRATEGY_COLORS.WHITE;
+  if (upper.includes('BLACK')) return STRATEGY_COLORS.BLACK;
+  return STRATEGY_COLORS.DETECTED;
 };
 
 /**
@@ -892,12 +892,12 @@ export default function ChartScreen() {
   const renderBottomBar = () => {
     if (!analysisSummary) return null;
     const stratColorMap: Record<string, string> = {
-      BLUE: '#0088ff',
-      RED: '#ff2e63',
-      PINK: '#ff69b4',
-      WHITE: '#ffffff',
-      BLACK: '#333333',
-      GREEN: '#00ff88',
+      BLUE: STRATEGY_COLORS.BLUE,
+      RED: STRATEGY_COLORS.RED,
+      PINK: STRATEGY_COLORS.PINK,
+      WHITE: STRATEGY_COLORS.WHITE,
+      BLACK: STRATEGY_COLORS.BLACK,
+      GREEN: STRATEGY_COLORS.GREEN,
     };
     const stratColor = analysisSummary.strategy_color
       ? stratColorMap[analysisSummary.strategy_color.toUpperCase()] || theme.colors.textMuted

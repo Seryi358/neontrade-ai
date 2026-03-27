@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, authFetch } from '../services/api';
+import { API_URL, authFetch, STRATEGY_COLORS } from '../services/api';
 
 // Types
 interface Trade {
@@ -39,24 +39,16 @@ interface HistoryStats {
 
 const STRATEGY_FILTERS = [
   { key: 'ALL', label: 'ALL', color: theme.colors.textWhite },
-  { key: 'BLUE', label: 'BLUE', color: '#4488ff' },
-  { key: 'RED', label: 'RED', color: '#ff2e63' },
-  { key: 'PINK', label: 'PINK', color: '#eb4eca' },
-  { key: 'WHITE', label: 'WHITE', color: '#f0e6ff' },
-  { key: 'BLACK', label: 'BLACK', color: '#555555' },
-  { key: 'GREEN', label: 'GREEN', color: '#00ff88' },
+  { key: 'BLUE', label: 'BLUE', color: STRATEGY_COLORS.BLUE },
+  { key: 'RED', label: 'RED', color: STRATEGY_COLORS.RED },
+  { key: 'PINK', label: 'PINK', color: STRATEGY_COLORS.PINK },
+  { key: 'WHITE', label: 'WHITE', color: STRATEGY_COLORS.WHITE },
+  { key: 'BLACK', label: 'BLACK', color: STRATEGY_COLORS.BLACK },
+  { key: 'GREEN', label: 'GREEN', color: STRATEGY_COLORS.GREEN },
 ];
 
 const getStrategyDotColor = (color: string): string => {
-  switch (color?.toUpperCase()) {
-    case 'BLUE': return '#4488ff';
-    case 'RED': return '#ff2e63';
-    case 'PINK': return '#eb4eca';
-    case 'WHITE': return '#f0e6ff';
-    case 'BLACK': return '#555555';
-    case 'GREEN': return '#00ff88';
-    default: return theme.colors.textMuted;
-  }
+  return STRATEGY_COLORS[color?.toUpperCase()] || theme.colors.textMuted;
 };
 
 export default function HistoryScreen() {

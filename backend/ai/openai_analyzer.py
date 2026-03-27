@@ -179,26 +179,26 @@ Fair Value Gaps (FVG):
 ──── BLUE STRATEGY (1H Trend Change — Elliott Wave 1-2) ────
 Associated Wave: Wave 2 retracement end → catching the beginning of Wave 3 on 1H
 
-BLUE A (Standard):
+BLUE A (Doble suelo/techo):
   Step 1: Daily chart shows deceleration of current trend (candle patterns: doji, hammer, shooting star, engulfing)
   Step 2: 4H chart shows price near key S/R level or EMA 4H
   Step 3: 1H chart shows trend change (BOS against the 1H trend, or CHOCH)
   Step 4: Price retraces to a key zone (Fibonacci 0.382-0.618, FVG, or OB)
   Step 5: Entry on 5m/2m with reversal candle pattern at the key zone
   SL: Below/above the 1H swing that created the new structure
-  TP1: EMA 4H (20-period) level
+  TP1: EMA 50 4H level
   TP_max: Previous 4H swing high/low
 
-BLUE B (EMA Break):
+BLUE B (Estandar):
   Step 1: Same HTF deceleration as Blue A
-  Step 2: 1H price breaks and closes beyond EMA 1H (20-period)
+  Step 2: 1H price breaks and closes beyond EMA 50 1H
   Step 3: Wait for retest of the broken EMA from the other side
   Step 4: Entry on retest with confirmation candle on 5m
   SL: Beyond the EMA break candle's wick
   TP1: EMA 4H level
   TP_max: Next 4H S/R level
 
-BLUE C (Fibonacci):
+BLUE C (Rechazo EMA 4H):
   Step 1: Same HTF conditions
   Step 2: 1H impulse wave completed (Wave 1 on 1H)
   Step 3: Price retraces into Fibonacci 0.382-0.618 zone of the 1H impulse
@@ -308,7 +308,7 @@ Scalping Rules:
 ═══════════════════════════════════════════════════════════════════
 
 Day Trading Position Management:
-- EMA 50 on the management style timeframe (LP: Weekly/H4/M15, CP: H1/M15/M1, CPA: M15/M2/30s)
+- EMA 50 on the management style timeframe (Largo Plazo (LP): Weekly/H4/M15, Corto Plazo (CP): H1/M15/M1, Corto Plazo Agresivo (CPA): M15/M2/30s)
 - SMA 200 (H1): major trend filter from Scalping Workshop
 
 EMA Trailing Rules:

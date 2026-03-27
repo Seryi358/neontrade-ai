@@ -279,12 +279,12 @@ export const api = {
 // ── Shared Constants ─────────────────────────────────────────────
 
 export const STRATEGY_COLORS: Record<string, string> = {
-  BLACK: '#1a1a2e',
-  BLUE: '#00f0ff',
-  RED: '#ff2e63',
+  BLUE: '#0088ff',
+  RED: '#ff0040',
   PINK: '#ff69b4',
-  GREEN: '#00ff88',
-  WHITE: '#f0e6ff',
+  WHITE: '#ffffff',
+  BLACK: '#888888',
+  GREEN: '#00ff41',
   DETECTED: '#eb4eca',
 };
 
@@ -296,14 +296,16 @@ export function getScoreColor(score: number): string {
 }
 
 export function getTrendColor(trend: string): string {
-  if (trend?.includes('BULL')) return '#00ff88';
-  if (trend?.includes('BEAR')) return '#ff2e63';
+  const upper = trend?.toUpperCase() || '';
+  if (upper.includes('BULL')) return '#00ff41';
+  if (upper.includes('BEAR')) return '#ff0040';
   return '#7a6b9a';
 }
 
 export function getTrendIcon(trend: string): string {
-  if (trend?.includes('BULL')) return '▲';
-  if (trend?.includes('BEAR')) return '▼';
+  const upper = trend?.toUpperCase() || '';
+  if (upper.includes('BULL')) return '▲';
+  if (upper.includes('BEAR')) return '▼';
   return '◆';
 }
 

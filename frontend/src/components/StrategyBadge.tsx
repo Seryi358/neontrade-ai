@@ -6,17 +6,13 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+import { STRATEGY_COLORS as BASE_STRATEGY_COLORS } from '../services/api';
 
 const STRATEGY_COLORS: Record<string, string> = {
-  BLUE: '#0088ff',
-  BLUE_A: '#0088ff',
-  BLUE_B: '#0088ff',
-  BLUE_C: '#0088ff',
-  RED: '#ff2e63',
-  PINK: '#ff69b4',
-  WHITE: '#f0e6ff',
-  BLACK: '#555555',
-  GREEN: '#00ff88',
+  ...BASE_STRATEGY_COLORS,
+  BLUE_A: BASE_STRATEGY_COLORS.BLUE,
+  BLUE_B: BASE_STRATEGY_COLORS.BLUE,
+  BLUE_C: BASE_STRATEGY_COLORS.BLUE,
 };
 
 const STRATEGY_NAMES: Record<string, string> = {

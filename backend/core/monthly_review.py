@@ -156,7 +156,7 @@ class MonthlyReviewGenerator:
         report.total_trades = len(trades)
 
         for trade in trades:
-            pnl = trade.get("pnl", 0.0) or 0.0
+            pnl = trade.get("pnl_dollars", trade.get("pnl", 0.0)) or 0.0
             pnl_pct = trade.get("pnl_pct", 0.0) or 0.0
             result = trade.get("result", "")
             strategy = trade.get("strategy", "UNKNOWN")
@@ -221,7 +221,7 @@ class MonthlyReviewGenerator:
                 inst["wins"] += 1
 
             # ── By day of week ────────────────────────────────────────────
-            trade_date = trade.get("open_time", trade.get("timestamp", ""))
+            trade_date = trade.get("open_time") or trade.get("date", trade.get("timestamp", ""))
             day_name = self._get_day_name(trade_date)
             if day_name:
                 if day_name not in report.by_day_of_week:
@@ -456,7 +456,7 @@ class MonthlyReviewGenerator:
         max_dd_pct = 0.0
 
         for t in trades:
-            pnl = t.get("pnl", 0.0) or 0.0
+            pnl = t.get("pnl_dollars", t.get("pnl", 0.0)) or 0.0
             equity += pnl
             if equity > peak:
                 peak = equity

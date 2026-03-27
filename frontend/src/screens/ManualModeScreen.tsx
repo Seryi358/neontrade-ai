@@ -15,7 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
-import { API_URL, authFetch } from '../services/api';
+import { API_URL, authFetch, STRATEGY_COLORS } from '../services/api';
 
 // Types
 interface PendingSetup {
@@ -37,15 +37,7 @@ interface PendingSetup {
 }
 
 const getStrategyDotColor = (color: string): string => {
-  switch (color?.toUpperCase()) {
-    case 'BLUE': return '#4488ff';
-    case 'RED': return '#ff2e63';
-    case 'PINK': return '#eb4eca';
-    case 'WHITE': return '#f0e6ff';
-    case 'BLACK': return '#555555';
-    case 'GREEN': return '#00ff88';
-    default: return theme.colors.textMuted;
-  }
+  return STRATEGY_COLORS[color?.toUpperCase()] || theme.colors.textMuted;
 };
 
 const getConfidenceColor = (confidence: string) => {
@@ -164,15 +156,12 @@ export default function ManualModeScreen() {
           onPress: async () => {
             try {
               setActionLoading('reject-all');
-              // Reject each setup individually
-              await Promise.all(
-                setups.map((s) =>
-                  authFetch(`${API_URL}/api/v1/pending-setups/${s.id}/reject`, {
-                    method: 'POST',
-                  })
-                )
-              );
-              setSetups([]);
+              const res = await authFetch(`${API_URL}/api/v1/pending-setups/reject-all`, {
+                method: 'POST',
+              });
+              if (res.ok) {
+                setSetups([]);
+              }
             } catch (err) {
               console.error('Failed to reject all:', err);
             } finally {

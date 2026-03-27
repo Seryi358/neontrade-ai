@@ -1614,7 +1614,12 @@ async def generate_monthly_review(month: str = Query(..., description="YYYY-MM f
     # Filter trades for the requested month
     month_trades = []
     for t in all_trades:
-        ts = t.get("timestamp", t.get("open_time", ""))
+        # Try month field first, then fall back to date/open_time/timestamp
+        trade_month = t.get("month", "")
+        if trade_month == month:
+            month_trades.append(t)
+            continue
+        ts = t.get("date") or t.get("open_time") or t.get("timestamp", "")
         if isinstance(ts, str) and ts.startswith(month):
             month_trades.append(t)
 
@@ -1647,6 +1652,180 @@ async def list_monthly_reviews():
     if engine is None or not hasattr(engine, 'monthly_review') or engine.monthly_review is None:
         return {"reports": []}
     return {"reports": engine.monthly_review.list_reports()}
+
+
+# ── Weekly Review (ASR - Análisis Semanal de Resultados) ───────────
+
+@router.get("/weekly-review")
+async def get_weekly_review(
+    week: Optional[str] = Query(
+        None,
+        description="ISO week in YYYY-Www format (e.g. 2026-W13). Defaults to current week.",
+    ),
+):
+    """
+    Generate a weekly analysis report (ASR - Análisis Semanal de Resultados).
+
+    The mentorship teaches ASR as a critical weekly practice to review
+    performance, identify patterns, and make adjustments.
+    """
+    from main import engine
+    from datetime import datetime, timezone, timedelta
+
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        return {
+            "week": week or "unknown",
+            "total_trades": 0,
+            "message": "Trade journal not initialized",
+        }
+
+    # Determine the ISO week to analyze
+    now = datetime.now(timezone.utc)
+    if week:
+        # Parse YYYY-Www format
+        import re
+        match = re.match(r'^(\d{4})-W(\d{2})$', week)
+        if not match:
+            raise HTTPException(400, "Week must be in YYYY-Www format (e.g. 2026-W13)")
+        iso_year = int(match.group(1))
+        iso_week = int(match.group(2))
+        if iso_week < 1 or iso_week > 53:
+            raise HTTPException(400, "Week number must be between 1 and 53")
+    else:
+        iso_year, iso_week, _ = now.isocalendar()
+        week = f"{iso_year}-W{iso_week:02d}"
+
+    # Calculate the Monday and Sunday of the target week
+    # ISO week 1 starts on the Monday of the week containing the year's first Thursday
+    jan4 = datetime(iso_year, 1, 4, tzinfo=timezone.utc)
+    # Monday of ISO week 1
+    week1_monday = jan4 - timedelta(days=jan4.weekday())
+    week_monday = week1_monday + timedelta(weeks=iso_week - 1)
+    week_sunday = week_monday + timedelta(days=6, hours=23, minutes=59, seconds=59)
+
+    week_start_str = week_monday.strftime("%Y-%m-%d")
+    week_end_str = week_sunday.strftime("%Y-%m-%d")
+
+    # Get all trades and filter for the target week
+    all_trades = engine.trade_journal.get_trades(limit=9999)
+    week_trades = []
+    for t in all_trades:
+        ts = t.get("date") or t.get("open_time") or t.get("timestamp", "")
+        if isinstance(ts, str) and len(ts) >= 10:
+            trade_date_str = ts[:10]  # YYYY-MM-DD
+            if week_start_str <= trade_date_str <= week_end_str:
+                week_trades.append(t)
+
+    # Build the weekly summary
+    total = len(week_trades)
+    wins = [t for t in week_trades if t.get("result") == "TP"]
+    losses = [t for t in week_trades if t.get("result") == "SL"]
+    be_trades = [t for t in week_trades if t.get("result") == "BE"]
+
+    win_count = len(wins)
+    loss_count = len(losses)
+    total_pnl = sum(t.get("pnl_dollars", 0.0) or 0.0 for t in week_trades)
+
+    win_rate = (win_count / total * 100) if total > 0 else 0.0
+
+    # Best and worst trade
+    best_trade = None
+    worst_trade = None
+    if week_trades:
+        best_t = max(week_trades, key=lambda t: t.get("pnl_dollars", 0.0) or 0.0)
+        worst_t = min(week_trades, key=lambda t: t.get("pnl_dollars", 0.0) or 0.0)
+        best_trade = {
+            "trade_id": best_t.get("trade_id"),
+            "instrument": best_t.get("instrument"),
+            "pnl_dollars": best_t.get("pnl_dollars", 0.0),
+            "strategy": best_t.get("strategy"),
+        }
+        worst_trade = {
+            "trade_id": worst_t.get("trade_id"),
+            "instrument": worst_t.get("instrument"),
+            "pnl_dollars": worst_t.get("pnl_dollars", 0.0),
+            "strategy": worst_t.get("strategy"),
+        }
+
+    # P&L by strategy
+    pnl_by_strategy: Dict[str, dict] = {}
+    for t in week_trades:
+        strat = t.get("strategy", "UNKNOWN")
+        if strat not in pnl_by_strategy:
+            pnl_by_strategy[strat] = {"trades": 0, "pnl": 0.0, "wins": 0}
+        pnl_by_strategy[strat]["trades"] += 1
+        pnl_by_strategy[strat]["pnl"] += t.get("pnl_dollars", 0.0) or 0.0
+        if t.get("result") == "TP":
+            pnl_by_strategy[strat]["wins"] += 1
+    # Add win_rate to each strategy
+    for data in pnl_by_strategy.values():
+        data["pnl"] = round(data["pnl"], 2)
+        data["win_rate"] = round(
+            (data["wins"] / data["trades"] * 100) if data["trades"] > 0 else 0.0, 2
+        )
+
+    # P&L by instrument
+    pnl_by_instrument: Dict[str, dict] = {}
+    for t in week_trades:
+        inst = t.get("instrument", "UNKNOWN")
+        if inst not in pnl_by_instrument:
+            pnl_by_instrument[inst] = {"trades": 0, "pnl": 0.0, "wins": 0}
+        pnl_by_instrument[inst]["trades"] += 1
+        pnl_by_instrument[inst]["pnl"] += t.get("pnl_dollars", 0.0) or 0.0
+        if t.get("result") == "TP":
+            pnl_by_instrument[inst]["wins"] += 1
+    for data in pnl_by_instrument.values():
+        data["pnl"] = round(data["pnl"], 2)
+        data["win_rate"] = round(
+            (data["wins"] / data["trades"] * 100) if data["trades"] > 0 else 0.0, 2
+        )
+
+    # Average R:R achieved
+    rr_values = [
+        t.get("rr_achieved") for t in week_trades
+        if t.get("rr_achieved") is not None
+    ]
+    avg_rr_achieved = round(sum(rr_values) / len(rr_values), 4) if rr_values else 0.0
+
+    # Analysis note
+    if total == 0:
+        analysis_note = (
+            f"No se ejecutaron trades en la semana {week}. "
+            "Verificar si las condiciones del plan de trading se cumplieron."
+        )
+    elif win_rate >= 65:
+        analysis_note = (
+            f"Semana positiva con win rate de {win_rate:.1f}%. "
+            "Mantener disciplina y consistencia."
+        )
+    elif win_rate >= 50:
+        analysis_note = (
+            f"Semana aceptable con win rate de {win_rate:.1f}%. "
+            "Revisar trades perdedores para identificar mejoras."
+        )
+    else:
+        analysis_note = (
+            f"Semana con win rate bajo ({win_rate:.1f}%). "
+            "Revisar entradas, confluencias y gestión emocional. "
+            "Considerar reducir tamaño o pausar si hay racha perdedora."
+        )
+
+    return {
+        "week": week,
+        "period": {"start": week_start_str, "end": week_end_str},
+        "total_trades": total,
+        "wins": win_count,
+        "losses": loss_count,
+        "break_evens": len(be_trades),
+        "win_rate": round(win_rate, 2),
+        "total_pnl": round(total_pnl, 2),
+        "best_trade": best_trade,
+        "worst_trade": worst_trade,
+        "pnl_by_strategy": pnl_by_strategy,
+        "pnl_by_instrument": pnl_by_instrument,
+        "avg_rr_achieved": avg_rr_achieved,
+        "analysis_note": analysis_note,
+    }
 
 
 # ── Discretionary Trade Tracking ───────────────────────────────────

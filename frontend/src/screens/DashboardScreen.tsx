@@ -56,15 +56,17 @@ interface EngineStatus {
 export default function DashboardScreen() {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [status, setStatus] = useState<EngineStatus | null>(null);
+  const [maxTotalRisk, setMaxTotalRisk] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       setError(null);
-      const [accountRes, statusRes] = await Promise.all([
+      const [accountRes, statusRes, riskRes] = await Promise.all([
         authFetch(`${API_URL}/api/v1/account`).catch(() => null),
         authFetch(`${API_URL}/api/v1/status`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/risk-config`).catch(() => null),
       ]);
       if (statusRes?.ok) {
         const statusData = await statusRes.json();
@@ -78,6 +80,12 @@ export default function DashboardScreen() {
         setAccount(await accountRes.json());
       } else if (!accountRes) {
         setError('No se pudo conectar al servidor');
+      }
+      if (riskRes?.ok) {
+        const riskData = await riskRes.json();
+        if (riskData?.max_total_risk != null) {
+          setMaxTotalRisk(riskData.max_total_risk);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -203,7 +211,9 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.stat}>
             <Text style={styles.statLabel}>RIESGO MAX</Text>
-            <Text style={styles.statValue}>7.0%</Text>
+            <Text style={styles.statValue}>
+              {maxTotalRisk != null ? `${(maxTotalRisk * 100).toFixed(1)}%` : '---'}
+            </Text>
           </View>
           <View style={styles.stat}>
             <Text style={styles.statLabel}>MODO</Text>

@@ -1929,29 +1929,26 @@ class PinkStrategy(BaseStrategy):
         met: List[str] = []
         failed: List[str] = []
 
-        # --- Paso 4: EMA 50 1H se rompe en patron correctivo ---
-        # Para Pink, la EMA 50 1H se rompe CONTRA la tendencia (patron correctivo)
-        # Es decir, si la tendencia es BUY, la EMA 50 1H se rompe a la baja temporalmente
-        opposite = "SELL" if direction == "BUY" else "BUY"
-        ema_1h_break_opposite, desc = _check_ema_break(analysis, "EMA_H1_50", opposite)
-
-        if ema_1h_break_opposite:
-            confidence += 15.0
-            met.append(f"Paso 4: EMA 50 1H rota en correccion - {desc}")
-        else:
-            # Si la EMA no esta rota en contra, verificar si esta muy cerca (inicio de correccion)
-            price = _get_current_price_proxy(analysis)
-            ema_1h = _ema_val(analysis, "EMA_H1_50")
-            if price and ema_1h:
-                dist = abs(price - ema_1h) / ema_1h * 100
-                if dist < 0.3:
-                    confidence += 8.0
-                    met.append(f"Paso 4: Precio muy cerca de EMA 50 1H ({dist:.2f}%) - posible inicio de correccion")
-                else:
-                    failed.append(f"Paso 4: EMA 50 1H no rota en correccion y distante ({dist:.2f}%)")
-                    return None
+        # --- Paso 4: Verificar que correccion se esta completando ---
+        # Pink concept: HTF already confirmed EMA 50 1H break (correction).
+        # LTF should check for corrective pattern completion (price returning),
+        # NOT re-check EMA direction (which would conflict with HTF check).
+        price = _get_current_price_proxy(analysis)
+        ema_1h = _ema_val(analysis, "EMA_H1_50")
+        if price and ema_1h:
+            dist = abs(price - ema_1h) / ema_1h * 100
+            if dist < 0.5:
+                # Price is returning near EMA 50 1H - correction completing
+                confidence += 15.0
+                met.append(f"Paso 4: Precio regresando a EMA 50 1H ({dist:.2f}%) - correccion completandose")
+            elif dist < 1.0:
+                confidence += 8.0
+                met.append(f"Paso 4: Precio cerca de EMA 50 1H ({dist:.2f}%) - correccion en progreso")
             else:
+                failed.append(f"Paso 4: Precio lejos de EMA 50 1H ({dist:.2f}%) - correccion no completada")
                 return None
+        else:
+            return None
 
         # Verificar patron correctivo (usamos patrones de velas como proxy)
         # Patrones de consolidacion: DOJI frecuentes indican compresion
@@ -2071,31 +2068,19 @@ class PinkStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL debajo del minimo anterior (proteger el patron). Fib 0.618 as candidate."""
+        """SL debajo del minimo anterior (proteger el patron). Previous swing extreme only, NO Fibonacci."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
-        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
-            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                candidates.append(max(below))
-            # Add Fib 0.618 as candidate if valid
-            if fib_618 > 0 and fib_618 < entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return min(candidates)  # Protect previous low (furthest from entry)
+                return min(below)  # Protect previous low (furthest from entry)
             return entry_price * 0.99
         else:
-            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                candidates.append(min(above))
-            if fib_618 > 0 and fib_618 > entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return max(candidates)  # Protect previous high (furthest from entry)
+                return max(above)  # Protect previous high (furthest from entry)
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2386,31 +2371,19 @@ class WhiteStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Fib 0.618 as candidate."""
+        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Previous swing extreme only, NO Fibonacci."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
-        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
-            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                candidates.append(max(below))
-            # Add Fib 0.618 as candidate if valid
-            if fib_618 > 0 and fib_618 < entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return min(candidates)  # Protect previous low (furthest from entry)
+                return min(below)  # Protect previous low (furthest from entry)
             return entry_price * 0.99
         else:
-            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                candidates.append(min(above))
-            if fib_618 > 0 and fib_618 > entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return max(candidates)  # Protect previous high (furthest from entry)
+                return max(above)  # Protect previous high (furthest from entry)
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2816,31 +2789,19 @@ class BlackStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Fib 0.618 as candidate."""
+        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Previous swing extreme only."""
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
-        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
-            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                candidates.append(max(below))
-            # Add Fib 0.618 as candidate if valid
-            if fib_618 > 0 and fib_618 < entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return min(candidates)  # Protect previous low (furthest from entry)
+                return min(below)  # Protect previous low (furthest from entry)
             return entry_price * 0.985  # 1.5% fallback (tight for counter-trend)
         else:
-            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                candidates.append(min(above))
-            if fib_618 > 0 and fib_618 > entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return max(candidates)  # Protect previous high (furthest from entry)
+                return max(above)  # Protect previous high (furthest from entry)
             return entry_price * 1.015
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -2886,7 +2847,7 @@ class GreenStrategy(BaseStrategy):
     - Day Trading: 4H (trend) -> 1H (pattern) -> 15M (diagonal) -> 2M (execution)
     - Scalping:    15M (trend) -> 5M (pattern) -> 1M (diagonal) -> 30s (execution)
 
-    6 Pasos:
+    7 Pasos:
     1. Direccion de tendencia semanal (alcista/bajista)
     2. Correccion semanal forma un patron diario (cuna/triangulo)
     3. Fibonacci, S/R, medias moviles como zonas de soporte dentro del patron
@@ -3237,36 +3198,24 @@ class GreenStrategy(BaseStrategy):
         """
         SL debajo del minimo anterior de 1H (ajustado para lograr alto R:R).
         Green usa SL muy ajustado, por eso logra R:R tan altos.
-        Fib 0.618 as candidate for better protection.
+        Previous 1H swing low/high only, NO Fibonacci.
         """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
         ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
-        fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
 
         if direction == "BUY":
-            candidates = []
             below = [s for s in supports if s < entry_price]
             if below:
-                candidates.append(max(below))
-            # Add Fib 0.618 as candidate if valid
-            if fib_618 > 0 and fib_618 < entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return max(candidates)  # Tightest SL for high R:R
+                return max(below)  # Tightest SL for high R:R
             # Fallback: ligeramente debajo de EMA 1H si disponible
             if ema_1h_50 and ema_1h_50 < entry_price:
                 return ema_1h_50 * 0.999
             return entry_price * 0.995  # 0.5% tight SL
         else:
-            candidates = []
             above = [r for r in resistances if r > entry_price]
             if above:
-                candidates.append(min(above))
-            if fib_618 > 0 and fib_618 > entry_price:
-                candidates.append(fib_618)
-            if candidates:
-                return min(candidates)
+                return min(above)
             if ema_1h_50 and ema_1h_50 > entry_price:
                 return ema_1h_50 * 1.001
             return entry_price * 1.005

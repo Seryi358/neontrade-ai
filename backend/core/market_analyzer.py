@@ -120,11 +120,10 @@ class AnalysisResult:
 class MarketAnalyzer:
     """Multi-timeframe market analysis engine."""
 
-    # Class-level cache for SMT divergence: stores last swing high/low per instrument
-    _smt_cache: Dict[str, Dict] = {}
-
     def __init__(self, broker_client):
         self.broker = broker_client
+        # Instance-level cache for SMT divergence: stores last swing high/low per instrument
+        self._smt_cache: Dict[str, Dict] = {}
 
     async def full_analysis(self, instrument: str) -> AnalysisResult:
         """
@@ -480,6 +479,7 @@ class MarketAnalyzer:
 
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
+        rsi = rsi.fillna(100.0)
         current_rsi = rsi.iloc[-1]
 
         if current_rsi > 70:
@@ -690,13 +690,15 @@ class MarketAnalyzer:
             patterns.append("DOJI")
 
         # Hammer (bullish reversal)
-        if (wick_lower3 > body3 * 2 and
+        if (body3 > 0 and
+            wick_lower3 > body3 * 2 and
             wick_upper3 < body3 * 0.5 and
             c3["close"] > c3["open"]):
             patterns.append("HAMMER")
 
         # Shooting Star (bearish reversal)
-        if (wick_upper3 > body3 * 2 and
+        if (body3 > 0 and
+            wick_upper3 > body3 * 2 and
             wick_lower3 < body3 * 0.5 and
             c3["close"] < c3["open"]):
             patterns.append("SHOOTING_STAR")
@@ -751,16 +753,16 @@ class MarketAnalyzer:
         wick_upper2 = c2["high"] - max(c2["close"], c2["open"])
         if total_range2 > 0:
             if (abs(c3["high"] - c2["high"]) < total_range3 * 0.1 and
-                wick_upper3 > body3 * 1.5 and
-                wick_upper2 > body2 * 1.5):
+                body3 > 0 and wick_upper3 > body3 * 1.5 and
+                body2 > 0 and wick_upper2 > body2 * 1.5):
                 patterns.append("TWEEZER_TOP")
 
         # Tweezer Bottom - two consecutive candles with similar lows at support
         wick_lower2 = min(c2["close"], c2["open"]) - c2["low"]
         if total_range2 > 0:
             if (abs(c3["low"] - c2["low"]) < total_range3 * 0.1 and
-                wick_lower3 > body3 * 1.5 and
-                wick_lower2 > body2 * 1.5):
+                body3 > 0 and wick_lower3 > body3 * 1.5 and
+                body2 > 0 and wick_lower2 > body2 * 1.5):
                 patterns.append("TWEEZER_BOTTOM")
 
         # Inside Bar Bullish - c3 entirely within c2 range, bullish bias
@@ -950,6 +952,7 @@ class MarketAnalyzer:
 
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
+        rsi = rsi.fillna(100.0)
         val = rsi.iloc[-1]
         return val if not pd.isna(val) else None
 
@@ -970,6 +973,7 @@ class MarketAnalyzer:
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
+        rsi = rsi.fillna(100.0)
 
         # Look at last 20 candles for swing points
         recent_price = df.tail(20)
@@ -1893,7 +1897,7 @@ class MarketAnalyzer:
 
         if len(swing_highs) < 2 or len(swing_lows) < 2:
             # Store what we have and return
-            MarketAnalyzer._smt_cache[instrument] = {
+            self._smt_cache[instrument] = {
                 "last_swing_high": swing_highs[-1][1] if swing_highs else None,
                 "last_swing_low": swing_lows[-1][1] if swing_lows else None,
                 "prev_swing_high": swing_highs[-2][1] if len(swing_highs) >= 2 else None,
@@ -1908,7 +1912,7 @@ class MarketAnalyzer:
             "prev_swing_high": swing_highs[-2][1],
             "prev_swing_low": swing_lows[-2][1],
         }
-        MarketAnalyzer._smt_cache[instrument] = current_data
+        self._smt_cache[instrument] = current_data
 
         # Determine if current instrument made higher high or lower low
         made_higher_high = current_data["last_swing_high"] > current_data["prev_swing_high"]
@@ -1930,7 +1934,7 @@ class MarketAnalyzer:
 
         # Check against cached data for correlated instruments
         for corr_inst in correlated_instruments:
-            corr_data = MarketAnalyzer._smt_cache.get(corr_inst)
+            corr_data = self._smt_cache.get(corr_inst)
             if not corr_data:
                 continue
 

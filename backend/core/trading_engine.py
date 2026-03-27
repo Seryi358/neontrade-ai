@@ -830,8 +830,10 @@ class TradingEngine:
                     logger.debug(f"Failed to calculate PnL for funded close: {e}")
 
             await self.broker.close_all_trades()
+            for trade_id in list(self.risk_manager._active_risks.keys()):
+                instrument = self.risk_manager._active_risks[trade_id].get("instrument", "")
+                self.risk_manager.unregister_trade(trade_id, instrument)
             self.position_manager.positions.clear()
-            self.risk_manager._active_risks.clear()
 
     # ── Position Sync ────────────────────────────────────────────
 
@@ -936,7 +938,7 @@ class TradingEngine:
                                 direction=pos.direction,
                                 entry_price=pos.entry_price,
                                 close_price=close_price,
-                                pnl_pct=round(pnl_dollars / pos.entry_price * 100, 2) if pos.entry_price else 0,
+                                pnl_pct=round((close_price - pos.entry_price if pos.direction == "BUY" else pos.entry_price - close_price) / pos.entry_price * 100, 2) if pos.entry_price else 0,
                                 result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
                             )
                         except Exception:

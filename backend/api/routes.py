@@ -318,10 +318,12 @@ async def reject_all_setups():
     """Reject all pending setups."""
     from main import engine
     if hasattr(engine, 'pending_setups'):
-        count = len(engine.pending_setups)
-        for setup in list(engine.pending_setups):
+        pending = [s for s in engine.pending_setups if getattr(s, 'status', 'pending') == "pending"]
+        count = 0
+        for setup in pending:
             try:
-                engine.reject_setup(setup.id)
+                if engine.reject_setup(setup.id):
+                    count += 1
             except Exception:
                 pass
         return {"status": "rejected_all", "count": count}

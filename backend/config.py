@@ -289,8 +289,9 @@ def _load_risk_overrides():
             for key, value in overrides.items():
                 if hasattr(settings, key):
                     setattr(settings, key, value)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to load risk overrides from data/risk_config.json: {e}")
 
 _load_risk_overrides()
 
@@ -308,8 +309,8 @@ OANDA_STREAM_URL = {
 
 
 def get_oanda_url() -> str:
-    return OANDA_API_URL[settings.oanda_environment]
+    return OANDA_API_URL.get(settings.oanda_environment, OANDA_API_URL["practice"])
 
 
 def get_oanda_stream_url() -> str:
-    return OANDA_STREAM_URL[settings.oanda_environment]
+    return OANDA_STREAM_URL.get(settings.oanda_environment, OANDA_STREAM_URL["practice"])

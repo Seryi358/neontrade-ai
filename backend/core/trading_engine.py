@@ -1108,13 +1108,32 @@ class TradingEngine:
 
                     self._daily_setups_found += 1
 
-                    # Log session quality for the detected setup
+                    # Session quality filter: reduce confidence or skip during low-quality sessions
                     now_utc = datetime.now(timezone.utc)
                     session_name, session_quality = self._get_session_quality(now_utc)
                     logger.info(
                         f"Setup on {instrument} during {session_name} session "
                         f"(quality={session_quality:.1f})"
                     )
+
+                    if session_quality < 0.3:
+                        # OFF_HOURS: skip entirely for day trading and scalping (swing is ok)
+                        if setup.style in (TradingStyle.DAY_TRADING, TradingStyle.SCALPING):
+                            logger.info(
+                                f"Skipping {instrument} setup: OFF_HOURS session "
+                                f"(quality={session_quality:.1f}) — not suitable for {setup.style.value}"
+                            )
+                            setup = None
+                    elif session_quality < 0.5:
+                        # ASIAN session: reduce risk (proxy for confidence penalty of -15 pts)
+                        setup.risk_percent *= 0.85
+                        logger.info(
+                            f"Reduced risk for {instrument}: {session_name} session "
+                            f"(quality={session_quality:.1f}) — risk adjusted to {setup.risk_percent:.2%}"
+                        )
+
+                    if setup is None:
+                        continue
 
                     # Re-generate explanation with the setup signal context
                     # (setup is TradeRisk, not SetupSignal, so we pass what we can)

@@ -448,6 +448,46 @@ class PositionManager:
                 except Exception as e:
                     logger.error(f"{pos.trade_id}: Failed to close at TP_max: {e}")
 
+        # Emergency exit: if both EMA M5 2-period and EMA M5 5-period broken against position
+        # NOTE: EMA_M5_2 and EMA_M5_5 may not be available; using CPA EMA as proxy.
+        # If dedicated M5 EMA 2 & 5 are added later, replace the proxy with actual values.
+        ema_m5_2 = self._get_trail_ema(pos.instrument, "EMA_M5_2")
+        ema_m5_5 = self._get_trail_ema(pos.instrument, "EMA_M5_5")
+
+        if ema_m5_2 is not None and ema_m5_5 is not None:
+            if pos.direction == "BUY":
+                both_broken = current_price < ema_m5_2 and current_price < ema_m5_5
+            else:
+                both_broken = current_price > ema_m5_2 and current_price > ema_m5_5
+
+            if both_broken:
+                try:
+                    await self.broker.close_trade(pos.trade_id)
+                    logger.warning(
+                        f"{pos.trade_id}: EMERGENCY EXIT — both EMA M5 2 and EMA M5 5 broken "
+                        f"against {pos.direction} at {current_price:.5f} "
+                        f"(EMA2={ema_m5_2:.5f}, EMA5={ema_m5_5:.5f})"
+                    )
+                    self.remove_position(pos.trade_id)
+                    return
+                except Exception as e:
+                    logger.error(f"{pos.trade_id}: Failed emergency exit: {e}")
+        else:
+            # Proxy: use CPA EMA as a rough substitute for the M5 short EMAs
+            proxy_ema = self._get_trail_ema(pos.instrument, self._cpa_ema_key)
+            if proxy_ema is not None:
+                if pos.direction == "BUY":
+                    proxy_broken = current_price < proxy_ema
+                else:
+                    proxy_broken = current_price > proxy_ema
+
+                if proxy_broken:
+                    logger.warning(
+                        f"{pos.trade_id}: AGGRESSIVE phase — CPA EMA proxy broken against "
+                        f"{pos.direction} (price={current_price:.5f}, CPA={proxy_ema:.5f}). "
+                        f"Consider closing. (Limitation: EMA_M5_2/EMA_M5_5 not available)"
+                    )
+
         # Use CPA EMA 50 for aggressive trailing beyond TP1
         aggressive_ema = self._get_trail_ema(pos.instrument, self._cpa_ema_key)
 

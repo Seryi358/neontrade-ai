@@ -6,7 +6,7 @@ Implements BaseBroker abstract interface with standardized return types.
 
 import httpx
 from typing import Optional, Dict, List, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from loguru import logger
 from config import settings, get_oanda_url, get_oanda_stream_url
 
@@ -212,7 +212,7 @@ class OandaClient(BaseBroker):
     ) -> OrderResult:
         """Place a limit order at a specific price."""
         from datetime import timedelta
-        expiry = datetime.utcnow() + timedelta(hours=expiry_hours)
+        expiry = datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
 
         order_data: Dict[str, Any] = {
             "order": {

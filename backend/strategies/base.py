@@ -1590,10 +1590,14 @@ class RedStrategy(BaseStrategy):
             # Sin rompimiento de EMA 50 4H, Red no es valida
             return False, score, met, failed
 
-        # Convergencia HTF/LTF da puntos extra
+        # Convergencia HTF/LTF: hard-block when missing
+        # Mentorship: "no operes contra tendencia"
         if analysis.htf_ltf_convergence:
             score += 10.0
             met.append("Convergencia HTF/LTF confirmada")
+        else:
+            failed.append("Convergencia HTF/LTF ausente — RED bloqueado (no operes contra tendencia)")
+            return False, score, met, failed
 
         passed = score >= 20.0
         return passed, score, met, failed
@@ -1872,12 +1876,13 @@ class PinkStrategy(BaseStrategy):
             return False, score, met, failed
 
         # --- Paso 2: Alineacion de tendencia en 4H y 1H ---
+        # Mentorship: "no operes contra tendencia" — hard-block for PINK
         if analysis.htf_ltf_convergence:
             score += 15.0
             met.append("Paso 2: Tendencia alineada en 4H y 1H (convergencia HTF/LTF)")
         else:
-            failed.append("Paso 2: Tendencia NO alineada entre 4H y 1H")
-            # No es descalificante pero importante
+            failed.append("Paso 2: Tendencia NO alineada entre 4H y 1H — PINK bloqueado (no operes contra tendencia)")
+            return False, score, met, failed
 
         # --- Paso 3: PINK key condition ---
         # TradingLab: 1H EMA 50 breaks AGAINST the trend direction (corrective pattern
@@ -1974,11 +1979,9 @@ class PinkStrategy(BaseStrategy):
                     corrective_pattern_type = "WEDGE_TRIANGLE"
 
         if corrective_pattern_type == "CHANNEL":
-            confidence -= 20.0
-            failed.append(
-                "Paso 4c: Patron CANAL detectado — la mentoria recomienda WHITE en vez de PINK "
-                "para canales (-20 confianza). Considere usar WHITE strategy."
-            )
+            # Mentorship: "cuando yo veo un canal, no ejecuto pink"
+            # CHANNEL patterns invalidate PINK — use WHITE instead.
+            return None
 
         # --- Paso 5: Ejecutar al final del patron en 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
@@ -2201,11 +2204,13 @@ class WhiteStrategy(BaseStrategy):
             failed.append("Paso 1: Sin tendencia HTF - White requiere contexto post-Pink")
             return False, score, met, failed
 
+        # Mentorship: "no operes contra tendencia" — hard-block for WHITE
         if analysis.htf_ltf_convergence:
             score += 10.0
             met.append("Paso 1b: Convergencia HTF/LTF (indica tendencia consolidada)")
         else:
-            failed.append("Paso 1b: Sin convergencia HTF/LTF")
+            failed.append("Paso 1b: Sin convergencia HTF/LTF — WHITE bloqueado (no operes contra tendencia)")
+            return False, score, met, failed
 
         # --- Paso 2: Impulso + pullback en 1H ---
         # Verificar que EMA 50 1H esta en el lado correcto (tendencia ya rota previamente)

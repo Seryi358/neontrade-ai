@@ -287,7 +287,7 @@ async def run_tests():
         (settings.min_rr_ratio == 0.80, "Min R:R = 0.80"),
         (settings.min_rr_black == 2.0, "Min R:R BLACK = 2.0"),
         (settings.min_rr_green == 2.0, "Min R:R GREEN = 2.0"),
-        (settings.move_sl_to_be_at == 0.50, "BE at 50% to TP1"),
+        (settings.move_sl_to_be_at == 0.01, "BE at 1% unrealized profit"),
         (settings.scale_in_require_be == True, "Scale-in requires BE"),
         (settings.partial_taking == False, "No partial taking"),
         (settings.sl_management_style == "ema", "SL management = EMA"),

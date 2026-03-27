@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R
 
     # Position management (ch21 Avanzado)
-    move_sl_to_be_at: float = 0.50   # Move SL to BE when price is 50% to TP1
+    move_sl_to_be_at: float = 0.01   # Move SL to BE at 1% unrealized profit (TradingLab: "al 1% pongo BE")
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
     partial_taking: bool = False      # Alex does NOT take partials — prefers quick exit at TP1
     # SL management style: "ema" (recommended), "price_action" (subjective, not recommended)

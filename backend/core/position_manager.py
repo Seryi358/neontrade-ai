@@ -140,16 +140,17 @@ class PositionManager:
 
     async def _handle_sl_moved_phase(self, pos: ManagedPosition, current_price: float):
         """
-        Phase 2: Move to Break Even when price is 50% to TP1.
+        Phase 2: Move to Break Even when unrealized profit reaches 1%.
+        TradingLab: "siempre que lleguemos al 1% pongo el break-even"
         """
-        distance_to_tp1 = abs(pos.take_profit_1 - pos.entry_price)
         current_profit = (
             (current_price - pos.entry_price) if pos.direction == "BUY"
             else (pos.entry_price - current_price)
         )
+        profit_pct = current_profit / pos.entry_price if pos.entry_price else 0
 
-        # Move to BE when at 50% to TP1
-        if current_profit >= distance_to_tp1 * 0.50:
+        # Move to BE when at 1% unrealized profit (TradingLab rule)
+        if profit_pct >= 0.01:
             # BE = entry price (+ small buffer for spread)
             spread_buffer = abs(pos.entry_price - pos.original_sl) * 0.02
             if pos.direction == "BUY":

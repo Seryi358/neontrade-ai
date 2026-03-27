@@ -1730,27 +1730,21 @@ class RedStrategy(BaseStrategy):
             if below:
                 result["tp1"] = max(below)
 
-        # RED TP_max = Fibonacci extension 1.0 (Trading Plan: "RED con HTF a favor: extension de Fibonacci de 1")
+        # RED TP_max = Fibonacci extension 1.272 (TradingLab: "extension optima para onda 3")
+        # Fallback to 1.0 if 1.272 not available or not beyond TP1
         tp1 = result.get("tp1")
-        fib_100 = analysis.fibonacci_levels.get("1.0")
         fib_1272 = analysis.fibonacci_levels.get("1.272")
-        if fib_100 and tp1:
-            if direction == "BUY" and fib_100 > tp1:
-                result["tp_max"] = fib_100
-            elif direction == "SELL" and fib_100 < tp1:
-                result["tp_max"] = fib_100
-            elif fib_1272:
-                # Fallback to 1.272 if 1.0 is not beyond TP1
-                if direction == "BUY" and fib_1272 > (tp1 or 0):
-                    result["tp_max"] = fib_1272
-                elif direction == "SELL" and fib_1272 < (tp1 or float("inf")):
-                    result["tp_max"] = fib_1272
-        elif fib_1272 and tp1:
-            # Fallback: use 1.272 only if 1.0 is not available
+        fib_100 = analysis.fibonacci_levels.get("1.0")
+        if fib_1272 and tp1:
             if direction == "BUY" and fib_1272 > tp1:
                 result["tp_max"] = fib_1272
             elif direction == "SELL" and fib_1272 < tp1:
                 result["tp_max"] = fib_1272
+        if "tp_max" not in result and fib_100 and tp1:
+            if direction == "BUY" and fib_100 > tp1:
+                result["tp_max"] = fib_100
+            elif direction == "SELL" and fib_100 < tp1:
+                result["tp_max"] = fib_100
 
         return result
 

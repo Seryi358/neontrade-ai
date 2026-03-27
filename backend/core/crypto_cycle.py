@@ -24,6 +24,8 @@ class CryptoMarketCycle:
     halving_phase: str = "unknown"  # pre_halving, post_halving, mid_cycle
     btc_rsi_14: Optional[float] = None  # RSI 14 on BTC daily
     ema8_weekly_broken: bool = False  # True if BTC weekly close < EMA 8
+    bmsb_status: Optional[str] = None  # "bullish", "bearish", or None
+    pi_cycle_status: Optional[str] = None  # "near_top", "near_bottom", or None
     last_updated: Optional[str] = None
 
 
@@ -45,8 +47,17 @@ class CryptoCycleAnalyzer:
         self._cache_time: Optional[datetime] = None
         self._http = httpx.AsyncClient(timeout=10.0)
 
-    async def get_cycle_status(self) -> CryptoMarketCycle:
-        """Get current crypto market cycle status. Cached for 1 hour."""
+    async def get_cycle_status(
+        self,
+        bmsb: Optional[Dict] = None,
+        pi_cycle: Optional[Dict] = None,
+    ) -> CryptoMarketCycle:
+        """Get current crypto market cycle status. Cached for 1 hour.
+
+        Args:
+            bmsb: BMSB dict from AnalysisResult (keys: bullish, bearish).
+            pi_cycle: Pi Cycle dict from AnalysisResult (keys: near_top, near_bottom).
+        """
         now = datetime.now(timezone.utc)
         if self._cache and self._cache_time and (now - self._cache_time).total_seconds() < 3600:
             return self._cache
@@ -60,6 +71,11 @@ class CryptoCycleAnalyzer:
         self._analyze_halving_phase(cycle)
         await self._analyze_rsi(cycle)
         await self._check_ema8_weekly(cycle)
+
+        # Incorporate BMSB and Pi Cycle from market_analyzer AnalysisResult
+        self._apply_bmsb(cycle, bmsb)
+        self._apply_pi_cycle(cycle, pi_cycle)
+
         self._determine_market_phase(cycle)
 
         cycle.last_updated = now.isoformat()
@@ -269,6 +285,34 @@ class CryptoCycleAnalyzer:
         except Exception as e:
             logger.debug(f"EMA 8 weekly check failed: {e}")
 
+    def _apply_bmsb(self, cycle: CryptoMarketCycle, bmsb: Optional[Dict]):
+        """Apply Bull Market Support Band status to cycle.
+
+        BMSB (TradingLab Crypto Module 8): SMA 20 + EMA 21 on Weekly.
+        Price above both = bullish (bull market intact).
+        Price below both = bearish (bull market support lost).
+        """
+        if not bmsb:
+            return
+        if bmsb.get("bullish"):
+            cycle.bmsb_status = "bullish"
+        elif bmsb.get("bearish"):
+            cycle.bmsb_status = "bearish"
+
+    def _apply_pi_cycle(self, cycle: CryptoMarketCycle, pi_cycle: Optional[Dict]):
+        """Apply Pi Cycle Top/Bottom indicator to cycle.
+
+        Pi Cycle (TradingLab Crypto Module 8):
+        - near_top: SMA 111 approaching 2x SMA 350 cross (cycle top).
+        - near_bottom: SMA 150 approaching SMA 471 cross (cycle bottom).
+        """
+        if not pi_cycle:
+            return
+        if pi_cycle.get("near_top"):
+            cycle.pi_cycle_status = "near_top"
+        elif pi_cycle.get("near_bottom"):
+            cycle.pi_cycle_status = "near_bottom"
+
     def _determine_market_phase(self, cycle: CryptoMarketCycle):
         """Determine overall market phase from combined signals."""
         signals = []
@@ -285,6 +329,18 @@ class CryptoCycleAnalyzer:
         if cycle.altcoin_season:
             signals.append("bull")
 
+        # BMSB: Bull Market Support Band (SMA 20 + EMA 21 weekly)
+        if cycle.bmsb_status == "bullish":
+            signals.append("bull")
+        elif cycle.bmsb_status == "bearish":
+            signals.append("bear")
+
+        # Pi Cycle Top/Bottom indicator
+        if cycle.pi_cycle_status == "near_top":
+            signals.append("bear")  # Distribution / cycle top
+        elif cycle.pi_cycle_status == "near_bottom":
+            signals.append("bull")  # Accumulation / cycle bottom
+
         bull_count = signals.count("bull")
         bear_count = signals.count("bear")
 
@@ -297,15 +353,28 @@ class CryptoCycleAnalyzer:
         else:
             cycle.market_phase = "distribution"
 
-    async def should_trade_crypto(self) -> tuple:
+    async def should_trade_crypto(
+        self,
+        bmsb: Optional[Dict] = None,
+        pi_cycle: Optional[Dict] = None,
+    ) -> tuple:
         """Should we be actively trading crypto right now?
-        Returns (bool, reason)."""
-        cycle = await self.get_cycle_status()
+        Returns (bool, reason).
+
+        Args:
+            bmsb: BMSB dict from AnalysisResult (keys: bullish, bearish).
+            pi_cycle: Pi Cycle dict from AnalysisResult (keys: near_top, near_bottom).
+        """
+        cycle = await self.get_cycle_status(bmsb=bmsb, pi_cycle=pi_cycle)
         if cycle.market_phase == "bear_market":
             return False, f"Bear market detected (dominance={cycle.btc_dominance_trend}, halving={cycle.halving_phase})"
         reason = f"Market phase: {cycle.market_phase}"
         if cycle.ema8_weekly_broken:
             reason += " | WARNING: BTC weekly close below EMA 8 (bearish signal)"
+        if cycle.bmsb_status == "bearish":
+            reason += " | WARNING: BMSB bearish (price below SMA20+EMA21 weekly)"
+        if cycle.pi_cycle_status == "near_top":
+            reason += " | WARNING: Pi Cycle near top (distribution risk)"
         return True, reason
 
     async def close(self):

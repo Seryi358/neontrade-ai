@@ -233,6 +233,7 @@ class ScalpingAnalyzer:
         self,
         analysis: AnalysisResult,
         scalp_data: ScalpingData,
+        enabled_strategies: Optional[Dict[str, object]] = None,
     ) -> Optional[SetupSignal]:
         """
         Apply the same 6 color strategies but with compressed timeframes.
@@ -259,7 +260,7 @@ class ScalpingAnalyzer:
             return None
 
         # Run strategy detection on the synthetic analysis
-        signal = get_best_setup(scalp_analysis)
+        signal = get_best_setup(scalp_analysis, enabled_strategies)
         if signal is None:
             return None
 

@@ -317,15 +317,14 @@ def _check_rsi_divergence(analysis, direction: str) -> tuple[bool, float]:
     Bearish divergence: price makes higher high but RSI makes lower high (SELL signal).
     Returns (has_divergence, confidence_bonus).
     """
-    divs = getattr(analysis, 'rsi_divergences', [])
-    if not divs:
-        return False, 0.0
-    for div in divs:
-        if direction == "BUY" and div.get("type") == "bullish":
-            return True, 10.0
-        if direction == "SELL" and div.get("type") == "bearish":
-            return True, 10.0
-    return False, 0.0
+    divergence = getattr(analysis, 'rsi_divergence', None)
+    if divergence is None:
+        return (False, 0.0)
+    if direction == "BUY" and divergence == "bullish":
+        return (True, 10.0)  # bullish divergence supports BUY
+    if direction == "SELL" and divergence == "bearish":
+        return (True, 10.0)  # bearish divergence supports SELL
+    return (False, 0.0)
 
 
 def _check_weekly_ema8_filter(analysis, direction: str) -> bool:

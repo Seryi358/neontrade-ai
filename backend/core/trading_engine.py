@@ -124,7 +124,7 @@ class TradingEngine:
     def __init__(self):
         self.broker = _create_broker()
         self.risk_manager = RiskManager(self.broker)
-        self.position_manager = PositionManager(self.broker)
+        self.position_manager = PositionManager(self.broker, risk_manager=self.risk_manager)
 
         # OpenAI analyzer for AI-enhanced trade validation
         if _AI_AVAILABLE:
@@ -1140,7 +1140,7 @@ class TradingEngine:
 
                 # Detect scalping setup
                 signal = self.scalping_analyzer.detect_scalping_setup(
-                    base_analysis, scalp_data
+                    base_analysis, scalp_data, self._enabled_strategies
                 )
                 if signal:
                     self._daily_setups_found += 1

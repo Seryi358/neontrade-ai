@@ -260,20 +260,31 @@ Risk Level: HIGHEST — requires minimum 2:1 R:R
   TP_max: Fibonacci 1.618 extension (projected Wave 1 target)
   MANDATORY: R:R must be >= 2.0 for BLACK strategy
 
-──── GREEN STRATEGY (Weekly + Daily + 15M — Most Lucrative) ────
-Associated Wave: Wave 1 or Wave 3 on daily (strong trending conditions)
+──── GREEN STRATEGY (Trend + Breakout + Pullback + Pattern — Most Lucrative) ────
+Primary use: Crypto (GREEN is the ONLY strategy for crypto markets)
+Also works on: Strong trending forex/indices when all HTFs align
 Potential R:R: Up to 10:1
+NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequential process
 
-  Step 1: Weekly chart trend is clear and strong (not near exhaustion)
-  Step 2: Daily chart pattern confirms weekly direction (breakout, continuation pattern)
-  Step 3: Daily Elliott Wave is in Wave 1 or Wave 3 (impulse phases)
-  Step 4: 4H trend is aligned with daily/weekly
-  Step 5: 15M shows entry setup (FVG fill, OB test, or pattern breakout)
-  Step 6: Entry on 15M with 5m fine-tuning
-  SL: Below/above 15M structure (tight SL due to HTF alignment)
-  TP1: 4H S/R level
-  TP_max: Daily S/R level or Fibonacci 1.618 extension of the daily wave
+  7 Sequential Steps:
+  Step 1 (Trend): Identify the trend on the highest timeframe (Weekly for swing, 4H for day trading)
+  Step 2 (Breakout): Confirm breakout on the structure timeframe (Daily for swing, 1H for day trading)
+  Step 3 (Pullback): Wait for pullback on the intermediate timeframe
+  Step 4 (Pattern): Identify continuation pattern (flag, pennant, triangle, wedge)
+  Step 5 (Diagonal): Draw diagonal/trendline on the pullback pattern
+  Step 6 (RCC Entry): Execute using RCC — Ruptura (price breaks the diagonal), Cierre (candle closes beyond it), Confirmacion (next candle confirms the break direction)
+  Step 7 (SL/TP): Set SL below/above the pattern low/high; TP at measured move or Fibonacci extension
+
+  Timeframes per trading style:
+  - Swing Trading: Weekly -> Daily -> 1H -> 15M (execution)
+  - Day Trading: 4H -> 1H -> 15M -> 2M (execution)
+  - Scalping: 15M -> 5M -> 1M -> 30s (execution)
+
+  SL: Below/above the pattern structure (tight SL due to HTF alignment)
+  TP1: Next structure level on the intermediate timeframe
+  TP_max: Major S/R level or Fibonacci 1.618 extension
   NOTE: GREEN setups are rare but extremely profitable when all timeframes align
+  CRITICAL: For crypto, GREEN is mandatory — no other color strategy applies
 
 ═══════════════════════════════════════════════════════════════════
              SCALPING WORKSHOP KNOWLEDGE
@@ -380,7 +391,7 @@ Phase 3 — BREAK_EVEN (BE):
 Phase 4 — TRAILING:
   Price approaching TP1
   SL trails using EMA 5 on M5
-  No partial profit taking (as per TradingLab mentorship). Trail with EMA 50 on the appropriate timeframe per management style.
+  Partial profit taking is optional (configurable). Trail with EMA 50 on the appropriate timeframe per management style, or use PRICE_ACTION style (swing highs/lows).
 
 Phase 5 — AGGRESSIVE (Beyond TP1):
   TP1 hit, trailing remaining position
@@ -394,7 +405,7 @@ Phase 5 — AGGRESSIVE (Beyond TP1):
 
 Entry Types:
 - Market entry on 2m or 5m timeframe (preferred — immediate execution)
-- Limit entry: ONLY when 3 levels converge (Fibonacci + EMA + S/R or FVG)
+- Limit entry: ONLY when 4 levels converge (both EMAs + Fibonacci + extra S/R or diagonal)
 - Stop entry: ONLY when you cannot monitor AND all timeframes fully align
 
 Trading Hours:
@@ -412,6 +423,75 @@ News Avoidance:
 - Stop trading 30 minutes before HIGH-IMPACT news events (NFP, FOMC, CPI, ECB, etc.)
 - Wait 15 minutes after the news release before trading
 - Check economic calendar BEFORE every trading session
+
+═══════════════════════════════════════════════════════════════════
+          CRYPTO SPECIALIZATION (TradingLab Crypto Module)
+═══════════════════════════════════════════════════════════════════
+
+GREEN is the ONLY valid strategy for crypto:
+- Crypto markets are trend-driven with strong impulses; GREEN exploits this
+- The 7 sequential steps for crypto GREEN:
+  1. Identify the trend on the highest timeframe (Weekly)
+  2. Confirm breakout on the structure timeframe (Daily)
+  3. Wait for pullback on the intermediate timeframe
+  4. Identify continuation pattern (flag, pennant, triangle)
+  5. Draw diagonal/trendline on the pattern
+  6. RCC execution: Ruptura (break), Cierre (close beyond), Confirmacion (next candle confirms)
+  7. Set SL below pattern low / TP at measured move or Fibonacci extension
+- Timeframes per style:
+  - Swing: Weekly -> Daily -> 1H -> 15M execution
+  - Day Trading: 4H -> 1H -> 15M -> 2M execution
+  - Scalping: 15M -> 5M -> 1M -> 30s execution
+
+BMSB - Bull Market Support Band (Crypto Module 8):
+- SMA 20 + EMA 21 on the WEEKLY chart
+- Requires a weekly CLOSE (not intraday) to confirm signals
+- Price above both = bull market intact (bullish)
+- Price below both = bull market support lost (bearish)
+- During bull runs, BMSB acts as dynamic support on pullbacks
+
+Pi Cycle Top/Bottom Indicator:
+- Near top: SMA 111 approaching 2x SMA 350 cross (historically marks cycle tops)
+- Near bottom: SMA 150 approaching SMA 471 cross (historically marks cycle bottoms)
+- Use as macro confirmation, NOT as a timing tool
+
+EMA 8 Weekly Close:
+- If BTC weekly candle CLOSES below EMA 8, it signals potential trend weakness
+- Important: must be a close, not just a wick below
+- Often the first warning sign before a larger correction
+
+BTC Halving Cycle Phases:
+- Post-halving (0-25% of cycle): Explosion phase — most bullish, supply shock in effect
+- Expansion (25-50%): Continued bull run, strong momentum
+- Distribution (50-75%): Market top area, bearish, watch for reversal signals
+- Pre-halving (75-100%): Accumulation phase, price starts rising in anticipation — neutral to slightly bullish
+
+BTC Dominance Analysis:
+- BTC.D > 50%: BTC phase, money in Bitcoin, altcoins underperform
+- BTC.D 40-50%: Transitional zone, watch for rotation signals
+- BTC.D < 40%: Altseason potential, capital rotating to altcoins
+- Dominance Transition Table:
+  - BTC.D up + BTC up = Altcoins down
+  - BTC.D up + BTC down = Altcoins down MUCH MORE
+  - BTC.D down + BTC up = Altcoins up significantly (altseason)
+  - BTC.D down + BTC stable = Capital rotating to altcoins
+
+Capital Rotation Flow:
+- Bull market rotation order: BTC -> ETH -> Large cap alts -> Small cap alts -> Memecoins
+- Track ETH/BTC ratio: if ETH outperforming BTC, rotation has started
+- Late-cycle rotation to memecoins/micro-caps signals market euphoria (caution)
+
+Crypto-Specific Price Action:
+- Impulses are more aggressive than forex (larger % moves, faster)
+- Pullbacks are faster and shallower in strong trends
+- Crypto respects diagonals/trendlines well for breakout entries
+- Volume confirmation is crucial (crypto has more fake breakouts)
+
+RSI 14 on 2-Week Chart (Cycle Analysis):
+- Use RSI 14 on weekly candles to approximate the 2-week timeframe
+- RSI > 80 on this timeframe = cycle top distribution zone
+- RSI < 25 on this timeframe = cycle bottom accumulation zone
+- Can draw diagonal trendlines on RSI itself for early reversal detection
 
 ═══════════════════════════════════════════════════════════════════
                    RESPONSE GUIDELINES

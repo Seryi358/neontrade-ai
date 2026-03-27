@@ -25,7 +25,12 @@ Hybrid approach (recommended):
   - At key levels (previous highs, Fib extensions, major resistance), switch to CPA
   - Close partial position if CPA triggers exit, continue LP/CP with remaining
 
-Key rule: "No se toman parciales de ganancia" — no partial profit taking.
+Partial profit taking: configurable via allow_partial_profits parameter.
+Alex personally does not take partials ("No se toman parciales de ganancia"),
+but the mentorship teaches it as a valid option and the CPA section
+explicitly recommends partial closes at key levels. Default is False
+(Alex's preference), but can be enabled.
+
 Give space to the EMA — buffer slightly below/above, never place SL exactly on it.
 """
 
@@ -45,10 +50,11 @@ class PositionPhase(Enum):
 
 
 class ManagementStyle(Enum):
-    """TradingLab position management styles — all trail with EMA 50."""
-    LP = "lp"    # Long-term: wider EMA timeframes, gives trades more room
-    CP = "cp"    # Short-term: tighter EMA timeframes, locks profit sooner
-    CPA = "cpa"  # Short-term Aggressive: tightest EMAs, only at key levels
+    """TradingLab position management styles."""
+    LP = "lp"              # Long-term: wider EMA timeframes, gives trades more room
+    CP = "cp"              # Short-term: tighter EMA timeframes, locks profit sooner
+    CPA = "cpa"            # Short-term Aggressive: tightest EMAs, only at key levels
+    PRICE_ACTION = "price_action"  # Trail SL using previous swing highs/lows (alternative to EMA)
 
 
 class TradingStyle(Enum):
@@ -124,30 +130,45 @@ class PositionManager:
         risk_manager=None,
         management_style: str = "lp",
         trading_style: str = "day_trading",
+        allow_partial_profits: bool = False,
     ):
         self.broker = broker_client
         self.risk_manager = risk_manager
         self.positions: Dict[str, ManagedPosition] = {}
         # EMA values from last market analysis (injected by trading engine)
         self._latest_emas: Dict[str, Dict[str, float]] = {}
+        # Swing high/low values for PRICE_ACTION trailing (injected by trading engine)
+        self._latest_swings: Dict[str, Dict[str, List[float]]] = {}
+
+        # Partial profit taking: Alex doesn't use it but the mentorship
+        # teaches it as optional and CPA recommends partial closes at key levels.
+        self.allow_partial_profits = allow_partial_profits
 
         # Management style configuration
         self.management_style = ManagementStyle(management_style.lower())
         self.trading_style = TradingStyle(trading_style.lower())
 
-        # Resolve EMA keys from the grid
-        self._base_ema_key = _EMA_TIMEFRAME_GRID[
-            (self.management_style, self.trading_style)
-        ]
-        # CPA key for aggressive phase (beyond TP1) or key-level trailing
-        self._cpa_ema_key = _EMA_TIMEFRAME_GRID[
-            (ManagementStyle.CPA, self.trading_style)
-        ]
+        # For PRICE_ACTION style, we don't use the EMA grid
+        if self.management_style == ManagementStyle.PRICE_ACTION:
+            self._base_ema_key = None
+            self._cpa_ema_key = _EMA_TIMEFRAME_GRID[
+                (ManagementStyle.CPA, self.trading_style)
+            ]
+        else:
+            # Resolve EMA keys from the grid
+            self._base_ema_key = _EMA_TIMEFRAME_GRID[
+                (self.management_style, self.trading_style)
+            ]
+            # CPA key for aggressive phase (beyond TP1) or key-level trailing
+            self._cpa_ema_key = _EMA_TIMEFRAME_GRID[
+                (ManagementStyle.CPA, self.trading_style)
+            ]
 
         logger.info(
             f"PositionManager initialized: style={self.management_style.value}, "
             f"trading={self.trading_style.value}, "
-            f"base_ema={self._base_ema_key}, cpa_ema={self._cpa_ema_key}"
+            f"base_ema={self._base_ema_key}, cpa_ema={self._cpa_ema_key}, "
+            f"partial_profits={self.allow_partial_profits}"
         )
 
     def _is_crypto(self, instrument: str) -> bool:
@@ -157,6 +178,23 @@ class PositionManager:
     def set_ema_values(self, instrument: str, emas: Dict[str, float]):
         """Update EMA values for an instrument (called by trading engine after analysis)."""
         self._latest_emas[instrument] = emas
+
+    def set_swing_values(self, instrument: str, swing_highs: List[float], swing_lows: List[float]):
+        """Update swing high/low values for PRICE_ACTION trailing.
+
+        The mentorship teaches managing SL via previous swing highs/lows as an
+        alternative to EMA trailing. After each completed pullback, the SL is
+        moved to the most recent swing high (for SELL) or swing low (for BUY).
+
+        Args:
+            instrument: The trading instrument
+            swing_highs: Recent swing high prices (most recent first)
+            swing_lows: Recent swing low prices (most recent first)
+        """
+        self._latest_swings[instrument] = {
+            "highs": swing_highs,
+            "lows": swing_lows,
+        }
 
     def _get_trail_ema(self, instrument: str, ema_key: str) -> Optional[float]:
         """
@@ -313,11 +351,15 @@ class PositionManager:
 
     async def _handle_trailing_phase(self, pos: ManagedPosition, current_price: float):
         """
-        Phase 4: Trail SL using EMA 50 on the timeframe determined by the
-        configured management style (LP/CP).
+        Phase 4: Trail SL using EMA 50 or swing highs/lows depending on
+        the configured management style (LP/CP or PRICE_ACTION).
 
-        EMA 50 acts as dynamic support/resistance — SL follows it toward TP1.
-        No partial profit taking: "No se toman parciales de ganancia."
+        EMA styles: EMA 50 acts as dynamic support/resistance.
+        PRICE_ACTION: SL trails behind previous swing highs (SELL) or
+        swing lows (BUY) after each completed pullback.
+
+        Partial profits: if allow_partial_profits is True, partial position
+        can be closed at TP1. Otherwise trail full position.
         Give space to the EMA — buffer below/above, never exactly on it.
         """
         # Check if TP1 has been reached -> switch to aggressive (CPA) trailing
@@ -326,6 +368,20 @@ class PositionManager:
             (pos.direction == "SELL" and current_price <= pos.take_profit_1)
         )
         if tp1_reached:
+            # If partial profits enabled, close part of the position at TP1
+            if self.allow_partial_profits and pos.units != 0:
+                partial_units = pos.units // 2  # Close half
+                if partial_units != 0:
+                    try:
+                        await self.broker.close_trade(pos.trade_id, units=partial_units)
+                        pos.units -= partial_units
+                        logger.info(
+                            f"{pos.trade_id}: PARTIAL PROFIT at TP1 — closed {partial_units} units, "
+                            f"remaining {pos.units} units"
+                        )
+                    except Exception as e:
+                        logger.error(f"{pos.trade_id}: Failed partial close at TP1: {e}")
+
             pos.phase = PositionPhase.BEYOND_TP1
             logger.info(
                 f"{pos.trade_id}: TP1 REACHED -> Phase AGGRESSIVE "
@@ -333,7 +389,12 @@ class PositionManager:
             )
             return
 
-        # Get the EMA 50 value for the base management style
+        # PRICE_ACTION style: trail with swing highs/lows
+        if self.management_style == ManagementStyle.PRICE_ACTION:
+            await self._trail_with_price_action(pos, current_price)
+            return
+
+        # EMA-based styles (LP/CP): get the EMA 50 value
         trail_ema = self._get_trail_ema(pos.instrument, self._base_ema_key)
 
         if trail_ema is not None:
@@ -367,8 +428,7 @@ class PositionManager:
         Phase 5: Beyond TP1 — switch to CPA (Short-term Aggressive) trailing.
 
         Uses the CPA EMA 50 timeframe for tighter trailing to maximize profit.
-        No partial profits: only full close at TP_max or via trailing SL hit.
-        "No se toman parciales de ganancia."
+        Position closes at TP_max or via trailing SL hit.
         """
         # Check if TP_max has been reached -> close full position
         if pos.take_profit_max:
@@ -414,6 +474,51 @@ class PositionManager:
         else:
             # Fallback: tight percentage trail
             await self._trail_with_percentage(pos, current_price, trail_pct=0.2)
+
+    async def _trail_with_price_action(self, pos: ManagedPosition, current_price: float):
+        """Trail SL using previous swing highs/lows (PRICE_ACTION style).
+
+        The mentorship teaches this as an alternative to EMA trailing:
+        after each completed pullback, move SL to the most recent swing
+        high (for SELL positions) or swing low (for BUY positions).
+
+        This method is more subjective than EMA trailing but can give
+        trades more room in strongly trending markets with deep pullbacks.
+        """
+        swings = self._latest_swings.get(pos.instrument, {})
+        if not swings:
+            # Fallback to percentage trailing if no swing data
+            await self._trail_with_percentage(pos, current_price, trail_pct=0.4)
+            return
+
+        buffer = self._ema_buffer(pos, aggressive=False)
+
+        if pos.direction == "BUY":
+            swing_lows = swings.get("lows", [])
+            if swing_lows:
+                # Use the most recent swing low that is below current price
+                valid_lows = [sl for sl in swing_lows if sl < current_price]
+                if valid_lows:
+                    new_sl = valid_lows[0] - buffer  # Most recent swing low minus buffer
+                    if new_sl > pos.current_sl:
+                        await self._update_sl(pos, new_sl)
+                        logger.debug(
+                            f"{pos.trade_id}: PRICE_ACTION trail SL -> {new_sl:.5f} "
+                            f"(swing low={valid_lows[0]:.5f})"
+                        )
+        else:  # SELL
+            swing_highs = swings.get("highs", [])
+            if swing_highs:
+                # Use the most recent swing high that is above current price
+                valid_highs = [sh for sh in swing_highs if sh > current_price]
+                if valid_highs:
+                    new_sl = valid_highs[0] + buffer  # Most recent swing high plus buffer
+                    if new_sl < pos.current_sl:
+                        await self._update_sl(pos, new_sl)
+                        logger.debug(
+                            f"{pos.trade_id}: PRICE_ACTION trail SL -> {new_sl:.5f} "
+                            f"(swing high={valid_highs[0]:.5f})"
+                        )
 
     async def _trail_with_percentage(self, pos: ManagedPosition, current_price: float, trail_pct: float):
         """Fallback trailing: move SL to lock in a percentage of unrealized profit. Syncs with broker."""

@@ -94,8 +94,8 @@ class AnalysisResult:
     elliott_wave_detail: Dict[str, Any] = field(default_factory=dict)
     # Pivot Points (P, S1, S2, R1, R2) from daily data
     pivot_points: Dict[str, float] = field(default_factory=dict)
-    # Premium/Discount zone: "premium", "discount", "equilibrium", or None
-    premium_discount_zone: Optional[str] = None
+    # Premium/Discount zone: dict with zone, position, swing levels, sweet_spot, or None
+    premium_discount_zone: Optional[Dict[str, Any]] = None
     # Volume divergence: "bullish", "bearish", or None
     volume_divergence: Optional[str] = None
     # Mitigation Blocks: order blocks that have been partially filled
@@ -1022,12 +1022,33 @@ class MarketAnalyzer:
                 ob_size = data["open"].iloc[i-1] - data["close"].iloc[i-1]
                 # Impulse must be significantly larger than the OB candle
                 if impulse_size > ob_size * 1.5:
+                    # Extend OB to include prior small contrary candles (dojis)
+                    # "la última vela o CONJUNTO DE VELAS contrarias"
+                    ob_high = data["high"].iloc[i-1]
+                    ob_low = data["low"].iloc[i-1]
+                    ob_start_idx = i - 1
+                    candle_range = data["high"].iloc[i-1] - data["low"].iloc[i-1]
+                    for ext in range(1, 3):  # check up to 2 prior candles
+                        ext_idx = i - 1 - ext
+                        if ext_idx < 0:
+                            break
+                        ext_body = abs(data["close"].iloc[ext_idx] - data["open"].iloc[ext_idx])
+                        ext_range = data["high"].iloc[ext_idx] - data["low"].iloc[ext_idx]
+                        is_small = ext_body < candle_range * 0.5 if candle_range > 0 else False
+                        is_bearish = data["close"].iloc[ext_idx] < data["open"].iloc[ext_idx]
+                        # Include if small (doji-like) or also bearish (contrary)
+                        if is_small or is_bearish:
+                            ob_high = max(ob_high, data["high"].iloc[ext_idx])
+                            ob_low = min(ob_low, data["low"].iloc[ext_idx])
+                            ob_start_idx = ext_idx
+                        else:
+                            break
                     order_blocks.append({
                         "type": "bullish_ob",
-                        "high": data["high"].iloc[i-1],
-                        "low": data["low"].iloc[i-1],
-                        "mid": (data["high"].iloc[i-1] + data["low"].iloc[i-1]) / 2,
-                        "index": i - 1,
+                        "high": ob_high,
+                        "low": ob_low,
+                        "mid": (ob_high + ob_low) / 2,
+                        "index": ob_start_idx,
                     })
 
             # Bearish Order Block: bullish candle(s) followed by strong bearish impulse
@@ -1037,12 +1058,32 @@ class MarketAnalyzer:
                 ob_size = data["close"].iloc[i-1] - data["open"].iloc[i-1]
                 # Filtro de calidad: impulso mínimo 1.5x OB (no especificado en mentoría)
                 if impulse_size > ob_size * 1.5:
+                    # Extend OB to include prior small contrary candles (dojis)
+                    ob_high = data["high"].iloc[i-1]
+                    ob_low = data["low"].iloc[i-1]
+                    ob_start_idx = i - 1
+                    candle_range = data["high"].iloc[i-1] - data["low"].iloc[i-1]
+                    for ext in range(1, 3):  # check up to 2 prior candles
+                        ext_idx = i - 1 - ext
+                        if ext_idx < 0:
+                            break
+                        ext_body = abs(data["close"].iloc[ext_idx] - data["open"].iloc[ext_idx])
+                        ext_range = data["high"].iloc[ext_idx] - data["low"].iloc[ext_idx]
+                        is_small = ext_body < candle_range * 0.5 if candle_range > 0 else False
+                        is_bullish = data["close"].iloc[ext_idx] > data["open"].iloc[ext_idx]
+                        # Include if small (doji-like) or also bullish (contrary)
+                        if is_small or is_bullish:
+                            ob_high = max(ob_high, data["high"].iloc[ext_idx])
+                            ob_low = min(ob_low, data["low"].iloc[ext_idx])
+                            ob_start_idx = ext_idx
+                        else:
+                            break
                     order_blocks.append({
                         "type": "bearish_ob",
-                        "high": data["high"].iloc[i-1],
-                        "low": data["low"].iloc[i-1],
-                        "mid": (data["high"].iloc[i-1] + data["low"].iloc[i-1]) / 2,
-                        "index": i - 1,
+                        "high": ob_high,
+                        "low": ob_low,
+                        "mid": (ob_high + ob_low) / 2,
+                        "index": ob_start_idx,
                     })
 
         # Keep only recent order blocks (last 10)
@@ -1077,57 +1118,117 @@ class MarketAnalyzer:
             return breaks
 
         # Analyze last few swing points for BOS and CHOCH
+        # BOS requires established trend context: at least 2 prior HH/HL or LL/LH
+        # CHOCH = price breaks the LAST swing low in uptrend (bearish) or
+        #         LAST swing high in downtrend (bullish)
+
         for j in range(max(2, len(swing_highs) - 5), len(swing_highs)):
-            if j < 1:
+            if j < 2:
                 continue
             prev_high = swing_highs[j - 1][1]
             curr_high = swing_highs[j][1]
 
             if curr_high > prev_high:
-                # BOS bullish: new higher high
-                breaks.append({
-                    "type": "BOS",
-                    "direction": "bullish",
-                    "level": prev_high,
-                    "index": swing_highs[j][0],
-                })
-            elif curr_high < prev_high * 0.998:
-                # Tolerancia implementación: 0.2% (mentoría no especifica tolerancia exacta)
-                # Potential CHOCH: lower high after uptrend
-                # Check if previous was making higher highs
-                if j >= 2 and swing_highs[j-1][1] > swing_highs[j-2][1]:
+                # Potential BOS bullish: new higher high
+                # Require established uptrend: at least 2 prior HH
+                prior_hh_count = 0
+                for k in range(1, j):
+                    if swing_highs[k][1] > swing_highs[k - 1][1]:
+                        prior_hh_count += 1
+                if prior_hh_count >= 2:
                     breaks.append({
-                        "type": "CHOCH",
-                        "direction": "bearish",
-                        "level": curr_high,
+                        "type": "BOS",
+                        "direction": "bullish",
+                        "level": prev_high,
                         "index": swing_highs[j][0],
                     })
 
         for j in range(max(2, len(swing_lows) - 5), len(swing_lows)):
-            if j < 1:
+            if j < 2:
                 continue
             prev_low = swing_lows[j - 1][1]
             curr_low = swing_lows[j][1]
 
             if curr_low < prev_low:
-                # BOS bearish: new lower low
-                breaks.append({
-                    "type": "BOS",
-                    "direction": "bearish",
-                    "level": prev_low,
-                    "index": swing_lows[j][0],
-                })
-            elif curr_low > prev_low * 1.002:
-                # Tolerancia implementación: 0.2% (mentoría no especifica tolerancia exacta)
-                # Potential CHOCH: higher low after downtrend
-                if j >= 2 and swing_lows[j-1][1] < swing_lows[j-2][1]:
+                # Potential BOS bearish: new lower low
+                # Require established downtrend: at least 2 prior LL
+                prior_ll_count = 0
+                for k in range(1, j):
+                    if swing_lows[k][1] < swing_lows[k - 1][1]:
+                        prior_ll_count += 1
+                if prior_ll_count >= 2:
                     breaks.append({
-                        "type": "CHOCH",
-                        "direction": "bullish",
-                        "level": curr_low,
+                        "type": "BOS",
+                        "direction": "bearish",
+                        "level": prev_low,
                         "index": swing_lows[j][0],
                     })
 
+        # CHOCH detection: price breaks through the last swing low (bearish)
+        # or last swing high (bullish), signaling a trend change.
+        # Bearish CHOCH: in uptrend (HH sequence), price breaks below the
+        # last swing low => the structure changed.
+        # Bullish CHOCH: in downtrend (LL sequence), price breaks above the
+        # last swing high => the structure changed.
+
+        for j in range(max(2, len(swing_highs) - 5), len(swing_highs)):
+            if j < 2:
+                continue
+            curr_high_idx = swing_highs[j][0]
+            curr_high_val = swing_highs[j][1]
+
+            # Check for bearish CHOCH: was there an uptrend (HH) and did
+            # price break below the last swing low?
+            if (swing_highs[j - 1][1] > swing_highs[j - 2][1]):
+                # Previous highs were making HH => uptrend context
+                # Find the last swing low before this swing high
+                last_swing_low = None
+                for si, sv in swing_lows:
+                    if si < curr_high_idx:
+                        last_swing_low = (si, sv)
+                if last_swing_low is not None:
+                    # Check if any candle after the swing high broke below
+                    # that last swing low
+                    for k in range(curr_high_idx + 1, len(data)):
+                        if float(data["low"].iloc[k]) < last_swing_low[1]:
+                            breaks.append({
+                                "type": "CHOCH",
+                                "direction": "bearish",
+                                "level": last_swing_low[1],
+                                "index": k,
+                            })
+                            break
+
+        for j in range(max(2, len(swing_lows) - 5), len(swing_lows)):
+            if j < 2:
+                continue
+            curr_low_idx = swing_lows[j][0]
+            curr_low_val = swing_lows[j][1]
+
+            # Check for bullish CHOCH: was there a downtrend (LL) and did
+            # price break above the last swing high?
+            if (swing_lows[j - 1][1] < swing_lows[j - 2][1]):
+                # Previous lows were making LL => downtrend context
+                # Find the last swing high before this swing low
+                last_swing_high = None
+                for si, sv in swing_highs:
+                    if si < curr_low_idx:
+                        last_swing_high = (si, sv)
+                if last_swing_high is not None:
+                    # Check if any candle after the swing low broke above
+                    # that last swing high
+                    for k in range(curr_low_idx + 1, len(data)):
+                        if float(data["high"].iloc[k]) > last_swing_high[1]:
+                            breaks.append({
+                                "type": "CHOCH",
+                                "direction": "bullish",
+                                "level": last_swing_high[1],
+                                "index": k,
+                            })
+                            break
+
+        # Sort by index and return most recent
+        breaks.sort(key=lambda b: b.get("index", 0))
         return breaks[-10:]
 
     # ── Trading Session Detection ─────────────────────────────────────
@@ -1498,15 +1599,34 @@ class MarketAnalyzer:
         self, df: pd.DataFrame, order_blocks: List[Dict]
     ) -> List[Dict]:
         """
-        Detect Breaker Blocks: order blocks that price BROKE THROUGH with a candle body.
-        When a bullish OB is broken to the downside, it flips to bearish (resistance).
-        When a bearish OB is broken to the upside, it flips to bullish (support).
+        Detect Breaker Blocks: order blocks where price swept liquidity
+        (took the previous swing extreme) and THEN broke through the OB.
+
+        From mentorship: "el precio rompe el máximo anterior, toma la liquidez
+        del máximo anterior, retrocede y no respeta este order block."
+
+        Requirements:
+        1. Price must have swept liquidity (new high/low beyond previous swing
+           extreme) BEFORE the OB was broken.
+        2. Then a candle body broke through the OB.
+        3. The OB flips direction (bullish OB becomes bearish resistance, etc.).
         """
         if df.empty or not order_blocks:
             return []
 
         breaker_blocks = []
         data = df.reset_index(drop=True)
+
+        # Pre-compute swing highs and swing lows for liquidity sweep check
+        swing_highs: List[Tuple[int, float]] = []
+        swing_lows: List[Tuple[int, float]] = []
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                    data["high"].iloc[i] > data["high"].iloc[i + 1]):
+                swing_highs.append((i, float(data["high"].iloc[i])))
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                    data["low"].iloc[i] < data["low"].iloc[i + 1]):
+                swing_lows.append((i, float(data["low"].iloc[i])))
 
         for ob in order_blocks:
             ob_idx = ob.get("index", 0)
@@ -1517,39 +1637,83 @@ class MarketAnalyzer:
             if ob_high == 0 or ob_low == 0:
                 continue
 
-            # Check if any subsequent candle's body broke through the OB
+            # Step 1: Find the break candle (body broke through the OB)
+            break_idx = None
             for j in range(ob_idx + 2, len(data)):
                 candle_open = float(data["open"].iloc[j])
                 candle_close = float(data["close"].iloc[j])
                 body_high = max(candle_open, candle_close)
                 body_low = min(candle_open, candle_close)
 
-                if ob_type == "bullish_ob":
-                    # Bullish OB broken: candle body closes below the OB low
-                    if body_low < ob_low and body_high < ob_low:
-                        # Entire body below OB low → broken through
-                        breaker_blocks.append({
-                            "type": "bearish",  # Flipped: was bullish, now resistance
-                            "high": ob_high,
-                            "low": ob_low,
-                            "mid": (ob_high + ob_low) / 2,
-                            "original_type": ob_type,
-                            "break_index": j,
-                        })
-                        break
-                elif ob_type == "bearish_ob":
-                    # Bearish OB broken: candle body closes above the OB high
-                    if body_low > ob_high and body_high > ob_high:
-                        # Entire body above OB high → broken through
-                        breaker_blocks.append({
-                            "type": "bullish",  # Flipped: was bearish, now support
-                            "high": ob_high,
-                            "low": ob_low,
-                            "mid": (ob_high + ob_low) / 2,
-                            "original_type": ob_type,
-                            "break_index": j,
-                        })
-                        break
+                if ob_type == "bullish_ob" and body_low < ob_low and body_high < ob_low:
+                    break_idx = j
+                    break
+                elif ob_type == "bearish_ob" and body_low > ob_high and body_high > ob_high:
+                    break_idx = j
+                    break
+
+            if break_idx is None:
+                continue  # OB was never broken
+
+            # Step 2: Check that liquidity was swept BEFORE the break
+            # For bullish OB broken downward: price must have made a new high
+            # above the previous swing high (swept buy-side liquidity) before
+            # reversing and breaking the OB.
+            # For bearish OB broken upward: price must have made a new low
+            # below the previous swing low (swept sell-side liquidity) before
+            # reversing and breaking the OB.
+            liquidity_swept = False
+
+            if ob_type == "bullish_ob":
+                # Find the swing high before the OB
+                prev_swing_high = None
+                for si, sv in swing_highs:
+                    if si < ob_idx:
+                        prev_swing_high = sv
+                # Check if price went above that swing high between OB and break
+                if prev_swing_high is not None:
+                    for k in range(ob_idx, break_idx):
+                        if float(data["high"].iloc[k]) > prev_swing_high:
+                            liquidity_swept = True
+                            break
+
+            elif ob_type == "bearish_ob":
+                # Find the swing low before the OB
+                prev_swing_low = None
+                for si, sv in swing_lows:
+                    if si < ob_idx:
+                        prev_swing_low = sv
+                # Check if price went below that swing low between OB and break
+                if prev_swing_low is not None:
+                    for k in range(ob_idx, break_idx):
+                        if float(data["low"].iloc[k]) < prev_swing_low:
+                            liquidity_swept = True
+                            break
+
+            # Step 3: Only classify as Breaker Block if liquidity was swept
+            if not liquidity_swept:
+                continue
+
+            if ob_type == "bullish_ob":
+                breaker_blocks.append({
+                    "type": "bearish",  # Flipped: was bullish, now resistance
+                    "high": ob_high,
+                    "low": ob_low,
+                    "mid": (ob_high + ob_low) / 2,
+                    "original_type": ob_type,
+                    "break_index": break_idx,
+                    "liquidity_swept": True,
+                })
+            elif ob_type == "bearish_ob":
+                breaker_blocks.append({
+                    "type": "bullish",  # Flipped: was bearish, now support
+                    "high": ob_high,
+                    "low": ob_low,
+                    "mid": (ob_high + ob_low) / 2,
+                    "original_type": ob_type,
+                    "break_index": break_idx,
+                    "liquidity_swept": True,
+                })
 
         return breaker_blocks[-10:]
 
@@ -1621,6 +1785,12 @@ class MarketAnalyzer:
             result["phase"] = "accumulation"
         elif session == "LONDON":
             result["phase"] = "manipulation"
+            # Capture the London manipulation price range as entry zone
+            london_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+            london_candles = data[data.index >= london_start]
+            if not london_candles.empty:
+                result["manipulation_zone_high"] = float(london_candles["high"].max())
+                result["manipulation_zone_low"] = float(london_candles["low"].min())
             # Check if price broke the Asian range aggressively
             if current_price is not None:
                 if current_price > asian_high:
@@ -1642,6 +1812,13 @@ class MarketAnalyzer:
             london_candles = data[
                 (data.index >= london_start) & (data.index < london_end)
             ]
+
+            if not london_candles.empty:
+                london_high = float(london_candles["high"].max())
+                london_low = float(london_candles["low"].min())
+                # Provide London manipulation zone for entry reference
+                result["manipulation_zone_high"] = london_high
+                result["manipulation_zone_low"] = london_low
 
             if not london_candles.empty and current_price is not None:
                 london_high = float(london_candles["high"].max())
@@ -1897,6 +2074,57 @@ class MarketAnalyzer:
         if asian_low is not None:
             pools.append({"level": asian_low, "type": "asian_low", "strength": 1})
 
+        # --- Trendline Liquidity Zones ---
+        # Detect diagonal trendlines connecting swing lows (uptrend) or swing
+        # highs (downtrend). Where multiple swing points align along a line,
+        # stops cluster and form trendline liquidity.
+        if len(swing_lows) >= 3:
+            # Ascending trendline: connect the last 3+ swing lows
+            # Use simple linear regression on the most recent swing lows
+            recent_sl = swing_lows[-5:] if len(swing_lows) >= 5 else swing_lows[-3:]
+            # Check if they form an ascending line (each higher than previous)
+            ascending = all(
+                recent_sl[k] > recent_sl[k - 1]
+                for k in range(1, len(recent_sl))
+            )
+            if ascending and len(recent_sl) >= 3:
+                # Project the trendline to the current bar
+                # Use first and last points for the line
+                x1, y1 = 0, recent_sl[0]
+                x2, y2 = len(recent_sl) - 1, recent_sl[-1]
+                slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
+                # Project forward: estimate where trendline is NOW
+                # Use the index distance from last swing low to end of data
+                if not daily.empty:
+                    bars_ahead = len(daily) - 1  # rough projection
+                    projected_level = y2 + slope * 2  # 2 bars ahead
+                    pools.append({
+                        "level": projected_level,
+                        "type": "trendline_support",
+                        "strength": len(recent_sl),
+                        "slope": slope,
+                    })
+
+        if len(swing_highs) >= 3:
+            # Descending trendline: connect the last 3+ swing highs
+            recent_sh = swing_highs[-5:] if len(swing_highs) >= 5 else swing_highs[-3:]
+            descending = all(
+                recent_sh[k] < recent_sh[k - 1]
+                for k in range(1, len(recent_sh))
+            )
+            if descending and len(recent_sh) >= 3:
+                x1, y1 = 0, recent_sh[0]
+                x2, y2 = len(recent_sh) - 1, recent_sh[-1]
+                slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
+                if not daily.empty:
+                    projected_level = y2 + slope * 2
+                    pools.append({
+                        "level": projected_level,
+                        "type": "trendline_resistance",
+                        "strength": len(recent_sh),
+                        "slope": slope,
+                    })
+
         # --- Sweep-then-reverse detection ---
         # Check if the most recent H1 candles swept a liquidity level and reversed
         if not h1.empty and len(h1) >= 3 and current_price is not None and pools:
@@ -1909,13 +2137,15 @@ class MarketAnalyzer:
                 ptype = pool["type"]
 
                 # Swept highs: wick went above level but close came back below
-                if ptype in ("equal_highs", "pdh", "asian_high"):
+                if ptype in ("equal_highs", "pdh", "asian_high",
+                             "trendline_resistance"):
                     if recent_high > lvl and current_price < lvl and prev_close < lvl:
                         sweep = {"level": lvl, "direction": "swept_highs"}
                         break
 
                 # Swept lows: wick went below level but close came back above
-                if ptype in ("equal_lows", "pdl", "asian_low"):
+                if ptype in ("equal_lows", "pdl", "asian_low",
+                             "trendline_support"):
                     if recent_low < lvl and current_price > lvl and prev_close > lvl:
                         sweep = {"level": lvl, "direction": "swept_lows"}
                         break
@@ -1926,34 +2156,96 @@ class MarketAnalyzer:
 
     def _detect_premium_discount(
         self, df: pd.DataFrame, current_price: Optional[float]
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, Any]]:
         """
-        Detect whether price is in the Premium or Discount zone.
+        Detect whether price is in the Premium or Discount zone relative to the
+        most recent impulse swing, using Fibonacci levels (0, 0.5, 1).
 
-        From TradingLab SMC:
-        - Use the recent daily swing range (high to low over last 20-60 candles).
-        - Binary split at 50% of the Fibonacci range:
-          * Premium  : above 50% (favor SELL setups)
-          * Discount : below 50% (favor BUY setups)
+        From mentorship:
+        - Identify the most recent impulse swing (significant high-to-low or
+          low-to-high move).
+        - Calculate premium/discount relative to THAT specific swing, not the
+          global range.
+        - The 50-70% retracement zone is the "sweet spot" where institutions
+          typically place orders (optimal entry area).
 
-        Returns "premium", "discount", or None.
+        Returns dict with zone, position, swing_high, swing_low, equilibrium,
+        sweet_spot_high, sweet_spot_low, or None.
         """
         if df.empty or len(df) < 20 or current_price is None:
             return None
 
-        recent = df.tail(60)
-        swing_high = float(recent["high"].max())
-        swing_low = float(recent["low"].min())
-        rng = swing_high - swing_low
+        data = df.reset_index(drop=True)
 
+        # Find swing highs and lows to identify the most recent impulse
+        swing_points: List[Tuple[int, float, str]] = []
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                data["high"].iloc[i] > data["high"].iloc[i - 2] and
+                data["high"].iloc[i] > data["high"].iloc[i + 1] and
+                data["high"].iloc[i] > data["high"].iloc[i + 2]):
+                swing_points.append((i, float(data["high"].iloc[i]), "H"))
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                data["low"].iloc[i] < data["low"].iloc[i - 2] and
+                data["low"].iloc[i] < data["low"].iloc[i + 1] and
+                data["low"].iloc[i] < data["low"].iloc[i + 2]):
+                swing_points.append((i, float(data["low"].iloc[i]), "L"))
+
+        swing_points.sort(key=lambda s: s[0])
+
+        if len(swing_points) < 2:
+            return None
+
+        # Find the most recent significant impulse swing
+        # Walk backwards through swing points to find the last H->L or L->H pair
+        impulse_high = None
+        impulse_low = None
+
+        for k in range(len(swing_points) - 1, 0, -1):
+            curr = swing_points[k]
+            prev = swing_points[k - 1]
+            if curr[2] != prev[2]:
+                # Alternating swing types => impulse leg
+                if curr[2] == "L" and prev[2] == "H":
+                    # Bearish impulse: high to low
+                    impulse_high = prev[1]
+                    impulse_low = curr[1]
+                elif curr[2] == "H" and prev[2] == "L":
+                    # Bullish impulse: low to high
+                    impulse_high = curr[1]
+                    impulse_low = prev[1]
+                break
+
+        if impulse_high is None or impulse_low is None:
+            return None
+
+        rng = impulse_high - impulse_low
         if rng <= 0:
             return None
 
-        # Binary split at 50% of swing range (Fibonacci midpoint)
-        # position = 0.0 at swing_low, 1.0 at swing_high
-        position = (current_price - swing_low) / rng  # 0=low, 1=high
+        # Fibonacci levels relative to this impulse swing
+        equilibrium = impulse_low + rng * 0.5
+        # Sweet spot: 50-70% retracement (institutional order zone)
+        sweet_spot_high = impulse_low + rng * 0.7
+        sweet_spot_low = impulse_low + rng * 0.5
+
+        # Position within the swing (0.0 = swing low, 1.0 = swing high)
+        position = (current_price - impulse_low) / rng
 
         if position > 0.5:
-            return "premium"
+            zone = "premium"
         else:
-            return "discount"
+            zone = "discount"
+
+        in_sweet_spot = 0.5 <= position <= 0.7
+
+        return {
+            "zone": zone,
+            "position": round(float(position), 4),
+            "swing_high": impulse_high,
+            "swing_low": impulse_low,
+            "equilibrium": equilibrium,
+            "sweet_spot_high": sweet_spot_high,
+            "sweet_spot_low": sweet_spot_low,
+            "in_sweet_spot": in_sweet_spot,
+        }

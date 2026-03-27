@@ -21,8 +21,12 @@ class CryptoMarketCycle:
     altcoin_season: bool = False  # True if altcoins outperforming BTC
     btc_eth_ratio: Optional[float] = None  # BTC/ETH price ratio
     btc_eth_trend: str = "unknown"  # btc_leading, eth_leading, neutral
-    halving_phase: str = "unknown"  # pre_halving, post_halving, mid_cycle
-    btc_rsi_14: Optional[float] = None  # RSI 14 on BTC daily
+    eth_outperforming_btc: bool = False  # True if ETH/BTC trend is rising
+    rotation_phase: str = "unknown"  # btc, eth, large_alts, small_alts, memecoins
+    halving_phase: str = "unknown"  # pre_halving, post_halving, expansion, distribution
+    halving_phase_description: str = ""  # Human-readable phase description
+    halving_sentiment: str = "neutral"  # very_bullish, bullish, bearish, neutral
+    btc_rsi_14: Optional[float] = None  # RSI 14 on BTC weekly (approx 2-week chart)
     ema8_weekly_broken: bool = False  # True if BTC weekly close < EMA 8
     bmsb_status: Optional[str] = None  # "bullish", "bearish", or None
     pi_cycle_status: Optional[str] = None  # "near_top", "near_bottom", or None
@@ -95,6 +99,17 @@ class CryptoCycleAnalyzer:
         outperform Bitcoin over the trailing period.  We approximate this
         with relative BTC-vs-alts performance since we don't have a full
         top-100 scanner here.
+
+        DATA SOURCE LIMITATION: btc_dominance (BTC.D percentage) is not
+        directly available from most broker APIs. To populate it, you need
+        either:
+          1. A crypto data API (CoinGecko, CoinMarketCap) that provides
+             total crypto market cap and BTC market cap.
+          2. A TradingView-style feed that supplies the BTC.D index.
+        As a fallback, we approximate dominance direction from relative
+        BTC vs ETH/alt performance (rising BTC outperformance = rising
+        dominance). The btc_dominance float remains None when no direct
+        data source is configured; downstream logic uses the trend instead.
         """
         if not self.broker:
             return
@@ -143,7 +158,17 @@ class CryptoCycleAnalyzer:
             logger.debug(f"Dominance analysis failed: {e}")
 
     async def _analyze_btc_eth(self, cycle: CryptoMarketCycle):
-        """Analyze BTC/ETH ratio for capital rotation."""
+        """Analyze BTC/ETH ratio and capital rotation flow.
+
+        Capital rotation model (TradingLab Crypto Specialization):
+        Money flows in a predictable order during bull markets:
+          BTC -> ETH -> Large cap alts -> Small cap alts -> Memecoins
+
+        We track:
+        - BTC/ETH ratio: if falling, ETH is outperforming BTC (rotation started)
+        - rotation_phase: which stage of the rotation the market is in
+        - eth_outperforming_btc: directional indicator for ETH/BTC trend
+        """
         if not self.broker:
             return
         try:
@@ -151,6 +176,33 @@ class CryptoCycleAnalyzer:
             eth_price = await self.broker.get_current_price("ETH_USD")
             if btc_price and eth_price and eth_price.bid > 0:
                 cycle.btc_eth_ratio = btc_price.bid / eth_price.bid
+
+            # Determine ETH/BTC trend from recent candle data
+            btc_candles = await self.broker.get_candles("BTC_USD", granularity="D", count=14)
+            eth_candles = await self.broker.get_candles("ETH_USD", granularity="D", count=14)
+
+            if (btc_candles and eth_candles
+                    and len(btc_candles) >= 7 and len(eth_candles) >= 7):
+                btc_perf = (btc_candles[-1].close - btc_candles[-7].close) / btc_candles[-7].close
+                eth_perf = (eth_candles[-1].close - eth_candles[-7].close) / eth_candles[-7].close
+
+                cycle.eth_outperforming_btc = eth_perf > btc_perf
+
+                # Determine capital rotation phase based on dominance trend
+                # and relative performance
+                if cycle.btc_dominance_trend == "rising":
+                    cycle.rotation_phase = "btc"  # Money flowing into BTC
+                elif cycle.eth_outperforming_btc and cycle.btc_dominance_trend == "falling":
+                    # ETH outperforming + falling dominance = rotation to ETH/alts
+                    if cycle.altcoin_season:
+                        cycle.rotation_phase = "large_alts"  # Broad alt rotation
+                    else:
+                        cycle.rotation_phase = "eth"  # Early rotation to ETH
+                elif cycle.altcoin_season:
+                    cycle.rotation_phase = "small_alts"  # Late-cycle alt speculation
+                else:
+                    cycle.rotation_phase = "btc"  # Default: money in BTC
+
         except Exception as e:
             logger.debug(f"BTC/ETH analysis failed: {e}")
 
@@ -217,24 +269,47 @@ class CryptoCycleAnalyzer:
             progress = days_since / cycle_length
 
             if progress < 0.25:
-                cycle.halving_phase = "post_halving"  # 0-25%: post-halving accumulation
+                cycle.halving_phase = "post_halving"
+                cycle.halving_phase_description = "Explosion phase - most bullish"
+                cycle.halving_sentiment = "very_bullish"
             elif progress < 0.50:
-                cycle.halving_phase = "expansion"  # 25-50%: bull run typically
+                cycle.halving_phase = "expansion"
+                cycle.halving_phase_description = "Continued bull run"
+                cycle.halving_sentiment = "bullish"
             elif progress < 0.75:
-                cycle.halving_phase = "distribution"  # 50-75%: market top area
+                cycle.halving_phase = "distribution"
+                cycle.halving_phase_description = "Market top area"
+                cycle.halving_sentiment = "bearish"
             else:
-                cycle.halving_phase = "pre_halving"  # 75-100%: pre-halving, often bear/accumulation
+                # Pre-halving: accumulation phase where price starts rising
+                # (historically, BTC bottoms well before the halving and
+                # begins a new uptrend in anticipation of the supply cut)
+                cycle.halving_phase = "pre_halving"
+                cycle.halving_phase_description = "Accumulation, price starts rising"
+                cycle.halving_sentiment = "slightly_bullish"
 
     async def _analyze_rsi(self, cycle: CryptoMarketCycle):
-        """RSI 14 on BTC daily for cycle top/bottom detection."""
+        """RSI 14 on BTC weekly for cycle top/bottom detection.
+
+        From the mentorship (Alex): "lo que me gusta mas es para 14 semanas,
+        perdon 14 semanas no, dos semanas o 14 dias". We use weekly candles
+        with RSI period 14 to approximate the 2-week chart timeframe, which
+        gives a cleaner cycle signal than daily RSI.
+
+        Diagonal analysis note: RSI on this timeframe can also be used to
+        draw diagonal trendlines on the RSI itself. A break of a rising RSI
+        diagonal while price is at highs can signal cycle exhaustion before
+        RSI reaches the extreme 80+ level.
+        """
         if not self.broker:
             return
         try:
-            candles = await self.broker.get_candles("BTC_USD", granularity="D", count=30)
+            # Use weekly candles (approximates 2-week chart for cycle analysis)
+            candles = await self.broker.get_candles("BTC_USD", granularity="W", count=30)
             if not candles or len(candles) < 15:
                 return
             closes = [c.close for c in candles]
-            # Calculate RSI 14
+            # Calculate RSI 14 on weekly closes
             gains, losses = [], []
             for i in range(1, len(closes)):
                 diff = closes[i] - closes[i - 1]
@@ -254,11 +329,11 @@ class CryptoCycleAnalyzer:
                 rsi = 100 - (100 / (1 + rs))
             cycle.btc_rsi_14 = rsi
             # NOTE: Standard RSI thresholds are 70 (overbought) and 30 (oversold).
-            # For BTC cycle analysis we use more extreme levels (>80 / <25) because
-            # crypto markets on higher-timeframe charts (2-week, monthly) routinely
-            # sustain RSI above 70 during bull runs and below 30 during prolonged
-            # bear markets.  The extreme thresholds filter out noise and only flag
-            # true cycle distribution tops and accumulation bottoms.
+            # For BTC cycle analysis on weekly/2-week charts we use more extreme
+            # levels (>80 / <25) because crypto markets on higher-timeframe charts
+            # routinely sustain RSI above 70 during bull runs and below 30 during
+            # prolonged bear markets. The extreme thresholds filter out noise and
+            # only flag true cycle distribution tops and accumulation bottoms.
             if rsi > 80:
                 cycle.market_phase = "distribution"  # Potential cycle top
             elif rsi < 25:
@@ -323,8 +398,10 @@ class CryptoCycleAnalyzer:
 
         if cycle.halving_phase in ("post_halving", "expansion"):
             signals.append("bull")
-        elif cycle.halving_phase in ("distribution", "pre_halving"):
+        elif cycle.halving_phase == "distribution":
             signals.append("bear")
+        # pre_halving is neutral to slightly bullish (accumulation, price starts
+        # rising before halving) — do NOT count it as bearish
 
         if cycle.altcoin_season:
             signals.append("bull")

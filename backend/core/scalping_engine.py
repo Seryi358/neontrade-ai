@@ -6,7 +6,7 @@ Scalping temporal hierarchy (compressed from day trading):
 - H1: Main direction (like Daily in day trading) -> MACD + EMA 50 + SMA 200
 - M15: Structure (like 4H in day trading) -> EMA 50
 - M5: Confirmation (like 1H in day trading) -> EMA 50 + MACD + Volume
-- M1: Execution (like 5M in day trading) -> EMA 50 + MACD
+- M1: Execution (like 5M in day trading) -> EMA 50 break (diagonal/trendline)
 
 Position Management:
 - Method 1 (fast): Exit when price closes below EMA 50 on M1 (~7-10% profit)
@@ -431,7 +431,7 @@ class ScalpingAnalyzer:
         Validate scalping-specific entry conditions:
         1. M15 EMA 50 break confirms structure (price on correct side)
         2. M5 MACD confirms direction
-        3. M1 MACD confirms execution timing
+        3. M1 EMA 50 break confirms execution timing
         4. Volume on M5 above average (confirmation)
         """
         # Condition 1: M15 structure - price must be on correct side of EMA 50
@@ -449,13 +449,20 @@ class ScalpingAnalyzer:
             if direction == "SELL" and macd_bullish:
                 return False
 
-        # Condition 3: M1 MACD should agree (execution timing)
-        if scalp_data.macd_m1:
-            macd_bullish = scalp_data.macd_m1.get("bullish", False)
-            if direction == "BUY" and not macd_bullish:
+        # Condition 3: M1 execution trigger — diagonal/trendline break or EMA 50 break
+        # The scalping workshop says M1 execution should be based on a diagonal
+        # break or EMA 50 break in the signal direction, NOT MACD agreement.
+        if scalp_data.close_m1 is not None and scalp_data.ema50_m1 is not None:
+            if direction == "BUY" and scalp_data.close_m1 < scalp_data.ema50_m1:
+                # Price below M1 EMA 50 — no BUY execution trigger
                 return False
-            if direction == "SELL" and macd_bullish:
+            if direction == "SELL" and scalp_data.close_m1 > scalp_data.ema50_m1:
+                # Price above M1 EMA 50 — no SELL execution trigger
                 return False
+        # NOTE: Diagonal/trendline break detection requires candle pattern analysis
+        # on M1 which is handled by the strategy detection in detect_scalping_setup().
+        # Here we validate the minimum condition: price must have broken through
+        # M1 EMA 50 in the signal direction as the execution trigger.
 
         # Condition 4: Volume confirmation on M5 (at least 0.8x average)
         if scalp_data.volume_m5:

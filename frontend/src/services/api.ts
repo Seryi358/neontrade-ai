@@ -282,6 +282,7 @@ export const STRATEGY_COLORS: Record<string, string> = {
   BLACK: '#1a1a2e',
   BLUE: '#00f0ff',
   RED: '#ff2e63',
+  PINK: '#ff69b4',
   GREEN: '#00ff88',
   WHITE: '#f0e6ff',
   DETECTED: '#eb4eca',

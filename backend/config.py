@@ -100,7 +100,11 @@ class Settings(BaseSettings):
     move_sl_to_be_at: float = 0.01   # Move SL to BE at 1% unrealized profit (TradingLab: "al 1% pongo BE")
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
     partial_taking: bool = False      # Alex does NOT take partials — prefers quick exit at TP1
-    # SL management style: "ema" (recommended), "price_action" (subjective, not recommended)
+    # Partial profit taking: Alex personally doesn't use it, but the mentorship
+    # teaches it as optional and the CPA section recommends partial closes at
+    # key levels. Enable to allow partial position closes at TP levels.
+    allow_partial_profits: bool = False
+    # SL management style: "ema" (recommended), "price_action" (swing highs/lows alternative)
     sl_management_style: str = "ema"
 
     # Drawdown-based risk adjustment (ch18.7)

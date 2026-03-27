@@ -350,9 +350,14 @@ def _check_premium_discount_zone(analysis, direction: str) -> tuple[bool, str]:
     BUY should be in DISCOUNT zone, SELL in PREMIUM zone.
     Returns (favorable, description).
     """
-    zone = getattr(analysis, 'premium_discount_zone', None)
-    if zone is None:
+    pd_data = getattr(analysis, 'premium_discount_zone', None)
+    if pd_data is None:
         return True, ""  # No data = don't block
+
+    # premium_discount_zone is a Dict with a "zone" key (e.g. "premium", "discount")
+    zone = pd_data.get("zone") if isinstance(pd_data, dict) else pd_data
+    if zone is None:
+        return True, ""
 
     if direction == "BUY" and zone in ("discount", "deep_discount"):
         return True, f"Precio en zona de DESCUENTO {'profundo ' if zone == 'deep_discount' else ''}(favorable para compra)"
@@ -1136,9 +1141,14 @@ class BaseStrategy(ABC):
             elif ew_desc:
                 signal.conditions_met.append(ew_desc)
 
+            # TradingLab: PINK and BLACK must ALWAYS use MARKET entries.
+            # Limit and Stop entries are only available for BLUE, RED, and WHITE.
+            _allows_non_market = self.color in (
+                StrategyColor.BLUE, StrategyColor.RED, StrategyColor.WHITE,
+            )
+
             # TradingLab: Check for limit entry opportunity (3-level confluence)
-            # Only check limit entry for strategies that support it (TradingLab rule)
-            if self.color in (StrategyColor.BLUE, StrategyColor.RED, StrategyColor.WHITE):
+            if _allows_non_market:
                 limit_ok, limit_price, limit_desc = _check_limit_entry_confluence(
                     analysis, signal.direction, signal.entry_price
                 )
@@ -1149,8 +1159,8 @@ class BaseStrategy(ABC):
                     signal.conditions_met.append(limit_desc)
 
             # TradingLab: Check for stop entry opportunity (breakout above/below S/R)
-            # Only for strategies NOT already using limit entry
-            if signal.entry_type != "LIMIT":
+            # Only for strategies NOT already using limit entry AND that allow non-market
+            if _allows_non_market and signal.entry_type != "LIMIT":
                 stop_ok, stop_price, stop_desc = _check_stop_entry_opportunity(
                     analysis, signal.direction, signal.entry_price
                 )
@@ -1384,7 +1394,7 @@ class BlueStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < min_rr:
+            if rr < min_rr - 1e-9:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {min_rr}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
@@ -1699,7 +1709,7 @@ class RedStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < settings.min_rr_ratio:
+            if rr < settings.min_rr_ratio - 1e-9:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
@@ -1950,6 +1960,27 @@ class PinkStrategy(BaseStrategy):
             confidence += 5.0
             met.append("Paso 4b: Patron de consolidacion detectado (DOJI = compresion)")
 
+        # TradingLab: "cuando yo veo un canal, no ejecuto pink, ejecuto white."
+        # Penalize CHANNEL patterns — prefer wedge/triangle for PINK.
+        corrective_pattern_type = None
+        if hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptype_lower = ptype.lower()
+                if "channel" in ptype_lower:
+                    corrective_pattern_type = "CHANNEL"
+                    break
+                elif any(k in ptype_lower for k in ("wedge", "cuna", "triangle", "triangulo")):
+                    corrective_pattern_type = "WEDGE_TRIANGLE"
+
+        if corrective_pattern_type == "CHANNEL":
+            confidence -= 20.0
+            failed.append(
+                "Paso 4c: Patron CANAL detectado — la mentoria recomienda WHITE en vez de PINK "
+                "para canales (-20 confianza). Considere usar WHITE strategy."
+            )
+
         # --- Paso 5: Ejecutar al final del patron en 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         if ema_5m_break:
@@ -1999,7 +2030,7 @@ class PinkStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < settings.min_rr_ratio:
+            if rr < settings.min_rr_ratio - 1e-9:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
@@ -2068,23 +2099,65 @@ class PinkStrategy(BaseStrategy):
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
-        """TP en maximo/minimo anterior (extremo del swing previo)."""
+        """
+        TP en el swing high/low anterior (maximos recientes / minimos anteriores).
+        TradingLab mentorship: "take profit en maximos recientes" / "minimos anteriores"
+        — specifically the previous swing high (BUY) or swing low (SELL).
+        """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        swing_highs = getattr(analysis, 'swing_highs', [])
+        swing_lows = getattr(analysis, 'swing_lows', [])
         result: Dict[str, float] = {}
 
         if direction == "BUY":
-            above = [r for r in resistances if r > entry_price]
-            if above:
-                result["tp1"] = min(above)
-                if len(above) > 1:
-                    result["tp_max"] = sorted(above)[1]  # Segundo nivel
+            # Previous swing high above entry price
+            valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
+            if valid_swing_highs:
+                # Use the most recent (last) swing high, not the nearest S/R
+                result["tp1"] = valid_swing_highs[-1]
+            else:
+                # Fallback: highest resistance above entry (previous high area)
+                above = sorted([r for r in resistances if r > entry_price])
+                if len(above) >= 2:
+                    result["tp1"] = above[1]  # Second resistance = more likely a swing extreme
+                elif above:
+                    result["tp1"] = above[0]
+
+            # tp_max: next swing high beyond tp1
+            tp1 = result.get("tp1")
+            if tp1:
+                further_highs = [sh for sh in swing_highs if sh > tp1]
+                if further_highs:
+                    result["tp_max"] = further_highs[-1]
+                else:
+                    further_res = [r for r in resistances if r > tp1]
+                    if further_res:
+                        result["tp_max"] = sorted(further_res)[0]
         else:
-            below = [s for s in supports if s < entry_price]
-            if below:
-                result["tp1"] = max(below)
-                if len(below) > 1:
-                    result["tp_max"] = sorted(below, reverse=True)[1]
+            # Previous swing low below entry price
+            valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
+            if valid_swing_lows:
+                # Use the most recent (last) swing low, not the nearest S/R
+                result["tp1"] = valid_swing_lows[-1]
+            else:
+                # Fallback: lowest support below entry (previous low area)
+                below = sorted([s for s in supports if s < entry_price], reverse=True)
+                if len(below) >= 2:
+                    result["tp1"] = below[1]  # Second support = more likely a swing extreme
+                elif below:
+                    result["tp1"] = below[0]
+
+            # tp_max: next swing low beyond tp1
+            tp1 = result.get("tp1")
+            if tp1:
+                further_lows = [sl for sl in swing_lows if sl < tp1]
+                if further_lows:
+                    result["tp_max"] = further_lows[-1]
+                else:
+                    further_sup = [s for s in supports if s < tp1]
+                    if further_sup:
+                        result["tp_max"] = sorted(further_sup, reverse=True)[0]
 
         return result
 
@@ -2272,7 +2345,7 @@ class WhiteStrategy(BaseStrategy):
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < settings.min_rr_ratio:
+            if rr < settings.min_rr_ratio - 1e-9:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
@@ -2341,46 +2414,72 @@ class WhiteStrategy(BaseStrategy):
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
-        """TP en el nivel objetivo de Pink (extremo del swing previo).
-        TP_max = alto/bajo del impulso de 4H (Trading Plan: "WHITE: TP maximo = alto/bajo del impulso de 4H")."""
+        """
+        TP como si fuera el de una PINK (previous swing extreme).
+        TradingLab mentorship: "take profit como si fuera el de una PINK."
+        Uses previous swing high (BUY) or swing low (SELL) - same logic as PinkStrategy.
+        """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        swing_highs = getattr(analysis, 'swing_highs', [])
+        swing_lows = getattr(analysis, 'swing_lows', [])
         result: Dict[str, float] = {}
 
         if direction == "BUY":
-            above = [r for r in resistances if r > entry_price]
-            if above:
-                sorted_above = sorted(above)
-                result["tp1"] = sorted_above[0]
-        else:
-            below = [s for s in supports if s < entry_price]
-            if below:
-                sorted_below = sorted(below, reverse=True)
-                result["tp1"] = sorted_below[0]
-
-        # WHITE TP_max = H4 impulse high/low (Trading Plan rule)
-        # Use the highest resistance / lowest support from key_levels as the H4 impulse extreme
-        tp1 = result.get("tp1")
-        if tp1:
-            if direction == "BUY":
-                # H4 impulse high: highest resistance above TP1
-                above_tp1 = [r for r in resistances if r > tp1]
-                if above_tp1:
-                    result["tp_max"] = max(above_tp1)
+            # Previous swing high above entry price (same as PINK)
+            valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
+            if valid_swing_highs:
+                result["tp1"] = valid_swing_highs[-1]
             else:
-                # H4 impulse low: lowest support below TP1
-                below_tp1 = [s for s in supports if s < tp1]
-                if below_tp1:
-                    result["tp_max"] = min(below_tp1)
+                above = sorted([r for r in resistances if r > entry_price])
+                if len(above) >= 2:
+                    result["tp1"] = above[1]
+                elif above:
+                    result["tp1"] = above[0]
 
-        # Fallback: EMA H4 50 as tp_max if no S/R levels found
-        if "tp_max" not in result and tp1:
-            ema_h4_50 = _ema_val(analysis, "EMA_H4_50")
-            if ema_h4_50:
-                if direction == "BUY" and ema_h4_50 > tp1:
-                    result["tp_max"] = ema_h4_50
-                elif direction == "SELL" and ema_h4_50 < tp1:
-                    result["tp_max"] = ema_h4_50
+            # tp_max: next swing high beyond tp1
+            tp1 = result.get("tp1")
+            if tp1:
+                further_highs = [sh for sh in swing_highs if sh > tp1]
+                if further_highs:
+                    result["tp_max"] = further_highs[-1]
+                else:
+                    further_res = [r for r in resistances if r > tp1]
+                    if further_res:
+                        result["tp_max"] = sorted(further_res)[0]
+        else:
+            # Previous swing low below entry price (same as PINK)
+            valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
+            if valid_swing_lows:
+                result["tp1"] = valid_swing_lows[-1]
+            else:
+                below = sorted([s for s in supports if s < entry_price], reverse=True)
+                if len(below) >= 2:
+                    result["tp1"] = below[1]
+                elif below:
+                    result["tp1"] = below[0]
+
+            # tp_max: next swing low beyond tp1
+            tp1 = result.get("tp1")
+            if tp1:
+                further_lows = [sl for sl in swing_lows if sl < tp1]
+                if further_lows:
+                    result["tp_max"] = further_lows[-1]
+                else:
+                    further_sup = [s for s in supports if s < tp1]
+                    if further_sup:
+                        result["tp_max"] = sorted(further_sup, reverse=True)[0]
+
+        # Fallback: EMA H4 50 as tp_max if no swing/S/R levels found
+        if "tp_max" not in result:
+            tp1 = result.get("tp1")
+            if tp1:
+                ema_h4_50 = _ema_val(analysis, "EMA_H4_50")
+                if ema_h4_50:
+                    if direction == "BUY" and ema_h4_50 > tp1:
+                        result["tp_max"] = ema_h4_50
+                    elif direction == "SELL" and ema_h4_50 < tp1:
+                        result["tp_max"] = ema_h4_50
 
         return result
 
@@ -2552,6 +2651,39 @@ class BlackStrategy(BaseStrategy):
             confidence += 5.0
             met.append("Paso 5d: Consolidacion detectada (DOJI = compresion/indecision)")
 
+        # --- Paso 5e: REQUIRED 1H candlestick pattern at completion zone ---
+        # TradingLab Step 6: "esperara que se complete al maximo este patron de
+        # 1 hora y en el momento en el que se esta formando algun patron de
+        # candlestick bajar a 5 minutos."
+        # A bearish/bullish candlestick pattern on 1H is REQUIRED before checking 5M.
+        h1_candle_patterns = getattr(analysis, 'h1_candlestick_patterns', [])
+        if not h1_candle_patterns:
+            # Fallback: use the general candlestick_patterns (which are from the LTF analysis)
+            h1_candle_patterns = analysis.candlestick_patterns
+
+        h1_has_pattern, h1_pattern_desc = _has_reversal_pattern(analysis, direction)
+        if h1_has_pattern:
+            confidence += 10.0
+            met.append(f"Paso 5e: Patron de velas 1H en zona de completitud - {h1_pattern_desc}")
+        else:
+            # Check for any candlestick pattern (not just reversal) that signals completion
+            completion_patterns = {
+                "DOJI", "HAMMER", "SHOOTING_STAR", "ENGULFING_BULLISH",
+                "ENGULFING_BEARISH", "MORNING_STAR", "EVENING_STAR",
+                "HIGH_TEST", "LOW_TEST", "TWEEZER_TOP", "TWEEZER_BOTTOM",
+                "INSIDE_BAR_BULLISH", "INSIDE_BAR_BEARISH",
+            }
+            found_completion = set(h1_candle_patterns) & completion_patterns
+            if found_completion:
+                confidence += 5.0
+                met.append(f"Paso 5e: Patron de velas 1H detectado: {', '.join(found_completion)}")
+            else:
+                failed.append(
+                    "Paso 5e [OBLIGATORIO]: Sin patron de velas en 1H al completar zona correctiva "
+                    "(requerido antes de bajar a 5M)"
+                )
+                return None  # No 1H candle pattern = no Black entry
+
         # --- Paso 6: Ejecutar en rompimiento 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         if ema_5m_break:
@@ -2575,13 +2707,46 @@ class BlackStrategy(BaseStrategy):
             confidence += smc_bonus
             met.append(f"SMC: {smc_desc}")
 
-        # TradingLab: If EMA 50 1H acts as dynamic S/R, no Black trade
+        # TradingLab: "Si la media movil de 50 de 1 hora esta actuando como
+        # soporte o como resistencia dinamica, no hay black."
+        # Check if EMA 50 H1 acts as dynamic support (blocks SELL) or
+        # dynamic resistance (blocks BUY).
         ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
         if ema_1h_50 and ema_1h_50 > 0:
             distance_to_ema = abs(entry_price - ema_1h_50) / entry_price
-            if distance_to_ema < 0.003:  # Within 0.3% = acting as S/R
-                failed.append("EMA 50 1H actuando como S/R dinamica — no Black")
+
+            # Check if price is near EMA (within 0.3%) = acting as S/R
+            if distance_to_ema < 0.003:
+                failed.append("EMA 50 1H actuando como S/R dinamica (precio muy cerca) — no Black")
                 return None
+
+            # Check direction-specific dynamic S/R behavior using recent candles
+            m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
+            if len(m5_candles) >= 5:
+                # Count how many of last 5 candles bounced off the EMA
+                bounce_count = 0
+                for candle in m5_candles[-5:]:
+                    c_low = candle.get("low", 0)
+                    c_high = candle.get("high", 0)
+                    c_close = candle.get("close", 0)
+                    ema_tolerance = ema_1h_50 * 0.002
+
+                    if direction == "BUY":
+                        # EMA acting as dynamic resistance: price approaches from below, gets rejected
+                        if c_high >= ema_1h_50 - ema_tolerance and c_close < ema_1h_50:
+                            bounce_count += 1
+                    else:  # SELL
+                        # EMA acting as dynamic support: price approaches from above, gets rejected
+                        if c_low <= ema_1h_50 + ema_tolerance and c_close > ema_1h_50:
+                            bounce_count += 1
+
+                if bounce_count >= 2:
+                    ema_role = "resistencia dinamica" if direction == "BUY" else "soporte dinamico"
+                    failed.append(
+                        f"EMA 50 1H actuando como {ema_role} "
+                        f"({bounce_count} rechazos recientes) — no Black"
+                    )
+                    return None
 
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -2606,7 +2771,7 @@ class BlackStrategy(BaseStrategy):
             rr = reward / risk
             # BLACK requiere MINIMO 2:1 (contratendencia = mayor riesgo, mejor R:R)
             black_min_rr = max(settings.min_rr_black, settings.min_rr_ratio)
-            if rr < black_min_rr:
+            if rr < black_min_rr - 1e-9:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (BLACK requiere MINIMO {black_min_rr}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1 (minimo Black: {black_min_rr}:1)")
@@ -2752,8 +2917,8 @@ class GreenStrategy(BaseStrategy):
         met.append(f"Paso 1: Tendencia semanal {analysis.htf_trend.value}")
 
         # --- Paso 2: Correccion semanal forma patron diario ---
-        # Una correccion se detecta cuando el LTF va contra el HTF temporalmente
-        # o cuando el mercado esta en consolidacion despues de un impulso
+        # TradingLab: Also check for breakout of weekly resistance/support level
+        # (not just divergence — the correction should break a key weekly level)
         if not analysis.htf_ltf_convergence:
             # LTF va contra HTF = posible correccion (bueno para Green)
             score += 15.0
@@ -2765,6 +2930,32 @@ class GreenStrategy(BaseStrategy):
                 met.append("Paso 2: Convergencia con desaceleracion - posible inicio de correccion")
             else:
                 failed.append("Paso 2: Convergencia sin desaceleracion - puede no haber patron correctivo")
+
+        # Paso 2b: Check breakout of weekly S/R level
+        weekly_sr_broken = False
+        price = _get_current_price_proxy(analysis)
+        if price:
+            w_supports = analysis.key_levels.get("supports", [])
+            w_resistances = analysis.key_levels.get("resistances", [])
+            tolerance = price * 0.005  # 0.5%
+            if direction == "BUY":
+                # For BUY: price should have broken above a weekly resistance
+                for r in w_resistances:
+                    if price > r and abs(price - r) < tolerance * 3:
+                        weekly_sr_broken = True
+                        score += 5.0
+                        met.append(f"Paso 2b: Rompimiento de resistencia semanal {r:.5f}")
+                        break
+            else:
+                # For SELL: price should have broken below a weekly support
+                for s in w_supports:
+                    if price < s and abs(price - s) < tolerance * 3:
+                        weekly_sr_broken = True
+                        score += 5.0
+                        met.append(f"Paso 2b: Rompimiento de soporte semanal {s:.5f}")
+                        break
+        if not weekly_sr_broken:
+            failed.append("Paso 2b: Sin rompimiento claro de nivel S/R semanal")
 
         # --- Paso 3: Fibonacci, S/R, medias moviles como soporte dentro del patron ---
         fib_382 = analysis.fibonacci_levels.get("0.382")
@@ -2802,6 +2993,28 @@ class GreenStrategy(BaseStrategy):
             met.append(f"Paso 3: Confluencia moderada ({confluence_count} nivel)")
         else:
             failed.append("Paso 3: Sin confluencia de niveles en zona actual")
+
+        # Paso 3b: Check pullback TO the broken weekly level specifically
+        # TradingLab: price should pull back to the broken S/R level (now acting as support/resistance)
+        if weekly_sr_broken and price:
+            # The broken level should now act as support (BUY) or resistance (SELL)
+            pullback_to_level = False
+            if direction == "BUY":
+                for r in w_resistances:
+                    if price > r and abs(price - r) / price < 0.008:  # Within 0.8% of broken resistance
+                        pullback_to_level = True
+                        score += 5.0
+                        met.append(f"Paso 3b: Pullback al nivel roto {r:.5f} (ahora soporte)")
+                        break
+            else:
+                for s in w_supports:
+                    if price < s and abs(price - s) / price < 0.008:
+                        pullback_to_level = True
+                        score += 5.0
+                        met.append(f"Paso 3b: Pullback al nivel roto {s:.5f} (ahora resistencia)")
+                        break
+            if not pullback_to_level:
+                failed.append("Paso 3b: Sin pullback al nivel semanal roto")
 
         passed = score >= 25.0
         return passed, score, met, failed
@@ -2880,22 +3093,57 @@ class GreenStrategy(BaseStrategy):
             confidence += smc_bonus
             met.append(f"SMC: {smc_desc}")
 
-        # --- Paso 5: Entrada en 15M (RCC: Ruptura + Cierre + Confirmación) ---
-        ema_15m_break, ema_15m_desc = _check_ema_break(analysis, "EMA_M15_5", direction)
-        ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, "EMA_M15_20", direction)
+        # --- Paso 5: Entrada en 15M ---
+        # TradingLab: "copiar la diagonal de 1H a 15M y ejecutar en rompimiento+cierre+
+        # confirmacion de ese nivel" — NOT on EMA breaks.
+        # Primary: detect diagonal/trendline breakout on 15M.
+        # Fallback: use EMA breaks only if no diagonal data is available.
+        diagonal_breakout_detected = False
+        if hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
+                ptype_lower = ptype.lower()
+                # Look for diagonal/trendline breakout on 15M or M5
+                if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break", "triangle_break")):
+                    if ptf in ("M15", "M5", ""):
+                        diagonal_breakout_detected = True
+                        confidence += 15.0
+                        met.append(f"Paso 5: Rompimiento de diagonal en 15M detectado ({ptype})")
+                        break
 
-        if ema_15m_break and ema_15m_20_break:
-            if _check_rcc_confirmation(analysis, "EMA_M15_5", direction):
-                confidence += 15.0
-                met.append(f"Paso 5: RCC confirmado (EMA 5 + EMA 20 de M15)")
+        # Also check structure breaks as proxy for diagonal breakout
+        if not diagonal_breakout_detected:
+            structure_breaks = getattr(analysis, 'structure_breaks', [])
+            for sb in structure_breaks[-5:]:
+                if isinstance(sb, dict):
+                    sb_dir = sb.get("direction", "")
+                    sb_type = sb.get("type", "")
+                    expected_dir = "bullish" if direction == "BUY" else "bearish"
+                    if sb_dir == expected_dir and sb_type in ("BOS", "CHOCH"):
+                        diagonal_breakout_detected = True
+                        confidence += 12.0
+                        met.append(f"Paso 5: Rompimiento estructural {sb_type} {sb_dir} (proxy para diagonal)")
+                        break
+
+        # Fallback: EMA breaks on M15 only if no diagonal detected
+        if not diagonal_breakout_detected:
+            ema_15m_break, ema_15m_desc = _check_ema_break(analysis, "EMA_M15_5", direction)
+            ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, "EMA_M15_20", direction)
+
+            if ema_15m_break and ema_15m_20_break:
+                if _check_rcc_confirmation(analysis, "EMA_M15_5", direction):
+                    confidence += 10.0
+                    met.append(f"Paso 5: Fallback EMA - RCC confirmado (EMA 5 + EMA 20 de M15)")
+                else:
+                    confidence += 5.0
+                    met.append(f"Paso 5: Fallback EMA - Rompimiento doble sin RCC")
+            elif ema_15m_break:
+                confidence += 3.0
+                met.append(f"Paso 5: Fallback EMA - Rompimiento parcial - {ema_15m_desc}")
             else:
-                confidence += 8.0
-                met.append(f"Paso 5: Rompimiento doble sin RCC")
-        elif ema_15m_break:
-            confidence += 5.0
-            met.append(f"Paso 5: Rompimiento parcial - {ema_15m_desc}")
-        else:
-            failed.append(f"Paso 5: Sin rompimiento - {ema_15m_desc}")
+                failed.append(f"Paso 5: Sin rompimiento de diagonal ni EMA en 15M - {ema_15m_desc}")
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -2921,7 +3169,7 @@ class GreenStrategy(BaseStrategy):
             rr = reward / risk
             # GREEN busca minimo 2:1 (potencial hasta 10:1 R:R)
             green_min_rr = max(settings.min_rr_green, settings.min_rr_ratio)
-            if rr < green_min_rr:
+            if rr < green_min_rr - 1e-9:
                 failed.append(f"R:R insuficiente: {rr:.2f}:1 (Green busca minimo {green_min_rr}:1, ideal 5-10:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
@@ -3165,12 +3413,14 @@ def _apply_elliott_wave_priority(
     """
     Re-score setups based on the current Elliott Wave phase.
 
-    From Trading Plan 2024:
-    - Wave 1: GREEN (Day) +10, BLACK (Swing) +8 — first impulse after reversal
-    - Wave 2: BLUE +8, conservative pullback (reduce tp_max)
-    - Wave 3: GREEN +10, RED +8, BLUE +5 — strongest impulse
-    - Wave 4: PINK +8, BLUE +5, conservative pullback
-    - Wave 5: GREEN +10, RED +5, PINK +5 — final impulse
+    GREEN is excluded from wave bonuses (crypto-only strategy, not wave-specific).
+
+    From Trading Plan 2024 (corrected):
+    - Wave 1: BLACK +12 — counter-trend anticipation (highest priority)
+    - Wave 2: BLUE +8, WHITE +3 — conservative pullback (reduce tp_max)
+    - Wave 3: RED +10, BLUE +5, WHITE +5 — strongest impulse
+    - Wave 4: PINK +8, BLUE +5, WHITE +3 — conservative pullback
+    - Wave 5: PINK +10, WHITE +8, RED +5 — PINK designed for Wave 4->5
     - Wave A/B/C: BLACK +5 — corrective = counter-trend opportunity
     """
     if not setups:
@@ -3183,12 +3433,16 @@ def _apply_elliott_wave_priority(
         return setups
 
     # Define confidence bonuses/penalties per wave
+    # GREEN removed from wave mappings: it's crypto-only, not wave-specific.
+    # BLACK has highest score in Wave 1 (counter-trend anticipation).
+    # Wave 5 primarily favors PINK (designed for Wave 4->5).
+    # WHITE added to wave mappings where appropriate.
     wave_bonuses: Dict[str, Dict[str, float]] = {
-        "1": {"GREEN": 10, "BLACK": 8},
-        "2": {"BLUE": 8},
-        "3": {"GREEN": 10, "RED": 8, "BLUE": 5},
-        "4": {"PINK": 8, "BLUE": 5},
-        "5": {"GREEN": 10, "RED": 5, "PINK": 5},
+        "1": {"BLACK": 12},
+        "2": {"BLUE": 8, "WHITE": 3},
+        "3": {"RED": 10, "BLUE": 5, "WHITE": 5},
+        "4": {"PINK": 8, "BLUE": 5, "WHITE": 3},
+        "5": {"PINK": 10, "RED": 5, "WHITE": 8},
         "A": {"BLACK": 5},
         "B": {"BLACK": 5},
         "C": {"BLACK": 5},
@@ -3246,6 +3500,11 @@ def get_best_setup(
 ) -> Optional[SetupSignal]:
     """Retorna el mejor setup (mayor confianza) o None si no hay ninguno."""
     signals = detect_all_setups(analysis, enabled_strategies)
+
+    # TradingLab: "La green es la UNICA estrategia que vamos a aplicar en cripto."
+    # Safety filter: even if detect_all_setups missed it, enforce GREEN-only for crypto.
+    if _is_crypto_instrument(analysis.instrument):
+        signals = [s for s in signals if s.strategy == StrategyColor.GREEN]
 
     # Apply Elliott Wave prioritization before selecting the best
     signals = _apply_elliott_wave_priority(analysis, signals)

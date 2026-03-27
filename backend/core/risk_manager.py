@@ -447,7 +447,9 @@ class RiskManager:
             return False
 
         rr_ratio = reward / risk
-        if rr_ratio < settings.min_rr_ratio:
+        # Use small epsilon for floating-point comparison to avoid rejecting
+        # trades that are exactly at the minimum ratio (e.g., 2.0 computed as 1.9999...)
+        if rr_ratio < settings.min_rr_ratio - 1e-9:
             logger.warning(
                 f"R:R ratio {rr_ratio:.2f} is below minimum {settings.min_rr_ratio}. "
                 f"Trade rejected."

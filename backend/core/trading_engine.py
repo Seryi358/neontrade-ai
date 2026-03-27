@@ -258,6 +258,32 @@ class TradingEngine:
         # Scalping scan interval: 30 seconds (faster than normal 120s)
         self._scalping_scan_interval: int = 30
 
+    # ── Public accessors for internal state ─────────────────────────
+
+    @property
+    def running(self) -> bool:
+        return self._running
+
+    @property
+    def startup_error(self) -> str:
+        return self._startup_error
+
+    @startup_error.setter
+    def startup_error(self, value: str):
+        self._startup_error = value
+
+    @property
+    def last_scan_results(self) -> Dict[str, 'AnalysisResult']:
+        return self._last_scan_results
+
+    @property
+    def latest_explanations(self) -> Dict[str, 'StrategyExplanation']:
+        return self._latest_explanations
+
+    @property
+    def scan_interval(self) -> int:
+        return self._scan_interval
+
     # ── Notifications ──────────────────────────────────────────────
 
     def _push_notification(self, notif_type: str, title: str, body: str, data: dict = None):

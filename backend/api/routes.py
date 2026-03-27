@@ -133,9 +133,9 @@ async def run_diagnostic():
     from core.resilience import broker_circuit_breaker
     broker = engine.broker
     results = {
-        "engine_running": engine._running,
-        "startup_error": engine._startup_error,
-        "scanned_instruments": len(engine._last_scan_results),
+        "engine_running": engine.running,
+        "startup_error": engine.startup_error,
+        "scanned_instruments": len(engine.last_scan_results),
         "broker_type": getattr(broker, 'broker_type', None),
         "circuit_breaker": {
             "state": broker_circuit_breaker.state,
@@ -222,12 +222,12 @@ async def run_diagnostic():
 
     # Step 6: Check scan results
     scan_sample = {}
-    for inst, analysis in list(engine._last_scan_results.items())[:3]:
+    for inst, analysis in list(engine.last_scan_results.items())[:3]:
         scan_sample[inst] = {"score": analysis.score, "htf_trend": analysis.htf_trend.value}
     results["steps"].append({
         "step": "6_scan_results",
-        "ok": len(engine._last_scan_results) > 0,
-        "detail": f"{len(engine._last_scan_results)} instruments scanned",
+        "ok": len(engine.last_scan_results) > 0,
+        "detail": f"{len(engine.last_scan_results)} instruments scanned",
         "sample": scan_sample,
     })
 
@@ -344,12 +344,12 @@ async def get_positions():
 async def get_analysis(instrument: str):
     """Get latest analysis for a specific instrument with full explanation."""
     from main import engine
-    results = engine._last_scan_results
+    results = engine.last_scan_results
     if instrument not in results:
         # Build a descriptive message depending on engine state
-        if not engine._running and engine._startup_error:
-            msg = f"Motor detenido — error de broker: {engine._startup_error[:100]}"
-        elif not engine._running:
+        if not engine.running and engine.startup_error:
+            msg = f"Motor detenido — error de broker: {engine.startup_error[:100]}"
+        elif not engine.running:
             msg = "Motor no iniciado — esperando conexión al broker..."
         elif len(results) == 0:
             msg = "Escaneo inicial en progreso — analizando pares..."
@@ -397,8 +397,8 @@ async def get_analysis(instrument: str):
     }
 
     # Add detailed explanation if available
-    if instrument in engine._latest_explanations:
-        explanation = engine._latest_explanations[instrument]
+    if instrument in engine.latest_explanations:
+        explanation = engine.latest_explanations[instrument]
         response["explanation"] = {
             "overall_bias": explanation.overall_bias,
             "confidence_level": explanation.confidence_level,
@@ -432,7 +432,7 @@ async def get_all_analyses():
     """Get latest analysis summary for all scanned instruments."""
     from main import engine
     results = []
-    for inst, analysis in engine._last_scan_results.items():
+    for inst, analysis in engine.last_scan_results.items():
         entry = {
             "instrument": inst,
             "score": analysis.score,
@@ -443,8 +443,8 @@ async def get_all_analyses():
             "patterns": analysis.candlestick_patterns,
         }
         # Add strategy detection if available
-        if inst in engine._latest_explanations:
-            expl = engine._latest_explanations[inst]
+        if inst in engine.latest_explanations:
+            expl = engine.latest_explanations[inst]
             entry["strategy_detected"] = expl.strategy_detected
             entry["confidence_level"] = expl.confidence_level
             entry["recommendation"] = expl.recommendation
@@ -472,16 +472,16 @@ async def get_watchlist():
             "patterns": [],
             "strategy_detected": None,
         }
-        if instrument in engine._last_scan_results:
-            analysis = engine._last_scan_results[instrument]
+        if instrument in engine.last_scan_results:
+            analysis = engine.last_scan_results[instrument]
             entry["score"] = analysis.score
             entry["trend"] = analysis.htf_trend.value
             entry["convergence"] = analysis.htf_ltf_convergence
             entry["patterns"] = analysis.candlestick_patterns
             entry["condition"] = analysis.htf_condition.value
 
-            if instrument in engine._latest_explanations:
-                expl = engine._latest_explanations[instrument]
+            if instrument in engine.latest_explanations:
+                expl = engine.latest_explanations[instrument]
                 entry["strategy_detected"] = expl.strategy_detected
                 entry["confidence_level"] = expl.confidence_level
 
@@ -520,8 +520,8 @@ async def start_engine():
     """Start the trading engine."""
     from main import engine
     import asyncio
-    if not engine._running:
-        engine._startup_error = ""  # Clear previous error
+    if not engine.running:
+        engine.startup_error = ""  # Clear previous error
         asyncio.create_task(engine.start())
         return {"status": "starting", "message": "Motor de trading iniciando..."}
     return {"status": "already_running", "message": "El motor ya está en ejecución"}
@@ -669,7 +669,7 @@ async def get_current_broker():
         sec = getattr(broker, '_security_token', None)
         connected = bool(cst and sec)
         # Also check if engine is running as a proxy for "connected"
-        if not connected and engine._running:
+        if not connected and engine.running:
             connected = True
     except Exception:
         connected = False
@@ -1263,7 +1263,7 @@ async def toggle_scalping(request: ScalpingToggleRequest):
         status = "activado" if request.enabled else "desactivado"
         return {
             "scalping_enabled": request.enabled,
-            "scan_interval": engine._scan_interval,
+            "scan_interval": engine.scan_interval,
             "message": f"Modo scalping {status}",
         }
     raise HTTPException(501, "Scalping module not available")

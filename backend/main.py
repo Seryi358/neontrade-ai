@@ -51,11 +51,18 @@ db = None  # Initialized in lifespan
 
 
 # ── WebSocket Manager ────────────────────────────────────────────
+MAX_WS_CONNECTIONS = 50
+
+
 class ConnectionManager:
     """Manages WebSocket connections and broadcasts events."""
 
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+
+    @property
+    def is_full(self) -> bool:
+        return len(self.active_connections) >= MAX_WS_CONNECTIONS
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -214,6 +221,12 @@ async def websocket_endpoint(websocket: WebSocket):
     - {"action": "set_mode", "mode": "AUTO"|"MANUAL"}
     - {"action": "subscribe", "instruments": ["EUR_USD", ...]}
     """
+    # Reject if connection limit reached
+    if ws_manager.is_full:
+        await websocket.close(code=4003, reason="Connection limit reached")
+        logger.warning(f"WS connection rejected: limit of {MAX_WS_CONNECTIONS} reached")
+        return
+
     # Authenticate WebSocket via query param: /ws?api_key=...
     if security_config.auth_enabled and security_config.api_keys:
         api_key = websocket.query_params.get("api_key", "")

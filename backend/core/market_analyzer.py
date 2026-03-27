@@ -27,6 +27,16 @@ from loguru import logger
 
 from core.chart_patterns import detect_chart_patterns, ChartPattern
 
+# Negatively correlated pairs: when one goes up, the other goes down.
+# For SMT divergence, the comparison logic must be inverted for these pairs.
+NEGATIVE_CORRELATIONS = {
+    "EUR_USD": "DXY",
+    "GBP_USD": "DXY",
+    "AUD_USD": "DXY",
+    "NZD_USD": "DXY",
+    "DXY": "EUR_USD",  # reverse mapping
+}
+
 
 class Trend(Enum):
     BULLISH = "bullish"
@@ -50,7 +60,7 @@ class AnalysisResult:
     htf_condition: MarketCondition
     ltf_trend: Trend
     htf_ltf_convergence: bool  # True if HTF and LTF agree
-    key_levels: Dict[str, List[float]]  # supports, resistances, FVGs
+    key_levels: Dict[str, List]  # supports, resistances, FVGs, fvg_zones, liquidity_pools
     ema_values: Dict[str, float]
     fibonacci_levels: Dict[str, float]
     candlestick_patterns: List[str]
@@ -96,6 +106,12 @@ class AnalysisResult:
     power_of_three: Dict[str, Any] = field(default_factory=dict)
     # SMT Divergence: "bullish", "bearish", or None
     smt_divergence: Optional[str] = None
+    # Liquidity sweep detection: {"level": float, "direction": "swept_highs"|"swept_lows"}
+    liquidity_sweep: Optional[Dict[str, Any]] = None
+    # BMSB (Bull Market Support Band) - TradingLab Crypto Module 8
+    bmsb: Optional[Dict] = None
+    # Pi Cycle Top/Bottom - TradingLab Crypto Module 8
+    pi_cycle: Optional[Dict] = None
 
 
 class MarketAnalyzer:
@@ -292,7 +308,50 @@ class MarketAnalyzer:
             instrument, candles.get("H1", pd.DataFrame())
         )
 
-        return AnalysisResult(
+        # Step 27: Liquidity Pools & sweep detection (Gap 6)
+        liquidity_pools, liquidity_sweep = self._detect_liquidity_pools(
+            candles, key_levels, power_of_three, current_price
+        )
+        key_levels["liquidity_pools"] = liquidity_pools
+
+        # Step 28: BMSB (Bull Market Support Band) - TradingLab Crypto Module 8
+        # SMA 20 + EMA 21 on Daily
+        bmsb = None
+        d_df = candles.get("D", pd.DataFrame())
+        if not d_df.empty and len(d_df) >= 21 and current_price is not None:
+            daily_closes = d_df["close"].tolist()
+            sma_20 = sum(daily_closes[-20:]) / 20
+            # EMA 21
+            ema_21 = daily_closes[0]
+            multiplier = 2 / (21 + 1)
+            for price_val in daily_closes[1:]:
+                ema_21 = (price_val - ema_21) * multiplier + ema_21
+            bmsb = {
+                "sma_20": sma_20,
+                "ema_21": ema_21,
+                "bullish": current_price > sma_20 and current_price > ema_21,
+                "bearish": current_price < sma_20 and current_price < ema_21,
+            }
+
+        # Step 29: Pi Cycle Top/Bottom - TradingLab Crypto Module 8
+        # Pi Cycle Top: SMA 111 crosses above 2x SMA 350
+        # Pi Cycle Bottom: SMA 150 crosses below SMA 471
+        pi_cycle = None
+        if not d_df.empty and len(d_df) >= 471:
+            daily_closes = d_df["close"].tolist()
+            sma_111 = sum(daily_closes[-111:]) / 111
+            sma_350 = sum(daily_closes[-350:]) / 350
+            sma_350_2x = sma_350 * 2
+            sma_150 = sum(daily_closes[-150:]) / 150
+            sma_471 = sum(daily_closes[-471:]) / 471
+            pi_cycle = {
+                "sma_111": sma_111,
+                "sma_350_2x": sma_350_2x,
+                "near_top": sma_111 > sma_350_2x * 0.98,  # Within 2% of cross
+                "near_bottom": sma_150 < sma_471 * 1.02,
+            }
+
+        result = AnalysisResult(
             instrument=instrument,
             htf_trend=htf_trend,
             htf_condition=htf_condition,
@@ -324,7 +383,11 @@ class MarketAnalyzer:
             breaker_blocks=breaker_blocks,
             power_of_three=power_of_three,
             smt_divergence=smt_divergence,
+            liquidity_sweep=liquidity_sweep,
+            bmsb=bmsb,
+            pi_cycle=pi_cycle,
         )
+        return result
 
     def _candles_to_dataframe(self, candles) -> pd.DataFrame:
         """Convert CandleData objects (or legacy dicts) to pandas DataFrame."""
@@ -401,12 +464,13 @@ class MarketAnalyzer:
             return MarketCondition.OVERSOLD
         return MarketCondition.NEUTRAL
 
-    def _find_key_levels(self, candles: Dict[str, pd.DataFrame]) -> Dict[str, List[float]]:
+    def _find_key_levels(self, candles: Dict[str, pd.DataFrame]) -> Dict[str, List]:
         """Find support, resistance, and Fair Value Gap (FVG) levels."""
-        levels: Dict[str, List[float]] = {
+        levels: Dict[str, List] = {
             "supports": [],
             "resistances": [],
-            "fvg": [],
+            "fvg": [],          # backward-compatible: list of midpoint floats
+            "fvg_zones": [],    # full FVG data model (Gap 7)
         }
 
         daily = candles.get("D", pd.DataFrame())
@@ -429,23 +493,86 @@ class MarketAnalyzer:
                 daily["low"].iloc[i] < daily["low"].iloc[i+2]):
                 levels["supports"].append(daily["low"].iloc[i])
 
-        # Find FVGs (Fair Value Gaps) from 1H
+        # Find FVGs (Fair Value Gaps) from 1H — full data model (Gap 7)
         h1 = candles.get("H1", pd.DataFrame())
+        fvg_zones: List[Dict] = []
         if not h1.empty:
             for i in range(2, len(h1)):
                 # Bullish FVG: candle[i] low > candle[i-2] high
                 if h1["low"].iloc[i] > h1["high"].iloc[i-2]:
-                    fvg_mid = (h1["low"].iloc[i] + h1["high"].iloc[i-2]) / 2
-                    levels["fvg"].append(fvg_mid)
+                    high_boundary = float(h1["low"].iloc[i])
+                    low_boundary = float(h1["high"].iloc[i-2])
+                    midpoint = (high_boundary + low_boundary) / 2
+                    levels["fvg"].append(midpoint)
+                    fvg_zones.append({
+                        "high": high_boundary,
+                        "low": low_boundary,
+                        "mid": midpoint,
+                        "direction": "bullish",
+                        "filled": False,
+                        "timeframe": "H1",
+                        "index": i,
+                    })
                 # Bearish FVG: candle[i] high < candle[i-2] low
                 elif h1["high"].iloc[i] < h1["low"].iloc[i-2]:
-                    fvg_mid = (h1["high"].iloc[i] + h1["low"].iloc[i-2]) / 2
-                    levels["fvg"].append(fvg_mid)
+                    high_boundary = float(h1["low"].iloc[i-2])
+                    low_boundary = float(h1["high"].iloc[i])
+                    midpoint = (high_boundary + low_boundary) / 2
+                    levels["fvg"].append(midpoint)
+                    fvg_zones.append({
+                        "high": high_boundary,
+                        "low": low_boundary,
+                        "mid": midpoint,
+                        "direction": "bearish",
+                        "filled": False,
+                        "timeframe": "H1",
+                        "index": i,
+                    })
+
+            # Check if FVGs have been filled by subsequent price action
+            for fvg in fvg_zones:
+                fvg_idx = fvg["index"]
+                for j in range(fvg_idx + 1, len(h1)):
+                    if fvg["direction"] == "bullish":
+                        # Bullish FVG filled if price comes back down through it
+                        if float(h1["low"].iloc[j]) <= fvg["low"]:
+                            fvg["filled"] = True
+                            break
+                    else:
+                        # Bearish FVG filled if price comes back up through it
+                        if float(h1["high"].iloc[j]) >= fvg["high"]:
+                            fvg["filled"] = True
+                            break
+
+            # IFVG detection: inverted FVGs (FVG broken by candle body = flip direction)
+            for fvg in fvg_zones:
+                if fvg.get("inverted"):
+                    continue
+                fvg_idx = fvg["index"]
+                for j in range(fvg_idx + 1, len(h1)):
+                    candle_open = float(h1["open"].iloc[j])
+                    candle_close = float(h1["close"].iloc[j])
+                    body_high = max(candle_open, candle_close)
+                    body_low = min(candle_open, candle_close)
+
+                    if fvg["direction"] == "bullish":
+                        # Bullish FVG broken by bearish body closing below FVG low
+                        if body_high < fvg["low"]:
+                            fvg["inverted"] = True
+                            fvg["direction"] = "bearish"  # flip
+                            break
+                    else:
+                        # Bearish FVG broken by bullish body closing above FVG high
+                        if body_low > fvg["high"]:
+                            fvg["inverted"] = True
+                            fvg["direction"] = "bullish"  # flip
+                            break
 
         # Keep only recent levels
         levels["supports"] = sorted(levels["supports"])[-10:]
         levels["resistances"] = sorted(levels["resistances"])[-10:]
         levels["fvg"] = levels["fvg"][-20:]
+        levels["fvg_zones"] = fvg_zones[-20:]
 
         return levels
 
@@ -1239,14 +1366,31 @@ class MarketAnalyzer:
         self, df: pd.DataFrame, order_blocks: List[Dict]
     ) -> List[Dict]:
         """
-        Detect Mitigation Blocks: order blocks that price has revisited (partially filled).
-        A mitigated OB is one where price returned to the OB zone after the initial impulse.
+        Detect Mitigation Blocks (corrected per SMC workshop definition - Gap 8).
+
+        A Mitigation Block is an Order Block that price broke through WITHOUT a
+        prior liquidity sweep.  In other words:
+        1. Price closed beyond the OB (broke it).
+        2. Before that break, the previous swing high/low was NOT taken.
+        3. If liquidity WAS swept before the break, it is a Breaker Block instead
+           (handled by _detect_breaker_blocks).
         """
         if df.empty or not order_blocks:
             return []
 
         mitigation_blocks = []
         data = df.reset_index(drop=True)
+
+        # Pre-compute swing highs and swing lows for the whole series
+        swing_highs: List[Tuple[int, float]] = []
+        swing_lows: List[Tuple[int, float]] = []
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                    data["high"].iloc[i] > data["high"].iloc[i + 1]):
+                swing_highs.append((i, float(data["high"].iloc[i])))
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                    data["low"].iloc[i] < data["low"].iloc[i + 1]):
+                swing_lows.append((i, float(data["low"].iloc[i])))
 
         for ob in order_blocks:
             ob_idx = ob.get("index", 0)
@@ -1257,30 +1401,64 @@ class MarketAnalyzer:
             if ob_high == 0 or ob_low == 0:
                 continue
 
-            # Check if price revisited this OB zone after it was created
-            mitigated = False
+            # Step 1: Check if price broke through this OB
+            break_idx = None
             for j in range(ob_idx + 2, len(data)):
-                candle_low = float(data["low"].iloc[j])
-                candle_high = float(data["high"].iloc[j])
+                candle_open = float(data["open"].iloc[j])
+                candle_close = float(data["close"].iloc[j])
+                body_low = min(candle_open, candle_close)
+                body_high = max(candle_open, candle_close)
 
-                if ob_type == "bullish_ob":
-                    # Bullish OB mitigated: price dipped back into the OB zone
-                    if candle_low <= ob_high and candle_low >= ob_low:
-                        mitigated = True
-                        break
-                elif ob_type == "bearish_ob":
-                    # Bearish OB mitigated: price rallied back into the OB zone
-                    if candle_high >= ob_low and candle_high <= ob_high:
-                        mitigated = True
-                        break
+                if ob_type == "bullish_ob" and body_low < ob_low:
+                    break_idx = j
+                    break
+                elif ob_type == "bearish_ob" and body_high > ob_high:
+                    break_idx = j
+                    break
 
-            if mitigated:
+            if break_idx is None:
+                continue  # OB was never broken — not a mitigation block
+
+            # Step 2: Check if liquidity was swept BEFORE the break
+            liquidity_swept = False
+
+            if ob_type == "bullish_ob":
+                # For a bullish OB break-down, check if previous swing low
+                # was taken (lower low made) before the break
+                prev_swing_low = None
+                for si, sv in swing_lows:
+                    if si < ob_idx:
+                        prev_swing_low = sv
+                # Check if any candle between OB and break went below prev swing low
+                if prev_swing_low is not None:
+                    for j in range(ob_idx, break_idx):
+                        if float(data["low"].iloc[j]) < prev_swing_low:
+                            liquidity_swept = True
+                            break
+
+            elif ob_type == "bearish_ob":
+                # For a bearish OB break-up, check if previous swing high
+                # was taken (higher high made) before the break
+                prev_swing_high = None
+                for si, sv in swing_highs:
+                    if si < ob_idx:
+                        prev_swing_high = sv
+                # Check if any candle between OB and break went above prev swing high
+                if prev_swing_high is not None:
+                    for j in range(ob_idx, break_idx):
+                        if float(data["high"].iloc[j]) > prev_swing_high:
+                            liquidity_swept = True
+                            break
+
+            # Step 3: Mitigation Block = broken OB WITHOUT prior liquidity sweep
+            if not liquidity_swept:
                 mitigation_blocks.append({
-                    "type": f"mitigated_{ob_type}",
+                    "type": f"mitigation_{ob_type}",
                     "high": ob_high,
                     "low": ob_low,
                     "mid": (ob_high + ob_low) / 2,
                     "original_index": ob_idx,
+                    "break_index": break_idx,
                 })
 
         return mitigation_blocks[-10:]
@@ -1538,23 +1716,176 @@ class MarketAnalyzer:
             corr_made_higher_high = corr_last_high > corr_prev_high
             corr_made_lower_low = corr_last_low < corr_prev_low
 
-            # Bearish SMT: instrument makes higher high but correlated doesn't
-            if made_higher_high and not corr_made_higher_high:
-                logger.debug(
-                    f"SMT Divergence BEARISH: {instrument} made HH but "
-                    f"{corr_inst} did not"
-                )
-                return "bearish"
+            # Gap 9: For negatively correlated pairs (e.g. EUR/USD vs DXY),
+            # invert the comparison — they should move opposite, so SAME
+            # direction = divergence.
+            is_negative = (
+                NEGATIVE_CORRELATIONS.get(instrument) == corr_inst
+                or NEGATIVE_CORRELATIONS.get(corr_inst) == instrument
+            )
 
-            # Bullish SMT: instrument makes lower low but correlated doesn't
-            if made_lower_low and not corr_made_lower_low:
-                logger.debug(
-                    f"SMT Divergence BULLISH: {instrument} made LL but "
-                    f"{corr_inst} did not"
-                )
-                return "bullish"
+            if is_negative:
+                # Negative correlation: divergence = both moving same way
+                # Bearish SMT: instrument HH AND correlated also HH (should be LL)
+                if made_higher_high and corr_made_higher_high:
+                    logger.debug(
+                        f"SMT Divergence BEARISH (neg-corr): {instrument} HH "
+                        f"and {corr_inst} also HH (should diverge)"
+                    )
+                    return "bearish"
+                # Bullish SMT: instrument LL AND correlated also LL (should be HH)
+                if made_lower_low and corr_made_lower_low:
+                    logger.debug(
+                        f"SMT Divergence BULLISH (neg-corr): {instrument} LL "
+                        f"and {corr_inst} also LL (should diverge)"
+                    )
+                    return "bullish"
+            else:
+                # Positive correlation (original logic):
+                # Bearish SMT: instrument makes higher high but correlated doesn't
+                if made_higher_high and not corr_made_higher_high:
+                    logger.debug(
+                        f"SMT Divergence BEARISH: {instrument} made HH but "
+                        f"{corr_inst} did not"
+                    )
+                    return "bearish"
+
+                # Bullish SMT: instrument makes lower low but correlated doesn't
+                if made_lower_low and not corr_made_lower_low:
+                    logger.debug(
+                        f"SMT Divergence BULLISH: {instrument} made LL but "
+                        f"{corr_inst} did not"
+                    )
+                    return "bullish"
 
         return None
+
+    # ── Liquidity Pool Detection (SMC Workshop - Gap 6) ────────────────
+
+    def _detect_liquidity_pools(
+        self,
+        candles: Dict[str, pd.DataFrame],
+        key_levels: Dict[str, List],
+        power_of_three: Dict[str, Any],
+        current_price: Optional[float],
+    ) -> Tuple[List[Dict], Optional[Dict[str, Any]]]:
+        """
+        Detect Liquidity Pools and sweep-then-reverse events.
+
+        Liquidity pools form at:
+        - Equal highs (multiple swing highs within 0.1% of each other)
+        - Equal lows  (multiple swing lows within 0.1% of each other)
+        - Previous Day High / Low (PDH / PDL)
+        - Asian session high / low (from Power of Three data)
+
+        Returns:
+            (liquidity_pools, liquidity_sweep)
+            - liquidity_pools: list of dicts with level, type, strength
+            - liquidity_sweep: None or {"level": float, "direction": str}
+        """
+        pools: List[Dict] = []
+        sweep: Optional[Dict[str, Any]] = None
+
+        daily = candles.get("D", pd.DataFrame())
+        h1 = candles.get("H1", pd.DataFrame())
+
+        # --- Equal Highs / Equal Lows from daily swing points ---
+        swing_highs: List[float] = []
+        swing_lows: List[float] = []
+
+        if not daily.empty:
+            for i in range(2, len(daily) - 2):
+                if (daily["high"].iloc[i] > daily["high"].iloc[i - 1] and
+                        daily["high"].iloc[i] > daily["high"].iloc[i - 2] and
+                        daily["high"].iloc[i] > daily["high"].iloc[i + 1] and
+                        daily["high"].iloc[i] > daily["high"].iloc[i + 2]):
+                    swing_highs.append(float(daily["high"].iloc[i]))
+                if (daily["low"].iloc[i] < daily["low"].iloc[i - 1] and
+                        daily["low"].iloc[i] < daily["low"].iloc[i - 2] and
+                        daily["low"].iloc[i] < daily["low"].iloc[i + 1] and
+                        daily["low"].iloc[i] < daily["low"].iloc[i + 2]):
+                    swing_lows.append(float(daily["low"].iloc[i]))
+
+        # Cluster equal highs (within 0.1% tolerance)
+        tolerance = 0.001  # 0.1%
+        used: set = set()
+        for i, h in enumerate(swing_highs):
+            if i in used:
+                continue
+            cluster = [h]
+            for j in range(i + 1, len(swing_highs)):
+                if j in used:
+                    continue
+                if abs(swing_highs[j] - h) / max(h, 1e-10) <= tolerance:
+                    cluster.append(swing_highs[j])
+                    used.add(j)
+            if len(cluster) >= 2:
+                avg_level = sum(cluster) / len(cluster)
+                pools.append({
+                    "level": avg_level,
+                    "type": "equal_highs",
+                    "strength": len(cluster),
+                })
+
+        used = set()
+        for i, lo in enumerate(swing_lows):
+            if i in used:
+                continue
+            cluster = [lo]
+            for j in range(i + 1, len(swing_lows)):
+                if j in used:
+                    continue
+                if abs(swing_lows[j] - lo) / max(lo, 1e-10) <= tolerance:
+                    cluster.append(swing_lows[j])
+                    used.add(j)
+            if len(cluster) >= 2:
+                avg_level = sum(cluster) / len(cluster)
+                pools.append({
+                    "level": avg_level,
+                    "type": "equal_lows",
+                    "strength": len(cluster),
+                })
+
+        # --- Previous Day High / Low (PDH / PDL) ---
+        if not daily.empty and len(daily) >= 2:
+            prev_day = daily.iloc[-2]
+            pdh = float(prev_day["high"])
+            pdl = float(prev_day["low"])
+            pools.append({"level": pdh, "type": "pdh", "strength": 1})
+            pools.append({"level": pdl, "type": "pdl", "strength": 1})
+
+        # --- Asian session High / Low (if Power of Three data available) ---
+        asian_high = power_of_three.get("asian_high")
+        asian_low = power_of_three.get("asian_low")
+        if asian_high is not None:
+            pools.append({"level": asian_high, "type": "asian_high", "strength": 1})
+        if asian_low is not None:
+            pools.append({"level": asian_low, "type": "asian_low", "strength": 1})
+
+        # --- Sweep-then-reverse detection ---
+        # Check if the most recent H1 candles swept a liquidity level and reversed
+        if not h1.empty and len(h1) >= 3 and current_price is not None and pools:
+            recent_high = float(h1.iloc[-1]["high"])
+            recent_low = float(h1.iloc[-1]["low"])
+            prev_close = float(h1.iloc[-2]["close"])
+
+            for pool in pools:
+                lvl = pool["level"]
+                ptype = pool["type"]
+
+                # Swept highs: wick went above level but close came back below
+                if ptype in ("equal_highs", "pdh", "asian_high"):
+                    if recent_high > lvl and current_price < lvl and prev_close < lvl:
+                        sweep = {"level": lvl, "direction": "swept_highs"}
+                        break
+
+                # Swept lows: wick went below level but close came back above
+                if ptype in ("equal_lows", "pdl", "asian_low"):
+                    if recent_low < lvl and current_price > lvl and prev_close > lvl:
+                        sweep = {"level": lvl, "direction": "swept_lows"}
+                        break
+
+        return pools, sweep
 
     # ── Premium / Discount Zone Detection (TradingLab SMC) ────────────
 

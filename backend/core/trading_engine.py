@@ -1062,6 +1062,14 @@ class TradingEngine:
                 # Check for strategy setups
                 setup = await self._detect_setup(analysis)
                 if setup:
+                    # Check if this is a reentry opportunity (TradingLab: reentry at 75% normal risk)
+                    reentry = self._reentry_candidates.get(instrument)
+                    if reentry and setup.direction == reentry.get("direction"):
+                        setup.risk_percent *= 0.75
+                        logger.info(
+                            f"[{instrument}] Reentry opportunity — reduced risk to {setup.risk_percent:.2%}"
+                        )
+
                     self._daily_setups_found += 1
 
                     # Log session quality for the detected setup

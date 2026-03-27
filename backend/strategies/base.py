@@ -636,12 +636,12 @@ def _count_confluence_points(
 
     # 6. RSI condition
     rsi_d = analysis.rsi_values.get("D", 50)
-    if direction == "BUY" and rsi_d < 40:
+    if direction == "BUY" and rsi_d < 30:
         pos_pts += 1
-        pos_details.append(f"RSI diario favorable ({rsi_d:.0f})")
-    elif direction == "SELL" and rsi_d > 60:
+        pos_details.append(f"RSI diario sobrevendido favorable ({rsi_d:.0f})")
+    elif direction == "SELL" and rsi_d > 70:
         pos_pts += 1
-        pos_details.append(f"RSI diario favorable ({rsi_d:.0f})")
+        pos_details.append(f"RSI diario sobrecomprado favorable ({rsi_d:.0f})")
     elif direction == "BUY" and rsi_d > 70:
         neg_pts += 1
         neg_details.append(f"RSI diario sobrecomprado ({rsi_d:.0f})")
@@ -1328,12 +1328,16 @@ class BlueStrategy(BaseStrategy):
             return None
 
         # Validar R:R minimo (config: min_rr_ratio para Blue)
+        min_rr = settings.min_rr_ratio
+        if variant == "BLUE_C":
+            min_rr = 2.0  # TradingLab: Blue C requires minimum 2:1 R:R
+
         risk = abs(entry_price - sl)
         reward = abs(tp1 - entry_price)
         if risk > 0:
             rr = reward / risk
-            if rr < settings.min_rr_ratio:
-                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {settings.min_rr_ratio}:1)")
+            if rr < min_rr:
+                failed.append(f"R:R insuficiente: {rr:.2f}:1 (minimo {min_rr}:1)")
                 return None
             met.append(f"R:R valido: {rr:.2f}:1")
         else:
@@ -2097,6 +2101,13 @@ class WhiteStrategy(BaseStrategy):
         if direction is None:
             return None
 
+        # TradingLab: White MUST come after a Pink (wave 5 context)
+        failed: List[str] = []
+        elliott = analysis.elliott_wave
+        if not elliott:
+            failed.append("White requiere contexto de onda 5 (post-Pink)")
+            return None
+
         # TradingLab: Volume confirmation on breakout
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
         if not vol_ok:
@@ -2112,7 +2123,7 @@ class WhiteStrategy(BaseStrategy):
 
         confidence = 0.0
         met: List[str] = []
-        failed: List[str] = []
+        failed = []  # Reset after initial check
 
         # --- Paso 3: Pullback a EMA 50 1H + Fibonacci ---
         pb_ok, pb_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
@@ -2489,6 +2500,14 @@ class BlackStrategy(BaseStrategy):
             confidence += smc_bonus
             met.append(f"SMC: {smc_desc}")
 
+        # TradingLab: If EMA 50 1H acts as dynamic S/R, no Black trade
+        ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
+        if ema_1h_50 and ema_1h_50 > 0:
+            distance_to_ema = abs(entry_price - ema_1h_50) / entry_price
+            if distance_to_ema < 0.003:  # Within 0.3% = acting as S/R
+                failed.append("EMA 50 1H actuando como S/R dinamica — no Black")
+                return None
+
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
         tp_levels = self.get_tp_levels(analysis, direction, entry_price)
@@ -2728,6 +2747,26 @@ class GreenStrategy(BaseStrategy):
         met: List[str] = []
         failed: List[str] = []
 
+        # TradingLab: Green REQUIRES 1H diagonal (non-negotiable)
+        has_diagonal = False
+        if hasattr(analysis, 'chart_patterns'):
+            patterns = analysis.chart_patterns or []
+            for p in patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                if any(k in ptype.lower() for k in ("diagonal", "wedge", "triangle", "channel", "trendline")):
+                    has_diagonal = True
+                    break
+        # Also check for structure break on 1H as proxy for diagonal break
+        if not has_diagonal:
+            structure_breaks = getattr(analysis, 'structure_breaks', [])
+            for sb in structure_breaks:
+                if isinstance(sb, dict) and sb.get("type") in ("BOS", "CHOCH"):
+                    has_diagonal = True
+                    break
+        if not has_diagonal:
+            failed.append("Green REQUIERE diagonal en 1H (non-negotiable)")
+            return None
+
         # --- Paso 4: Cambio de tendencia en 1H al final del patron ---
         # Buscamos que la tendencia LTF este girando a favor de la HTF
         # (reversal del movimiento correctivo)
@@ -2819,6 +2858,16 @@ class GreenStrategy(BaseStrategy):
             if risk > 0:
                 rr_max = reward_max / risk
                 met.append(f"R:R maximo potencial: {rr_max:.2f}:1")
+
+        # TradingLab Crypto: Green Fractal - same pattern on multiple TFs = stronger signal
+        fractal_bonus = 0.0
+        # Check if weekly, daily AND 4H all show same direction pattern
+        htf_aligns = analysis.htf_trend.value == ("bullish" if direction == "BUY" else "bearish")
+        ltf_aligns = analysis.ltf_trend.value == ("bullish" if direction == "BUY" else "bearish")
+        if htf_aligns and ltf_aligns:
+            fractal_bonus = 10.0
+            met.append("Green Fractal: patron alineado en multiples timeframes (+10%)")
+        confidence += fractal_bonus
 
         if confidence < self.min_confidence:
             return None

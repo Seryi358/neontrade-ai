@@ -64,6 +64,8 @@ class ScalpingData:
     close_m1: Optional[float] = None
     # H1 direction
     h1_direction: Optional[str] = None  # "BUY" or "SELL"
+    # H1 MACD divergence (Gap 11)
+    h1_macd_divergence: Optional[str] = None  # "bullish", "bearish", or None
     # Raw candle DataFrames for strategy detection
     candles: Dict[str, pd.DataFrame] = field(default_factory=dict)
 
@@ -151,6 +153,10 @@ class ScalpingAnalyzer:
             if not df.empty:
                 setattr(data, attr, float(df["close"].iloc[-1]))
 
+        # ── H1 MACD divergence detection (Gap 11) ──
+        h1_df = candles.get("H1", pd.DataFrame())
+        data.h1_macd_divergence = self._detect_macd_divergence(h1_df)
+
         # ── H1 direction determination ──
         # Direction based on MACD + EMA 50 + SMA 200 on H1
         data.h1_direction = self._determine_h1_direction(data)
@@ -164,6 +170,7 @@ class ScalpingAnalyzer:
         - MACD bullish/bearish on H1
         - Price above/below EMA 50 on H1
         - Price above/below SMA 200 on H1 (strong filter)
+        - MACD divergence on H1 (Gap 11: confluence factor)
         """
         if data.close_h1 is None or data.ema50_h1 is None:
             return None
@@ -176,14 +183,47 @@ class ScalpingAnalyzer:
         if data.sma200_h1 is not None:
             sma_filter = data.close_h1 > data.sma200_h1
 
+        # Gap 11: MACD divergence as additional confluence
+        # A bullish divergence can confirm BUY even when MACD is not yet
+        # bullish (early reversal signal). A bearish divergence warns that
+        # a current BUY trend may reverse.
+        divergence = data.h1_macd_divergence
+
         if price_above_ema50 and macd_bullish:
             # Strong buy if also above SMA 200
             if sma_filter is None or sma_filter:
+                if divergence == "bearish":
+                    logger.info(
+                        f"Scalping H1: bearish MACD divergence detected on "
+                        f"{data.instrument} — weakening BUY direction"
+                    )
+                    return None  # divergence warns against the trend
                 return "BUY"
         elif not price_above_ema50 and not macd_bullish:
             # Strong sell if also below SMA 200
             if sma_filter is None or not sma_filter:
+                if divergence == "bullish":
+                    logger.info(
+                        f"Scalping H1: bullish MACD divergence detected on "
+                        f"{data.instrument} — weakening SELL direction"
+                    )
+                    return None  # divergence warns against the trend
                 return "SELL"
+
+        # Gap 11: divergence can provide direction when standard conditions
+        # are ambiguous (e.g. price near EMA 50 with no clear MACD)
+        if divergence == "bullish" and (sma_filter is None or sma_filter):
+            logger.info(
+                f"Scalping H1: bullish MACD divergence provides BUY bias "
+                f"on {data.instrument}"
+            )
+            return "BUY"
+        if divergence == "bearish" and (sma_filter is None or not sma_filter):
+            logger.info(
+                f"Scalping H1: bearish MACD divergence provides SELL bias "
+                f"on {data.instrument}"
+            )
+            return "SELL"
 
         return None
 
@@ -219,8 +259,16 @@ class ScalpingAnalyzer:
             return None
 
         # Run strategy detection on the synthetic analysis
+        # TradingLab: Exclude BLUE from scalping — BLUE is a day-trading strategy
+        _scalp_exclude_variants = {"BLUE", "BLUE_A", "BLUE_B", "BLUE_C"}
         signal = get_best_setup(scalp_analysis)
         if signal is None:
+            return None
+
+        if signal.strategy == StrategyColor.BLUE or signal.strategy_variant in _scalp_exclude_variants:
+            logger.debug(
+                f"Scalping: excluding {signal.strategy_variant} — BLUE not valid for scalping"
+            )
             return None
 
         # Tag as scalping setup
@@ -427,56 +475,154 @@ class ScalpingAnalyzer:
         scalp_data: ScalpingData,
         direction: str,
         method: str = "fast",
-    ) -> bool:
+        ema_buffer_pct: float = 0.001,
+    ) -> Dict[str, Any]:
         """
-        Check if a scalping exit signal is triggered.
+        Check if a scalping exit signal is triggered using gradual trailing SL
+        instead of a binary exit (Gap 12).
+
+        Instead of exiting immediately when price crosses EMA 50, this method:
+        1. Trails the SL behind EMA 50 with a small buffer as price advances.
+        2. Only triggers a hard exit when the full candle body closes
+           aggressively through EMA 50 (not just a wick touch).
 
         Methods:
-        - "fast": Exit when price closes below/above EMA 50 on M1
-                  Targets ~7-10% profit, tighter management
-        - "slow": Exit when price closes below/above EMA 50 on M5
-                  Targets ~10%+ profit, gives more room
+        - "fast": Trail / exit based on EMA 50 on M1 (~7-10% profit)
+        - "slow": Trail / exit based on EMA 50 on M5 (~10%+ profit)
 
         Args:
             scalp_data: Current scalping analysis data
             direction: Current position direction ("BUY" or "SELL")
             method: Exit method - "fast" (M1) or "slow" (M5)
+            ema_buffer_pct: Buffer as fraction of EMA for trailing SL
+                            (default 0.1% = 0.001)
 
         Returns:
-            True if exit signal is triggered
+            Dict with:
+              - should_exit (bool): True only on aggressive close through EMA
+              - new_trailing_sl (float | None): Suggested trailing SL level
+              - reason (str): Human-readable explanation
         """
         if method == "fast":
-            # Fast exit: M1 close vs EMA 50 on M1
             close = scalp_data.close_m1
             ema = scalp_data.ema50_m1
             tf_label = "M1"
+            tf_key = "M1"
         else:
-            # Slow exit: M5 close vs EMA 50 on M5
             close = scalp_data.close_m5
             ema = scalp_data.ema50_m5
             tf_label = "M5"
+            tf_key = "M5"
 
         if close is None or ema is None:
-            return False
+            return {"should_exit": False, "new_trailing_sl": None, "reason": ""}
+
+        # Get the last candle to inspect body vs wick
+        candle_df = scalp_data.candles.get(tf_key, pd.DataFrame())
+        candle_open = None
+        if not candle_df.empty:
+            candle_open = float(candle_df["open"].iloc[-1])
+
+        buffer = ema * ema_buffer_pct
 
         if direction == "BUY":
-            # For long positions, exit if price closes below EMA 50
-            if close < ema:
+            trailing_sl = ema - buffer  # SL trails below EMA 50
+
+            # Check for aggressive bearish close: full candle body below EMA
+            body_closed_below = (
+                candle_open is not None
+                and close < ema
+                and candle_open < ema
+            )
+
+            if body_closed_below:
                 logger.info(
                     f"Scalping EXIT ({method}): {scalp_data.instrument} BUY "
-                    f"- price {close:.5f} closed below EMA 50 {ema:.5f} on {tf_label}"
+                    f"- candle body [{candle_open:.5f}->{close:.5f}] closed "
+                    f"aggressively below EMA 50 {ema:.5f} on {tf_label}"
                 )
-                return True
-        elif direction == "SELL":
-            # For short positions, exit if price closes above EMA 50
+                return {
+                    "should_exit": True,
+                    "new_trailing_sl": None,
+                    "reason": (
+                        f"Aggressive close below EMA 50 on {tf_label}: "
+                        f"body [{candle_open:.5f}->{close:.5f}], "
+                        f"EMA={ema:.5f}"
+                    ),
+                }
+
+            # Price still favourable — trail the SL behind EMA 50
             if close > ema:
+                return {
+                    "should_exit": False,
+                    "new_trailing_sl": trailing_sl,
+                    "reason": (
+                        f"Trailing SL to {trailing_sl:.5f} "
+                        f"(EMA 50 {ema:.5f} - {ema_buffer_pct:.1%} buffer) "
+                        f"on {tf_label}"
+                    ),
+                }
+
+            # Wick touch only (close below but open above) — tighten SL,
+            # do not exit yet
+            return {
+                "should_exit": False,
+                "new_trailing_sl": trailing_sl,
+                "reason": (
+                    f"Wick touch below EMA 50 on {tf_label} — tightening SL "
+                    f"to {trailing_sl:.5f}, waiting for aggressive close"
+                ),
+            }
+
+        elif direction == "SELL":
+            trailing_sl = ema + buffer  # SL trails above EMA 50
+
+            # Check for aggressive bullish close: full candle body above EMA
+            body_closed_above = (
+                candle_open is not None
+                and close > ema
+                and candle_open > ema
+            )
+
+            if body_closed_above:
                 logger.info(
                     f"Scalping EXIT ({method}): {scalp_data.instrument} SELL "
-                    f"- price {close:.5f} closed above EMA 50 {ema:.5f} on {tf_label}"
+                    f"- candle body [{candle_open:.5f}->{close:.5f}] closed "
+                    f"aggressively above EMA 50 {ema:.5f} on {tf_label}"
                 )
-                return True
+                return {
+                    "should_exit": True,
+                    "new_trailing_sl": None,
+                    "reason": (
+                        f"Aggressive close above EMA 50 on {tf_label}: "
+                        f"body [{candle_open:.5f}->{close:.5f}], "
+                        f"EMA={ema:.5f}"
+                    ),
+                }
 
-        return False
+            # Price still favourable — trail the SL behind EMA 50
+            if close < ema:
+                return {
+                    "should_exit": False,
+                    "new_trailing_sl": trailing_sl,
+                    "reason": (
+                        f"Trailing SL to {trailing_sl:.5f} "
+                        f"(EMA 50 {ema:.5f} + {ema_buffer_pct:.1%} buffer) "
+                        f"on {tf_label}"
+                    ),
+                }
+
+            # Wick touch only — tighten SL, do not exit yet
+            return {
+                "should_exit": False,
+                "new_trailing_sl": trailing_sl,
+                "reason": (
+                    f"Wick touch above EMA 50 on {tf_label} — tightening SL "
+                    f"to {trailing_sl:.5f}, waiting for aggressive close"
+                ),
+            }
+
+        return {"should_exit": False, "new_trailing_sl": None, "reason": ""}
 
     # ── Status ───────────────────────────────────────────────────────
 
@@ -488,7 +634,217 @@ class ScalpingAnalyzer:
             "timeframe_mapping": SCALPING_TIMEFRAMES,
         }
 
+    # ── Limit Entry Confluence (Gap 13) ─────────────────────────────
+
+    def check_limit_entry_confluence(
+        self,
+        analysis: AnalysisResult,
+        direction: str,
+        entry_price: float,
+        scalp_data: Optional[ScalpingData] = None,
+        zone_threshold: float = 0.003,
+    ) -> Dict[str, Any]:
+        """
+        Check if 4 confluence levels align for a limit order entry (Gap 13).
+
+        The workshop requires 4 parameters for a valid limit entry:
+        1. EMA 50 M5
+        2. EMA 50 M15
+        3. Fibonacci level (0.382-0.618)
+        4. One extra level (S/R, diagonal, or other)
+
+        If all 4 align within a narrow zone (default 0.3% of zone center),
+        suggest a limit entry at the zone center instead of a market entry.
+
+        Args:
+            analysis: The AnalysisResult with fibonacci / key levels.
+            direction: "BUY" or "SELL".
+            entry_price: The current market price for reference.
+            scalp_data: ScalpingData with EMA values (if available).
+            zone_threshold: Maximum zone width as a fraction of the center
+                            (default 0.003 = 0.3%).
+
+        Returns:
+            Dict with:
+              - use_limit (bool): True if a limit entry is recommended.
+              - limit_price (float): Suggested limit price (zone center).
+              - confluences (list): List of (label, value) tuples.
+        """
+        levels: List[tuple] = []
+
+        # 1. EMA 50 M5
+        ema_m5 = None
+        if scalp_data and scalp_data.ema50_m5 is not None:
+            ema_m5 = scalp_data.ema50_m5
+        elif "EMA_H1_50" in analysis.ema_values:
+            # Scalping remap: M5 -> H1 slot
+            ema_m5 = analysis.ema_values["EMA_H1_50"]
+        if ema_m5 is not None:
+            levels.append(("EMA_M5", ema_m5))
+
+        # 2. EMA 50 M15
+        ema_m15 = None
+        if scalp_data and scalp_data.ema50_m15 is not None:
+            ema_m15 = scalp_data.ema50_m15
+        elif "EMA_H4_50" in analysis.ema_values:
+            # Scalping remap: M15 -> H4 slot
+            ema_m15 = analysis.ema_values["EMA_H4_50"]
+        if ema_m15 is not None:
+            levels.append(("EMA_M15", ema_m15))
+
+        # 3. Fibonacci level (pick the closest level in the 0.382-0.618 range)
+        fib_levels = analysis.fibonacci_levels or {}
+        best_fib = None
+        best_fib_dist = float("inf")
+        for fib_key, fib_val in fib_levels.items():
+            # Accept levels whose key indicates 0.382-0.618 range
+            try:
+                fib_ratio = float(fib_key)
+            except (ValueError, TypeError):
+                # Try extracting from string like "fib_0.382"
+                for token in str(fib_key).split("_"):
+                    try:
+                        fib_ratio = float(token)
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    continue
+            if 0.382 <= fib_ratio <= 0.618:
+                dist = abs(fib_val - entry_price)
+                if dist < best_fib_dist:
+                    best_fib_dist = dist
+                    best_fib = fib_val
+        if best_fib is not None:
+            levels.append(("Fib", best_fib))
+
+        # 4. One extra level: nearest support (for BUY) or resistance (for SELL)
+        key_levels = analysis.key_levels or {}
+        sr_level = None
+        if direction == "BUY":
+            supports = key_levels.get("supports", [])
+            if supports:
+                # Nearest support at or below entry_price
+                below = [s for s in supports if s <= entry_price]
+                if below:
+                    sr_level = max(below)
+                else:
+                    sr_level = min(supports, key=lambda s: abs(s - entry_price))
+        else:
+            resistances = key_levels.get("resistances", [])
+            if resistances:
+                # Nearest resistance at or above entry_price
+                above = [r for r in resistances if r >= entry_price]
+                if above:
+                    sr_level = min(above)
+                else:
+                    sr_level = min(
+                        resistances, key=lambda r: abs(r - entry_price)
+                    )
+        if sr_level is not None:
+            levels.append(("S/R", sr_level))
+
+        # Evaluate confluence zone
+        if len(levels) >= 4:
+            values = [lv[1] for lv in levels]
+            zone_center = sum(values) / len(values)
+            if zone_center > 0:
+                zone_width = (max(values) - min(values)) / zone_center
+                if zone_width < zone_threshold:
+                    logger.info(
+                        f"Scalping LIMIT confluence on {analysis.instrument}: "
+                        f"{len(levels)} levels within {zone_width:.4%} — "
+                        f"zone center {zone_center:.5f}"
+                    )
+                    return {
+                        "use_limit": True,
+                        "limit_price": zone_center,
+                        "confluences": levels,
+                    }
+
+        return {"use_limit": False, "limit_price": None, "confluences": levels}
+
     # ── Internal Helpers ─────────────────────────────────────────────
+
+    def _detect_macd_divergence(
+        self, df: pd.DataFrame, lookback: int = 30
+    ) -> Optional[str]:
+        """
+        Detect MACD histogram divergence from price on a given DataFrame
+        (Gap 11).
+
+        Bullish divergence: price makes a lower low but MACD histogram
+                            makes a higher low.
+        Bearish divergence: price makes a higher high but MACD histogram
+                            makes a lower high.
+
+        Args:
+            df: OHLCV DataFrame (typically H1 candles).
+            lookback: Number of recent candles to scan for swing points.
+
+        Returns:
+            "bullish", "bearish", or None.
+        """
+        if df.empty or len(df) < 35:
+            return None
+
+        macd_data = self._calculate_macd(df)
+        if macd_data is None:
+            return None
+
+        # Recompute full histogram series for swing detection
+        ema_fast = df["close"].ewm(span=12).mean()
+        ema_slow = df["close"].ewm(span=26).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=9).mean()
+        histogram = macd_line - signal_line
+
+        # Work on the last `lookback` candles
+        price_series = df["close"].iloc[-lookback:]
+        hist_series = histogram.iloc[-lookback:]
+        low_series = df["low"].iloc[-lookback:]
+        high_series = df["high"].iloc[-lookback:]
+
+        # Find local lows (for bullish divergence)
+        # A local low: lower than the candle before and after
+        lows_idx = []
+        for i in range(1, len(low_series) - 1):
+            if (low_series.iloc[i] < low_series.iloc[i - 1]
+                    and low_series.iloc[i] < low_series.iloc[i + 1]):
+                lows_idx.append(i)
+
+        # Find local highs (for bearish divergence)
+        highs_idx = []
+        for i in range(1, len(high_series) - 1):
+            if (high_series.iloc[i] > high_series.iloc[i - 1]
+                    and high_series.iloc[i] > high_series.iloc[i + 1]):
+                highs_idx.append(i)
+
+        # Check bullish divergence: compare the two most recent lows
+        if len(lows_idx) >= 2:
+            prev_low_i = lows_idx[-2]
+            curr_low_i = lows_idx[-1]
+            price_lower_low = low_series.iloc[curr_low_i] < low_series.iloc[prev_low_i]
+            hist_higher_low = hist_series.iloc[curr_low_i] > hist_series.iloc[prev_low_i]
+            if price_lower_low and hist_higher_low:
+                logger.debug(
+                    "MACD bullish divergence: price lower low but histogram higher low"
+                )
+                return "bullish"
+
+        # Check bearish divergence: compare the two most recent highs
+        if len(highs_idx) >= 2:
+            prev_high_i = highs_idx[-2]
+            curr_high_i = highs_idx[-1]
+            price_higher_high = high_series.iloc[curr_high_i] > high_series.iloc[prev_high_i]
+            hist_lower_high = hist_series.iloc[curr_high_i] < hist_series.iloc[prev_high_i]
+            if price_higher_high and hist_lower_high:
+                logger.debug(
+                    "MACD bearish divergence: price higher high but histogram lower high"
+                )
+                return "bearish"
+
+        return None
 
     def _calculate_macd(
         self, df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9

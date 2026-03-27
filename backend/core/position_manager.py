@@ -43,12 +43,22 @@ class ManagedPosition:
 class PositionManager:
     """Manages all open positions according to the Trading Plan rules."""
 
+    # Crypto instrument prefixes for EMA 50 trailing logic
+    _CRYPTO_PREFIXES = (
+        "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
+        "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB",
+    )
+
     def __init__(self, broker_client, risk_manager=None):
         self.broker = broker_client
         self.risk_manager = risk_manager  # Reference for scale-in BE tracking
         self.positions: Dict[str, ManagedPosition] = {}
         # EMA values from last market analysis (injected by trading engine)
         self._latest_emas: Dict[str, Dict[str, float]] = {}
+
+    def _is_crypto(self, instrument: str) -> bool:
+        """Check if an instrument is a crypto pair."""
+        return any(instrument.upper().startswith(p) for p in self._CRYPTO_PREFIXES)
 
     def set_ema_values(self, instrument: str, emas: Dict[str, float]):
         """Update EMA values for an instrument (called by trading engine after analysis)."""
@@ -187,27 +197,34 @@ class PositionManager:
 
         # Get EMA values for this instrument
         emas = self._latest_emas.get(pos.instrument, {})
-        ema_m5_5 = emas.get("EMA_M5_5")
 
-        if ema_m5_5 is not None:
-            # Trail SL to EMA 5 on M5 (with small buffer)
+        # TradingLab Crypto Module: Use EMA 50 for crypto trailing (wider, suits crypto volatility)
+        if self._is_crypto(pos.instrument):
+            trail_ema = emas.get("EMA_H1_50") or emas.get("EMA_H4_50")
+            trail_label = "EMA50 crypto"
+        else:
+            trail_ema = emas.get("EMA_M5_5")
+            trail_label = "EMA5 M5"
+
+        if trail_ema is not None:
+            # Trail SL to selected EMA (with small buffer)
             pip_buffer = abs(pos.take_profit_1 - pos.entry_price) * 0.02
 
             if pos.direction == "BUY":
-                new_sl = ema_m5_5 - pip_buffer
+                new_sl = trail_ema - pip_buffer
                 # Only move SL up, never down
                 if new_sl > pos.current_sl:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
-                        f"{pos.trade_id}: Trailing SL -> {new_sl:.5f} (EMA5 M5={ema_m5_5:.5f})"
+                        f"{pos.trade_id}: Trailing SL -> {new_sl:.5f} ({trail_label}={trail_ema:.5f})"
                     )
             else:
-                new_sl = ema_m5_5 + pip_buffer
+                new_sl = trail_ema + pip_buffer
                 # Only move SL down, never up
                 if new_sl < pos.current_sl:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
-                        f"{pos.trade_id}: Trailing SL -> {new_sl:.5f} (EMA5 M5={ema_m5_5:.5f})"
+                        f"{pos.trade_id}: Trailing SL -> {new_sl:.5f} ({trail_label}={trail_ema:.5f})"
                     )
         else:
             # Fallback: trail with percentage if no EMA data available
@@ -238,27 +255,35 @@ class PositionManager:
                     logger.error(f"{pos.trade_id}: Failed to close at TP_max: {e}")
 
         emas = self._latest_emas.get(pos.instrument, {})
-        ema_m5_2 = emas.get("EMA_M5_2")
 
-        if ema_m5_2 is not None:
-            # Aggressive trailing with EMA 2 on M5 (tightest EMA)
+        # TradingLab Crypto Module: Use EMA 50 for crypto (even in aggressive phase)
+        # Crypto is too volatile for EMA 2 — EMA 50 keeps positions open longer
+        if self._is_crypto(pos.instrument):
+            aggressive_ema = emas.get("EMA_M5_50") or emas.get("EMA_H1_50")
+            aggressive_label = "EMA50 crypto"
+        else:
+            aggressive_ema = emas.get("EMA_M5_2")
+            aggressive_label = "EMA2 M5"
+
+        if aggressive_ema is not None:
+            # Aggressive trailing with selected EMA
             pip_buffer = abs(pos.take_profit_1 - pos.entry_price) * 0.01
 
             if pos.direction == "BUY":
-                new_sl = ema_m5_2 - pip_buffer
+                new_sl = aggressive_ema - pip_buffer
                 if new_sl > pos.current_sl:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
                         f"{pos.trade_id}: AGGRESSIVE trail SL -> {new_sl:.5f} "
-                        f"(EMA2 M5={ema_m5_2:.5f})"
+                        f"({aggressive_label}={aggressive_ema:.5f})"
                     )
             else:
-                new_sl = ema_m5_2 + pip_buffer
+                new_sl = aggressive_ema + pip_buffer
                 if new_sl < pos.current_sl:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
                         f"{pos.trade_id}: AGGRESSIVE trail SL -> {new_sl:.5f} "
-                        f"(EMA2 M5={ema_m5_2:.5f})"
+                        f"({aggressive_label}={aggressive_ema:.5f})"
                     )
         else:
             # Fallback: tight percentage trail

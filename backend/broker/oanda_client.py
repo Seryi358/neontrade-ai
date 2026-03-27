@@ -328,7 +328,7 @@ class OandaClient(BaseBroker):
                 direction="BUY" if units > 0 else "SELL",
                 units=units,
                 entry_price=float(t["price"]),
-                current_price=float(t.get("unrealizedPL", 0)),
+                current_price=float(t.get("price", 0)),  # Use entry price as fallback; live price fetched via get_prices_bulk
                 unrealized_pnl=float(t.get("unrealizedPL", 0)),
                 stop_loss=float(t["stopLossOrder"]["price"])
                     if t.get("stopLossOrder") else None,

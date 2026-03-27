@@ -1799,8 +1799,8 @@ class RedStrategy(BaseStrategy):
         # RED TP_max = Fibonacci extension 1.272 (TradingLab: "extension optima para onda 3")
         # Fallback to 1.0 if 1.272 not available or not beyond TP1
         tp1 = result.get("tp1")
-        fib_1272 = analysis.fibonacci_levels.get("1.272")
-        fib_100 = analysis.fibonacci_levels.get("1.0")
+        fib_1272 = analysis.fibonacci_levels.get("ext_1.272")
+        fib_100 = analysis.fibonacci_levels.get("ext_1.0")
         if fib_1272 and tp1:
             if direction == "BUY" and fib_1272 > tp1:
                 result["tp_max"] = fib_1272
@@ -3263,8 +3263,8 @@ class GreenStrategy(BaseStrategy):
                     result["tp_max"] = below[1]  # Segundo nivel diario S/R (daily previous low)
 
         # Tambien considerar extensiones Fibonacci para TP_max
-        fib_1272 = analysis.fibonacci_levels.get("1.272")
-        fib_1618 = analysis.fibonacci_levels.get("1.618")
+        fib_1272 = analysis.fibonacci_levels.get("ext_1.272")
+        fib_1618 = analysis.fibonacci_levels.get("ext_1.618")
         if direction == "BUY":
             # Para BUY, las extensiones superiores
             fib_0 = analysis.fibonacci_levels.get("0.0")  # swing high

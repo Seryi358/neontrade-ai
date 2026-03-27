@@ -112,6 +112,9 @@ class AnalysisResult:
     bmsb: Optional[Dict] = None
     # Pi Cycle Top/Bottom - TradingLab Crypto Module 8
     pi_cycle: Optional[Dict] = None
+    # Swing highs/lows from H1 structure detection (used by PINK/WHITE TP calc)
+    swing_highs: List[float] = field(default_factory=list)
+    swing_lows: List[float] = field(default_factory=list)
 
 
 class MarketAnalyzer:
@@ -228,6 +231,20 @@ class MarketAnalyzer:
         structure_breaks = self._detect_structure_breaks(
             candles.get("H1", pd.DataFrame())
         )
+
+        # Step 12b: Extract swing highs/lows from H1 (used by PINK/WHITE TP calc)
+        swing_highs_list: List[float] = []
+        swing_lows_list: List[float] = []
+        h1_df = candles.get("H1", pd.DataFrame())
+        if not h1_df.empty and len(h1_df) >= 5:
+            h1_data = h1_df.reset_index(drop=True)
+            for i in range(2, len(h1_data) - 2):
+                if (h1_data["high"].iloc[i] > h1_data["high"].iloc[i-1] and
+                        h1_data["high"].iloc[i] > h1_data["high"].iloc[i+1]):
+                    swing_highs_list.append(float(h1_data["high"].iloc[i]))
+                if (h1_data["low"].iloc[i] < h1_data["low"].iloc[i-1] and
+                        h1_data["low"].iloc[i] < h1_data["low"].iloc[i+1]):
+                    swing_lows_list.append(float(h1_data["low"].iloc[i]))
 
         # Step 13a: Volume analysis on H1 and M5 (TradingLab course)
         volume_analysis = {}
@@ -391,6 +408,8 @@ class MarketAnalyzer:
             liquidity_sweep=liquidity_sweep,
             bmsb=bmsb,
             pi_cycle=pi_cycle,
+            swing_highs=swing_highs_list,
+            swing_lows=swing_lows_list,
         )
         return result
 

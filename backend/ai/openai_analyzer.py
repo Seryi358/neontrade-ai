@@ -390,12 +390,12 @@ Phase 3 — BREAK_EVEN (BE):
 
 Phase 4 — TRAILING:
   Price approaching TP1
-  SL trails using EMA 5 on M5
+  SL trails using EMA 50 on the Largo Plazo/Corto Plazo management timeframe
   Partial profit taking is optional (configurable). Trail with EMA 50 on the appropriate timeframe per management style, or use PRICE_ACTION style (swing highs/lows).
 
 Phase 5 — AGGRESSIVE (Beyond TP1):
   TP1 hit, trailing remaining position
-  Switch to EMA 2 on M5 for aggressive trailing
+  Switch to CPA (Corto Plazo Agresivo) EMA 50 for tighter trailing beyond TP1
   Let profits run toward TP_max
   Close immediately if EMA 2 and EMA 5 both break against position
 
@@ -405,7 +405,8 @@ Phase 5 — AGGRESSIVE (Beyond TP1):
 
 Entry Types:
 - Market entry on 2m or 5m timeframe (preferred — immediate execution)
-- Limit entry: ONLY when 4 levels converge (both EMAs + Fibonacci + extra S/R or diagonal)
+- Limit entry: ONLY when 3 levels converge (both EMAs + Fibonacci + extra S/R or diagonal)
+  # Note: Scalping workshop recommends 4 confluences, but 3 is the configured minimum in code
 - Stop entry: ONLY when you cannot monitor AND all timeframes fully align
 
 Trading Hours:
@@ -676,7 +677,7 @@ Analysis Score: {analysis_score:.0f}/100
 Key Levels:
   Supports: {key_levels.get('supports', [])}
   Resistances: {key_levels.get('resistances', [])}
-  FVGs: {key_levels.get('fvgs', key_levels.get('FVG', []))}
+  FVGs: {key_levels.get('fvg', [])}
 
 EMA Values: {json.dumps(ema_values, default=str) if ema_values else 'N/A'}
 Fibonacci Levels: {json.dumps(fib_levels, default=str) if fib_levels else 'N/A'}

@@ -960,3 +960,21 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Alex teaches that journaling notes must be written IN THE MOMENT (emotional bias capture), while ASR should be done LATER with emotional distance — the separate endpoints support this workflow
   - The weekly review endpoint (GET /weekly-review) was labeled "ASR" but was purely a P&L summary — now it includes actual ASR completion tracking
 ---
+
+## 2026-03-28 - ALEX-010
+- **What was implemented:** Recovery mathematics from Alex's mentorship displayed on the dashboard when drawdown is active
+- **Files changed:**
+  - `backend/core/risk_manager.py` — Added `calculate_recovery_pct()` static method, `RECOVERY_TABLE` constant (10 reference levels from 5%→75%), `DD_ALERT_THRESHOLDS` [5,10,15], `get_dd_alert_level()` method, and extended `get_risk_status()` with `recovery_pct_needed`, `loss_dollars`, `dd_alert_level`, and `recovery_table` fields
+  - `frontend/src/screens/DashboardScreen.tsx` — Added `RiskStatus` interface, fetches `/api/v1/risk-status`, renders DD alert banner (warning/high/critical with color-coded severity), Recovery Math card with current DD/recovery needed/loss dollars and reference table highlighting the user's current level, Alex quote on capital preservation
+- **Acceptance criteria verified:**
+  - Dashboard shows % recovery needed when there's DD ✅
+  - Recovery table: 5%→5.26%, 10%→11.11%, 20%→25%, 30%→42.86%, 50%→100% ✅
+  - Alert banners at DD ≥5% (warning/yellow), ≥10% (high/orange), ≥15% (critical/red) ✅
+  - Current DD vs max allowed shown in the card stats ✅
+  - User understands how much they need to recover via highlighted table row ✅
+- **Learnings for future iterations:**
+  - Recovery formula: `dd / (1 - dd)` — simple but the asymmetry is exponential
+  - `get_risk_status()` is the single source of truth for the frontend risk display — always extend it rather than creating new endpoints
+  - Pre-existing test failures: `test_round3_bugs::test_risk_manager_zero_balance` (position sizing returns 19999 instead of 0 for zero SL), `test_05_ai_prompt` (no openai module), `test_final_integration` (openai), `test_round4_comprehensive` (sys.exit at module level)
+  - TypeScript compiler is not installed in the frontend — no tsc check available, rely on React Native Metro bundler for type errors
+---

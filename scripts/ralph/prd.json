@@ -499,7 +499,7 @@
         "Visualización clara del DD actual vs máximo permitido",
         "El usuario entiende cuánto necesita recuperar"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "BUGFIX-001",

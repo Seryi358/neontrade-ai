@@ -300,4 +300,46 @@ Started: vie 27 mar 2026 21:45:20 -05
   - BLACK has lowest win rate but highest R:R (~2.80:1 avg). "Es la que tiene menos porcentaje de acierto, por eso tiene más normas"
   - For SL in extreme situations (large low test): Alex uses 2:1 R:R distance to determine SL, ensuring it covers previous extreme
   - EMA 50 1H as dynamic S/R = 2+ consecutive rejections means no BLACK trade
+- GREEN is the only strategy that doesn't differentiate Day/Swing natively — it fuses both. Crypto specialization adds Scalping variant
+- Fibonacci 0.75 is the invalidation boundary for GREEN crypto setups — clearly broken = no trade/reentry
+---
+
+## 2026-03-27 - AUDIT-012
+- **What was implemented:** Audited all 10 transcriptions for GREEN strategy: 2 from Trading Mastery/03_Intermedio/03_Estrategias (17_Introducción Green, 18_Green Day Swing) + 8 from Esp. Criptomonedas/01_Contenido/09_Estrategia de trading. Fixed 1 discrepancy: missing Fibonacci 0.75 invalidation.
+- **Files changed:**
+  - `backend/strategies/base.py` — Added Fibonacci 0.75 invalidation check to GreenStrategy.check_htf_conditions(). Alex explicitly states in the crypto lessons: "Si se rompe claramente el 0.75, no hay reentrada." The pullback being deeper than 0.75 means the correction has gone too far and the setup is invalid. Uses 0.3% tolerance to avoid invalidating on mere wick touches.
+  - `scripts/ralph/prd.json` — Marked AUDIT-012 as passes: true
+- **Audit findings:**
+  - 7-step process correctly implemented ✅:
+    1. Weekly trend direction (alcista/bajista) ✅
+    2. Weekly correction forms daily pattern (wedge/triangle/channel) ✅
+    3. Fibonacci + S/R + MAs as support within pattern ✅
+    4. 1H change of trend at the END of the pattern (diagonal, H&S, triangle) — non-negotiable ✅
+    5. Copy 1H diagonal to 15M, execute on FIRST breakout + confirmation on 15M ✅
+    6. SL below previous 1H swing low (tight!), TP at previous daily high/low ✅
+  - **FIXED:** Fibonacci 0.75 invalidation was missing. Alex teaches in crypto lessons that if the pullback clearly breaks past Fib 0.75, the setup is invalid — "the essence of the setup is no longer intact." Code now hard-blocks when Fib 0.75 is clearly broken (>0.3% past level).
+  - Crypto-only restriction correctly implemented (`_is_crypto_instrument`) ✅
+  - min_rr_green = 2.0, with confidence bonuses at 3.0 (+5) and 5.0 (+10) — matches "hasta 10:1 R:R" ✅
+  - Green Fractal concept: multi-TF alignment bonus (+10) correctly implemented ✅
+  - Timeframe cascade for all 3 styles:
+    - Swing: Weekly→Daily→1H→15M ✅
+    - Day Trading: 4H→1H→15M→2M ✅ (code uses M5 as proxy since brokers don't provide M2)
+    - Scalping: 15M→5M→1M→30s ✅ (not directly executed, handled by scalping_engine.py)
+  - SL placement: previous 1H swing low/high (NOT daily, NOT Fibonacci) — matches "stop loss por debajo del mínimo anterior en 1 hora" ✅
+  - TP: previous daily high/low as baseline, with tp_max at second level for extended moves ✅
+  - Diagonal on 1H is non-negotiable hard block — matches "si no hay diagonal, no hay trade" ✅
+  - EMA 8 Weekly filter applied to GREEN (consistent with all strategies) ✅
+  - Reentries: concept documented in transcriptions (reduced size 0.25-0.5%, max 2-3 in same structure) — NOT implemented as separate code logic, which is acceptable since reentry is a position management concept, not a strategy entry rule. The strategy itself generates signals independently each time it's evaluated.
+  - Breakout of weekly S/R level (Step 2b) and pullback to broken level (Step 3b) correctly scored ✅
+  - Volume confirmation as confluence scoring (not hard block) ✅
+  - SMC confluence (Order Block, FVG, BOS) as bonus scoring ✅
+  - RSI divergence as bonus scoring ✅
+- **Learnings for future iterations:**
+  - GREEN is NOT a standard strategy — it was "born" to fuse swing and day trading. Alex: "no hay un vídeo posterior de un ejemplo en largo y un ejemplo en corto de otra temporalidad"
+  - Reentries are a defining GREEN characteristic in crypto. Price can make 2-3 false breakouts before the real impulse. Reentry size must be REDUCED (0.25-0.5% vs 1% original)
+  - For crypto, Fibonacci levels frequently overshoot — 0.5-0.618 zone is TARGET but price may fake, continue to 0.75, then reverse. 0.75 clearly broken = invalidation
+  - Green Fractal = same pattern on multiple TFs simultaneously. Swing entry + Day entry can coexist on the same directional move
+  - Alex's scalping GREEN uses 30-second execution TF — extremely stressful, recommends mastering swing first
+  - The 4H chart is optional in GREEN — only D, 1H, 15M are mandatory: "estos 3 gráficos 100% tienen que estar"
+  - Code uses M5 EMA as proxy for M2 execution (Day Trading) since brokers typically don't provide M2 data — acceptable workaround
 ---

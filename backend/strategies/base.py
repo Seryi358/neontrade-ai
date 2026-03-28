@@ -3309,12 +3309,38 @@ class GreenStrategy(BaseStrategy):
         # --- Paso 3: Fibonacci, S/R, medias moviles como soporte dentro del patron ---
         fib_382 = analysis.fibonacci_levels.get("0.382")
         fib_618 = analysis.fibonacci_levels.get("0.618")
+        fib_750 = analysis.fibonacci_levels.get("0.750") or analysis.fibonacci_levels.get("0.75")
         ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
 
         confluence_count = 0
         price = _get_current_price_proxy(analysis)
+
+        # TradingLab Crypto: If Fib 0.75 is CLEARLY broken, the pullback is too deep
+        # and the setup is invalid. Alex: "Si se rompe claramente el 0.75, no hay reentrada."
+        # For BUY: price below 0.75 means correction went too deep.
+        # For SELL: price above 0.75 means correction went too deep.
+        if price and fib_750:
+            fib_1000 = analysis.fibonacci_levels.get("1.0")
+            fib_0 = analysis.fibonacci_levels.get("0.0")
+            broken_075 = False
+            if direction == "BUY" and fib_1000 is not None and fib_0 is not None:
+                # In a BUY setup: 0.0 = swing high, 1.0 = swing low (retracement)
+                # 0.75 is deeper retracement. If price < fib_750 (clearly past 75%), invalid.
+                if fib_1000 > fib_0:
+                    # fib_1000 is the low, fib_0 is the high — price below 0.75 = too deep
+                    broken_075 = price < fib_750 and abs(price - fib_750) / price > 0.003
+                else:
+                    broken_075 = price > fib_750 and abs(price - fib_750) / price > 0.003
+            elif direction == "SELL" and fib_1000 is not None and fib_0 is not None:
+                if fib_1000 < fib_0:
+                    broken_075 = price > fib_750 and abs(price - fib_750) / price > 0.003
+                else:
+                    broken_075 = price < fib_750 and abs(price - fib_750) / price > 0.003
+            if broken_075:
+                failed.append("Paso 3: Fibonacci 0.75 claramente roto - pullback demasiado profundo (setup invalido)")
+                return False, score, met, failed
 
         if price:
             tolerance = price * 0.005  # 0.5%

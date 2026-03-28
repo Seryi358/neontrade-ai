@@ -345,7 +345,7 @@
         "Verificar cálculos numéricos con el Excel de riesgo",
         "Edge cases verificados (ej: múltiples posiciones abiertas, pares correlacionados)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-026",

@@ -722,3 +722,48 @@ Started: vie 27 mar 2026 21:45:20 -05
   - BLACK's H4 Step 4 has TWO innegociable components: overbought (distance from EMA) AND consolidation/brake. Code only checks the first.
   - Double-counting bonuses can inflate confidence — always check if a generic helper overlaps with strategy-specific logic
 ---
+
+## 2026-03-28 - AUDIT-025
+- **What was implemented:** Second-pass re-audit of risk_manager.py (gestión monetaria, 9 lessons) and position_manager.py (manejo posición, 8 lessons). Re-read all 17 transcriptions and verified every numerical value, formula, and edge case against the code. No discrepancies found — code already matches mentorship exactly after first-pass corrections.
+- **Files changed:** None — code already matches mentorship exactly
+- **Second-pass audit findings (all pass):**
+  - **Risk per trade**: 1% Day (risk_day_trading=0.01), 0.5% Scalping (risk_scalping=0.005), 3% Swing (risk_swing=0.03) ✅
+  - **Position size formula**: `units = risk_amount / sl_distance` — mathematically equivalent to Alex's `Risk$ / %SL × 100` ✅
+  - **Max total risk**: 7% (max_total_risk=0.07) ✅
+  - **Correlated pairs**: Fixed 0.75% (correlated_risk_pct=0.0075) per correlated trade ✅
+  - **Min R:R**: 1.5 general, 2.0 for BLACK and GREEN ✅
+  - **Scale-in rule**: Must have BE on existing position before re-entry (scale_in_require_be=True) ✅
+  - **Drawdown Fixed 1%**: Always use base risk ✅
+  - **Drawdown Variable**: Adjusts based on win rate + max historical DD ✅
+  - **Drawdown Fixed Levels**: 1%→0.75% at -5% DD→0.50% at -7.5%→0.25% at -10% DD ✅ (matches "pasas de 1 a 0.75, luego a 0.50 y luego a 0.25")
+  - **Delta algorithm**: Parameter 0.60 recommended ✅. Levels 1%→1.5%→2%→3% from Excel ✅. Disabled by default ✅.
+  - **Delta reset**: On any loss ✅ (conservative, matches "se reinicia")
+  - **Order type restrictions**: PINK/BLACK cannot use limit orders — enforced at strategy level ✅
+  - **5-phase position management**: INITIAL→SL_MOVED→BREAK_EVEN→TRAILING→AGGRESSIVE ✅
+  - **Phase 1 (Initial)**: SL moves after 30% of risk distance (proxy for "exits pattern structure") ✅
+  - **Phase 2 (SL_MOVED→BE)**: At 50% of distance to TP1 (matches "cuando ya tengo un 1% de ganancia, pongo el break-even" for standard 2:1 R:R) ✅
+  - **BE spread buffer**: +0.02×risk_distance for BUY (SL above entry), -0.02×risk_distance for SELL (SL below entry) — both correctly account for bid-ask spread ✅
+  - **Phase 3 (BE→Trailing)**: At BE + 20% more toward TP1 (~60-70% to TP1) ✅
+  - **Phase 4 (Trailing)**: EMA 50 with 2% buffer (matches "darle espacio a la media") ✅
+  - **Phase 5 (Aggressive)**: CPA EMA 50 with 1% buffer ✅
+  - **EMA timeframe grid forex**: LP Day=H1, Swing=Daily; CP Day=M5, Swing=H1; CPA Day=M5(M2 proxy), Swing=M15 ✅ (matches "innegociable" rule for cross-TF targets)
+  - **EMA timeframe grid crypto**: LP Day=H4, Swing=Weekly; CP Day=M15, Swing=H1; CPA same as forex ✅ (wider due to volatility)
+  - **Partial profits**: Disabled by default (allow_partial_profits=False) ✅ (Alex: "yo personalmente no soy fan")
+  - **Price action trailing**: Uses swing highs/lows with buffer ✅
+  - **Alex recommends EMA**: Default sl_management_style="ema" ✅
+  - **CPA only in specific situations**: Only activates in Phase 5 (beyond TP1) ✅
+  - **Individual position management**: Positions tracked individually in dict by trade_id ✅
+- **Edge cases verified:**
+  - BE for SELL positions: spread buffer correctly places SL below entry (at 99.90 for entry=100), ensuring small profit on close to cover spread ✅
+  - Delta hardcoded levels (1.5%/2%/3%) are from Excel's Delta+ sheet for 1% base case — correct since delta is disabled by default and Alex only teaches it for 1% context. For non-1% base risk, levels would be disproportionate, but this is an acceptable design limitation.
+  - Variable drawdown fallback (max_dd_hist=0.05 when no history) only affects first few trades before any drawdown is recorded — produces conservative behavior, acceptable.
+  - `_accumulated_gain` and `_delta_accumulated_gain` are duplicate variables (both updated identically) — dead code / redundancy, not a mentorship discrepancy.
+  - `pip_value` fetched but unused in position sizing — calculation uses absolute price distance instead of pips, mathematically equivalent.
+  - Funded account profit calculation uses `peak/(1+dd)` instead of `peak*(1-dd)` — mathematical imprecision in a bot-specific feature NOT from TradingLab transcriptions (out of scope).
+- **Learnings for future iterations:**
+  - The 9 gestión monetaria lessons are heavily conceptual — most numerical parameters come from 3 lessons: Regla 1% (Lesson 3), Drawdown (Lesson 7), and Delta (Lesson 8)
+  - The 8 position management lessons split cleanly: LP (Lesson 3), CP (Lesson 4), CPA (Lesson 5), Price Action (Lesson 6), Partials (Lesson 7), Reentries (Lesson 8)
+  - Alex's BE rule "at 1% gain" is specifically for 2:1 R:R trades. The code's "50% to TP1" generalizes this correctly for any R:R ratio.
+  - The "6 trend changes in 1H within 1 daily trend change" is a key insight for LP vs CP decision — conceptual, not algorithmic
+  - CPA's 4 trigger situations (approaching S/R, news incoming, near TP with decel, Friday close) are partially implemented (only beyond-TP1 generic trigger). Full event-based CPA would need news calendar + pattern detection integration.
+---

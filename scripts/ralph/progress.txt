@@ -620,3 +620,26 @@ Started: vie 27 mar 2026 21:45:20 -05
   - SMT requires cross-instrument cached data (_smt_cache) — only works when multiple correlated instruments are analyzed in the same analyzer session
   - Power of Three accumulation quality uses H1 candle ranges (not daily), compared to 40% of avg daily range from last 10 bars
 ---
+
+## 2026-03-28 - AUDIT-022
+- **What was implemented:** Audited all 7 transcriptions from Workshop de Cuentas Fondeadas/01_Contenido against the codebase (config.py, risk_manager.py, routes.py)
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - DD limits match: daily 5% (`funded_max_daily_dd=0.05`), total 10% (`funded_max_total_dd=0.10`) — standard 2-phase
+  - 1-phase sprint DD (4%/6%) documented in config comment — matches 5RF example from workshop
+  - Account types: "normal" vs "swing" with correct restrictions (no overnight/news/weekend for normal)
+  - Evaluation types: "2phase", "1phase", "instant", "real" — all workshop types covered
+  - Profit targets: Phase 1=10%, Phase 2=5% — matches FTMO standard
+  - Instant funding: no daily DD limit — code correctly handles `"instant"` type
+  - Config comment "Only enable after 3 consecutive months of profitability" — matches Kevin's tip
+  - Config comment "Kevin recommends swing for TradingLab strategies" — matches workshop advice
+  - `check_funded_account_limits()` blocks trading when DD limits reached
+  - `record_funded_pnl()` tracks daily P&L accumulation
+  - API routes `/funded/toggle` and `/funded/status` expose funded account management
+  - Drawdown fixed_levels method level_3=0.10 aligns with funded max DD
+- **Pre-existing discrepancy noted:** test_round10_ultimate.py:118-119 expects `funded_no_overnight=True` and `funded_no_news_trading=True` but config defaults are `False` (swing recommended). Not an audit issue.
+- **Learnings for future iterations:**
+  - Workshop is educational/advisory, not technical — teaches about prop firms, business models, dangers (MyForexFans fraud)
+  - All technical parameters (DD limits, account types, restrictions) were already implemented in prior rounds
+  - The funded account feature set is complete: config, risk checks, API, daily PnL tracking
+---

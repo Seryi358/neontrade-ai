@@ -309,7 +309,7 @@
         "Si aplica: reglas de cuentas fondeadas (DD limits) configurables en la app",
         "Consejos de la clase reflejados en la configuración de riesgo"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-023",

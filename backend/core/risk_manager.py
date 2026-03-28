@@ -625,9 +625,44 @@ class RiskManager:
             "no_weekend": settings.funded_no_weekend,
         }
 
+    @staticmethod
+    def calculate_recovery_pct(drawdown_pct: float) -> float:
+        """Calculate % gain needed to recover from a drawdown.
+        Alex's recovery math: loss of X% requires gain of X/(1-X/100) %.
+        E.g., -10% needs +11.1%, -50% needs +100%.
+        """
+        if drawdown_pct <= 0:
+            return 0.0
+        dd_decimal = drawdown_pct / 100.0
+        if dd_decimal >= 1.0:
+            return float('inf')
+        return round((dd_decimal / (1.0 - dd_decimal)) * 100, 2)
+
+    # Standard recovery reference table from Alex's mentorship
+    RECOVERY_TABLE = [
+        (5, 5.26), (10, 11.11), (15, 17.65), (20, 25.0),
+        (25, 33.33), (30, 42.86), (40, 66.67), (50, 100.0),
+        (60, 150.0), (75, 300.0),
+    ]
+
+    # DD alert thresholds — warn the user at these levels
+    DD_ALERT_THRESHOLDS = [5, 10, 15]
+
+    def get_dd_alert_level(self) -> Optional[str]:
+        """Return alert severity if DD exceeds thresholds, else None."""
+        dd_pct = self.get_current_drawdown() * 100
+        if dd_pct >= 15:
+            return "critical"
+        if dd_pct >= 10:
+            return "high"
+        if dd_pct >= 5:
+            return "warning"
+        return None
+
     def get_risk_status(self) -> Dict:
         """Get comprehensive risk status for API/frontend."""
         dd = self.get_current_drawdown()
+        dd_pct = round(dd * 100, 2)
         base_day = settings.risk_day_trading
         adjusted_day = self.get_risk_for_style(TradingStyle.DAY_TRADING)
 
@@ -635,8 +670,13 @@ class RiskManager:
         total = min(len(self._trade_history), 50)
         win_rate = wins / total if total > 0 else 0.0
 
+        # Recovery math
+        recovery_pct = self.calculate_recovery_pct(dd_pct)
+        dd_alert = self.get_dd_alert_level()
+        loss_dollars = round(self._peak_balance - self._current_balance, 2) if self._peak_balance > 0 else 0.0
+
         return {
-            "current_drawdown": round(dd * 100, 2),
+            "current_drawdown": dd_pct,
             "peak_balance": round(self._peak_balance, 2),
             "current_balance": round(self._current_balance, 2),
             "drawdown_method": settings.drawdown_method,
@@ -648,4 +688,9 @@ class RiskManager:
             "max_total_risk": round(settings.max_total_risk * 100, 2),
             "recent_win_rate": round(win_rate * 100, 1),
             "recent_trades": total,
+            # Recovery math fields
+            "recovery_pct_needed": recovery_pct,
+            "loss_dollars": loss_dollars,
+            "dd_alert_level": dd_alert,
+            "recovery_table": self.RECOVERY_TABLE,
         }

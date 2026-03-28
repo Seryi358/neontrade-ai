@@ -23,6 +23,18 @@ interface AccountData {
   currency: string;
 }
 
+interface RiskStatus {
+  current_drawdown: number;
+  peak_balance: number;
+  current_balance: number;
+  recovery_pct_needed: number;
+  loss_dollars: number;
+  dd_alert_level: string | null;
+  recovery_table: [number, number][];
+  max_total_risk: number;
+  adjusted_risk_day: number;
+}
+
 interface Position {
   instrument: string;
   direction: string;
@@ -57,16 +69,18 @@ export default function DashboardScreen() {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [status, setStatus] = useState<EngineStatus | null>(null);
   const [maxTotalRisk, setMaxTotalRisk] = useState<number | null>(null);
+  const [riskStatus, setRiskStatus] = useState<RiskStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       setError(null);
-      const [accountRes, statusRes, riskRes] = await Promise.all([
+      const [accountRes, statusRes, riskRes, riskStatusRes] = await Promise.all([
         authFetch(`${API_URL}/api/v1/account`).catch(() => null),
         authFetch(`${API_URL}/api/v1/status`).catch(() => null),
         authFetch(`${API_URL}/api/v1/risk-config`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/risk-status`).catch(() => null),
       ]);
       if (statusRes?.ok) {
         const statusData = await statusRes.json();
@@ -85,6 +99,12 @@ export default function DashboardScreen() {
         const riskData = await riskRes.json();
         if (riskData?.max_total_risk != null) {
           setMaxTotalRisk(riskData.max_total_risk);
+        }
+      }
+      if (riskStatusRes?.ok) {
+        const rsData = await riskStatusRes.json();
+        if (rsData && !rsData.error) {
+          setRiskStatus(rsData);
         }
       }
     } catch (err) {
@@ -174,6 +194,114 @@ export default function DashboardScreen() {
           </View>
         </View>
       </View>
+
+      {/* Drawdown Alert Banner */}
+      {riskStatus?.dd_alert_level && (
+        <View style={[
+          styles.card,
+          {
+            borderColor: riskStatus.dd_alert_level === 'critical'
+              ? theme.colors.neonRed
+              : riskStatus.dd_alert_level === 'high'
+                ? theme.colors.neonOrange
+                : theme.colors.neonYellow,
+            backgroundColor: riskStatus.dd_alert_level === 'critical'
+              ? 'rgba(255, 46, 99, 0.1)'
+              : riskStatus.dd_alert_level === 'high'
+                ? 'rgba(255, 107, 53, 0.1)'
+                : 'rgba(255, 184, 0, 0.08)',
+          },
+        ]}>
+          <Text style={[
+            styles.cardTitle,
+            {
+              color: riskStatus.dd_alert_level === 'critical'
+                ? theme.colors.neonRed
+                : riskStatus.dd_alert_level === 'high'
+                  ? theme.colors.neonOrange
+                  : theme.colors.neonYellow,
+            },
+          ]}>
+            {riskStatus.dd_alert_level === 'critical' ? 'DRAWDOWN CRITICO' :
+             riskStatus.dd_alert_level === 'high' ? 'DRAWDOWN ALTO' : 'DRAWDOWN ALERTA'}
+          </Text>
+          <Text style={[styles.statValue, { textAlign: 'center', fontSize: 14 }]}>
+            DD actual: {riskStatus.current_drawdown.toFixed(2)}% | Recuperar: {riskStatus.recovery_pct_needed.toFixed(2)}%
+          </Text>
+          <Text style={[styles.emptyText, { marginTop: 2 }]}>
+            {riskStatus.dd_alert_level === 'critical'
+              ? 'Reducir riesgo inmediatamente. Considerar pausa.'
+              : riskStatus.dd_alert_level === 'high'
+                ? 'Riesgo elevado. Revisa tu gestión monetaria.'
+                : 'Monitorea el drawdown de cerca.'}
+          </Text>
+        </View>
+      )}
+
+      {/* Recovery Math Card — only show when there's drawdown */}
+      {riskStatus && riskStatus.current_drawdown > 0 && (
+        <View style={[styles.card, { borderColor: theme.colors.neonYellow }]}>
+          <Text style={[styles.cardTitle, { color: theme.colors.neonYellow }]}>
+            RECOVERY MATH
+          </Text>
+          <View style={styles.row}>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>DD ACTUAL</Text>
+              <Text style={[styles.statValue, styles.loss]}>
+                -{riskStatus.current_drawdown.toFixed(2)}%
+              </Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>RECUPERAR</Text>
+              <Text style={[styles.statValue, { color: theme.colors.neonYellow }]}>
+                +{riskStatus.recovery_pct_needed.toFixed(2)}%
+              </Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>PERDIDO</Text>
+              <Text style={[styles.statValue, styles.loss]}>
+                -${riskStatus.loss_dollars.toFixed(0)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Recovery reference table */}
+          <View style={recoveryStyles.tableContainer}>
+            <View style={recoveryStyles.tableHeader}>
+              <Text style={recoveryStyles.tableHeaderText}>PERDIDA</Text>
+              <Text style={recoveryStyles.tableHeaderText}>PARA RECUPERAR</Text>
+            </View>
+            {(riskStatus.recovery_table || []).map(([loss, recovery]) => (
+              <View
+                key={loss}
+                style={[
+                  recoveryStyles.tableRow,
+                  riskStatus.current_drawdown >= loss && riskStatus.current_drawdown < (loss + 5)
+                    ? recoveryStyles.tableRowActive
+                    : null,
+                ]}
+              >
+                <Text style={[
+                  recoveryStyles.tableCell,
+                  styles.loss,
+                ]}>
+                  -{loss}%
+                </Text>
+                <Text style={[
+                  recoveryStyles.tableCell,
+                  { color: recovery >= 50 ? theme.colors.neonRed : theme.colors.neonYellow },
+                ]}>
+                  +{recovery.toFixed(1)}%
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={[styles.emptyText, { marginTop: 4, fontSize: 10 }]}>
+            Alex: "La conservación del capital es lo primero"
+          </Text>
+        </View>
+      )}
 
       {/* Active Positions */}
       <View style={styles.card}>
@@ -422,5 +550,40 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     paddingVertical: theme.spacing.lg,
+  },
+});
+
+const recoveryStyles = StyleSheet.create({
+  tableContainer: {
+    marginTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: theme.spacing.sm,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: 4,
+  },
+  tableHeaderText: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 9,
+    color: theme.colors.textMuted,
+    letterSpacing: 2,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 3,
+  },
+  tableRowActive: {
+    backgroundColor: 'rgba(255, 184, 0, 0.12)',
+    borderRadius: 4,
+  },
+  tableCell: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 12,
   },
 });

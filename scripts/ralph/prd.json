@@ -93,7 +93,7 @@
         "TP levels y R:R mínimo (2.0:1) verificados",
         "Confianza mínima configurada como dice la clase"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-008",

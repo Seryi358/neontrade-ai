@@ -1036,15 +1036,22 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
             if recent_highs[1] < recent_highs[0]:
                 return "BLUE_A"
 
-    # Fallback: check chart_patterns for explicit double bottom/top labels
+    # Fallback: check chart_patterns for explicit reversal pattern labels
+    # TradingLab: Blue A triggers on "doble suelo, hombro cabeza hombro, minimo creciente"
     if hasattr(analysis, 'chart_patterns'):
         chart_patterns = analysis.chart_patterns or []
         for p in chart_patterns:
             ptype = p.get("type", "") if isinstance(p, dict) else str(p)
             ptype_lower = ptype.lower()
-            if direction == "BUY" and any(k in ptype_lower for k in ("double_bottom", "doble_suelo", "double bottom")):
+            if direction == "BUY" and any(k in ptype_lower for k in (
+                "double_bottom", "doble_suelo", "double bottom",
+                "inverse_head_and_shoulders",
+            )):
                 return "BLUE_A"
-            if direction == "SELL" and any(k in ptype_lower for k in ("double_top", "doble_techo", "double top")):
+            if direction == "SELL" and any(k in ptype_lower for k in (
+                "double_top", "doble_techo", "double top",
+                "head_and_shoulders",
+            )):
                 return "BLUE_A"
 
     # Variante C: precio esta cerca de EMA 4H (rechazo de EMA 4H)

@@ -17,6 +17,10 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Elliott extension targets by wave: Wave 3 → 1.618 max / 1.272 optimal, Wave 5 → prior high/low or 0.618 / max 1.0
 - MTFA module is conceptual/analytical — no specific parameters to implement, teaches thinking framework
 - HTF/LTF convergence logic: `htf_trend == ltf_trend` — used in scoring (+30) and strategy gating
+- Blue A variant triggers on ANY reversal pattern (double bottom/top, H&S/inverse H&S, higher low/lower high) — not just double bottom
+- Strategy variant classification is in `_classify_blue_variant()` — separate from the strategy class itself
+- When price action conflicts with indicator (e.g., double top + EMA rejection), price action wins per Alex
+- Swing strategies use same code as Day but with shifted timeframes — controlled by config.py `trading_style`
 
 ---
 
@@ -147,4 +151,30 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Convergence (HTF and LTF aligned) is the highest-probability setup; divergence = caution
   - In Elliott MTFA: Wave 3 in HTF + Wave 3 in LTF = extend targets beyond LTF normal limits
   - Position in HTF wave determines how aggressively to manage LTF trades (e.g., in HTF Wave 3, hold LTF trades longer)
+---
+
+## 2026-03-27 - AUDIT-007
+- **What was implemented:** Audited all 3 transcriptions from Trading Mastery/03_Intermedio/03_Estrategias (02_Introducción Blue, 03_Blue Day, 04_Blue Swing) against BlueStrategy in strategies/base.py. Fixed 1 discrepancy in `_classify_blue_variant()`.
+- **Files changed:**
+  - `backend/strategies/base.py` — Added Head & Shoulders / Inverse H&S pattern recognition to Blue A variant classification. Alex teaches "doble suelo, hombro cabeza hombro, mínimo creciente" as Blue A triggers, but code only checked double bottom/top. Now also matches `HEAD_AND_SHOULDERS` (SELL) and `INVERSE_HEAD_AND_SHOULDERS` (BUY) from chart_patterns.py.
+  - `scripts/ralph/prd.json` — Marked AUDIT-007 as passes: true
+- **Audit findings:**
+  - 7-step process (Daily S/R → decel → 1H trend change → pullback EMA+Fib → decel/giro → 5M RCC entry → SL/TP) — all correctly implemented ✅
+  - 3 variants (A/B/C) correctly classified with proper confidence ranking A(+10) > B(0) > C(-5) ✅
+  - Blue A: double bottom, higher low, AND now H&S reversal patterns detected ✅ (FIXED)
+  - Blue B: default when no reversal pattern and no EMA 4H rejection ✅
+  - Blue C: proximity to EMA 4H (0.2% threshold) as proxy for rejection. Requires HTF trend in favor + min 2:1 R:R ✅
+  - SL placement: min(Fib 0.618, previous min) for BUY, max(Fib 0.618, previous max) for SELL — matches "siempre protegemos el máximo/mínimo anterior" ✅
+  - TP: EMA 50 4H as primary target — matches "take profit en la blue es siempre en la media móvil de 50 de 4 horas" ✅
+  - 5M entry: diagonal preferred (+12 confidence) > EMA 5M (+10) > EMA 2M (+5) with RCC confirmation — matches mentorship priority ✅
+  - Swing mapping (Monthly→Weekly→Daily→1H replaces Daily→4H→1H→5M) — not implemented as separate mode; architecture uses same strategy with different analysis input. Acceptable since trading_style in config.py controls timeframe selection upstream ✅
+  - EMA 8 Weekly hard block (line 1377) — not part of Blue's 7 rules but applied consistently across ALL strategies as general trend filter from Indicators module ✅
+  - min_confidence = 55.0 — transcription doesn't specify a number; reasonable default ✅
+  - R:R minimum: 1.5 general (from config), 2.0 for Blue C — matches "Blue C más exigente" ✅
+- **Learnings for future iterations:**
+  - Blue strategy is the SIMPLEST — only requires 1H EMA break. Red/Pink/White/Black add 4H conditions
+  - Alex's priority for 5M entry: EMA 5M (beginner) → diagonal (intermediate) → 2M (advanced). Code correctly treats diagonal as ideal
+  - When price action (double top) and indicator (EMA rejection) conflict, price action ALWAYS wins — Blue A takes precedence over Blue C
+  - Swing Blue uses same rules with shifted timeframes: Monthly=Daily, Weekly=4H, Daily=1H, 1H=5M
+  - Blue A "more permissive" = can be less strict on entry quality. Blue C "more demanding" = needs HTF alignment + higher R:R
 ---

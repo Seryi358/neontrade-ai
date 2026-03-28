@@ -1,3 +1,42 @@
 # Ralph Progress Log
 Started: vie 27 mar 2026 21:45:20 -05
+
+## Codebase Patterns
+- Market sessions are defined in `trading_engine.py:_get_session_quality()`, not in config.py
+- Pip values are per-broker in `broker/*_client.py:get_pip_value()` — keep all 3 clients in sync
+- Strategy-level pip heuristic in `strategies/base.py` uses `price > 10` for JPY detection
+- Tests checking config values are spread across 5+ test files — grep for the value when changing defaults
+- TradingLab transcriptions are at `/home/sergioacc/Projects/TradingLab_Notas/` (outside repo)
+- Each lesson has `transcripcion.txt` and `info.md` files in its directory
+
+---
+
+## 2026-03-27 - AUDIT-001
+- **What was implemented:** Audited all 9 transcriptions from Trading Mastery/01_Iniciación/03_Introducción al trading against the codebase
+- **Files changed:**
+  - `backend/core/trading_engine.py` — Added SYDNEY session, fixed session boundaries to match mentorship ET→UTC conversions, fixed session quality filter for ASIAN
+  - `backend/config.py` — Updated trading_end_hour from 21→22, added documentation comments with TradingLab session times
+  - `backend/broker/ibkr_client.py` — Added pip values for XAU, XAG, crypto, indices to match Capital.com client
+  - `backend/test_07_config.py`, `test_engine_systems.py`, `test_round3_bugs.py`, `test_round7_comprehensive.py`, `test_round9_final.py`, `test_round10_ultimate.py` — Updated trading_end_hour expectations
+- **Learnings for future iterations:**
+  - Session times in mentorship are in ET (Eastern Time) which shifts with DST. Code uses fixed UTC approximation.
+  - IBKR client had incomplete pip value handling vs Capital.com — always check all 3 broker clients when fixing instrument handling
+  - The `session_quality < 0.5` filter had an off-by-one: ASIAN at 0.5 was never caught. Changed to `<= 0.5`.
+  - Pre-existing test failures (9 total) exist in test_round7_comprehensive.py — not related to AUDIT-001
+---
+
+## 2026-03-27 - AUDIT-002
+- **What was implemented:** Audited all 4 transcriptions from Trading Mastery/01_Iniciación/05_Calendario económico against the codebase (news_filter.py, economic_calendar.py, config.py)
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - CRITICAL_EVENT_KEYWORDS includes all mentorship events: FOMC, ECB, BOE, NFP, CPI, GDP, Interest Rates, Unemployment Rate
+  - NEWS_WINDOWS match: Scalping (60,60), Day Trading (30,15), Swing (15,5)
+  - Style-specific behavior correct: Scalping=block all, Day=no new + move to BE, Swing=extreme caution
+  - Primary data source is FairEconomy (ForexFactory mirror) — matches mentorship recommendation
+  - Config defaults (avoid_news_minutes_before=30, after=15) match day trading style
+- **Learnings for future iterations:**
+  - The transcriptions don't specify exact minute windows (60/30/15 etc.) — those come from other mentorship materials or the Trading Plan
+  - RECURRING_HIGH_IMPACT constant in news_filter.py is defined but never used in code logic (dead code)
+  - Two calendar modules exist: news_filter.py (comprehensive, used by trading_engine) and economic_calendar.py (legacy Finnhub-based)
+  - Alex recommends ForexFactory for precision and Investing.com for user-friendliness
 ---

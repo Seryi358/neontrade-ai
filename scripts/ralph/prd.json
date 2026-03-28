@@ -14,7 +14,7 @@
         "Unidades de medida (pips, puntos, ticks) calculadas correctamente",
         "TP, SL y BE implementados según las definiciones de la clase"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-002",
@@ -26,7 +26,7 @@
         "Ventanas de bloqueo por estilo (scalping ±60min, day -30/+15, swing -15/+5) verificadas contra transcripción",
         "Fuentes de calendario (FairEconomy/ForexFactory) correctas"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-003",

@@ -132,7 +132,7 @@
         "Reglas similares a Blue pero con validación Pink verificadas",
         "SL, TP, R:R correcto para White"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-011",

@@ -223,7 +223,7 @@
         "MARKET_VIEW.txt comparado",
         "Todos los instrumentos de las listas están en la app"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-017",

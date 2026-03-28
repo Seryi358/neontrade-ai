@@ -244,8 +244,8 @@ class Settings(BaseSettings):
         # Exotic USD (more volume = better pattern respect — Alex keeps these)
         "USD_CNH", "USD_CZK", "USD_HUF", "USD_MXN", "USD_NOK",
         "USD_PLN", "USD_SEK", "USD_SGD", "USD_TRY", "USD_ZAR",
-        # Exotic EUR (reduced — worse than USD exotics per Alex)
-        "EUR_MXN", "EUR_NOK", "EUR_ZAR",
+        # Exotic EUR (reduced — worse than USD exotics per Alex, but kept per FOREX.txt)
+        "EUR_CNH", "EUR_MXN", "EUR_NOK", "EUR_SGD", "EUR_ZAR",
         # Precious metals (beyond Gold/Silver)
         "XPD_USD", "XPT_USD",
     ]
@@ -253,8 +253,11 @@ class Settings(BaseSettings):
     # Commodities — NOT recommended by TradingLab for primary trading.
     # Available only for backtesting/analysis.
     commodities_watchlist: List[str] = [
+        # Energy (COMMODITIES.txt: CL, NG, HO, RB)
         "BCO_USD", "WTICO_USD", "NATGAS_USD",
+        # Agricultural (COMMODITIES.txt: ZW, ZC, ZS, SB, KC, CC)
         "WHEAT_USD", "CORN_USD", "SOYBN_USD", "SUGAR_USD",
+        # Metals (COMMODITIES.txt: PL, PA, SI, GC, HG)
         "XPT_USD", "XPD_USD", "XCU_USD",
     ]
 
@@ -263,6 +266,43 @@ class Settings(BaseSettings):
         "US30_USD", "US2000_USD", "NAS100_USD", "SPX500_USD",
         "DE30_EUR", "FR40_EUR", "UK100_GBP",
         "JP225_USD", "AU200_AUD", "HK33_HKD", "CN50_USD",
+    ]
+
+    # Equities — US sector ETFs for swing trading (from EQUITIES_IND.txt)
+    # TradingLab: use sector ETFs to detect opportunities, then drill into holdings.
+    # Alex: "yo enfoco el trading en acciones como swing trading en acciones de EEUU"
+    # Available only via IBKR (not Oanda/Capital.com).
+    equities_watchlist: List[str] = [
+        # Innovation (ARK)
+        "ARKK", "ARKW", "ARKF", "ARKG", "ARKQ",
+        # Airlines
+        "JETS",
+        # Banking
+        "KBE", "JPM", "BAC", "GS",
+        # Semiconductors
+        "SOXX", "SMH",
+        # Software / Cybersecurity
+        "HACK", "IGV",
+        # Internet / Cloud
+        "FDN", "CLOU", "SKYY",
+        # Clean Energy
+        "ICLN", "TAN",
+        # Aerospace / Defense
+        "XAR", "ITA", "BA", "LMT",
+        # Biotechnology
+        "XBI", "IBB",
+        # Gaming
+        "ESPO", "HERO",
+        # Uranium
+        "URA",
+        # AI
+        "NVDA", "IBM",
+        # Cannabis
+        "MJ", "MSOS",
+        # Crypto-related equities
+        "COIN", "MSTR", "MARA",
+        # Basic Materials
+        "GDX", "GLD", "SLV", "XME",
     ]
 
     # Crypto — separate allocation per Trading Plan (10% of trading capital)
@@ -285,14 +325,34 @@ class Settings(BaseSettings):
         "SEI_USD", "SUI_USD", "AAVE_USD", "MKR_USD", "RUNE_USD",
         "DOGE_USD", "SHIB_USD", "PEPE_USD", "WIF_USD", "BONK_USD",
         "FTM_USD", "ALGO_USD", "XLM_USD", "HBAR_USD", "VET_USD",
+        "ICP_USD", "EOS_USD", "THETA_USD", "XTZ_USD", "EGLD_USD",
+        "MANA_USD", "SAND_USD", "GALA_USD", "AXS_USD", "CHZ_USD",
+        "CAKE_USD", "IOTA_USD",
         # === Top 50-150 (high volatility, smaller allocations) ===
         "CRV_USD", "SNX_USD", "COMP_USD", "LDO_USD", "RPL_USD",
         "ENS_USD", "PENDLE_USD", "GMX_USD", "DYDX_USD", "JUP_USD",
         "TIA_USD", "PYTH_USD", "WLD_USD", "ONDO_USD", "JTO_USD",
     ]
 
+    # Market View — macro dashboard symbols (from MARKET_VIEW.txt)
+    # NOT for trading — for context analysis (inflation, interest rates, global indices)
+    market_view_symbols: List[str] = [
+        # Europe indices
+        "DE30_EUR", "FR40_EUR", "UK100_GBP",
+        # US indices
+        "US30_USD", "US2000_USD", "NAS100_USD", "SPX500_USD",
+        # World indices
+        "CN50_USD", "HK33_HKD", "JP225_USD", "AU200_AUD",
+        # Metals (macro view)
+        "XAU_USD", "XAG_USD", "XPD_USD", "XPT_USD", "XCU_USD",
+        # Energy (macro view)
+        "NATGAS_USD", "WTICO_USD",
+        # Crypto (macro view — BTC + ETH only)
+        "BTC_USD", "ETH_USD",
+    ]
+
     # Active categories — only forex by default (TradingLab: focus on divisas)
-    # Options: forex, forex_exotic, commodities, indices, crypto
+    # Options: forex, forex_exotic, commodities, indices, equities, crypto
     active_watchlist_categories: List[str] = ["forex"]
 
     # ── Capital Allocation (ch18.5 + Trading Plan PDF) ──────────────

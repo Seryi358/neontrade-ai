@@ -24,6 +24,9 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Alex's "añadido" = bonus/extra, not hard requirement. RSI overbought + divergence in BLACK are extras, not gates
 - ASR fields in trade_journal.py are filled post-trade via `update_asr()` — not at record time. Journaling notes via `update_journal_notes()`
 - ASR evaluates execution vs trading plan, NOT vs trade result. Alex: "correcto o incorrecto viene relacionado con vuestro plan de trading"
+- Watchlists in config.py: forex_watchlist, forex_exotic_watchlist, commodities_watchlist, indices_watchlist, equities_watchlist, crypto_watchlist, market_view_symbols
+- routes.py `/watchlist/categories` must mirror config watchlist fields — add new categories to `valid` set AND `category_map` AND response dict
+- TradingLab watchlist .txt files are TradingView format (BROKER:SYMBOL,BROKER:SYMBOL) — config uses Oanda format (BASE_QUOTE)
 
 ---
 
@@ -431,4 +434,26 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Screenshots needed: entry + exit + "now" (for ASR to see what happened after exit)
   - Error progression in traders: perception → technical → routine → emotional. The ASR checklist fields map to these categories.
   - Alex's Trading Plan has 18 sections — the code doesn't need to replicate all of them (many are personal/conceptual), but the numeric and process sections must match
+---
+
+## 2026-03-28 - AUDIT-016
+- **What was implemented:** Audited all 3 transcriptions from Trading Mastery/03_Intermedio/05_Watchlist (Forex, Acciones, Criptomonedas) + 5 watchlist .txt files (FOREX.txt, CRYPTO_USDT.txt, EQUITIES_IND.txt, COMMODITIES.txt, MARKET_VIEW.txt). Compared every instrument against config.py and routes.py. Fixed discrepancies.
+- **Files changed:**
+  - `backend/config.py` — Added EUR_CNH and EUR_SGD to forex_exotic_watchlist (from FOREX.txt). Added 12 missing top-tier cryptos from CRYPTO_USDT.txt main section (ICP, EOS, THETA, XTZ, EGLD, MANA, SAND, GALA, AXS, CHZ, CAKE, IOTA). Added new equities_watchlist with 39 US sector ETFs from EQUITIES_IND.txt. Added commodities_watchlist section comments mapping to COMMODITIES.txt categories. Added market_view_symbols (20 macro dashboard instruments from MARKET_VIEW.txt). Updated active_watchlist_categories comment to include "equities".
+  - `backend/api/routes.py` — Added "equities" to WatchlistCategoriesRequest comment, valid categories set, get_watchlist_categories response, and get_full_watchlist category_map.
+  - `scripts/ralph/prd.json` — Marked AUDIT-016 as passes: true
+- **Audit findings:**
+  - FOREX.txt: All 30 major/cross pairs ✅, all 10 USD exotics ✅, 2 EUR exotics missing (EUR_CNH, EUR_SGD → added), metals XAU/XAG ✅, XPD/XPT in exotic ✅
+  - CRYPTO_USDT.txt: Top section has 32 core cryptos. 20 already in config ✅. 12 missing from Alex's top picks → added (ICP, EOS, THETA, XTZ, EGLD, MANA, SAND, GALA, AXS, CHZ, CAKE, IOTA). SECTION 1 (~230 altcoins) intentionally not all included — mentorship says "máximo 50 criptomonedas"
+  - EQUITIES_IND.txt: Entirely new category — no equities_watchlist existed. Added 39 key sector ETFs covering Innovation, Airlines, Banking, Semiconductors, Internet, Clean Energy, Aerospace, Biotech, Gaming, Uranium, AI, Cannabis, Crypto, Basic Materials
+  - COMMODITIES.txt: All broker-available commodities already in config ✅. Added section comments mapping to COMMODITIES.txt categories (Energy, Agricultural, Metals). Many COMMODITIES.txt futures (HO, RB, ZO, HE, LE, CC, KC, ZR) are CME/CBOT futures not available via Oanda/Capital.com CFDs.
+  - MARKET_VIEW.txt: Macro dashboard — not for trading. Added market_view_symbols (20 instruments: EU/US/World indices, metals, energy, BTC+ETH) for context analysis.
+  - Duplicate _(1) files are identical to originals (diff confirmed).
+- **Learnings for future iterations:**
+  - TradingLab .txt files are TradingView import format (BROKER:SYMBOL) — must translate to Oanda format (BASE_QUOTE) for the app
+  - CRYPTO_USDT.txt has a "main section" (32 top picks) and "SECTION 1" (230+ altcoins). Only the main section matches Alex's recommended ~50 watchlist
+  - Alex uses sector ETFs (EQUITIES_IND.txt) for swing trading detection — find opportunity in ETF, then drill into holdings. The app needs equities only via IBKR.
+  - COMMODITIES.txt has many CME/CBOT futures contracts not available as CFDs on Oanda/Capital.com — only the main commodities (oil, gas, wheat, corn, soybeans, sugar, metals) have CFD equivalents
+  - MARKET_VIEW.txt includes macro indicators (inflation USIRYY, interest rates USINTR, unemployment UNRATE, Fed balance sheet WALCL) that are TradingView-specific and have no broker API equivalent — kept as external analysis reference
+  - The _(1) duplicate files in the watchlist directory are identical copies — likely TradingView export duplicates
 ---

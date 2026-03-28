@@ -51,7 +51,7 @@
         "Fibonacci aplicado a Elliott (retrocesos en ondas 2,4, extensiones en 3,5) correcto",
         "Código coincide letra por letra con la teoría explicada"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-005",

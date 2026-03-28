@@ -13,6 +13,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Wedge/channel targets per TradingLab = start of pattern (not height projection like H&S/double top)
 - Some test files (test_round4, test_round10) use `sys.exit()` at module level — pytest crashes on collect; run them directly with `python3`
 - Pre-existing failures: 10 in test_round9 (openai missing, R:R, EMA config) — not related to audit work
+- Alex's Fibonacci levels: ONLY 0.382, 0.5, 0.618, 0.75, 1.0. Never use 0.236 — it's not from TradingLab
+- Elliott extension targets by wave: Wave 3 → 1.618 max / 1.272 optimal, Wave 5 → prior high/low or 0.618 / max 1.0
 
 ---
 
@@ -65,4 +67,26 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Wedge/channel target = start of pattern. H&S/double top target = height projection. Different rules for different patterns.
   - The 3-step breakout verification (Break→Close→Confirm) is available as `MarketAnalyzer.verify_sr_breakout()` — strategies can use this for entry signals.
   - Consolidation is specifically "correction in time" (narrow range) vs deceleration "correction in price" (pullback).
+---
+
+## 2026-03-27 - AUDIT-004
+- **What was implemented:** Audited all 3 transcriptions from Trading Mastery/02_Básico/04_Análisis técnico avanzado (Fibonacci, Elliott Waves, Fibonacci applied to Elliott). Fixed 1 discrepancy in `_validate_elliott_fibonacci()`.
+- **Files changed:**
+  - `backend/strategies/base.py` — Fixed Wave 4 Fibonacci validation: replaced non-canonical 23.6%-50.0% range with correct 38.2%-61.8% range per TradingLab. Added 0.75 extended zone for Wave 4 complex pullbacks. Removed unused `fib_236` computation (0.236 level not taught by Alex).
+  - `scripts/ralph/prd.json` — Marked AUDIT-004 as passes: true
+- **Audit findings:**
+  - Fibonacci retracement levels (0, 0.382, 0.5, 0.618, 0.75, 1.0) — correctly implemented ✅
+  - Fibonacci extension levels (0.618, 1.0, 1.272, 1.618) — correctly implemented ✅
+  - Elliott Wave structure (5 impulse waves + ABC corrective) — correctly implemented ✅
+  - Wave-to-strategy mapping (1→BLACK, 2→BLUE, 3→RED, 4→PINK, 5→WHITE/GREEN, A→BLACK, B→BLUE, C→RED) — correct ✅
+  - Wave characteristics: Wave 1 hardest to detect, Wave 3 longest, Wave 4 complex pullback (ABC), Wave 5 shorter than 3 unless 3 was short — all reflected in code ✅
+  - Fibonacci applied to Elliott: Wave 3 target 1.618 max / 1.272 optimal, Wave 5 target prior high/low or 0.618 / max 1.0 — correctly reflected in openai_analyzer.py ✅
+  - Wave 2 validation (38.2%-61.8% retracement) — correct ✅
+  - **FIXED:** Wave 4 validation was using 23.6%-50.0% range — Alex never teaches 23.6%. Changed to 38.2%-61.8% with 0.75 extended zone for complex pullbacks.
+  - Extension calculation uses simplified projection (not 3-click TradingView method) — acceptable since pullback endpoint unknown at calculation time
+- **Learnings for future iterations:**
+  - Alex's Fibonacci levels are ONLY: 0.382, 0.5, 0.618, 0.75 (reference), 1.0. The 0.236 level is NOT part of TradingLab.
+  - Wave 4's distinguishing feature is being a COMPLEX pullback (ABC pattern), not having shallower Fib retracement.
+  - Wave 3 target: extension 1.618 max, 1.272 optimal. Wave 5 target: prior high/low first, then ext 0.618, max ext 1.0.
+  - Alex prefers conservative exits (level 1.0 or prior high/low), not the max extension 1.618.
 ---

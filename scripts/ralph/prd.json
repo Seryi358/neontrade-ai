@@ -514,7 +514,7 @@
         "Tests para BLACK strategy (day/swing)",
         "Tests para GREEN strategy (day/swing, crypto only)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "BUGFIX-002",

@@ -12,7 +12,14 @@ Started: vie 27 mar 2026 21:45:20 -05
 - MarketCondition enum in `market_analyzer.py` — add new values there and check `test_round9_final.py` for enum assertions
 - Wedge/channel targets per TradingLab = start of pattern (not height projection like H&S/double top)
 - Some test files (test_round4, test_round10) use `sys.exit()` at module level — pytest crashes on collect; run them directly with `python3`
-- Pre-existing failures: 10 in test_round9 (openai missing, R:R, EMA config) — not related to audit work
+- Pre-existing failures: ALL FIXED in BUGFIX-001. Openai-dependent tests now skip gracefully.
+- _classify_blue_variant() checks chart_patterns and swing_lows/highs, NOT candlestick_patterns — test with chart_patterns
+- _has_reversal_pattern() checks candlestick_patterns — HAMMER (bullish), SHOOTING_STAR (bearish) now included
+- _adjust_for_correlation() returns FIXED correlated_risk_pct value (0.0075 = 0.75%), NOT a multiplier of base risk
+- EMA_W_8 was removed (not from TradingLab) — only EMA_W_50 exists on Weekly
+- _EMA_TIMEFRAME_GRID (forex): LP/day=EMA_H1_50, LP/swing=EMA_D_50, CP/day=EMA_M5_50
+- Trend detection needs swing structure (impulse-pullback waves), NOT linear data. Use 200+ bars with clear oscillation.
+- BMSB requires 2+ consecutive bearish closes for confirmed bearish status (first close = "warning")
 - Alex's Fibonacci levels: ONLY 0.382, 0.5, 0.618, 0.75, 1.0. Never use 0.236 — it's not from TradingLab
 - Elliott extension targets by wave: Wave 3 → 1.618 max / 1.272 optimal, Wave 5 → prior high/low or 0.618 / max 1.0
 - MTFA module is conceptual/analytical — no specific parameters to implement, teaches thinking framework
@@ -977,4 +984,28 @@ Started: vie 27 mar 2026 21:45:20 -05
   - `get_risk_status()` is the single source of truth for the frontend risk display — always extend it rather than creating new endpoints
   - Pre-existing test failures: `test_round3_bugs::test_risk_manager_zero_balance` (position sizing returns 19999 instead of 0 for zero SL), `test_05_ai_prompt` (no openai module), `test_final_integration` (openai), `test_round4_comprehensive` (sys.exit at module level)
   - TypeScript compiler is not installed in the frontend — no tsc check available, rely on React Native Metro bundler for type errors
+---
+
+## 2026-03-28 - BUGFIX-001
+- **What was implemented:** Fixed ALL existing test failures across 10+ test files. Created comprehensive pytest test suite for all 6 color strategies. Fixed 1 code bug (HAMMER/SHOOTING_STAR missing from reversal pattern detection).
+- **Files changed:**
+  - `backend/strategies/base.py` — Added HAMMER to bullish_reversals and SHOOTING_STAR to bearish_reversals in `_has_reversal_pattern()`
+  - `backend/test_strategies_pytest.py` — NEW: 45 pytest tests covering all 6 strategies (BLUE A/B/C, RED, PINK, WHITE, BLACK, GREEN), Elliott Wave priority, reversal patterns, entry restrictions
+  - `backend/test_round4_comprehensive.py` — Fixed PINK EMA values, R:R threshold (1.0 < 1.5 min), trade journal init (clear pre-loaded trades), openai skip
+  - `backend/test_round5_comprehensive.py` — Fixed PINK EMA values (3 locations), BE pct_to_tp1 (0.50), R:R threshold, openai skip
+  - `backend/test_round6_stress.py` — Fixed config ranges (correlated_risk_pct, move_sl_to_be), correlation test (fixed value), trend detection data (impulse-pullback waves)
+  - `backend/test_round7_comprehensive.py` — Fixed MarketCondition count (6), R:R, swing risk (3%), correlated_risk, Blue variant (chart_patterns), EMA grid values
+  - `backend/test_round8_definitive.py` — Fixed Blue variant A (chart_patterns), PINK EMA values, EMA_W_8→W_50, EMA grid values, swing risk, R:R, BMSB (2 closes), openai skip, trend data
+  - `backend/test_round9_final.py` — Fixed MarketCondition count, min_rr_ratio (1.5), EMA grid, correlation, R:R, openai skip (2 blocks)
+  - `backend/test_round10_ultimate.py` — Fixed funded_no_overnight/news (False default), allocation sums, openai skip
+  - `backend/test_05_ai_prompt.py` — Graceful skip when openai not installed
+  - `backend/test_final_integration.py` — Fixed RED SL (uses EMA 4H not Fib), openai skip, make_mock_analysis supports=[] fix, AI prompt skip
+- **Learnings for future iterations:**
+  - When changing config defaults (risk_swing, min_rr_ratio, etc.), grep ALL test files — expectations are in 5+ files
+  - `_classify_blue_variant()` ONLY checks chart_patterns and swing_lows/highs, NOT candlestick_patterns
+  - `_adjust_for_correlation()` returns a FIXED value (correlated_risk_pct), not a multiplier
+  - PINK EMA checks use OPPOSITE direction for BOTH 1H and 4H (after AUDIT-009 fix)
+  - Empty list `[]` is falsy in Python — `supports = supports or default` treats `[]` as `default`. Use `is not None` instead.
+  - Trend detection needs oscillating data (impulse-pullback), not monotonic linear data
+  - BMSB confirmation requires 2+ consecutive bearish weekly closes — first close is just "warning"
 ---

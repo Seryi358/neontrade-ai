@@ -95,12 +95,21 @@ class Settings(BaseSettings):
 
     # Minimum reward:risk ratio to TP1 (ch22.1 Trading Plan)
     # Trading Plan PDF: R:R mínimo 0.80:1 con 61% win rate (Alex experimentado)
-    # Mentoría clase: R:R mínimo ~2.5:1 para principiantes
+    # Mentoría ch18.3: R:R referencia ~2.5:1 con 30% win rate → breakeven con 1% riesgo
+    # Rango target: 1.5:1 a 2.5:1 (Alex: "Perfectamente puede ser un 2. Dos y medio, tres")
     # Default 1.5:1 as balanced starting point; adjust based on win rate
     min_rr_ratio: float = 1.5
     min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R (mentoría explícita)
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R (mentoría explícita)
     min_confluence_points: int = 2  # Minimum positive confluence points required (mentorship doesn't specify 3)
+
+    # Reference benchmarks from ch18.3 Regla del 1%:
+    # - Win rate target de referencia: 30% (con R:R 2.5:1 y 1% riesgo = ~breakeven)
+    #   Alex: "puedes ganar sin problema el 30% de los trades que ejecutas"
+    # - Mínimo 100 trades antes de juzgar el sistema (100 oportunidades al 1%)
+    #   Alex: "tienes 100 trades como mínimo para poder practicar, progresar, mejorar"
+    reference_win_rate: float = 0.30   # 30% — informational, not a gate
+    reference_min_trades: int = 100    # Minimum trades before evaluating system
 
     # Position management (ch21 Avanzado)
     # Default management style: "cp" (short-term, Alex's preference), "lp" (long-term), "cpa" (aggressive)

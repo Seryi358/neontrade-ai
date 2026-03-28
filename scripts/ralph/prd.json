@@ -401,7 +401,7 @@
         "Win rate target de referencia: 30% (con R:R adecuado es rentable)",
         "Mínimo 100 trades antes de juzgar el sistema"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-004",

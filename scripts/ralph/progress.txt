@@ -833,3 +833,22 @@ Started: vie 27 mar 2026 21:45:20 -05
   - CPA auto-trigger is an external signal — the position_manager can't detect double patterns or news by itself, needs trading_engine to call `set_cpa_trigger()`
   - The `position_management_style` is separate from `sl_management_style` — the former controls which EMA timeframe (LP/CP/CPA), the latter controls EMA vs price_action trailing
 ---
+
+## 2026-03-28 - ALEX-003
+- **What was implemented:** Audited risk management configuration against ch18.3 "Regla del 1%" transcription. Verified position sizing formula, SL progression phases, and R:R settings. Added reference benchmarks.
+- **Files changed:**
+  - `backend/config.py` — Added reference_win_rate (30%) and reference_min_trades (100) fields with Alex's exact quotes. Updated R:R comments to reflect 1.5:1–2.5:1 range from transcription.
+  - `backend/core/risk_manager.py` — Fixed validate_reward_risk docstring (said "2.0" but default is 1.5). Updated calculate_position_size docstring with Alex's exact formula (Risk$ / %SL × 100).
+  - `scripts/ralph/prd.json` — Marked ALEX-003 as passes: true
+- **Audit findings (all verified):**
+  - Risk 1% default: ✅ risk_day_trading = 0.01
+  - R:R range 1.5:1–2.5:1: ✅ min_rr_ratio = 1.5, Alex uses 2.5:1 as simulation benchmark
+  - Position sizing formula: ✅ Code equivalent to Alex's Risk$/SL%×100 (gives base-asset units)
+  - SL progression: ✅ INITIAL → SL_MOVED (50% risk) → BE (1x risk distance) → EMA trailing
+  - Win rate 30% reference: Added reference_win_rate = 0.30
+  - Min 100 trades: Added reference_min_trades = 100
+- **Learnings for future iterations:**
+  - Alex's position sizing formula (Risk$ / SL% × 100) gives USD-denominated position size. The code's units = risk_amount / sl_distance is mathematically equivalent but gives base-asset units.
+  - The validate_reward_risk docstring was stale — said 2.0 but config default was 1.5. Always check docstrings match actual config defaults.
+  - reference_win_rate and reference_min_trades are informational fields — not used as gates anywhere in the code, just benchmarks from the mentorship.
+---

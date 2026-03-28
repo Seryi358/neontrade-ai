@@ -390,8 +390,9 @@ class RiskManager:
         """
         Calculate the number of units to trade based on risk percentage.
 
-        Formula: units = (balance * risk%) / (|entry - SL| / pip_value)
-        From TradingLab ch18.4: Position Size = (Risk Amount / SL_distance%) * 100
+        Alex's formula (ch18.4): Position Size (USD) = Risk$ / %SL_distance × 100
+        Example: $10 risk, 4.17% SL distance → 10 / 4.17 × 100 = $240 position
+        In code: units = risk_amount / sl_distance (equivalent, gives base-asset units)
         """
         cached_balance = balance_cache.get("account_balance")
         if cached_balance is not None:
@@ -450,7 +451,8 @@ class RiskManager:
     ) -> bool:
         """
         Validate that the trade meets minimum R:R ratio.
-        Minimum R:R to TP1 must be >= 2.0 (from Trading Plan).
+        Minimum R:R to TP1 uses config min_rr_ratio (default 1.5:1).
+        Range: 1.5:1 to 2.5:1 per ch18.3. BLACK/GREEN use 2.0:1 min.
         """
         risk = abs(entry_price - stop_loss)
         reward = abs(take_profit_1 - entry_price)

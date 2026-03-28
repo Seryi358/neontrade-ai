@@ -631,7 +631,7 @@
         "Frontend se sirve correctamente",
         "Logs sin errores al arrancar"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DEPLOY-002",

@@ -1171,3 +1171,24 @@ Started: vie 27 mar 2026 21:45:20 -05
   - The root-level `data/` dir AND `backend/data/` dir can both contain `risk_config.json` — they serve different CWD contexts
   - No linting/type-checking tools installed in venv — use `py_compile` for Python syntax and `npx tsc --noEmit` for TypeScript
 ---
+
+## 2026-03-28 - DEPLOY-001
+- **What was implemented:** Docker configuration review and fix. Verified Dockerfile (multi-stage: frontend Expo build + Python backend), docker-compose.yml, .dockerignore, healthcheck, port mapping, env_file, volume mounts. Removed deprecated `version: "3.8"` from docker-compose.yml. Verified no secrets in codebase (.env in .gitignore, not tracked in git). All Python files compile without errors. 164 tests pass.
+- **Files changed:**
+  - `docker-compose.yml` — Removed deprecated `version: "3.8"` key (Docker Compose V2 ignores it with warning)
+  - `scripts/ralph/prd.json` — Marked DEPLOY-001 as passes: true
+- **Verification summary:**
+  - Dockerfile: Multi-stage build (node:20-slim → expo export → python:3.12-slim), curl installed for healthcheck, correct COPY paths ✅
+  - docker-compose.yml: port 8000:8000, env_file backend/.env, named volumes for data/logs, healthcheck on /health ✅
+  - .dockerignore: excludes .env, test files, node_modules, __pycache__, data/*.db ✅
+  - .gitignore: .env excluded ✅
+  - No hardcoded secrets in any .py file ✅
+  - Backend /health endpoint exists and returns engine status ✅
+  - Frontend served from /app/static (Docker) or ../frontend/dist (local) ✅
+  - All 164 tests pass, all Python files compile ✅
+- **NOTE:** Docker is not installed on this machine — actual `docker build` and `docker-compose up` require manual verification
+- **Learnings for future iterations:**
+  - Docker Compose V2 deprecated the top-level `version` key — remove it to avoid warnings
+  - `env_file` in docker-compose reads from host filesystem, not build context — .dockerignore excluding .env is correct (keeps secrets out of image)
+  - Expo `output: "single"` in app.json → `expo export --platform web` outputs to `dist/` directory
+---

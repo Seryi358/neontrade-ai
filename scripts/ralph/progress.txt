@@ -702,3 +702,23 @@ Started: vie 27 mar 2026 21:45:20 -05
   - M2 approximation: EMA 50 on M2 ≈ EMA 20 on M5 (since M5 candles are 2.5x longer than M2 candles)
   - Entry triggers and price proxies have DIFFERENT EMA requirements — don't conflate them
 ---
+
+## 2026-03-28 - AUDIT-024 (Addendum: Agent Audit Results)
+- **What was implemented:** Incorporated findings from 4 parallel audit agents (BLUE, RED, PINK, WHITE+BLACK+GREEN). Fixed 1 additional bug (BLACK double RSI divergence).
+- **Files changed:**
+  - `backend/strategies/base.py` — Removed duplicate `_check_rsi_divergence()` call in BlackStrategy (lines ~3062-3065). BLACK already has its own H4 RSI divergence check with proper +15/-10 scoring from the mentorship. The generic call was double-counting.
+- **Agent audit findings (deferred to future stories):**
+  - BLUE: Weekly EMA 8 filter blocks Blue A/B (Alex says no HTF filter for A/B). Conservative safety measure — defer.
+  - BLUE: Blue A higher-low has no minimum threshold. Minor — defer.
+  - BLUE: Extended TP via Fib extensions (1.272/1.618) unimplemented for Blue A. Feature gap — defer.
+  - RED: Step 3 order (1H checked before 4H). The 4H should be primary. Structural — defer.
+  - PINK: SL uses generic supports vs swing_lows. Minor precision — defer.
+  - PINK: Missing 4H EMA pullback proximity check. Structural — defer.
+  - BLACK: Missing H4 consolidation/deceleration check in Step 4. Medium — defer.
+  - GREEN: EMA 8 Weekly blocks during corrections (GREEN operates during corrections). Medium-high — defer.
+  - GREEN: Weekly S/R breakout treated as optional bonus, not requirement. Medium — defer.
+- **Learnings for future iterations:**
+  - The EMA 8 Weekly filter from the Indicators module may be too aggressive for strategies that operate during corrections (GREEN, potentially BLUE A/B)
+  - BLACK's H4 Step 4 has TWO innegociable components: overbought (distance from EMA) AND consolidation/brake. Code only checks the first.
+  - Double-counting bonuses can inflate confidence — always check if a generic helper overlaps with strategy-specific logic
+---

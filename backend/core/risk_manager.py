@@ -492,6 +492,13 @@ class RiskManager:
         # Clean up BE tracking
         self._positions_at_be.discard(trade_id)
 
+    def unregister_all_trades(self):
+        """Remove all active trades from risk tracking (e.g., funded overnight close)."""
+        count = len(self._active_risks)
+        self._active_risks.clear()
+        self._positions_at_be.clear()
+        logger.info(f"All {count} trades unregistered. Total risk: 0.00%")
+
     # ── Funded Account Mode (Workshop Cuentas Fondeadas) ────────
 
     def check_funded_account_limits(self) -> Tuple[bool, str]:

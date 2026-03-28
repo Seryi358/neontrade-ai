@@ -855,12 +855,7 @@ class TradingEngine:
                     logger.debug(f"Failed to calculate PnL for funded close: {e}")
 
             await self.broker.close_all_trades()
-            for key in list(self.risk_manager._active_risks.keys()):
-                # Keys are "instrument:trade_id" composites
-                parts = key.split(":", 1)
-                if len(parts) == 2:
-                    instrument, trade_id = parts[0], parts[1]
-                    self.risk_manager.unregister_trade(trade_id, instrument)
+            self.risk_manager.unregister_all_trades()
             self.position_manager.positions.clear()
 
     # ── Position Sync ────────────────────────────────────────────
@@ -1130,6 +1125,7 @@ class TradingEngine:
                     reentry = self._reentry_candidates.get(instrument)
                     if reentry and setup.direction == reentry.get("direction"):
                         setup.risk_percent *= 0.75
+                        setup.units = int(setup.units * 0.75) or (1 if setup.units > 0 else -1)
                         logger.info(
                             f"[{instrument}] Reentry opportunity — reduced risk to {setup.risk_percent:.2%}"
                         )
@@ -1155,6 +1151,7 @@ class TradingEngine:
                     elif session_quality <= 0.5:
                         # SYDNEY/ASIAN sessions: reduce risk (proxy for confidence penalty of -15 pts)
                         setup.risk_percent *= 0.85
+                        setup.units = int(setup.units * 0.85) or (1 if setup.units > 0 else -1)
                         logger.info(
                             f"Reduced risk for {instrument}: {session_name} session "
                             f"(quality={session_quality:.1f}) — risk adjusted to {setup.risk_percent:.2%}"

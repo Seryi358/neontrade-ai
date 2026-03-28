@@ -28,6 +28,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - routes.py `/watchlist/categories` must mirror config watchlist fields — add new categories to `valid` set AND `category_map` AND response dict
 - TradingLab watchlist .txt files are TradingView format (BROKER:SYMBOL,BROKER:SYMBOL) — config uses Oanda format (BASE_QUOTE)
 - Crypto uses WIDER EMA timeframes than forex for position management (LP: Weekly/H4 vs Daily/H1; CP Day: M15 vs M5) — `_EMA_TIMEFRAME_GRID_CRYPTO` in position_manager.py
+- EMA naming: `EMA_{TF}_{PERIOD}` — e.g. `EMA_M5_50` = period 50 on M5. TradingLab uses EMA 50 on EVERY timeframe. Entry triggers use `EMA_M5_50`, price proxies use `EMA_M5_5` (fast).
+- M2 approximation: broker APIs don't provide M2 candles, use `EMA_M5_20` as proxy (EMA 50 on M2 ≈ EMA 20 on M5)
 
 ---
 

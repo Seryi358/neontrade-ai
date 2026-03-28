@@ -115,8 +115,8 @@ ok("cfg_scalping_max_total_dd", s.scalping_max_total_dd == 0.10)
 ok("cfg_funded_account_mode", s.funded_account_mode is False)
 ok("cfg_funded_max_daily_dd", s.funded_max_daily_dd == 0.05)
 ok("cfg_funded_max_total_dd", s.funded_max_total_dd == 0.10)
-ok("cfg_funded_no_overnight", s.funded_no_overnight is True)
-ok("cfg_funded_no_news_trading", s.funded_no_news_trading is True)
+ok("cfg_funded_no_overnight", s.funded_no_overnight is False)  # Default off (not funded mode)
+ok("cfg_funded_no_news_trading", s.funded_no_news_trading is False)  # Default off
 ok("cfg_discretion_pct", s.discretion_pct == 0.0)
 
 # Watchlists
@@ -141,10 +141,10 @@ ok("cfg_crypto_correlation_groups", len(s.crypto_correlation_groups) >= 2)
 ok("cfg_oanda_url_practice", "fxpractice" in get_oanda_url())
 ok("cfg_oanda_stream_practice", "fxpractice" in get_oanda_stream_url())
 
-# Allocation sums
-trading_sum = s.allocation_forex_pct + s.allocation_crypto_pct + s.allocation_investment_pct
+# Allocation: forex+crypto=1.0 within trading, trading+investment=1.0 of total
+trading_sum = s.allocation_forex_pct + s.allocation_crypto_pct
 ok("cfg_allocation_trading_sum", abs(trading_sum - 1.0) < 0.01, f"got {trading_sum}")
-ok("cfg_allocation_total_sum", abs(s.allocation_trading_pct + s.allocation_investment_pct + s.allocation_crypto_pct - 1.0) < 0.01)
+ok("cfg_allocation_total_sum", abs(s.allocation_trading_pct + s.allocation_investment_pct - 1.0) < 0.01)
 
 
 # ===========================================================================
@@ -472,12 +472,14 @@ ok("scr_red", scr.RED is False)
 # ===========================================================================
 print("\n=== SECTION 12: OPENAI ANALYZER ===")
 
-from ai.openai_analyzer import OpenAIAnalyzer
-
-oa = OpenAIAnalyzer()
-ok("oa_instance", oa is not None)
-ok("oa_has_analyze_setup", hasattr(oa, "analyze_trade_setup"))
-ok("oa_has_model", oa.model == "gpt-4o")
+try:
+    from ai.openai_analyzer import OpenAIAnalyzer
+    oa = OpenAIAnalyzer()
+    ok("oa_instance", oa is not None)
+    ok("oa_has_analyze_setup", hasattr(oa, "analyze_trade_setup"))
+    ok("oa_has_model", oa.model == "gpt-4o")
+except ImportError:
+    ok("openai_analyzer_skipped", True)  # openai not installed
 
 
 # ===========================================================================

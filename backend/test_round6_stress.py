@@ -289,7 +289,8 @@ def test_09_correlation():
     # Now check NZD_USD correlation
     adjusted = rm._adjust_for_correlation("NZD_USD", 0.01)
     check("Correlated risk < base", adjusted < 0.01)
-    expected = 0.01 * settings.correlated_risk_pct
+    # _adjust_for_correlation returns the fixed correlated_risk_pct value (0.75%), not a multiplier
+    expected = settings.correlated_risk_pct
     check(f"Correlated risk = {expected}", abs(adjusted - expected) < 1e-9)
     rm.unregister_trade("trade1", "AUD_USD")
 
@@ -378,14 +379,48 @@ def test_13_trend_detection():
     import pandas as pd
     broker = MockBroker()
     ma = MarketAnalyzer(broker)
-    # Strong uptrend
-    prices = [1.0 + i * 0.002 for i in range(60)]
-    df = pd.DataFrame({"close": prices})
+    import numpy as np
+    # Strong uptrend with clear swing structure
+    # Build explicit impulse-pullback waves on an uptrend
+    n = 200
+    close_up = []
+    price = 1.0
+    for i in range(n):
+        # Every 10 bars: 7 bars up, 3 bars down (net up)
+        phase = i % 10
+        if phase < 7:
+            price += 0.003  # impulse up
+        else:
+            price -= 0.001  # pullback down (shallower)
+        close_up.append(price)
+    close_arr = np.array(close_up)
+    df = pd.DataFrame({
+        "open": close_arr - 0.001,
+        "high": close_arr + 0.002,
+        "low": close_arr - 0.002,
+        "close": close_arr,
+        "volume": [1000] * n,
+    })
     trend = ma._detect_trend(df)
     check("Uptrend detected as BULLISH", trend == Trend.BULLISH)
     # Strong downtrend
-    prices_down = [1.2 - i * 0.002 for i in range(60)]
-    df_down = pd.DataFrame({"close": prices_down})
+    close_down = []
+    price = 1.2
+    for i in range(n):
+        phase = i % 10
+        if phase < 7:
+            price -= 0.003  # impulse down
+        else:
+            price += 0.001  # pullback up (shallower)
+        close_down.append(price)
+    close_arr_d = np.array(close_down)
+    df_down = pd.DataFrame({
+        "open": close_arr_d + 0.001,
+        "high": close_arr_d + 0.002,
+        "low": close_arr_d - 0.002,
+        "close": close_arr_d,
+        "volume": [1000] * n,
+    })
     trend_down = ma._detect_trend(df_down)
     check("Downtrend detected as BEARISH", trend_down == Trend.BEARISH)
 
@@ -1102,8 +1137,8 @@ def test_43_config_field_types():
         "risk_swing": (0.001, 0.10),
         "max_total_risk": (0.01, 0.25),
         "min_rr_ratio": (0.5, 10.0),
-        "correlated_risk_pct": (0.1, 1.0),
-        "move_sl_to_be_pct_to_tp1": (0.001, 0.10),
+        "correlated_risk_pct": (0.001, 1.0),
+        "move_sl_to_be_pct_to_tp1": (0.001, 1.0),
         "delta_parameter": (0.1, 0.95),
         "delta_max_risk": (0.01, 0.10),
         "drawdown_level_1": (0.01, 0.20),

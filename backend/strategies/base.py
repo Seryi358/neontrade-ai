@@ -154,11 +154,11 @@ def _has_reversal_pattern(analysis: AnalysisResult, direction: str) -> Tuple[boo
     """
     bullish_reversals = {
         "LOW_TEST", "ENGULFING_BULLISH", "MORNING_STAR",
-        "TWEEZER_BOTTOM", "INSIDE_BAR_BULLISH",
+        "TWEEZER_BOTTOM", "INSIDE_BAR_BULLISH", "HAMMER",
     }
     bearish_reversals = {
         "HIGH_TEST", "ENGULFING_BEARISH", "EVENING_STAR",
-        "TWEEZER_TOP", "INSIDE_BAR_BEARISH",
+        "TWEEZER_TOP", "INSIDE_BAR_BEARISH", "SHOOTING_STAR",
     }
     patterns = set(analysis.candlestick_patterns)
 

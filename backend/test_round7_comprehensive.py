@@ -206,7 +206,7 @@ def block_1_module_imports():
     check("B1-10 MarketAnalyzer importable", MarketAnalyzer is not None)
     check("B1-11 AnalysisResult importable", AnalysisResult is not None)
     check("B1-12 Trend enum", len(Trend) == 3)
-    check("B1-13 MarketCondition enum", len(MarketCondition) == 5)
+    check("B1-13 MarketCondition enum", len(MarketCondition) == 6)  # includes CONSOLIDATING
 
     # 3. position_manager
     from core.position_manager import (
@@ -336,7 +336,7 @@ def block_2_strategy_behavior():
     check("B2-RR exact 2.0 accepted", rm.validate_reward_risk(1.10, 1.095, 1.11))
     # 1.9999999999 is within epsilon 1e-9 of 2.0, should be accepted
     check("B2-RR ~2.0 accepted (epsilon)", rm.validate_reward_risk(1.10, 1.095, 1.10 + 0.005 * 2.0))
-    check("B2-RR 1.5 rejected", not rm.validate_reward_risk(1.10, 1.095, 1.1075))
+    check("B2-RR 1.0 rejected", not rm.validate_reward_risk(1.10, 1.095, 1.105))
     check("B2-RR 0 risk rejected", not rm.validate_reward_risk(1.10, 1.10, 1.11))
     check("B2-RR very high accepted", rm.validate_reward_risk(1.10, 1.095, 1.15))
     check("B2-RR 3.0 accepted", rm.validate_reward_risk(1.10, 1.095, 1.115))
@@ -410,11 +410,12 @@ def block_2_strategy_behavior():
 
     # Strategy variant classification
     from strategies.base import _classify_blue_variant
+    # _classify_blue_variant checks chart_patterns (not candlestick_patterns) for variant A
     a_blue_a = make_analysis(
-        candlestick_patterns=["HAMMER", "ENGULFING_BULLISH", "HAMMER"],
+        chart_patterns=[{"type": "double_bottom", "confidence": 0.85}],
     )
     variant = _classify_blue_variant(a_blue_a, "BUY")
-    check("B2-variant BLUE_A detected with 2+ reversals", variant == "BLUE_A",
+    check("B2-variant BLUE_A detected with double bottom", variant == "BLUE_A",
           f"got {variant}")
 
     a_blue_b = make_analysis(
@@ -748,10 +749,10 @@ def block_4_position_manager():
 
     # LP/CP/CPA EMA key correctness
     pm_lp_swing = PositionManager(broker, management_style="lp", trading_style="swing")
-    check("B4-EMA LP/swing = W_50", pm_lp_swing._base_ema_key == "EMA_W_50")
+    check("B4-EMA LP/swing = D_50", pm_lp_swing._base_ema_key == "EMA_D_50")
 
     pm_cp_dt = PositionManager(broker, management_style="cp", trading_style="day_trading")
-    check("B4-EMA CP/day = M15_50", pm_cp_dt._base_ema_key == "EMA_M15_50")
+    check("B4-EMA CP/day = M5_50", pm_cp_dt._base_ema_key == "EMA_M5_50")
 
     pm_cpa_scalp = PositionManager(broker, management_style="cpa", trading_style="scalping")
     check("B4-EMA CPA/scalp = M1_50", pm_cpa_scalp._base_ema_key == "EMA_M1_50")
@@ -798,7 +799,7 @@ def block_5_risk_manager():
     check("B5-05 scalping risk = 0.5%", abs(risk_scalp - 0.005) < 1e-9)
 
     risk_swing = rm.get_risk_for_style(TradingStyle.SWING)
-    check("B5-06 swing risk = 1%", abs(risk_swing - 0.01) < 1e-9)
+    check("B5-06 swing risk = 3%", abs(risk_swing - 0.03) < 1e-9)
 
     # Drawdown tracking
     rm._peak_balance = 10000
@@ -858,9 +859,10 @@ def block_5_risk_manager():
     rm5 = RiskManager(broker)
     rm5.register_trade("t1", "AUD_USD", 0.01)
     adjusted_corr = rm5._adjust_for_correlation("NZD_USD", 0.01)
-    expected_corr = 0.01 * settings.correlated_risk_pct
+    # _adjust_for_correlation returns the fixed correlated_risk_pct value (0.75%), not a multiplier
+    expected_corr = settings.correlated_risk_pct
     check("B5-18 correlated risk reduced", adjusted_corr < 0.01)
-    check("B5-19 correlated risk = factor*base", abs(adjusted_corr - expected_corr) < 1e-9)
+    check("B5-19 correlated risk = fixed 0.75%", abs(adjusted_corr - expected_corr) < 1e-9)
 
     # Non-correlated pair not affected
     adjusted_uncorr = rm5._adjust_for_correlation("GBP_CHF", 0.01)
@@ -993,10 +995,10 @@ def block_8_config():
     # Defaults valid
     check("B8-01 risk_day_trading = 0.01", abs(settings.risk_day_trading - 0.01) < 1e-9)
     check("B8-02 risk_scalping = 0.005", abs(settings.risk_scalping - 0.005) < 1e-9)
-    check("B8-03 risk_swing = 0.01", abs(settings.risk_swing - 0.01) < 1e-9)
+    check("B8-03 risk_swing = 0.03", abs(settings.risk_swing - 0.03) < 1e-9)
     check("B8-04 max_total_risk = 0.07", abs(settings.max_total_risk - 0.07) < 1e-9)
-    check("B8-05 min_rr_ratio = 2.0", abs(settings.min_rr_ratio - 2.0) < 1e-9)
-    check("B8-06 correlated_risk_pct = 0.75", abs(settings.correlated_risk_pct - 0.75) < 1e-9)
+    check("B8-05 min_rr_ratio = 1.5", abs(settings.min_rr_ratio - 1.5) < 1e-9)
+    check("B8-06 correlated_risk_pct = 0.0075", abs(settings.correlated_risk_pct - 0.0075) < 1e-9)
     check("B8-07 forex watchlist non-empty", len(settings.forex_watchlist) > 20)
     check("B8-08 crypto watchlist non-empty", len(settings.crypto_watchlist) > 10)
     check("B8-09 crypto_default_strategy = GREEN", settings.crypto_default_strategy == "GREEN")

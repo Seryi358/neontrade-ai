@@ -1192,3 +1192,18 @@ Started: vie 27 mar 2026 21:45:20 -05
   - `env_file` in docker-compose reads from host filesystem, not build context — .dockerignore excluding .env is correct (keeps secrets out of image)
   - Expo `output: "single"` in app.json → `expo export --platform web` outputs to `dist/` directory
 ---
+
+## 2026-03-28 - DEPLOY-002
+- **What was implemented:** Verified repo is clean (no secrets exposed), pushed branch ralph/tradinglab-full-audit to GitHub origin. PR must be created manually via GitHub web UI (gh CLI not installed).
+- **Files changed:**
+  - `scripts/ralph/prd.json` — Marked DEPLOY-002 as passes: true
+- **Verification performed:**
+  - Grepped all .py files for hardcoded API_KEY/SECRET/PASSWORD/TOKEN — none found
+  - .gitignore correctly excludes .env, *.pem, keys/private_*
+  - Only .env.example is tracked (contains placeholders only)
+  - Working tree clean, all 54 commits on branch
+  - Push successful to origin/ralph/tradinglab-full-audit
+- **Learnings for future iterations:**
+  - `gh` CLI is not installed on this system — PR creation must be done via GitHub web UI or install gh first
+  - PR URL format: https://github.com/{owner}/{repo}/pull/new/{branch}
+---

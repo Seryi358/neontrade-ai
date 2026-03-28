@@ -643,7 +643,7 @@
         "Push exitoso a GitHub",
         "PR creado con resumen de todos los cambios"
       ],
-      "passes": false
+      "passes": true
     }
   ]
 }

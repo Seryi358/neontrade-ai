@@ -120,7 +120,7 @@
         "R:R mínimo 1.5:1 verificado",
         "Confianza mínima correcta"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-010",

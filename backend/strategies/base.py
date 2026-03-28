@@ -2109,7 +2109,10 @@ class PinkStrategy(BaseStrategy):
         # This differentiates PINK from RED (which requires BOTH to break WITH the trend).
         opposite = "SELL" if direction == "BUY" else "BUY"
         ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", opposite)
-        ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", direction)
+        # TradingLab: 4H EMA must NOT be broken by the correction (opposite direction).
+        # For BUY: correction goes down, so check if price broke BELOW 4H EMA (it shouldn't have).
+        # For SELL: correction goes up, so check if price broke ABOVE 4H EMA (it shouldn't have).
+        ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", opposite)
 
         # 1H EMA 50 must be broken (corrective pattern broke it)
         if ema_1h_break:

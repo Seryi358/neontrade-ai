@@ -948,6 +948,50 @@ class RiskConfigRequest(BaseModel):
     scale_in_require_be: Optional[bool] = None
 
 
+# ── Trading Profiles ─────────────────────────────────────────────
+
+@router.get("/profiles")
+async def get_profiles():
+    """List available trading profile presets."""
+    from config import TRADING_PROFILES, settings
+    profiles = []
+    for profile_id, profile in TRADING_PROFILES.items():
+        profiles.append({
+            "id": profile_id,
+            "name": profile["name"],
+            "description": profile["description"],
+        })
+    return {"profiles": profiles}
+
+
+class ApplyProfileRequest(BaseModel):
+    profile_id: str
+
+
+@router.post("/profiles/apply")
+async def apply_profile(request: ApplyProfileRequest):
+    """Apply a trading profile preset — updates all settings at once."""
+    from config import apply_trading_profile, TRADING_PROFILES
+    if request.profile_id not in TRADING_PROFILES:
+        available = list(TRADING_PROFILES.keys())
+        raise HTTPException(400, f"Perfil '{request.profile_id}' no existe. Disponibles: {available}")
+
+    applied = apply_trading_profile(request.profile_id)
+    profile = TRADING_PROFILES[request.profile_id]
+
+    # Also update watchlist categories if the profile specifies them
+    from config import settings
+    if "active_watchlist_categories" in applied:
+        settings.active_watchlist_categories = applied["active_watchlist_categories"]
+
+    return {
+        "profile": request.profile_id,
+        "name": profile["name"],
+        "applied_settings": len(applied),
+        "message": f"Perfil '{profile['name']}' aplicado correctamente ({len(applied)} ajustes)",
+    }
+
+
 @router.get("/risk-config")
 async def get_risk_config():
     """Get current risk management configuration."""

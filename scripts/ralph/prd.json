@@ -473,7 +473,7 @@
         "Perfil accesible desde la pantalla de Settings",
         "También crear perfil 'Conservative' para principiantes (swing, menos riesgo)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-009",

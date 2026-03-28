@@ -215,6 +215,42 @@ export default function SettingsScreen() {
     }
   };
 
+  const applyProfile = (profileId: string, profileName: string) => {
+    Alert.alert(
+      'APLICAR PERFIL',
+      `Se aplicará el perfil "${profileName}". Esto cambiará múltiples ajustes (riesgo, estilo, watchlists, gestión de posición). ¿Continuar?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'APLICAR',
+          onPress: async () => {
+            try {
+              setActionLoading('profile');
+              const res = await authFetch(`${API_URL}/api/v1/profiles/apply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profile_id: profileId }),
+              });
+              if (res.ok) {
+                // Refresh all data to reflect the new profile settings
+                await fetchData();
+                Alert.alert('Perfil Aplicado', `"${profileName}" configurado correctamente`);
+              } else {
+                const err = await res.json().catch(() => ({}));
+                Alert.alert('Error', err.detail || 'No se pudo aplicar el perfil');
+              }
+            } catch (err) {
+              console.error('Failed to apply profile:', err);
+              Alert.alert('Error', 'No se pudo conectar con el servidor');
+            } finally {
+              setActionLoading(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const toggleScalping = async () => {
     const newVal = !scalpingEnabled;
     try {
@@ -450,6 +486,58 @@ export default function SettingsScreen() {
             : 'NeonTrade te sugiere operaciones y tu decides si ejecutar o no'
           }
         </Text>
+      </View>
+
+      {/* Trading Profiles Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>PERFILES DE TRADING</Text>
+        <Text style={styles.strategyHint}>
+          Presets de configuración con valores recomendados por TradingLab
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.profileBtn, { borderColor: theme.colors.neonCyan }]}
+          onPress={() => applyProfile('tradinglab_recommended', 'TradingLab Recommended')}
+          disabled={actionLoading === 'profile'}
+        >
+          {actionLoading === 'profile' ? (
+            <ActivityIndicator size="small" color={theme.colors.neonCyan} />
+          ) : (
+            <>
+              <Text style={[styles.profileBtnTitle, { color: theme.colors.neonCyan }]}>
+                TRADINGLAB RECOMMENDED
+              </Text>
+              <Text style={styles.profileBtnDesc}>
+                Day Trading · 1% riesgo · R:R 1.5:1 · Salida rápida · Sin parciales · BE al 1%
+              </Text>
+              <Text style={styles.profileBtnDesc}>
+                Watchlists completas · London + NY · LP por defecto, CP y CPA disponibles
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.profileBtn, { borderColor: theme.colors.neonGreen, marginTop: theme.spacing.sm }]}
+          onPress={() => applyProfile('conservative', 'Conservative')}
+          disabled={actionLoading === 'profile'}
+        >
+          {actionLoading === 'profile' ? (
+            <ActivityIndicator size="small" color={theme.colors.neonGreen} />
+          ) : (
+            <>
+              <Text style={[styles.profileBtnTitle, { color: theme.colors.neonGreen }]}>
+                CONSERVATIVE
+              </Text>
+              <Text style={styles.profileBtnDesc}>
+                Swing Trading · 1% riesgo · R:R 2.0:1 · Trailing amplio (LP)
+              </Text>
+              <Text style={styles.profileBtnDesc}>
+                Solo Forex principales · Ideal para principiantes
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Scalping Module Card */}
@@ -1557,5 +1645,25 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#2a2445',
     alignItems: 'center',
+  },
+  // Profile buttons
+  profileBtn: {
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  profileBtnTitle: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 13,
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
+  profileBtnDesc: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    letterSpacing: 0.5,
+    marginTop: 2,
   },
 });

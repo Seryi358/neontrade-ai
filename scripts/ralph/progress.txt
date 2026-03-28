@@ -35,6 +35,7 @@ Started: vie 27 mar 2026 21:45:20 -05
 - PositionManager defaults must come from config.py — always pass `management_style`, `trading_style`, `allow_partial_profits` from settings, never rely on constructor defaults
 - BE trigger has 2 methods: "risk_distance" (Alex's 1% = 1x risk) vs "pct_to_tp1" (50% to TP1). Config `be_trigger_method` selects which. Both coincide at 2:1 R:R.
 - CPA auto-trigger is external: `position_manager.set_cpa_trigger(trade_id, reason)` — called by trading_engine when it detects double patterns, news, Friday close, or indecision
+- Trading profiles are in `config.py:TRADING_PROFILES` dict. Apply via `apply_trading_profile(id)` or `POST /profiles/apply`. Only risk-related keys are persisted to `data/risk_config.json`.
 
 ---
 
@@ -920,4 +921,18 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Alex's quick exit style (1.2-1.5 R:R actual vs 2.5:1 theoretical benchmark) is a key personality trait that affects trade validation scoring
   - CPA trigger situations come from position_manager config flags (`cpa_auto_on_double_pattern`, etc.) — the AI should reinforce these same conditions in its analysis
   - Spanish language was missing entirely — Alex teaches in Spanish and uses specific terminology ("sobrecompra", "confluencia", "rentabilidad riesgo")
+---
+
+## 2026-03-28 - ALEX-008
+- **What was implemented:** Created two trading profile presets ("TradingLab Recommended" and "Conservative") accessible from the Settings screen. Profiles apply a batch of ~30 settings at once (trading style, risk, position management, watchlists, sessions, drawdown, etc.).
+- **Files changed:**
+  - `backend/config.py` — Added `TRADING_PROFILES` dict with two profiles and `apply_trading_profile()` function that applies settings and persists risk config to `data/risk_config.json`
+  - `backend/api/routes.py` — Added `GET /profiles` (list available profiles) and `POST /profiles/apply` (apply a profile by ID) endpoints with `ApplyProfileRequest` model
+  - `frontend/src/screens/SettingsScreen.tsx` — Added "PERFILES DE TRADING" card with two profile buttons (TradingLab Recommended + Conservative), `applyProfile()` function with confirmation dialog, and profile button styles
+  - `scripts/ralph/prd.json` — Marked ALEX-008 as passes: true
+- **Learnings for future iterations:**
+  - Profile application uses the same persistence mechanism as `PUT /risk-config` (writes to `data/risk_config.json`) — only risk-related settings are persisted to disk; other settings are applied in-memory
+  - The `active_watchlist_categories` field on Settings controls which watchlist tabs are active — profiles can set this to expand/restrict instrument coverage
+  - Frontend `fetchData()` callback refreshes all settings panels after profile apply — no need to reload individual endpoints
+  - The TradingLab Recommended profile uses `position_management_style: "cp"` (Alex's preference for quick exits), while Conservative uses `"lp"` (wider trailing for beginners)
 ---

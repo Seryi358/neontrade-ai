@@ -462,6 +462,141 @@ def _load_risk_overrides():
 _load_risk_overrides()
 
 
+# ── Trading Profile Presets ──────��─────────────────────────────
+# Pre-configured profiles that apply a batch of settings at once.
+# "tradinglab_recommended" = Alex Ruiz's exact preferences (Day Trading)
+# "conservative" = Safer settings for beginners (Swing, lower risk)
+TRADING_PROFILES = {
+    "tradinglab_recommended": {
+        "name": "TradingLab Recommended",
+        "description": "Configuración exacta de Alex Ruiz: Day Trading, 1% riesgo, salida rápida, sin parciales, BE al 1%",
+        "settings": {
+            "trading_style": "day_trading",
+            # Risk management — Alex's exact values
+            "risk_day_trading": 0.01,       # 1% per trade
+            "risk_scalping": 0.005,         # 0.5%
+            "risk_swing": 0.03,             # 3%
+            "max_total_risk": 0.07,         # 7% max simultaneous
+            "correlated_risk_pct": 0.0075,  # 0.75% per correlated pair
+            "min_rr_ratio": 1.5,            # 1.5:1 minimum R:R
+            "min_rr_black": 2.0,            # BLACK counter-trend
+            "min_rr_green": 2.0,            # GREEN crypto
+            # Position management — Alex prefers quick exits
+            "position_management_style": "cp",  # Short-term (Alex: "salir cuanto antes")
+            "be_trigger_method": "risk_distance",  # BE at 1% profit
+            "partial_taking": False,         # Alex does NOT take partials
+            "allow_partial_profits": False,
+            "sl_management_style": "ema",
+            # CPA auto-triggers
+            "cpa_auto_on_double_pattern": True,
+            "cpa_auto_on_news": True,
+            "cpa_auto_on_friday_close": True,
+            "cpa_auto_on_indecision": True,
+            # Drawdown — fixed 1% for safety
+            "drawdown_method": "fixed_1pct",
+            "delta_enabled": False,
+            # Session hours — London + NY
+            "trading_start_hour": 7,
+            "trading_end_hour": 22,
+            "close_before_friday_hour": 20,
+            "no_new_trades_friday_hour": 18,
+            "avoid_news_minutes_before": 30,
+            "avoid_news_minutes_after": 15,
+            # Watchlists — Alex's full set
+            "active_watchlist_categories": ["forex", "forex_exotic", "commodities", "indices", "crypto"],
+            # Discretion — Alex uses 20% but default for users is 0%
+            "discretion_pct": 0.0,
+            # Scalping/Funded off by default
+            "scalping_enabled": False,
+            "funded_account_mode": False,
+        },
+    },
+    "conservative": {
+        "name": "Conservative",
+        "description": "Perfil conservador para principiantes: Swing Trading, menor riesgo, solo forex principales",
+        "settings": {
+            "trading_style": "swing",
+            # Risk management — lower risk for beginners
+            "risk_day_trading": 0.01,
+            "risk_scalping": 0.005,
+            "risk_swing": 0.01,             # 1% instead of 3% for safety
+            "max_total_risk": 0.05,          # 5% max (stricter)
+            "correlated_risk_pct": 0.005,    # 0.5% per correlated pair
+            "min_rr_ratio": 2.0,             # Higher minimum R:R for beginners
+            "min_rr_black": 2.5,
+            "min_rr_green": 2.5,
+            # Position management — long-term (more room)
+            "position_management_style": "lp",  # Long-term: wider trailing
+            "be_trigger_method": "risk_distance",
+            "partial_taking": False,
+            "allow_partial_profits": False,
+            "sl_management_style": "ema",
+            # CPA auto-triggers
+            "cpa_auto_on_double_pattern": True,
+            "cpa_auto_on_news": True,
+            "cpa_auto_on_friday_close": True,
+            "cpa_auto_on_indecision": True,
+            # Drawdown — fixed 1% (safest for beginners)
+            "drawdown_method": "fixed_1pct",
+            "delta_enabled": False,
+            # Session hours — same London + NY
+            "trading_start_hour": 7,
+            "trading_end_hour": 22,
+            "close_before_friday_hour": 20,
+            "no_new_trades_friday_hour": 18,
+            "avoid_news_minutes_before": 30,
+            "avoid_news_minutes_after": 15,
+            # Watchlists — only forex principals for beginners
+            "active_watchlist_categories": ["forex"],
+            # No discretion for beginners
+            "discretion_pct": 0.0,
+            # Scalping/Funded off
+            "scalping_enabled": False,
+            "funded_account_mode": False,
+        },
+    },
+}
+
+
+def apply_trading_profile(profile_id: str) -> dict:
+    """Apply a trading profile preset to the current settings.
+    Returns the dict of settings that were applied."""
+    import json
+    if profile_id not in TRADING_PROFILES:
+        raise ValueError(f"Perfil '{profile_id}' no existe. Disponibles: {list(TRADING_PROFILES.keys())}")
+
+    profile = TRADING_PROFILES[profile_id]
+    applied = {}
+    for key, value in profile["settings"].items():
+        if hasattr(settings, key):
+            setattr(settings, key, value)
+            applied[key] = value
+
+    # Persist risk-related settings to data/risk_config.json
+    risk_keys = {
+        "risk_day_trading", "risk_scalping", "risk_swing", "max_total_risk",
+        "correlated_risk_pct", "min_rr_ratio", "move_sl_to_be_pct_to_tp1",
+        "drawdown_method", "delta_enabled", "delta_parameter", "delta_max_risk",
+        "scale_in_require_be", "min_rr_black", "min_rr_green",
+    }
+    risk_updates = {k: v for k, v in applied.items() if k in risk_keys}
+    if risk_updates:
+        config_path = os.path.join("data", "risk_config.json")
+        existing = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path) as f:
+                    existing = json.load(f)
+            except Exception:
+                pass
+        existing.update(risk_updates)
+        os.makedirs("data", exist_ok=True)
+        with open(config_path, "w") as f:
+            json.dump(existing, f, indent=2)
+
+    return applied
+
+
 # ── OANDA API URLs ───────────────────────────────────────────────
 OANDA_API_URL = {
     "practice": "https://api-fxpractice.oanda.com",

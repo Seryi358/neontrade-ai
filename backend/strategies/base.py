@@ -1229,7 +1229,7 @@ class BaseStrategy(ABC):
                 signal.conditions_failed.append(pd_desc)
 
             # TradingLab: Minimum candle count (3 candles sustaining breakout)
-            if not _check_minimum_candle_count(analysis, "EMA_M5_5", signal.direction, 3):
+            if not _check_minimum_candle_count(analysis, "EMA_M5_50", signal.direction, 3):
                 signal.confidence = max(0.0, signal.confidence - 8.0)
                 signal.conditions_failed.append(
                     "Rompimiento reciente: menos de 3 velas confirmando"
@@ -1447,15 +1447,16 @@ class BlueStrategy(BaseStrategy):
                         met.append(f"Paso 6: Rompimiento de diagonal en 5M ({ptype}) - entrada ideal del curso")
                         break
 
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
-        # M2 not available from broker API; use M5 EMA 2 as approximation
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_2", direction)
+        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
+        # M2 not available from broker API; use M5 EMA 20 as approximation
+        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
+        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
 
         if not diagonal_entry_used:
             # Fallback: EMA-based entry (simplification - mentorship prefers diagonals)
             if ema_5m_break:
                 # TradingLab RCC: verify previous candle confirmed the breakout
-                if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                     confidence += 10.0
                     met.append(f"Paso 6: RCC confirmado en EMA 5M - {ema_5m_desc}")
                 else:
@@ -1845,9 +1846,9 @@ class RedStrategy(BaseStrategy):
             met.append(f"Paso 5b: {rev_desc}")
 
         # --- Paso 6: Entrada en 5M (RCC) ---
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
+        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 10.0
                 met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
             else:
@@ -2262,9 +2263,9 @@ class PinkStrategy(BaseStrategy):
                 )
 
         # --- Paso 5: Ejecutar al final del patron en 5M (RCC) ---
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
+        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 15.0
                 met.append(f"Paso 5: RCC confirmado en 5M - {ema_5m_desc}")
             else:
@@ -2615,9 +2616,9 @@ class WhiteStrategy(BaseStrategy):
             failed.append(f"Paso 4: {rev_desc}")
 
         # --- Paso 5: Entrada en 5M (RCC) ---
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
+        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 10.0
                 met.append(f"Paso 5: RCC confirmado - {ema_5m_desc}")
             else:
@@ -2626,8 +2627,9 @@ class WhiteStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 5: {ema_5m_desc}")
 
-        # M2 not available from broker API; use M5 EMA 2 as approximation
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_2", direction)
+        # M2 not available from broker API; use M5 EMA 20 as approximation
+        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
+        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
         if ema_2m_break:
             confidence += 5.0
             met.append(f"Paso 5b: Confirmacion EMA M5(2) - {ema_2m_desc}")
@@ -3046,9 +3048,9 @@ class BlackStrategy(BaseStrategy):
                 return None  # No 1H candle pattern = no Black entry
 
         # --- Paso 6: Ejecutar en rompimiento 5M (RCC) ---
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
+        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 10.0
                 met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
             else:
@@ -3513,13 +3515,13 @@ class GreenStrategy(BaseStrategy):
         # then fall back to M15 if M5 data isn't available.
         if not diagonal_breakout_detected:
             # Try M5 EMAs first (proxy for M2 execution in Day Trading mode)
-            ema_m5_break, ema_m5_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
+            ema_m5_break, ema_m5_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
             ema_m5_20_break, ema_m5_20_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
 
             if ema_m5_break and ema_m5_20_break:
-                if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                     confidence += 12.0
-                    met.append(f"Paso 5: M5 proxy (Day Trading) - RCC confirmado (EMA 5 + EMA 20 de M5)")
+                    met.append(f"Paso 5: M5 proxy (Day Trading) - RCC confirmado (EMA 50 + EMA 20 de M5)")
                 else:
                     confidence += 7.0
                     met.append(f"Paso 5: M5 proxy (Day Trading) - Rompimiento doble sin RCC")

@@ -106,7 +106,7 @@
         "SL, TP, R:R correcto para Red",
         "Diferencia entre Red Day y Red Swing correcta"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-009",

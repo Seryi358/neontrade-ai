@@ -178,3 +178,30 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Swing Blue uses same rules with shifted timeframes: Monthly=Daily, Weekly=4H, Daily=1H, 1H=5M
   - Blue A "more permissive" = can be less strict on entry quality. Blue C "more demanding" = needs HTF alignment + higher R:R
 ---
+
+## 2026-03-27 - AUDIT-008
+- **What was implemented:** Audited all 3 transcriptions from Trading Mastery/03_Intermedio/03_Estrategias (05_Introducción Red, 06_Red Day, 07_Red Swing) against RedStrategy in strategies/base.py. No discrepancies found — code already matches mentorship exactly.
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - 7-step process (Daily S/R → decel → BOTH EMA 50 1H+4H broken → pullback to both EMAs+Fib → 1H decel → 5M RCC entry → SL/TP) — all correctly implemented ✅
+  - BOTH EMA 50 1H AND 4H required (hard block if either missing) — matches "100% la media móvil de cuatro horas" + 1H ✅
+  - Permissive 1H EMA break: "seamos permisivos" — code allows minor breaks, rejects uncontrolled ones (2+ aggressive candles = penalty, 3 = hard block) ✅
+  - Daily deceleration is preferential not obligatory: "la desaceleración más que obligatoria es preferencial" — code scores +15 but doesn't hard block ✅
+  - SL below EMA 50 4H: min(EMA 50 4H * 0.998, previous support) — matches "por debajo de la media móvil de 50 de 4 horas" + "siempre hay que cubrir el mínimo anterior" ✅
+  - TP differentiated by wave context: Wave 3 + strong daily → 1.618 ext, Wave 5 → recent high/low only, daily pullback → recent high/low ✅
+  - TP intermediate resistance override: tp1 = nearest resistance — matches "si hay un nivel de resistencia importante entre medio, me salgo en ese nivel" ✅
+  - Convergence HTF/LTF hard block — correct since RED requires both 1H and 4H aligned ✅
+  - 5M entry: RCC (Ruptura, Cierre, Confirmación) — "rompa el nivel, cierre por encima, continúe un poco la siguiente vela" ✅
+  - Swing adaptation: Monthly→Weekly→Daily→1H instead of Daily→4H→1H→5M — handled by config.py trading_style upstream, same pattern as Blue ✅
+  - Alex says swing needs more permissiveness with Weekly/Daily correlation — architecture handles this implicitly ✅
+  - Elliott wave label "Onda 2->3 o 4->5" correctly represents RED capturing moves TO Wave 3 and TO Wave 5 ✅
+  - RED enabled by default alongside BLUE in _DEFAULT_STRATEGY_CONFIG — matches "La RED es la más fácil y sencilla de operar" ✅
+  - min_confidence = 55.0 — transcription doesn't specify; reasonable default ✅
+- **Learnings for future iterations:**
+  - RED is Blue + 4H confirmation. Alex: "prácticamente los mismos conceptos, pero para gráfico de cuatro horas"
+  - "La RED es una estrategia un poco más segura, porque tenemos más confirmaciones"
+  - Uncontrolled 1H EMA break rejection is RED-specific — Blue doesn't need this because Blue only requires 1H break
+  - Alex's TP philosophy: "siempre me gusta salir cuanto antes" — default is recent swing high/low, only extend for Wave 3 + strong daily
+  - For shorts at all-time-highs (no resistance): Alex requires extra decel/reversal confirmation — code's general decel+reversal pattern detection covers this
+  - Swing RED requires more permissiveness with media correlations than Day RED — more volatility in Weekly/Daily vs 4H/1H
+---

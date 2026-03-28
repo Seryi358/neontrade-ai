@@ -793,3 +793,18 @@ Started: vie 27 mar 2026 21:45:20 -05
   - The `int() or fallback` pattern prevents zero-unit trades when scaling small positions
   - Pre-existing test failures (6 total): 3 from missing `openai` module, 1 async test, 1 KeyError in test_round6, 1 test_round3 edge case — none related to AUDIT-026
 ---
+
+## 2026-03-28 - ALEX-001
+- **What was implemented:** Verified and documented Day Trading as default style per Alex's explicit preference. Config already had `trading_style: str = "day_trading"` and correct timeframe layout (HTF: W, D; LTF: H4, H1, M15, M5, M2). Added documentation comments with Alex's quotes and explicit timeframe role mapping (Directional=D, Analysis=H4, Entry/Management=H1, Execution=M5).
+- **Files changed:**
+  - `backend/config.py` — Enhanced comments on `trading_style` and `htf_timeframes`/`ltf_timeframes` with Alex's quotes and timeframe role documentation
+  - `scripts/ralph/prd.json` — Marked ALEX-001 as passes: true
+- **Audit findings (all pass):**
+  - Default `trading_style` = "day_trading" ✅
+  - Timeframes: Directional=1D (in htf_timeframes), Analysis=H4 (in ltf_timeframes), Entry/Management=H1, Execution=M5 ✅
+  - Transcription confirms Alex: "me he dado cuenta que lo que más me gusta es el day trading [...] es el estilo que se adapta más a mí"
+  - User can change style via config (all strategies adapt to selected style) ✅
+- **Learnings for future iterations:**
+  - Config was already well-configured for Day Trading — the ALEX-* stories are primarily about verifying defaults and adding documentation
+  - The `trading_style` field propagates to NewsFilter, PositionManager, TradeJournal — changing it automatically adjusts behavior across modules
+---

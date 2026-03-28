@@ -76,7 +76,10 @@ class Settings(BaseSettings):
     # ── "Con que seáis bueno con una sola estrategia ya es suficiente para
     # ──  empezar a operar e incluso fondearos y vivir del trading" — Alex
 
-    # Trading style: "day_trading" (default), "scalping", "swing"
+    # Trading style: "day_trading" (default, Alex's preference), "scalping", "swing"
+    # "me he dado cuenta que lo que más me gusta es el day trading [...] es el
+    #  estilo que se adapta más a mí" — Alex (Estilos de trading)
+    # User can change this; all strategies adapt to the selected style.
     trading_style: str = "day_trading"
 
     # Risk per trade by style (ch18.3 Regla del 1%)
@@ -147,7 +150,12 @@ class Settings(BaseSettings):
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
     avoid_news_minutes_after: int = 15   # Don't trade 15 min after major news
 
-    # Timeframes — Day Trading (default)
+    # Timeframes — Day Trading layout (Alex's preferred style)
+    # Roles: Directional=D (1D), Analysis=H4, Entry/Management=H1, Execution=M5
+    # W is included for context (Elliott waves, macro structure)
+    # "me levanto por la mañana, hago mi lista de seguimiento, me pongo mis
+    #  alertas [...] en el momento en que me saltan las alertas estoy pendiente
+    #  de si tengo que ejecutar alguna posición o no" — Alex (Estilos de trading)
     htf_timeframes: List[str] = ["W", "D"]
     ltf_timeframes: List[str] = ["H4", "H1", "M15", "M5", "M2"]
 

@@ -78,7 +78,7 @@
         "Convergencia HTF/LTF implementada como explica Alex Ruiz",
         "Elliott aplicado en contexto MTFA correcto"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-007",

@@ -15,6 +15,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Pre-existing failures: 10 in test_round9 (openai missing, R:R, EMA config) — not related to audit work
 - Alex's Fibonacci levels: ONLY 0.382, 0.5, 0.618, 0.75, 1.0. Never use 0.236 — it's not from TradingLab
 - Elliott extension targets by wave: Wave 3 → 1.618 max / 1.272 optimal, Wave 5 → prior high/low or 0.618 / max 1.0
+- MTFA module is conceptual/analytical — no specific parameters to implement, teaches thinking framework
+- HTF/LTF convergence logic: `htf_trend == ltf_trend` — used in scoring (+30) and strategy gating
 
 ---
 
@@ -117,4 +119,32 @@ Started: vie 27 mar 2026 21:45:20 -05
   - RSI for overbought/oversold, MACD for divergences — this is the primary split between the two oscillators
   - Volume on M5 is the only obligatory volume timeframe; M15 is "simplemente por curiosidad"
   - Pivot points are intraday S/R levels from previous session — useful for TP, SL fine-tuning
+---
+
+## 2026-03-27 - AUDIT-006
+- **What was implemented:** Audited all 6 transcriptions from Trading Mastery/03_Intermedio/02_MTFA (Layout, Tendencia, Patrones MTFA, Formaciones MTFA, Aceleración/Desaceleración MTFA, Elliott y MTFA) against market_analyzer.py, config.py, strategies/base.py, and scalping_engine.py. No discrepancies found — code already matches mentorship exactly.
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - Timeframe hierarchy: W→D→H4→H1→M15→M5→M1 all fetched and analyzed in full_analysis() ✅
+  - Day Trading layout (D/H4/H1/M5) matches config.py htf_timeframes=["W","D"], ltf_timeframes=["H4","H1","M15","M5","M2"] ✅
+  - Scalping layout (H1/M15/M5/M1) correctly remapped in scalping_engine.py ✅
+  - Trend detection: HTF from Weekly (structure-based HH/HL/LH/LL + EMA 20/50 + SMA 200), LTF from H1 ✅
+  - Fractalidad concept: same trend detection algorithm applied to any timeframe ✅
+  - HTF/LTF convergence: `convergence = (htf_trend == ltf_trend)` — simple, correct ✅
+  - Convergence in scoring: +30 for convergence, -10 for divergent trends ✅
+  - Convergence in strategies: RED/PINK/WHITE hard-block on no convergence, BLACK exempt (counter-trend) ✅
+  - Confluence point counting: HTF trend, LTF trend, convergence as separate points ✅
+  - Acceleration/Deceleration detection on Daily: candle body size + EMA 50 distance ✅
+  - Consolidation detection (extended deceleration, narrow range) ✅
+  - Chart patterns on H4, candlestick patterns on H1 — correct for MTFA pattern decomposition ✅
+  - Elliott Wave on Daily with strategy color mapping ✅
+  - Nested wave analysis (HTF→LTF) is conceptual/analytical — not algorithmic. Alex teaches this as thinking framework, code handles via strategy-level wave assignment ✅
+- **Learnings for future iterations:**
+  - The MTFA module is primarily conceptual — Alex teaches HOW to think, not specific parameters to implement
+  - Key MTFA concept: "el qué" (what's happening in HTF) vs "el cómo" (how it's happening in LTF)
+  - Alex uses the term "fractalidad" — same patterns repeat at all timeframes, same algo can analyze any TF
+  - HTF = High Time Frame, LTF = Low Time Frame — Alex uses these English terms explicitly
+  - Convergence (HTF and LTF aligned) is the highest-probability setup; divergence = caution
+  - In Elliott MTFA: Wave 3 in HTF + Wave 3 in LTF = extend targets beyond LTF normal limits
+  - Position in HTF wave determines how aggressively to manage LTF trades (e.g., in HTF Wave 3, hold LTF trades longer)
 ---

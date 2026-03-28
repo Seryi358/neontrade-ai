@@ -3059,10 +3059,8 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 6: Sin rompimiento 5M - {ema_5m_desc}")
 
-        # TradingLab: RSI divergence bonus
-        has_div, div_bonus = _check_rsi_divergence(analysis, direction)
-        if has_div:
-            confidence += div_bonus
+        # NOTE: RSI divergence already checked above (Paso 5c) with BLACK-specific
+        # logic (+15/-10). Do NOT call _check_rsi_divergence() here to avoid double-counting.
 
         # TradingLab SMC: Order Block / FVG / BOS confluence
         smc_ok, smc_bonus, smc_desc = _check_smc_confluence(analysis, direction, entry_price)

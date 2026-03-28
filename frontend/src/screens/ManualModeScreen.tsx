@@ -20,20 +20,19 @@ import { API_URL, authFetch, STRATEGY_COLORS } from '../services/api';
 // Types
 interface PendingSetup {
   id: string;
-  strategy_color: string;
-  strategy_name: string;
+  timestamp: string;
   instrument: string;
+  strategy: string;
   direction: 'BUY' | 'SELL';
   entry_price: number;
   stop_loss: number;
   take_profit: number;
-  sl_distance_pips: number;
-  tp_distance_pips: number;
-  rr_ratio: number;
-  confidence: 'ALTA' | 'MEDIA' | 'BAJA';
+  units: number;
+  confidence: number;
+  risk_reward_ratio: number;
   reasoning: string;
-  checklist: string[];
-  created_at: string;
+  status: string;
+  expires_at: string;
 }
 
 const getStrategyDotColor = (color: string): string => {
@@ -188,9 +187,9 @@ export default function ManualModeScreen() {
         <View style={styles.setupHeader}>
           <View style={styles.setupHeaderLeft}>
             <View style={styles.strategyBadge}>
-              <View style={[styles.strategyDot, { backgroundColor: getStrategyDotColor(item.strategy_color) }]} />
-              <Text style={[styles.strategyName, { color: getStrategyDotColor(item.strategy_color) }]}>
-                {item.strategy_name}
+              <View style={[styles.strategyDot, { backgroundColor: getStrategyDotColor(item.strategy) }]} />
+              <Text style={[styles.strategyName, { color: getStrategyDotColor(item.strategy) }]}>
+                {item.strategy}
               </Text>
             </View>
             <Text style={styles.setupInstrument}>
@@ -199,13 +198,13 @@ export default function ManualModeScreen() {
           </View>
           <View style={[
             styles.confidenceBadge,
-            { borderColor: getConfidenceColor(item.confidence) },
+            { borderColor: item.confidence >= 75 ? theme.colors.neonGreen : item.confidence >= 50 ? theme.colors.neonYellow : theme.colors.neonOrange },
           ]}>
             <Text style={[
               styles.confidenceText,
-              { color: getConfidenceColor(item.confidence) },
+              { color: item.confidence >= 75 ? theme.colors.neonGreen : item.confidence >= 50 ? theme.colors.neonYellow : theme.colors.neonOrange },
             ]}>
-              {item.confidence}
+              {item.confidence >= 75 ? 'ALTA' : item.confidence >= 50 ? 'MEDIA' : 'BAJA'} ({item.confidence}%)
             </Text>
           </View>
         </View>
@@ -218,27 +217,27 @@ export default function ManualModeScreen() {
           ]}>
             {item.direction === 'BUY' ? '▲ COMPRAR' : '▼ VENDER'}
           </Text>
-          <Text style={styles.rrText}>R:R {item.rr_ratio.toFixed(1)}</Text>
+          <Text style={styles.rrText}>R:R {(item.risk_reward_ratio || 0).toFixed(1)}</Text>
         </View>
 
         {/* Prices */}
         <View style={styles.pricesContainer}>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>ENTRADA</Text>
-            <Text style={styles.priceValue}>{item.entry_price.toFixed(5)}</Text>
+            <Text style={styles.priceValue}>{(item.entry_price || 0).toFixed(5)}</Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>STOP LOSS</Text>
             <Text style={[styles.priceValue, styles.loss]}>
-              {item.stop_loss.toFixed(5)}
-              <Text style={styles.priceDistance}> ({item.sl_distance_pips.toFixed(1)} pips)</Text>
+              {(item.stop_loss || 0).toFixed(5)}
+              <Text style={styles.priceDistance}> ({(Math.abs(item.entry_price - item.stop_loss) * 10000).toFixed(1)} pips)</Text>
             </Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>TAKE PROFIT</Text>
             <Text style={[styles.priceValue, styles.profit]}>
-              {item.take_profit.toFixed(5)}
-              <Text style={styles.priceDistance}> ({item.tp_distance_pips.toFixed(1)} pips)</Text>
+              {(item.take_profit || 0).toFixed(5)}
+              <Text style={styles.priceDistance}> ({(Math.abs(item.take_profit - item.entry_price) * 10000).toFixed(1)} pips)</Text>
             </Text>
           </View>
         </View>

@@ -65,7 +65,7 @@
         "Volumen analizado como describe Alex Ruiz",
         "Layout de indicadores en la app refleja lo del resumen"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-006",

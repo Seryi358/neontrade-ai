@@ -90,3 +90,31 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Wave 3 target: extension 1.618 max, 1.272 optimal. Wave 5 target: prior high/low first, then ext 0.618, max ext 1.0.
   - Alex prefers conservative exits (level 1.0 or prior high/low), not the max extension 1.618.
 ---
+
+## 2026-03-27 - AUDIT-005
+- **What was implemented:** Audited all 8 transcriptions from Trading Mastery/02_Básico/05_Indicadores against market_analyzer.py and config.py. No discrepancies found — code already matches mentorship exactly.
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - EMA: EMA 50 on all timeframes (W, D, H4, H1, M15, M5, M1) as "100% obligatoria" ✅
+  - EMA 20 on Daily for short pullbacks ✅
+  - SMA 200 on Daily and H1 for long-term trend filter ✅
+  - RSI: Period 14, default config unchanged, overbought >70, oversold <30 ✅
+  - RSI on H4 for overbought/oversold detection (layout), RSI in _detect_condition() for D ✅
+  - RSI divergence detection on H4 (used by Black strategy) ✅
+  - MACD: Default params 12/26/9 unchanged ✅
+  - MACD on D, H1, M15 (H1 for divergences per layout, M15 for execution) ✅
+  - M5 MACD correctly excluded per Alex quote: "en cinco minutos no utilizo MACD ni RSI porque lo veo ya demasiado volátil" ✅
+  - Pivot Points: Traditional formula P=(H+L+C)/3, R1=2P-L, S1=2P-H from Daily candles ✅
+  - Pivot averaging over 5 sessions (Alex says "de 3 a 7 como máximo sesiones atrás") ✅
+  - Volume: analysis on H1 and M5 (M5 obligatory per strategy, H1 supplementary) ✅
+  - Volume divergence detection (price vs volume direction) ✅
+  - Sessions indicator: visual-only TradingView tool, not applicable to bot code — correctly omitted ✅
+  - Layout indicator placement: all obligatory indicators present per Lesson 8 layout reference ✅
+  - Extra indicators (EMA on M15/M5, RSI on D/H1, MACD on D) are supplementary and non-harmful
+- **Learnings for future iterations:**
+  - Alex explicitly states indicators are "la parte menos importante" — price action is primary, indicators are complementary
+  - The layout is NOT rigid: "esto no tiene que tomarse como algo rígido" — strategies define which indicators are mandatory
+  - RSI for overbought/oversold, MACD for divergences — this is the primary split between the two oscillators
+  - Volume on M5 is the only obligatory volume timeframe; M15 is "simplemente por curiosidad"
+  - Pivot points are intraday S/R levels from previous session — useful for TP, SL fine-tuning
+---

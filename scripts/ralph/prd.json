@@ -238,7 +238,7 @@
         "BMSB implementado según la clase",
         "Pi Cycle Top/Bottom implementado"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-018",

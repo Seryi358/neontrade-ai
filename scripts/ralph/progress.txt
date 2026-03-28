@@ -457,3 +457,51 @@ Started: vie 27 mar 2026 21:45:20 -05
   - MARKET_VIEW.txt includes macro indicators (inflation USIRYY, interest rates USINTR, unemployment UNRATE, Fed balance sheet WALCL) that are TradingView-specific and have no broker API equivalent — kept as external analysis reference
   - The _(1) duplicate files in the watchlist directory are identical copies — likely TradingView export duplicates
 ---
+
+## 2026-03-28 - AUDIT-017
+- **What was implemented:** Audited all 6 transcriptions from Esp. Criptomonedas/01_Contenido/06_Fundamentos del trading y ciclos del mercado (Importancia cripto, Diferencias con otros activos, Dominancia BTC, Relación BTC-ETH, Transición a altcoins, Halving/Bullrun/Bear) against crypto_cycle.py and market_analyzer.py. No discrepancies found — code already matches mentorship exactly.
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - Lesson 1 (Importancia): Conceptual — crypto democratization, adoption, CBDCs, 24/7 market. No code rules. ✅ N/A
+  - Lesson 2 (Diferencias): Conceptual comparison stocks/forex/commodities/crypto. Key insight: crypto never breaks weekly minimums (always higher lows), each cycle longer but gains less. No code rules. ✅ N/A
+  - Lesson 3 (Dominancia BTC): BTC.D thresholds correctly implemented ✅:
+    - BTC.D > 50% = money in BTC, low altcoin speculation ✅
+    - BTC.D < 40% = increased altcoin interest, potential altseason ✅
+    - BTC.D 40-50% = neutral/transitional ✅
+    - BTC.D rising in bear market = flight to safety ✅
+    - BTC.D falling in bull market = capital rotating to alts ✅
+    - USDT.D filter: if USDT.D rising while BTC.D falls = money to stablecoins NOT alts ✅
+  - Lesson 4 (Relación BTC-ETH): Capital rotation model correct ✅:
+    - Rotation sequence: BTC → ETH → Large alts → Small alts → Memecoins ✅
+    - ETH as "bridge" between BTC and altcoins (rotation_phase="eth") ✅
+    - ETH/BTC ratio tracking (btc_eth_ratio, eth_outperforming_btc) ✅
+    - Altseason requires BOTH falling BTC.D AND ETH outperforming BTC ✅
+    - OTHERS/BTC (top 11+ vs BTC) not directly tracked — uses ETH as proxy. Acceptable since OTHERS data not available from broker APIs
+  - Lesson 5 (Transición a altcoins): Dominance transition table 100% match ✅:
+    - BTC.D up + BTC up = altcoins down ✅
+    - BTC.D up + BTC down = altcoins down MUCH MORE ✅
+    - BTC.D down + BTC up = altcoins up significantly (altseason) ✅
+    - BTC.D down + BTC stable = capital rotating to altcoins ✅
+    - BTC.D down + BTC down = rare, alts may fall ✅
+    - Total/Total2/Total3/Others capitalization metrics — TradingView-only manual tools, not needed in bot code ✅ N/A
+  - Lesson 6 (Halving/Bullrun/Bear): Halving cycle correctly implemented ✅:
+    - Halving dates: 2012-11-28, 2016-07-09, 2020-05-11, 2024-04-19, 2028 est. ✅ (Alex approximates dates slightly, code uses historically correct dates)
+    - 4-phase cycle: post_halving (explosion, very_bullish) → expansion (bull, bullish) → distribution (top, bearish) → pre_halving (accumulation, bullish) ✅
+    - "Year after halving = explosion" — post_halving phase covers ~33% of cycle (first year) ✅
+    - Bear markets historically -70-80%, each cycle drop is smaller — conceptual, not algorithmic ✅ N/A
+    - Halving reduces miner reward by half every ~210,000 blocks — conceptual ✅ N/A
+  - BMSB (SMA 20 + EMA 21 Weekly): Correctly computed in market_analyzer.py and passed to crypto_cycle.py ✅
+    - Bullish: price > both SMA 20 and EMA 21 weekly ✅
+    - Bearish: price < both, with 2-close confirmation rule ✅
+  - Pi Cycle Top/Bottom: Correctly computed in market_analyzer.py ✅
+    - Near top: SMA 111 approaching 2x SMA 350 ✅
+    - Near bottom: SMA 150 approaching SMA 471 ✅
+- **Learnings for future iterations:**
+  - BMSB and Pi Cycle are covered in Module 8 (Indicadores cripto), not Module 6. They're referenced in the acceptance criteria but are actually audited in AUDIT-018. Code already has them implemented correctly.
+  - Alex emphasizes dominance is NOT a tradeable asset: "esto de aquí no es un activo que se pueda operar, esto es una métrica, esto es un indicador"
+  - BTC.D rising during bull market is NOT automatically bad — it's the initial phase. The KEY signal is when BTC.D peaks AND ETH.D bottoms simultaneously = rotation begins
+  - Alex's current market observation: BTC.D still rising after 994 days of bull market due to memecoin destruction (money flowing back to BTC from failed memecoins)
+  - The 5-row dominance transition table from Lesson 5 is the most important analytical framework for predicting altcoin behavior
+  - OTHERS/BTC (excluding top 10) consistently falls during current cycle — strongest for short positions as you go lower in market cap
+  - Each BTC cycle: longer duration + smaller percentage gains = market maturing toward traditional asset behavior
+---

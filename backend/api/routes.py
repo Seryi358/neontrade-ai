@@ -936,9 +936,9 @@ class RiskConfigRequest(BaseModel):
     risk_scalping: Optional[float] = None
     risk_swing: Optional[float] = None
     max_total_risk: Optional[float] = None
-    correlated_risk_factor: Optional[float] = None
+    correlated_risk_pct: Optional[float] = None
     min_rr_ratio: Optional[float] = None
-    move_sl_to_be_at: Optional[float] = None
+    move_sl_to_be_pct_to_tp1: Optional[float] = None
     # Drawdown management (ch18.7)
     drawdown_method: Optional[str] = None  # "fixed_1pct", "variable", "fixed_levels"
     # Delta algorithm (ch18.8)
@@ -957,9 +957,9 @@ async def get_risk_config():
         "risk_scalping": settings.risk_scalping,
         "risk_swing": settings.risk_swing,
         "max_total_risk": settings.max_total_risk,
-        "correlated_risk_factor": settings.correlated_risk_factor,
+        "correlated_risk_pct": settings.correlated_risk_pct,
         "min_rr_ratio": settings.min_rr_ratio,
-        "move_sl_to_be_at": settings.move_sl_to_be_at,
+        "move_sl_to_be_pct_to_tp1": settings.move_sl_to_be_pct_to_tp1,
         "trading_start_hour": settings.trading_start_hour,
         "trading_end_hour": settings.trading_end_hour,
         "close_before_friday_hour": settings.close_before_friday_hour,
@@ -1027,11 +1027,11 @@ async def set_risk_config(request: RiskConfigRequest):
         settings.max_total_risk = request.max_total_risk
         updates["max_total_risk"] = request.max_total_risk
 
-    if request.correlated_risk_factor is not None:
-        if not (0.1 <= request.correlated_risk_factor <= 1.0):
-            raise HTTPException(400, "correlated_risk_factor debe estar entre 0.1 y 1.0")
-        settings.correlated_risk_factor = request.correlated_risk_factor
-        updates["correlated_risk_factor"] = request.correlated_risk_factor
+    if request.correlated_risk_pct is not None:
+        if not (0.001 <= request.correlated_risk_pct <= 0.05):
+            raise HTTPException(400, "correlated_risk_pct debe estar entre 0.1% y 5%")
+        settings.correlated_risk_pct = request.correlated_risk_pct
+        updates["correlated_risk_pct"] = request.correlated_risk_pct
 
     if request.min_rr_ratio is not None:
         if not (0.5 <= request.min_rr_ratio <= 5.0):
@@ -1039,11 +1039,11 @@ async def set_risk_config(request: RiskConfigRequest):
         settings.min_rr_ratio = request.min_rr_ratio
         updates["min_rr_ratio"] = request.min_rr_ratio
 
-    if request.move_sl_to_be_at is not None:
-        if not (0.001 <= request.move_sl_to_be_at <= 0.10):
-            raise HTTPException(400, "move_sl_to_be_at debe estar entre 0.1% y 10%")
-        settings.move_sl_to_be_at = request.move_sl_to_be_at
-        updates["move_sl_to_be_at"] = request.move_sl_to_be_at
+    if request.move_sl_to_be_pct_to_tp1 is not None:
+        if not (0.1 <= request.move_sl_to_be_pct_to_tp1 <= 0.9):
+            raise HTTPException(400, "move_sl_to_be_pct_to_tp1 debe estar entre 10% y 90% del recorrido a TP1")
+        settings.move_sl_to_be_pct_to_tp1 = request.move_sl_to_be_pct_to_tp1
+        updates["move_sl_to_be_pct_to_tp1"] = request.move_sl_to_be_pct_to_tp1
 
     # Drawdown management (ch18.7)
     if request.drawdown_method is not None:

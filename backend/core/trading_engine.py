@@ -593,6 +593,13 @@ class TradingEngine:
                     await self._handle_funded_overnight_close()
                     return
 
+            # Funded account: close positions before weekend (Friday close)
+            if settings.funded_account_mode and settings.funded_no_weekend:
+                if now.weekday() == 4 and now.hour >= settings.close_before_friday_hour:
+                    logger.info("Funded mode: closing all positions before weekend")
+                    await self._handle_funded_overnight_close()
+                    return
+
             # Check economic calendar for upcoming news
             has_news, news_desc = await self.news_filter.has_upcoming_news()
             if has_news:

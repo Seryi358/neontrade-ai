@@ -29,7 +29,11 @@ class CryptoMarketCycle:
     btc_rsi_14: Optional[float] = None  # RSI 14 on BTC weekly (approx 2-week chart)
     ema8_weekly_broken: bool = False  # True if BTC weekly close < EMA 8
     bmsb_status: Optional[str] = None  # "bullish", "bearish", or None
+    bmsb_consecutive_bearish_closes: int = 0  # Weekly closes below BMSB (need 2+ for confirmed bearish)
     pi_cycle_status: Optional[str] = None  # "near_top", "near_bottom", or None
+    dominance_transition: Optional[Dict[str, str]] = None  # From get_dominance_transition()
+    crypto_trailing_ema50: Optional[float] = None  # EMA 50 value for trailing stop
+    using_fixed_tp_warning: bool = False  # True if fixed TPs detected instead of EMA trailing
     last_updated: Optional[str] = None
 
 
@@ -50,6 +54,11 @@ class CryptoCycleAnalyzer:
         self._cache: Optional[CryptoMarketCycle] = None
         self._cache_time: Optional[datetime] = None
         self._http = httpx.AsyncClient(timeout=10.0)
+        # Track consecutive weekly closes below BMSB for confirmation logic.
+        # The mentorship emphasizes needing a weekly CLOSE below BMSB plus
+        # confirmation (at least 2 consecutive weekly closes) before declaring
+        # bearish. A single wick below doesn't count.
+        self._bmsb_bearish_streak: int = 0
 
     async def get_cycle_status(
         self,
@@ -150,9 +159,18 @@ class CryptoCycleAnalyzer:
                         cycle.btc_eth_trend = "neutral"
                         cycle.altcoin_season = False
                 else:
-                    # Fallback: infer altcoin season from relative performance
-                    # (approximates the >75/100 coins outperforming BTC rule)
-                    cycle.altcoin_season = (cycle.btc_dominance_trend == "falling")
+                    # Fallback: infer altcoin season from relative performance.
+                    # Falling dominance alone does NOT mean altseason -- money
+                    # could be rotating to USDT (risk-off). Require BOTH falling
+                    # dominance AND ETH outperforming BTC as confirmation that
+                    # capital is flowing into alts, not stablecoins.
+                    # TODO: Future enhancement -- track USDT.D (USDT dominance)
+                    # to distinguish risk-off (USDT.D rising) from true altseason
+                    # (USDT.D stable/falling while BTC.D falls).
+                    cycle.altcoin_season = (
+                        cycle.btc_dominance_trend == "falling"
+                        and cycle.eth_outperforming_btc
+                    )
 
         except Exception as e:
             logger.debug(f"Dominance analysis failed: {e}")
@@ -190,6 +208,7 @@ class CryptoCycleAnalyzer:
 
                 # Determine capital rotation phase based on dominance trend
                 # and relative performance
+                # Capital rotation sequence: btc -> eth -> large_alts -> small_alts -> memecoins
                 if cycle.btc_dominance_trend == "rising":
                     cycle.rotation_phase = "btc"  # Money flowing into BTC
                 elif cycle.eth_outperforming_btc and cycle.btc_dominance_trend == "falling":
@@ -199,7 +218,14 @@ class CryptoCycleAnalyzer:
                     else:
                         cycle.rotation_phase = "eth"  # Early rotation to ETH
                 elif cycle.altcoin_season:
-                    cycle.rotation_phase = "small_alts"  # Late-cycle alt speculation
+                    # Late-cycle: distinguish small_alts vs memecoins.
+                    # When dominance is falling fast AND ETH is no longer leading
+                    # (ETH/BTC flat or falling while alts pump), we're in the
+                    # final memecoin speculation phase.
+                    if not cycle.eth_outperforming_btc and cycle.btc_dominance_trend == "falling":
+                        cycle.rotation_phase = "memecoins"  # Final euphoria phase
+                    else:
+                        cycle.rotation_phase = "small_alts"  # Late-cycle alt speculation
                 else:
                     cycle.rotation_phase = "btc"  # Default: money in BTC
 
@@ -268,11 +294,15 @@ class CryptoCycleAnalyzer:
             days_since = (now - last_halving).days
             progress = days_since / cycle_length
 
-            if progress < 0.25:
+            # The year AFTER the halving is the "explosion" year (mentorship).
+            # 2024 halving was April, so 2025 is the peak year. We extend the
+            # post_halving/very_bullish phase to ~33% of the cycle to cover
+            # most of that first year after halving.
+            if progress < 0.33:
                 cycle.halving_phase = "post_halving"
-                cycle.halving_phase_description = "Explosion phase - most bullish"
+                cycle.halving_phase_description = "Explosion phase - most bullish (year after halving)"
                 cycle.halving_sentiment = "very_bullish"
-            elif progress < 0.50:
+            elif progress < 0.55:
                 cycle.halving_phase = "expansion"
                 cycle.halving_phase_description = "Continued bull run"
                 cycle.halving_sentiment = "bullish"
@@ -366,13 +396,31 @@ class CryptoCycleAnalyzer:
         BMSB (TradingLab Crypto Module 8): SMA 20 + EMA 21 on Weekly.
         Price above both = bullish (bull market intact).
         Price below both = bearish (bull market support lost).
+
+        CONFIRMATION RULE (mentorship): Need a weekly CLOSE below BMSB plus
+        at least one more weekly close below it (2 consecutive closes minimum)
+        before declaring bearish. This filters out false breakdowns / wicks.
         """
         if not bmsb:
             return
         if bmsb.get("bullish"):
+            self._bmsb_bearish_streak = 0  # Reset streak on bullish close
             cycle.bmsb_status = "bullish"
+            cycle.bmsb_consecutive_bearish_closes = 0
         elif bmsb.get("bearish"):
-            cycle.bmsb_status = "bearish"
+            self._bmsb_bearish_streak += 1
+            cycle.bmsb_consecutive_bearish_closes = self._bmsb_bearish_streak
+            if self._bmsb_bearish_streak >= 2:
+                # Confirmed bearish: 2+ consecutive weekly closes below BMSB
+                cycle.bmsb_status = "bearish"
+            else:
+                # First weekly close below BMSB -- not yet confirmed.
+                # Treat as warning, not full bearish signal.
+                cycle.bmsb_status = "warning"
+                logger.info(
+                    "BMSB: first weekly close below support band -- "
+                    "need 1 more weekly close for bearish confirmation"
+                )
 
     def _apply_pi_cycle(self, cycle: CryptoMarketCycle, pi_cycle: Optional[Dict]):
         """Apply Pi Cycle Top/Bottom indicator to cycle.
@@ -389,51 +437,98 @@ class CryptoCycleAnalyzer:
             cycle.pi_cycle_status = "near_bottom"
 
     def _determine_market_phase(self, cycle: CryptoMarketCycle):
-        """Determine overall market phase from combined signals."""
-        signals = []
+        """Determine overall market phase from combined signals.
+
+        Signal weighting:
+        - RSI 14 weekly, BMSB: 1.0 vote each (most reliable per mentorship)
+        - Pi Cycle: 0.5 vote (less reliable than RSI 14 and BMSB per mentorship)
+        - Dominance, halving, altseason, dominance transition: 1.0 vote each
+        """
+        bull_votes = 0.0
+        bear_votes = 0.0
+
         if cycle.btc_dominance_trend == "falling":
-            signals.append("bull")  # Falling dominance = risk-on = bullish
+            bull_votes += 1.0  # Falling dominance = risk-on = bullish
         elif cycle.btc_dominance_trend == "rising":
-            signals.append("bear")  # Rising dominance = risk-off = bearish
+            bear_votes += 1.0  # Rising dominance = risk-off = bearish
 
         if cycle.halving_phase in ("post_halving", "expansion"):
-            signals.append("bull")
+            bull_votes += 1.0
         elif cycle.halving_phase == "distribution":
-            signals.append("bear")
+            bear_votes += 1.0
         # pre_halving is neutral to slightly bullish (accumulation, price starts
-        # rising before halving) — do NOT count it as bearish
+        # rising before halving) -- do NOT count it as bearish
 
         if cycle.altcoin_season:
-            signals.append("bull")
+            bull_votes += 1.0
 
-        # BMSB: Bull Market Support Band (SMA 20 + EMA 21 weekly)
+        # BMSB: Bull Market Support Band (SMA 20 + EMA 21 weekly) -- full weight
         if cycle.bmsb_status == "bullish":
-            signals.append("bull")
+            bull_votes += 1.0
         elif cycle.bmsb_status == "bearish":
-            signals.append("bear")
+            bear_votes += 1.0
 
-        # Pi Cycle Top/Bottom indicator
+        # Pi Cycle Top/Bottom indicator -- LESS reliable than RSI 14 and BMSB
+        # (mentorship emphasis), so count as 0.5 votes instead of full vote
         if cycle.pi_cycle_status == "near_top":
-            signals.append("bear")  # Distribution / cycle top
+            bear_votes += 0.5  # Distribution / cycle top
         elif cycle.pi_cycle_status == "near_bottom":
-            signals.append("bull")  # Accumulation / cycle bottom
+            bull_votes += 0.5  # Accumulation / cycle bottom
 
-        bull_count = signals.count("bull")
-        bear_count = signals.count("bear")
+        # Integrate dominance transition analysis (BTC.D trend + BTC price trend)
+        transition = self.get_dominance_transition(cycle)
+        cycle.dominance_transition = transition
+        alt_outlook = transition.get("altcoin_outlook", "neutral")
+        if alt_outlook in ("up_significantly", "capital_rotating_to_alts"):
+            bull_votes += 1.0  # Strong altcoin signal = bullish market
+        elif alt_outlook in ("down_much_more",):
+            bear_votes += 1.0  # Alts dumping hard = bearish
 
-        if bull_count >= 2:
+        if bull_votes >= 2.0:
             cycle.market_phase = "bull_run"
-        elif bear_count >= 2:
+        elif bear_votes >= 2.0:
             cycle.market_phase = "bear_market"
-        elif bull_count == 1 and bear_count == 0:
+        elif bull_votes >= 1.0 and bear_votes == 0:
             cycle.market_phase = "accumulation"
         else:
             cycle.market_phase = "distribution"
+
+    async def get_crypto_trailing_ema(self, symbol: str = "BTC_USD") -> Optional[float]:
+        """Return the EMA 50 value for crypto trailing stop management.
+
+        The mentorship's CORE position management for crypto is EMA 50 trailing
+        on the weekly chart -- NOT fixed take-profit levels. EMA 50 weekly adapts
+        to the trend and keeps you in winning positions during bull runs while
+        protecting against trend reversals.
+
+        Usage: close position (or tighten stop) when weekly candle closes below
+        EMA 50. This replaces fixed TP1/TP2/TP3 targets for crypto swing trades.
+
+        Returns:
+            The current EMA 50 weekly value, or None if data unavailable.
+        """
+        if not self.broker:
+            return None
+        try:
+            candles = await self.broker.get_candles(symbol, granularity="W", count=60)
+            if not candles or len(candles) < 50:
+                return None
+            closes = [c.close for c in candles]
+            # Calculate EMA 50
+            ema = closes[0]
+            multiplier = 2 / (50 + 1)
+            for p in closes[1:]:
+                ema = (p - ema) * multiplier + ema
+            return ema
+        except Exception as e:
+            logger.debug(f"EMA 50 trailing calculation failed: {e}")
+            return None
 
     async def should_trade_crypto(
         self,
         bmsb: Optional[Dict] = None,
         pi_cycle: Optional[Dict] = None,
+        using_fixed_tp: bool = False,
     ) -> tuple:
         """Should we be actively trading crypto right now?
         Returns (bool, reason).
@@ -441,17 +536,38 @@ class CryptoCycleAnalyzer:
         Args:
             bmsb: BMSB dict from AnalysisResult (keys: bullish, bearish).
             pi_cycle: Pi Cycle dict from AnalysisResult (keys: near_top, near_bottom).
+            using_fixed_tp: If True, indicates the caller is using fixed TP levels
+                instead of EMA 50 trailing (triggers a warning).
         """
         cycle = await self.get_cycle_status(bmsb=bmsb, pi_cycle=pi_cycle)
+
+        # Populate EMA 50 trailing stop value on the cycle object
+        ema50 = await self.get_crypto_trailing_ema("BTC_USD")
+        cycle.crypto_trailing_ema50 = ema50
+
+        # Warn if fixed TPs are being used instead of EMA trailing
+        if using_fixed_tp:
+            cycle.using_fixed_tp_warning = True
+
         if cycle.market_phase == "bear_market":
             return False, f"Bear market detected (dominance={cycle.btc_dominance_trend}, halving={cycle.halving_phase})"
         reason = f"Market phase: {cycle.market_phase}"
         if cycle.ema8_weekly_broken:
             reason += " | WARNING: BTC weekly close below EMA 8 (bearish signal)"
         if cycle.bmsb_status == "bearish":
-            reason += " | WARNING: BMSB bearish (price below SMA20+EMA21 weekly)"
+            reason += " | WARNING: BMSB bearish (price below SMA20+EMA21 weekly, confirmed with 2+ closes)"
+        elif cycle.bmsb_status == "warning":
+            reason += " | CAUTION: BMSB first close below support band (awaiting confirmation)"
         if cycle.pi_cycle_status == "near_top":
             reason += " | WARNING: Pi Cycle near top (distribution risk)"
+        if using_fixed_tp:
+            reason += (
+                " | WARNING: Using fixed TPs instead of EMA 50 trailing stop. "
+                "Mentorship recommends EMA 50 weekly as trailing stop for crypto "
+                "positions -- fixed TPs leave money on the table in bull runs."
+            )
+        if ema50 is not None:
+            reason += f" | EMA 50 weekly trailing stop: {ema50:.2f}"
         return True, reason
 
     async def close(self):

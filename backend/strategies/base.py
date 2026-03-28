@@ -138,9 +138,9 @@ def _has_deceleration(analysis: AnalysisResult) -> bool:
     if analysis.htf_condition in (MarketCondition.DECELERATING,):
         return True
     decel_patterns = {
-        "DOJI", "HAMMER", "SHOOTING_STAR", "ENGULFING_BULLISH",
+        "DOJI", "LOW_TEST", "HIGH_TEST", "ENGULFING_BULLISH",
         "ENGULFING_BEARISH", "MORNING_STAR", "EVENING_STAR",
-        "HIGH_TEST", "LOW_TEST", "TWEEZER_TOP", "TWEEZER_BOTTOM",
+        "TWEEZER_TOP", "TWEEZER_BOTTOM",
         "INSIDE_BAR_BULLISH", "INSIDE_BAR_BEARISH",
     }
     return bool(set(analysis.candlestick_patterns) & decel_patterns)
@@ -153,12 +153,12 @@ def _has_reversal_pattern(analysis: AnalysisResult, direction: str) -> Tuple[boo
     Includes all patterns from Formación de Velas PDF.
     """
     bullish_reversals = {
-        "HAMMER", "ENGULFING_BULLISH", "MORNING_STAR",
-        "LOW_TEST", "TWEEZER_BOTTOM", "INSIDE_BAR_BULLISH",
+        "LOW_TEST", "ENGULFING_BULLISH", "MORNING_STAR",
+        "TWEEZER_BOTTOM", "INSIDE_BAR_BULLISH",
     }
     bearish_reversals = {
-        "SHOOTING_STAR", "ENGULFING_BEARISH", "EVENING_STAR",
-        "HIGH_TEST", "TWEEZER_TOP", "INSIDE_BAR_BEARISH",
+        "HIGH_TEST", "ENGULFING_BEARISH", "EVENING_STAR",
+        "TWEEZER_TOP", "INSIDE_BAR_BEARISH",
     }
     patterns = set(analysis.candlestick_patterns)
 
@@ -938,21 +938,52 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
     """
     Clasifica la variante Blue (A, B, C) revisando condiciones en 4H.
     TradingLab confidence ranking: A > B > C
-    A: Double bottom/reversal pattern BEFORE breaking 1H EMA 50 (most effective, HIGHEST confidence bonus +10)
+    A: Double bottom/top ("doble suelo" / "minimo creciente") visible in 1H/4H
+       BEFORE breaking 1H EMA 50 (most effective, HIGHEST confidence bonus +10)
     B: Simple impulse-pullback with no prior reversal pattern (neutral, no bonus)
     C: Breaks 1H EMA 50 but rejects 4H EMA 50 BEFORE pullback (most restrictive, LOWEST confidence -5)
     """
     ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
-    patterns = analysis.candlestick_patterns
 
-    # Variante A: doble suelo/techo (detectamos por patrones de reversal repetidos)
-    bullish_reversal_count = sum(1 for p in patterns if p in ("HAMMER", "ENGULFING_BULLISH", "MORNING_STAR"))
-    bearish_reversal_count = sum(1 for p in patterns if p in ("SHOOTING_STAR", "ENGULFING_BEARISH", "EVENING_STAR"))
+    # Variante A: structural double bottom/top detection
+    # TradingLab: "doble suelo" or "minimo creciente" - two swing lows/highs
+    # at similar levels (within 0.3% tolerance) visible in both 1H and 4H.
+    swing_lows = getattr(analysis, 'swing_lows', [])
+    swing_highs = getattr(analysis, 'swing_highs', [])
+    double_pattern_tolerance = 0.003  # 0.3% tolerance for similar levels
 
-    if direction == "BUY" and bullish_reversal_count >= 2:
-        return "BLUE_A"
-    if direction == "SELL" and bearish_reversal_count >= 2:
-        return "BLUE_A"
+    if direction == "BUY" and len(swing_lows) >= 2:
+        # Check last two swing lows for double bottom pattern
+        recent_lows = swing_lows[-2:]
+        if recent_lows[0] > 0 and recent_lows[1] > 0:
+            pct_diff = abs(recent_lows[0] - recent_lows[1]) / max(recent_lows[0], recent_lows[1])
+            if pct_diff <= double_pattern_tolerance:
+                return "BLUE_A"
+            # Also detect "minimo creciente" (higher low) - the second low is higher
+            if recent_lows[1] > recent_lows[0]:
+                return "BLUE_A"
+
+    if direction == "SELL" and len(swing_highs) >= 2:
+        # Check last two swing highs for double top pattern
+        recent_highs = swing_highs[-2:]
+        if recent_highs[0] > 0 and recent_highs[1] > 0:
+            pct_diff = abs(recent_highs[0] - recent_highs[1]) / max(recent_highs[0], recent_highs[1])
+            if pct_diff <= double_pattern_tolerance:
+                return "BLUE_A"
+            # Also detect "maximo decreciente" (lower high) - the second high is lower
+            if recent_highs[1] < recent_highs[0]:
+                return "BLUE_A"
+
+    # Fallback: check chart_patterns for explicit double bottom/top labels
+    if hasattr(analysis, 'chart_patterns'):
+        chart_patterns = analysis.chart_patterns or []
+        for p in chart_patterns:
+            ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+            ptype_lower = ptype.lower()
+            if direction == "BUY" and any(k in ptype_lower for k in ("double_bottom", "doble_suelo", "double bottom")):
+                return "BLUE_A"
+            if direction == "SELL" and any(k in ptype_lower for k in ("double_top", "doble_techo", "double top")):
+                return "BLUE_A"
 
     # Variante C: precio esta cerca de EMA 4H (rechazo de EMA 4H)
     price = _get_current_price_proxy(analysis)
@@ -1085,10 +1116,12 @@ class BaseStrategy(ABC):
             signal.confluence_score = pos_pts
             signal.anti_confluence_score = neg_pts
 
-            # TradingLab: Minimum 3 convergence factors required
-            if pos_pts < 3:
+            # TradingLab: Minimum confluence factors required (configurable)
+            # The mentorship does NOT specify a minimum of 3 - default is 2.
+            min_confluence = getattr(settings, 'min_confluence_points', 2)
+            if pos_pts < min_confluence:
                 logger.debug(
-                    f"[{self.color.value}] Confluence too low: {pos_pts} positive points (min 3)"
+                    f"[{self.color.value}] Confluence too low: {pos_pts} positive points (min {min_confluence})"
                 )
                 return None
 
@@ -1274,10 +1307,9 @@ class BlueStrategy(BaseStrategy):
             else:
                 return None
 
-        # TradingLab: Volume confirmation on breakout
+        # TradingLab: Volume confirmation - confluence scoring, not hard block
+        # The mentorship does NOT make volume a hard requirement for every entry.
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
-        if not vol_ok:
-            return None  # No entry without volume confirmation
 
         # TradingLab: EMA 8 Weekly trend filter
         if not _check_weekly_ema8_filter(analysis, direction):
@@ -1290,6 +1322,14 @@ class BlueStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed: List[str] = []
+
+        # Volume confluence scoring (not hard block)
+        if vol_ok and vol_ratio > 1.2:
+            confidence += 5.0
+            met.append(f"Volumen alto ({vol_ratio:.1f}x) confirma entrada")
+        elif not vol_ok:
+            confidence -= 3.0
+            failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
         # --- Paso 4: Pullback a EMA 50 1H + Fibonacci ---
         pb_ok, pb_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
@@ -1320,20 +1360,44 @@ class BlueStrategy(BaseStrategy):
             failed.append(f"Paso 5: {rev_desc}")
 
         # --- Paso 6: Entrada en 5M (RCC: Ruptura + Cierre + Confirmación) ---
+        # TradingLab mentorship: the ideal 5M entry is on a DIAGONAL breakout,
+        # not just EMA crosses. Automated diagonal detection is not fully reliable,
+        # so we use EMA breaks as a fallback. When only EMA is used, we log it
+        # so the trader knows this is a simplification of the mentorship method.
+        diagonal_entry_used = False
+        if hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
+                ptype_lower = ptype.lower()
+                if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
+                    if ptf in ("M5", "M2", ""):
+                        diagonal_entry_used = True
+                        confidence += 12.0
+                        met.append(f"Paso 6: Rompimiento de diagonal en 5M ({ptype}) - entrada ideal del curso")
+                        break
+
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
         # M2 not available from broker API; use M5 EMA 2 as approximation
         ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_2", direction)
 
-        if ema_5m_break:
-            # TradingLab RCC: verify previous candle confirmed the breakout
-            if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
-                confidence += 10.0
-                met.append(f"Paso 6: RCC confirmado en EMA 5M - {ema_5m_desc}")
+        if not diagonal_entry_used:
+            # Fallback: EMA-based entry (simplification - mentorship prefers diagonals)
+            if ema_5m_break:
+                # TradingLab RCC: verify previous candle confirmed the breakout
+                if _check_rcc_confirmation(analysis, "EMA_M5_5", direction):
+                    confidence += 10.0
+                    met.append(f"Paso 6: RCC confirmado en EMA 5M - {ema_5m_desc}")
+                else:
+                    confidence += 3.0  # Breakout without confirmation = weaker
+                    met.append(f"Paso 6: Rompimiento EMA 5M sin confirmacion RCC")
+                logger.info(
+                    f"[BLUE] Entrada por EMA (no diagonal) en {analysis.instrument} - "
+                    f"el curso prioriza diagonales sobre EMAs para 5M entry"
+                )
             else:
-                confidence += 3.0  # Breakout without confirmation = weaker
-                met.append(f"Paso 6: Rompimiento EMA 5M sin confirmacion RCC")
-        else:
-            failed.append(f"Paso 6: {ema_5m_desc}")
+                failed.append(f"Paso 6: {ema_5m_desc}")
 
         if ema_2m_break:
             confidence += 5.0
@@ -1612,10 +1676,8 @@ class RedStrategy(BaseStrategy):
             else:
                 return None
 
-        # TradingLab: Volume confirmation on breakout
+        # TradingLab: Volume confirmation - confluence scoring, not hard block
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
-        if not vol_ok:
-            return None  # No entry without volume confirmation
 
         # TradingLab: EMA 8 Weekly trend filter
         if not _check_weekly_ema8_filter(analysis, direction):
@@ -1628,6 +1690,51 @@ class RedStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed: List[str] = []
+
+        # Volume confluence scoring (not hard block)
+        if vol_ok and vol_ratio > 1.2:
+            confidence += 5.0
+            met.append(f"Volumen alto ({vol_ratio:.1f}x) confirma entrada")
+        elif not vol_ok:
+            confidence -= 3.0
+            failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
+
+        # --- Paso 3.5: Check for uncontrolled 1H EMA break ---
+        # TradingLab: be "permisivos" with the 1H EMA break during pullback,
+        # BUT if the break is "uncontrolled" (price continues strongly through
+        # with large bodies, no pullback), it's NOT a RED - it's just momentum.
+        # Check if the last 2-3 candles after breaking 1H EMA 50 continued
+        # aggressively in the break direction.
+        ema_1h_val = _ema_val(analysis, "EMA_H1_50")
+        m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
+        if ema_1h_val and len(m5_candles) >= 3:
+            aggressive_count = 0
+            for candle in m5_candles[-3:]:
+                body_size = abs(candle.get("close", 0) - candle.get("open", 0))
+                candle_range = candle.get("high", 0) - candle.get("low", 0)
+                if candle_range > 0:
+                    body_ratio = body_size / candle_range
+                    # Large body (>70% of candle range) = aggressive/momentum candle
+                    if body_ratio > 0.70:
+                        # Check if it's moving away from the EMA (uncontrolled)
+                        if direction == "BUY" and candle.get("close", 0) > candle.get("open", 0):
+                            aggressive_count += 1
+                        elif direction == "SELL" and candle.get("close", 0) < candle.get("open", 0):
+                            aggressive_count += 1
+            if aggressive_count >= 2:
+                # Uncontrolled break: 2-3 consecutive large-body candles moving away
+                confidence -= 15.0
+                failed.append(
+                    f"Rompimiento EMA 1H NO controlado ({aggressive_count} velas agresivas "
+                    f"consecutivas) - no es pullback, es momentum puro"
+                )
+                if aggressive_count >= 3:
+                    # 3 consecutive aggressive candles = reject outright
+                    logger.debug(
+                        f"[RED] Uncontrolled 1H EMA break on {analysis.instrument}: "
+                        f"{aggressive_count} aggressive candles - rejecting"
+                    )
+                    return None
 
         # --- Paso 4: Pullback a EMA 50 1H + EMA 50 4H + Fibonacci ---
         pb_1h, pb_1h_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
@@ -1784,13 +1891,20 @@ class RedStrategy(BaseStrategy):
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
         """
-        TP1: swing high/low reciente.
-        TP_max: extension Fibonacci 1.272 o 1.618.
+        TP differentiated by Elliott wave context (TradingLab mentorship):
+        - Wave 3 with strong daily setup: can target 1.618 Fibonacci extension
+        - Wave 5: stick to recent high/low (conservative)
+        - Daily pullback only: exit at recent high/low
         """
         result: Dict[str, float] = {}
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
 
+        # Determine wave context for TP differentiation
+        ew = getattr(analysis, 'elliott_wave_detail', {})
+        wave_count = str(ew.get("wave_count", "")).strip()
+
+        # TP1: swing high/low reciente (same for all wave contexts)
         if direction == "BUY":
             above = [r for r in resistances if r > entry_price]
             if above:
@@ -1800,16 +1914,52 @@ class RedStrategy(BaseStrategy):
             if below:
                 result["tp1"] = max(below)
 
-        # RED TP_max = Fibonacci extension 1.272 (TradingLab: "extension optima para onda 3")
-        # Fallback to 1.0 if 1.272 not available or not beyond TP1
         tp1 = result.get("tp1")
         fib_1272 = analysis.fibonacci_levels.get("ext_1.272")
+        fib_1618 = analysis.fibonacci_levels.get("ext_1.618")
         fib_100 = analysis.fibonacci_levels.get("ext_1.0")
-        if fib_1272 and tp1:
-            if direction == "BUY" and fib_1272 > tp1:
-                result["tp_max"] = fib_1272
-            elif direction == "SELL" and fib_1272 < tp1:
-                result["tp_max"] = fib_1272
+
+        # Wave 3 with strong daily setup: aggressive TP, target 1.618 extension
+        if wave_count == "3":
+            # Check if daily setup is strong (HTF overbought/oversold or deceleration)
+            daily_strong = (
+                analysis.htf_condition in (MarketCondition.OVERBOUGHT, MarketCondition.OVERSOLD)
+                or _has_deceleration(analysis)
+            )
+            if daily_strong and fib_1618 and tp1:
+                if direction == "BUY" and fib_1618 > tp1:
+                    result["tp_max"] = fib_1618
+                elif direction == "SELL" and fib_1618 < tp1:
+                    result["tp_max"] = fib_1618
+            # Fallback to 1.272 for Wave 3 without strong daily
+            if "tp_max" not in result and fib_1272 and tp1:
+                if direction == "BUY" and fib_1272 > tp1:
+                    result["tp_max"] = fib_1272
+                elif direction == "SELL" and fib_1272 < tp1:
+                    result["tp_max"] = fib_1272
+
+        elif wave_count == "5":
+            # Wave 5: conservative - stick to recent high/low only, no extensions
+            # tp1 already set to nearest S/R, tp_max stays at next S/R (no Fib ext)
+            if tp1:
+                if direction == "BUY":
+                    further = sorted([r for r in resistances if r > tp1])
+                    if further:
+                        result["tp_max"] = further[0]
+                else:
+                    further = sorted([s for s in supports if s < tp1], reverse=True)
+                    if further:
+                        result["tp_max"] = further[0]
+
+        else:
+            # Default / daily pullback: use 1.272 extension (original logic)
+            if fib_1272 and tp1:
+                if direction == "BUY" and fib_1272 > tp1:
+                    result["tp_max"] = fib_1272
+                elif direction == "SELL" and fib_1272 < tp1:
+                    result["tp_max"] = fib_1272
+
+        # Final fallback to ext_1.0 if no tp_max set
         if "tp_max" not in result and fib_100 and tp1:
             if direction == "BUY" and fib_100 > tp1:
                 result["tp_max"] = fib_100
@@ -1919,10 +2069,8 @@ class PinkStrategy(BaseStrategy):
         if direction is None:
             return None
 
-        # TradingLab: Volume confirmation on breakout
+        # TradingLab: Volume confirmation - confluence scoring, not hard block
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
-        if not vol_ok:
-            return None  # No entry without volume confirmation
 
         # TradingLab: EMA 8 Weekly trend filter
         if not _check_weekly_ema8_filter(analysis, direction):
@@ -1935,6 +2083,14 @@ class PinkStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed: List[str] = []
+
+        # Volume confluence scoring (not hard block)
+        if vol_ok and vol_ratio > 1.2:
+            confidence += 5.0
+            met.append(f"Volumen alto ({vol_ratio:.1f}x) confirma entrada")
+        elif not vol_ok:
+            confidence -= 3.0
+            failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
         # --- Paso 4: Verificar que correccion se esta completando ---
         # Pink concept: HTF already confirmed EMA 50 1H break (correction).
@@ -1982,6 +2138,56 @@ class PinkStrategy(BaseStrategy):
             # Mentorship: "cuando yo veo un canal, no ejecuto pink"
             # CHANNEL patterns invalidate PINK — use WHITE instead.
             return None
+
+        # --- Paso 4c: PINK entry happens at pattern COMPLETION, not as standard breakout ---
+        # TradingLab: check if the wedge/triangle pattern is near completion
+        # (price near the apex/convergence point) before allowing entry.
+        pattern_near_completion = False
+        if hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                if not isinstance(p, dict):
+                    continue
+                ptype = p.get("type", "").lower()
+                if any(k in ptype for k in ("wedge", "cuna", "triangle", "triangulo")):
+                    # Check if pattern has completion percentage or apex proximity
+                    completion_pct = p.get("completion_pct", None)
+                    if completion_pct is not None and completion_pct >= 0.75:
+                        pattern_near_completion = True
+                        confidence += 8.0
+                        met.append(
+                            f"Paso 4c: Patron {ptype} cerca de completitud "
+                            f"({completion_pct*100:.0f}%) - entrada PINK valida"
+                        )
+                        break
+                    # Alternative: check if price is near the apex/convergence
+                    apex_price = p.get("apex_price", None)
+                    if apex_price and price:
+                        apex_dist = abs(price - apex_price) / price
+                        if apex_dist < 0.005:  # Within 0.5% of apex
+                            pattern_near_completion = True
+                            confidence += 8.0
+                            met.append(
+                                f"Paso 4c: Precio cerca del apex del patron {ptype} "
+                                f"({apex_dist*100:.2f}%) - entrada PINK valida"
+                            )
+                            break
+
+        if not pattern_near_completion:
+            # If no chart_patterns data available, use price compression as proxy:
+            # low distance to EMA and DOJIs indicate the pattern is narrowing
+            if doji_count >= 2 and dist < 0.3:
+                pattern_near_completion = True
+                confidence += 5.0
+                met.append(
+                    "Paso 4c: Compresion de precio (DOJIs + cercano a EMA) "
+                    "sugiere patron cerca de completitud"
+                )
+            else:
+                failed.append(
+                    "Paso 4c: Patron correctivo no parece estar cerca de completitud "
+                    "(PINK entra al COMPLETAR el patron, no al inicio)"
+                )
 
         # --- Paso 5: Ejecutar al final del patron en 5M (RCC) ---
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_5", direction)
@@ -2236,17 +2442,58 @@ class WhiteStrategy(BaseStrategy):
         if direction is None:
             return None
 
-        # TradingLab: White MUST come after a Pink (wave 5 context)
+        # TradingLab: White MUST come from PINK. Since we can't track previous
+        # trades, we use structural proxies to verify the PINK phase occurred:
+        # (a) A recent structure break (BOS) in the trend direction, AND
+        # (b) The correction before it was a pattern (wedge/triangle), AND
+        # (c) Price is now above/below EMA 50 1H.
         failed: List[str] = []
+        pink_proxy_score = 0
+
+        # (a) Check for recent BOS in trend direction
+        structure_breaks = getattr(analysis, 'structure_breaks', [])
+        expected_sb_dir = "bullish" if direction == "BUY" else "bearish"
+        has_recent_bos = False
+        for sb in structure_breaks[-5:]:
+            if isinstance(sb, dict) and sb.get("type") == "BOS" and sb.get("direction") == expected_sb_dir:
+                has_recent_bos = True
+                pink_proxy_score += 1
+                break
+
+        # (b) Check if a corrective pattern (wedge/triangle) was present
+        has_corrective_pattern = False
+        if hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptype_lower = ptype.lower()
+                if any(k in ptype_lower for k in ("wedge", "cuna", "triangle", "triangulo")):
+                    has_corrective_pattern = True
+                    pink_proxy_score += 1
+                    break
+
+        # (c) Check if price is on correct side of EMA 50 1H
+        ema_1h_check, _ = _check_ema_break(analysis, "EMA_H1_50", direction)
+        if ema_1h_check:
+            pink_proxy_score += 1
+
+        # Also accept Elliott wave data as confirmation
         elliott = analysis.elliott_wave
-        if not elliott:
-            failed.append("White requiere contexto de onda 5 (post-Pink)")
+        if elliott:
+            pink_proxy_score += 1
+
+        # Need at least 2 of the 4 proxy conditions to confirm PINK phase
+        if pink_proxy_score < 2:
+            failed.append(
+                f"White requiere contexto post-Pink: solo {pink_proxy_score}/4 "
+                f"condiciones proxy cumplidas (BOS={has_recent_bos}, "
+                f"patron_correctivo={has_corrective_pattern}, "
+                f"EMA_1H_ok={ema_1h_check}, elliott={bool(elliott)})"
+            )
             return None
 
-        # TradingLab: Volume confirmation on breakout
+        # TradingLab: Volume confirmation - confluence scoring, not hard block
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
-        if not vol_ok:
-            return None  # No entry without volume confirmation
 
         # TradingLab: EMA 8 Weekly trend filter
         if not _check_weekly_ema8_filter(analysis, direction):
@@ -2259,6 +2506,14 @@ class WhiteStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed = []  # Reset after initial check
+
+        # Volume confluence scoring (not hard block)
+        if vol_ok and vol_ratio > 1.2:
+            confidence += 5.0
+            met.append(f"Volumen alto ({vol_ratio:.1f}x) confirma entrada")
+        elif not vol_ok:
+            confidence -= 3.0
+            failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
         # --- Paso 3: Pullback a EMA 50 1H + Fibonacci ---
         pb_ok, pb_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
@@ -2552,11 +2807,16 @@ class BlackStrategy(BaseStrategy):
 
         if ema_4h_50 and price:
             distance_pct = abs(price - ema_4h_50) / ema_4h_50 * 100
-            if distance_pct > 0.5:
+            # TradingLab: "strong separation" from EMA 4H requires at least 1.5%
+            # (previously 0.5% was too permissive for what the mentorship describes)
+            if distance_pct > 1.5:
                 score += 10.0
-                met.append(f"Paso 4: Precio lejos de EMA 50 4H ({distance_pct:.2f}%) - sobreextendido")
+                met.append(f"Paso 4: Precio lejos de EMA 50 4H ({distance_pct:.2f}%) - separacion fuerte")
+            elif distance_pct > 0.8:
+                score += 5.0
+                met.append(f"Paso 4: Precio moderadamente lejos de EMA 50 4H ({distance_pct:.2f}%) - separacion parcial")
             else:
-                failed.append(f"Paso 4: Precio cerca de EMA 50 4H ({distance_pct:.2f}%) - no sobreextendido")
+                failed.append(f"Paso 4: Precio cerca de EMA 50 4H ({distance_pct:.2f}%) - no sobreextendido (necesita >1.5%)")
         else:
             failed.append("Paso 4: No se puede evaluar distancia a EMA 50 4H")
 
@@ -2576,10 +2836,25 @@ class BlackStrategy(BaseStrategy):
         else:
             return None
 
-        # TradingLab: Volume confirmation on breakout
+        # --- H4 RSI overbought/oversold HARD REQUIREMENT ---
+        # TradingLab: BLACK requires H4 RSI > 70 (overbought for SELL) or
+        # H4 RSI < 30 (oversold for BUY) as a non-negotiable condition.
+        rsi_h4 = analysis.rsi_values.get("H4", 50)
+        if direction == "SELL" and rsi_h4 <= 70:
+            logger.debug(
+                f"[BLACK] H4 RSI {rsi_h4:.1f} not overbought (need >70 for SELL) "
+                f"on {analysis.instrument} - rejecting"
+            )
+            return None
+        if direction == "BUY" and rsi_h4 >= 30:
+            logger.debug(
+                f"[BLACK] H4 RSI {rsi_h4:.1f} not oversold (need <30 for BUY) "
+                f"on {analysis.instrument} - rejecting"
+            )
+            return None
+
+        # TradingLab: Volume confirmation - confluence scoring, not hard block
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
-        if not vol_ok:
-            return None  # No entry without volume confirmation
 
         # BLACK es contratendencia: NO aplicar EMA 8 Weekly trend filter
         # (filtrar por tendencia semanal bloquearía las señales contra-tendencia)
@@ -2591,6 +2866,19 @@ class BlackStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed: List[str] = []
+
+        # Add H4 RSI confirmation to met
+        if direction == "SELL":
+            met.append(f"H4 RSI sobrecomprado: {rsi_h4:.1f} > 70 (OBLIGATORIO para BLACK SELL)")
+        else:
+            met.append(f"H4 RSI sobrevendido: {rsi_h4:.1f} < 30 (OBLIGATORIO para BLACK BUY)")
+
+        # Volume confluence scoring (not hard block)
+        if vol_ok and vol_ratio > 1.2:
+            confidence += 5.0
+            met.append(f"Volumen alto ({vol_ratio:.1f}x) confirma entrada")
+        elif not vol_ok:
+            failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion")
 
         # --- Paso 5: Patron de reversal en 1H ---
         # EMA 50 1H NO debe actuar como S/R dinamico (precio debe estar lejos o cruzandola)
@@ -2648,9 +2936,9 @@ class BlackStrategy(BaseStrategy):
         else:
             # Check for any candlestick pattern (not just reversal) that signals completion
             completion_patterns = {
-                "DOJI", "HAMMER", "SHOOTING_STAR", "ENGULFING_BULLISH",
+                "DOJI", "LOW_TEST", "HIGH_TEST", "ENGULFING_BULLISH",
                 "ENGULFING_BEARISH", "MORNING_STAR", "EVENING_STAR",
-                "HIGH_TEST", "LOW_TEST", "TWEEZER_TOP", "TWEEZER_BOTTOM",
+                "TWEEZER_TOP", "TWEEZER_BOTTOM",
                 "INSIDE_BAR_BULLISH", "INSIDE_BAR_BEARISH",
             }
             found_completion = set(h1_candle_patterns) & completion_patterns
@@ -2992,10 +3280,8 @@ class GreenStrategy(BaseStrategy):
         if direction is None:
             return None
 
-        # TradingLab: Volume confirmation (market_analyzer calculates for H1 and M5 only)
+        # TradingLab: Volume confirmation - confluence scoring, not hard block
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
-        if not vol_ok:
-            return None  # No entry without volume confirmation
 
         # TradingLab: EMA 8 Weekly trend filter
         if not _check_weekly_ema8_filter(analysis, direction):
@@ -3008,6 +3294,14 @@ class GreenStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed: List[str] = []
+
+        # Volume confluence scoring (not hard block)
+        if vol_ok and vol_ratio > 1.2:
+            confidence += 5.0
+            met.append(f"Volumen alto ({vol_ratio:.1f}x) confirma entrada")
+        elif not vol_ok:
+            confidence -= 3.0
+            failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
         # TradingLab: Green REQUIRES 1H diagonal (non-negotiable)
         has_diagonal = False

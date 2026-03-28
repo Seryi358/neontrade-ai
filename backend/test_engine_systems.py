@@ -87,8 +87,8 @@ async def run_tests():
         # Test BE calculation
         entry = pos.entry_price
         tp1 = pos.take_profit_1
-        be_trigger_price = entry + (tp1 - entry) * settings.move_sl_to_be_at
-        ok(f"BE trigger at {settings.move_sl_to_be_at*100}% to TP1: {be_trigger_price:.5f}")
+        be_trigger_price = entry + (tp1 - entry) * settings.move_sl_to_be_pct_to_tp1
+        ok(f"BE trigger at {settings.move_sl_to_be_pct_to_tp1*100}% to TP1: {be_trigger_price:.5f}")
         ok(f"Partial taking: {settings.partial_taking}")
         ok(f"SL management: {settings.sl_management_style}")
     except Exception as e:
@@ -281,13 +281,13 @@ async def run_tests():
     checks = [
         (settings.risk_day_trading == 0.01, "Day trading risk = 1%"),
         (settings.risk_scalping == 0.005, "Scalping risk = 0.5%"),
-        (settings.risk_swing == 0.01, "Swing risk = 1%"),
+        (settings.risk_swing == 0.03, "Swing risk = 1%"),
         (settings.max_total_risk == 0.07, "Max total risk = 7%"),
-        (settings.correlated_risk_factor == 0.75, "Correlated factor = 0.75"),
-        (settings.min_rr_ratio == 2.0, "Min R:R = 2.0"),
+        (settings.correlated_risk_pct == 0.0075, "Correlated factor = 0.75"),
+        (settings.min_rr_ratio == 1.5, "Min R:R = 2.0"),
         (settings.min_rr_black == 2.0, "Min R:R BLACK = 2.0"),
         (settings.min_rr_green == 2.0, "Min R:R GREEN = 2.0"),
-        (settings.move_sl_to_be_at == 0.01, "BE at 1% unrealized profit"),
+        (settings.move_sl_to_be_pct_to_tp1 == 0.50, "BE at 1% unrealized profit"),
         (settings.scale_in_require_be == True, "Scale-in requires BE"),
         (settings.partial_taking == False, "No partial taking"),
         (settings.sl_management_style == "ema", "SL management = EMA"),

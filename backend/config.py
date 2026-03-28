@@ -82,22 +82,29 @@ class Settings(BaseSettings):
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # 0.5%
-    risk_swing: float = 0.01             # Mentoría: 1% para todos los estilos
+    risk_swing: float = 0.03             # Trading Plan PDF: 3% en Swing trading
     max_total_risk: float = 0.07          # 7% max simultaneous open risk
 
     # Correlated pairs risk reduction (ch18.3)
-    # e.g., AUD/JPY + AUD/CAD → 0.75% each instead of 1% + 1%
-    correlated_risk_factor: float = 0.75
+    # Mentorship: "entrar con el 0,75% de riesgo en cada uno"
+    # This is a FIXED absolute value: 0.75% per correlated trade
+    correlated_risk_pct: float = 0.0075  # Fixed 0.75% risk per correlated trade
 
     # Minimum reward:risk ratio to TP1 (ch22.1 Trading Plan)
-    # Mentoría: R:R mínimo ~2.5:1 para principiantes
-    # BLACK and GREEN enforce their own minimum of 2.0 separately
-    min_rr_ratio: float = 2.0
-    min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R
-    min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R
+    # Trading Plan PDF: R:R mínimo 0.80:1 con 61% win rate (Alex experimentado)
+    # Mentoría clase: R:R mínimo ~2.5:1 para principiantes
+    # Default 1.5:1 as balanced starting point; adjust based on win rate
+    min_rr_ratio: float = 1.5
+    min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R (mentoría explícita)
+    min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R (mentoría explícita)
+    min_confluence_points: int = 2  # Minimum positive confluence points required (mentorship doesn't specify 3)
 
     # Position management (ch21 Avanzado)
-    move_sl_to_be_at: float = 0.01   # Move SL to BE at 1% unrealized profit (TradingLab: "al 1% pongo BE")
+    # Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
+    # This means BE is set at 50% of the distance to TP1, NOT at a fixed 1% profit.
+    # For a 2:1 R:R trade with 1% risk, 50% to TP1 = 1% profit (coincides).
+    # For other R:R ratios, the 50% rule diverges from fixed 1%.
+    move_sl_to_be_pct_to_tp1: float = 0.50  # Move SL to BE at 50% of distance to TP1
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
     partial_taking: bool = False      # Alex does NOT take partials — prefers quick exit at TP1
     # Partial profit taking: Alex personally doesn't use it, but the mentorship
@@ -161,10 +168,24 @@ class Settings(BaseSettings):
     # Funded account mode (Workshop de Cuentas Fondeadas)
     # Only enable after 3 consecutive months of profitability
     funded_account_mode: bool = False
-    funded_max_daily_dd: float = 0.05  # 5% max daily drawdown
-    funded_max_total_dd: float = 0.10  # 10% max total drawdown
-    funded_no_overnight: bool = True   # Close all positions before session end
-    funded_no_news_trading: bool = True  # No trading around news events
+    # Account type: "normal" (FTMO restricted) or "swing" (FTMO no restrictions)
+    # Workshop: Kevin recommends "swing" for TradingLab day trading + swing strategies
+    funded_account_type: str = "swing"
+    # Evaluation type: "2phase" (standard), "1phase" (sprint, tighter DD), "instant", "real" (passed)
+    funded_evaluation_type: str = "2phase"
+    # DD limits - standard 2-phase (5%/10%). Sprint/1-phase: 4%/6% (set manually)
+    funded_max_daily_dd: float = 0.05  # 5% max daily drawdown (2-phase); 4% for 1-phase
+    funded_max_total_dd: float = 0.10  # 10% max total drawdown (2-phase); 6% for 1-phase
+    # Profit targets for evaluation phases
+    funded_profit_target_phase1: float = 0.10  # 10% for Phase 1 (FTMO), 8% (5RF)
+    funded_profit_target_phase2: float = 0.05  # 5% for Phase 2
+    funded_current_phase: int = 1  # 1 or 2 (for 2-phase evaluations)
+    # Restrictions — depends on account type:
+    # "normal" (FTMO): no overnight, no weekend, no news. "swing": no restrictions.
+    # Default False because workshop recommends swing accounts for TradingLab strategies.
+    funded_no_overnight: bool = False   # True only for FTMO "normal" accounts
+    funded_no_news_trading: bool = False  # True only for FTMO "normal" accounts
+    funded_no_weekend: bool = False  # True only for FTMO "normal" accounts
 
     # ── Discretion Level (ch22.1 Trading Plan) ──────────────────
     # Beginners: 100% precision, 0% discretion. Follow the plan exactly.
@@ -235,39 +256,56 @@ class Settings(BaseSettings):
     # Crypto — separate allocation per Trading Plan (10% of trading capital)
     # Mentoría: GREEN es la ÚNICA estrategia para crypto
     crypto_default_strategy: str = "GREEN"
+    # Mentoría: up to ~150 cryptos. Organized by capitalization tiers.
+    # Below ~1B market cap = extreme volatility, manipulation, less pattern reliability.
     crypto_watchlist: List[str] = [
-        # TradingLab allocation: 70% BTC, 20% ETH, 10% altcoins
-        "BTC_USD", "ETH_USD", "SOL_USD", "ADA_USD", "DOT_USD",
-        "LINK_USD", "AVAX_USD", "MATIC_USD", "UNI_USD", "ATOM_USD",
-        "XRP_USD", "DOGE_USD", "LTC_USD", "BNB_USD", "FTM_USD",
-        "ALGO_USD", "XLM_USD", "EOS_USD", "XTZ_USD", "VET_USD",
+        # === Top 10 (most stable, core positions) ===
+        "BTC_USD", "ETH_USD", "BNB_USD", "SOL_USD", "XRP_USD",
+        "ADA_USD", "AVAX_USD", "DOT_USD", "TRX_USD", "LINK_USD",
+        # === Top 10-50 (growth potential + risk) ===
+        "MATIC_USD", "UNI_USD", "ATOM_USD", "LTC_USD", "NEAR_USD",
+        "APT_USD", "FIL_USD", "ARB_USD", "OP_USD", "INJ_USD",
+        "RENDER_USD", "FET_USD", "GRT_USD", "STX_USD", "IMX_USD",
+        "SEI_USD", "SUI_USD", "AAVE_USD", "MKR_USD", "RUNE_USD",
+        "DOGE_USD", "SHIB_USD", "PEPE_USD", "WIF_USD", "BONK_USD",
+        "FTM_USD", "ALGO_USD", "XLM_USD", "HBAR_USD", "VET_USD",
+        # === Top 50-150 (high volatility, smaller allocations) ===
+        "CRV_USD", "SNX_USD", "COMP_USD", "LDO_USD", "RPL_USD",
+        "ENS_USD", "PENDLE_USD", "GMX_USD", "DYDX_USD", "JUP_USD",
+        "TIA_USD", "PYTH_USD", "WLD_USD", "ONDO_USD", "JTO_USD",
     ]
 
     # Active categories — only forex by default (TradingLab: focus on divisas)
     # Options: forex, forex_exotic, commodities, indices, crypto
     active_watchlist_categories: List[str] = ["forex"]
 
-    # ── Capital Allocation (ch18.5 + Trading Plan) ────────────────
-    # Mentoría: 70% trading, 20% inversión, 10% cripto
-    allocation_trading_pct: float = 0.70     # 70% in trading accounts
-    allocation_forex_pct: float = 0.70       # 70% forex/indices/metals (within trading)
+    # ── Capital Allocation (ch18.5 + Trading Plan PDF) ──────────────
+    # Trading Plan PDF: 80% trading (90% forex, 10% crypto), 20% investment
+    # Mentoría clase: 70% trading, 20% inversión, 10% cripto
+    # Using Trading Plan PDF values as authoritative
+    allocation_trading_pct: float = 0.80     # 80% in trading accounts (Trading Plan PDF)
+    allocation_forex_pct: float = 0.90       # 90% forex/indices/metals (within trading)
     allocation_crypto_pct: float = 0.10      # 10% crypto (within trading)
-    allocation_other_pct: float = 0.20       # Mentoría: 20% otros (índices, materias primas) dentro de trading
     allocation_investment_pct: float = 0.20  # 20% long-term (stocks/ETFs)
     allocation_investment_stocks: float = 0.80  # 80% stocks/ETFs (70% VT/S&P500, 30% sectors)
     allocation_investment_crypto: float = 0.20  # 20% crypto (70% BTC, 20% ETH, 10% alts)
 
-    # Extended correlation groups
+    # Extended crypto correlation groups (mentoría: most cryptos move together)
+    crypto_correlation_groups: List[List[str]] = [
+        ["BTC_USD", "ETH_USD"],
+        ["SOL_USD", "AVAX_USD", "FTM_USD", "NEAR_USD", "SUI_USD", "SEI_USD"],
+        ["ADA_USD", "DOT_USD", "ATOM_USD", "LINK_USD"],
+        ["ARB_USD", "OP_USD", "MATIC_USD", "IMX_USD"],
+        ["UNI_USD", "AAVE_USD", "CRV_USD", "SNX_USD", "COMP_USD"],
+        ["DOGE_USD", "SHIB_USD", "PEPE_USD", "WIF_USD", "BONK_USD"],
+        ["FET_USD", "RENDER_USD", "WLD_USD"],
+    ]
+
+    # Extended index correlation groups
     indices_correlation_groups: List[List[str]] = [
         ["US30_USD", "SPX500_USD", "NAS100_USD"],
         ["DE30_EUR", "FR40_EUR"],
         ["JP225_USD", "AU200_AUD"],
-    ]
-
-    crypto_correlation_groups: List[List[str]] = [
-        ["BTC_USD", "ETH_USD"],
-        ["SOL_USD", "AVAX_USD", "FTM_USD"],
-        ["ADA_USD", "DOT_USD", "ATOM_USD"],
     ]
 
     class Config:

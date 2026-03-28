@@ -4,19 +4,19 @@ Manages open positions: SL movement, BE, trailing stops.
 
 From TradingLab Mentorship - Position Management Styles (all based on EMA 50):
 
-Style LP (Long-term):
-  - Swing: trail with Weekly EMA 50
-  - Day Trading: trail with H4 EMA 50
+Style LP (Long-term) — PRIMARY timeframes from mentorship:
+  - Swing: trail with Daily EMA 50 (optional wider: Weekly)
+  - Day Trading: trail with H1 EMA 50 (optional wider: H4)
   - Scalping: trail with M15 EMA 50
 
-Style CP (Short-term):
-  - Swing: trail with H1 EMA 50
-  - Day Trading: trail with M15 EMA 50
+Style CP (Short-term) — PRIMARY timeframes from mentorship:
+  - Swing: trail with H1 EMA 50 (optional wider: H4)
+  - Day Trading: trail with M5 EMA 50 (optional wider: M15)
   - Scalping: trail with M1 EMA 50
 
 Style CPA (Short-term Aggressive):
   - Swing: trail with M15 EMA 50
-  - Day Trading: trail with M2 EMA 50
+  - Day Trading: trail with M2 EMA 50 (M5 if M2 unavailable)
   - Scalping: trail with M1 EMA 50 (30s not available)
   - CPA is NOT standalone — only used combined with LP/CP at key levels
 
@@ -68,15 +68,18 @@ class TradingStyle(Enum):
 # Maps (ManagementStyle, TradingStyle) -> EMA key suffix for _latest_emas
 # All values reference EMA 50 on the given timeframe
 _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
-    # LP (Long-term): widest timeframes
-    (ManagementStyle.LP, TradingStyle.SWING): "EMA_W_50",
-    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H4_50",
+    # LP (Long-term): PRIMARY timeframes from mentorship ch21
+    # Mentorship: Swing=Daily, Day=H1. (Optional wider: Swing=Weekly, Day=H4)
+    (ManagementStyle.LP, TradingStyle.SWING): "EMA_D_50",
+    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H1_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
-    # CP (Short-term): medium timeframes
+    # CP (Short-term): PRIMARY timeframes from mentorship ch21
+    # Mentorship: Swing=H1, Day=M5. (Optional wider: Swing=H4, Day=M15)
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
-    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",
+    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
     (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
     # CPA (Short-term Aggressive): tightest timeframes
+    # Mentorship: Swing=M15, Day=M2 (M5 fallback), Scalp=M1
     (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
     # M2 not available from broker API; M5 is the best available approximation
     (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M5_50",
@@ -285,16 +288,19 @@ class PositionManager:
     async def _handle_initial_phase(self, pos: ManagedPosition, current_price: float):
         """
         Phase 1: Price has started moving in our favor.
-        Move SL to previous high/low.
+        Trading Plan: "Pondré el SL por encima o debajo del máximo o mínimo anterior"
+        Move SL to cut ~50% of initial risk when price moves out of entry zone.
+        Trigger: when profit exceeds 30% of initial risk distance (conservative proxy
+        for "price leaving the pattern structure").
         """
-        distance_to_tp1 = abs(pos.take_profit_1 - pos.entry_price)
+        risk_distance = abs(pos.entry_price - pos.original_sl)
         current_profit = (
             (current_price - pos.entry_price) if pos.direction == "BUY"
             else (pos.entry_price - current_price)
         )
 
-        # When price has moved ~20% toward TP1, move SL to structure
-        if current_profit > distance_to_tp1 * 0.20:
+        # When price has moved ~30% of risk distance, move SL to cut risk
+        if current_profit > risk_distance * 0.30:
             if pos.direction == "BUY":
                 new_sl = pos.original_sl + (pos.entry_price - pos.original_sl) * 0.5
             else:
@@ -306,17 +312,21 @@ class PositionManager:
 
     async def _handle_sl_moved_phase(self, pos: ManagedPosition, current_price: float):
         """
-        Phase 2: Move to Break Even when unrealized profit reaches 1%.
-        TradingLab: "siempre que lleguemos al 1% pongo el break-even"
+        Phase 2: Move to Break Even at 50% of distance to TP1.
+        Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
+        For a 2:1 R:R trade risking 1%, 50% to TP1 = 1% profit (coincides with old rule).
+        For other R:R ratios, this is more accurate than a fixed percentage.
         """
+        from config import settings
+        distance_to_tp1 = abs(pos.take_profit_1 - pos.entry_price)
         current_profit = (
             (current_price - pos.entry_price) if pos.direction == "BUY"
             else (pos.entry_price - current_price)
         )
-        profit_pct = current_profit / pos.entry_price if pos.entry_price else 0
 
-        # Move to BE when at 1% unrealized profit (TradingLab rule)
-        if profit_pct >= 0.01:
+        # Move to BE when at 50% of distance to TP1 (Trading Plan PDF rule)
+        be_threshold = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
+        if current_profit >= be_threshold:
             # BE = entry price (+ small buffer for spread)
             spread_buffer = abs(pos.entry_price - pos.original_sl) * 0.02
             if pos.direction == "BUY":
@@ -333,7 +343,10 @@ class PositionManager:
 
     async def _handle_be_phase(self, pos: ManagedPosition, current_price: float):
         """
-        Phase 3: After BE, transition to trailing when at 70% to TP1.
+        Phase 3: After BE, transition to EMA trailing.
+        Trading Plan PDF: "A partir de aqui usaré siempre las dos medias móviles más cortas"
+        Transition happens once price breaks the recent consolidation/high after BE.
+        Proxy: when price moves an additional 20% of distance to TP1 beyond BE point.
         """
         distance_to_tp1 = abs(pos.take_profit_1 - pos.entry_price)
         current_profit = (
@@ -341,8 +354,12 @@ class PositionManager:
             else (pos.entry_price - current_price)
         )
 
-        # Start trailing when at 70% to TP1
-        if current_profit >= distance_to_tp1 * 0.70:
+        # Start trailing when beyond BE + 20% more toward TP1
+        # (i.e., ~60-70% to TP1 depending on BE placement)
+        from config import settings
+        be_distance = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
+        trailing_trigger = be_distance + distance_to_tp1 * 0.20
+        if current_profit >= trailing_trigger:
             pos.phase = PositionPhase.TRAILING_TO_TP1
             logger.info(
                 f"{pos.trade_id}: Phase -> TRAILING_TO_TP1 "

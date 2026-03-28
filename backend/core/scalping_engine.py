@@ -13,6 +13,11 @@ Position Management:
 - Method 2 (slow): Exit when price closes below EMA 50 on M5 (~10%+ profit)
 
 Risk: 0.5% per trade (from config), max daily DD 5%, max total DD 10%
+
+NOTE: The 5% daily drawdown and 10% total drawdown limits are app-added
+safety features implemented by NeonTrade AI. They are NOT from the
+TradingLab Scalping Workshop itself. The workshop focuses on per-trade
+risk (0.5%) and proper SL placement at the 0.618 Fibonacci level.
 """
 
 from typing import Optional, Dict, List, Any
@@ -163,14 +168,24 @@ class ScalpingAnalyzer:
 
         return data
 
-    def _determine_h1_direction(self, data: ScalpingData) -> Optional[str]:
+    def _determine_h1_direction(
+        self,
+        data: ScalpingData,
+        analysis: Optional["AnalysisResult"] = None,
+    ) -> Optional[str]:
         """
         Determine the main scalping direction from H1 indicators.
-        Requires:
+
+        Core indicators:
         - MACD bullish/bearish on H1
         - Price above/below EMA 50 on H1
         - Price above/below SMA 200 on H1 (strong filter)
         - MACD divergence on H1 (Gap 11: confluence factor)
+
+        Additional confluence (improves confidence, not hard blocks):
+        - Support/resistance level proximity check
+        - Pattern detection consideration (if available from analysis)
+        - RSI divergence on H1 (workshop: "much more evident" on H1)
         """
         if data.close_h1 is None or data.ema50_h1 is None:
             return None
@@ -184,30 +199,114 @@ class ScalpingAnalyzer:
             sma_filter = data.close_h1 > data.sma200_h1
 
         # Gap 11: MACD divergence as additional confluence
-        # A bullish divergence can confirm BUY even when MACD is not yet
-        # bullish (early reversal signal). A bearish divergence warns that
-        # a current BUY trend may reverse.
         divergence = data.h1_macd_divergence
 
+        # ── Additional confluence factors (scoring, not hard blocks) ──
+        # These factors accumulate a confidence score that can tip ambiguous
+        # situations toward a direction or strengthen existing signals.
+        buy_confluence = 0
+        sell_confluence = 0
+
+        # S/R proximity check: if price is near a support level, it favors
+        # BUY (bounce); near resistance, it favors SELL (rejection).
+        if analysis is not None and analysis.key_levels:
+            supports = analysis.key_levels.get("supports", [])
+            resistances = analysis.key_levels.get("resistances", [])
+            price = data.close_h1
+            sr_proximity_pct = 0.005  # within 0.5% of level
+
+            for s in supports:
+                if s > 0 and abs(price - s) / s < sr_proximity_pct:
+                    buy_confluence += 1
+                    logger.debug(
+                        f"Scalping H1: price near support {s:.5f} — "
+                        f"BUY confluence +1"
+                    )
+                    break
+
+            for r in resistances:
+                if r > 0 and abs(price - r) / r < sr_proximity_pct:
+                    sell_confluence += 1
+                    logger.debug(
+                        f"Scalping H1: price near resistance {r:.5f} — "
+                        f"SELL confluence +1"
+                    )
+                    break
+
+        # Pattern detection consideration (if available from analysis)
+        if analysis is not None and analysis.chart_patterns:
+            for pattern in analysis.chart_patterns:
+                p_name = pattern.get("name", "").lower() if isinstance(pattern, dict) else str(pattern).lower()
+                p_direction = pattern.get("direction", "").upper() if isinstance(pattern, dict) else ""
+                if p_direction == "BUY" or any(
+                    k in p_name for k in ("double bottom", "inverse head", "bull")
+                ):
+                    buy_confluence += 1
+                elif p_direction == "SELL" or any(
+                    k in p_name for k in ("double top", "head and shoulders", "bear")
+                ):
+                    sell_confluence += 1
+
+        # RSI divergence on H1 — workshop emphasizes this is "much more
+        # evident" on H1 than on lower timeframes.
+        if analysis is not None and analysis.rsi_divergence:
+            rsi_div = analysis.rsi_divergence
+            if isinstance(rsi_div, dict):
+                h1_rsi_div = rsi_div.get("H1") or rsi_div.get("D")  # D slot = H1 in scalping remap
+            elif isinstance(rsi_div, str):
+                h1_rsi_div = rsi_div
+            else:
+                h1_rsi_div = None
+
+            if h1_rsi_div:
+                div_str = str(h1_rsi_div).lower()
+                if "bullish" in div_str:
+                    buy_confluence += 2  # RSI div on H1 is strong signal
+                    logger.info(
+                        f"Scalping H1: RSI bullish divergence on "
+                        f"{data.instrument} — BUY confluence +2"
+                    )
+                elif "bearish" in div_str:
+                    sell_confluence += 2
+                    logger.info(
+                        f"Scalping H1: RSI bearish divergence on "
+                        f"{data.instrument} — SELL confluence +2"
+                    )
+
+        # ── Primary direction logic (unchanged core) ──
         if price_above_ema50 and macd_bullish:
-            # Strong buy if also above SMA 200
             if sma_filter is None or sma_filter:
                 if divergence == "bearish":
+                    # Bearish MACD divergence warns against BUY, but if
+                    # other confluence strongly favors BUY, allow it
+                    if buy_confluence >= 2:
+                        logger.info(
+                            f"Scalping H1: bearish MACD divergence on "
+                            f"{data.instrument} overridden by strong BUY "
+                            f"confluence ({buy_confluence} factors)"
+                        )
+                        return "BUY"
                     logger.info(
                         f"Scalping H1: bearish MACD divergence detected on "
                         f"{data.instrument} — weakening BUY direction"
                     )
-                    return None  # divergence warns against the trend
+                    return None
                 return "BUY"
         elif not price_above_ema50 and not macd_bullish:
-            # Strong sell if also below SMA 200
             if sma_filter is None or not sma_filter:
                 if divergence == "bullish":
+                    if sell_confluence >= 2:
+                        logger.info(
+                            f"Scalping H1: bullish MACD divergence on "
+                            f"{data.instrument} overridden by strong SELL "
+                            f"confluence ({sell_confluence} factors)"
+                        )
+                        return "SELL"
                     logger.info(
                         f"Scalping H1: bullish MACD divergence detected on "
                         f"{data.instrument} — weakening SELL direction"
                     )
-                    return None  # divergence warns against the trend
+                    return None
                 return "SELL"
 
         # Gap 11: divergence can provide direction when standard conditions
@@ -222,6 +321,22 @@ class ScalpingAnalyzer:
             logger.info(
                 f"Scalping H1: bearish MACD divergence provides SELL bias "
                 f"on {data.instrument}"
+            )
+            return "SELL"
+
+        # Additional confluence can tip ambiguous situations
+        if buy_confluence >= 2 and sell_confluence == 0:
+            logger.info(
+                f"Scalping H1: strong BUY confluence ({buy_confluence} factors) "
+                f"provides direction on {data.instrument} despite ambiguous "
+                f"EMA/MACD"
+            )
+            return "BUY"
+        if sell_confluence >= 2 and buy_confluence == 0:
+            logger.info(
+                f"Scalping H1: strong SELL confluence ({sell_confluence} factors) "
+                f"provides direction on {data.instrument} despite ambiguous "
+                f"EMA/MACD"
             )
             return "SELL"
 
@@ -247,6 +362,16 @@ class ScalpingAnalyzer:
         We build a synthetic AnalysisResult with scalping timeframe data
         and run it through the standard strategy detection.
         """
+        # Re-evaluate H1 direction with full analysis context for better
+        # confluence (S/R proximity, patterns, RSI divergence on H1).
+        # This enriches the initial direction determined in analyze_scalping()
+        # which runs without an AnalysisResult.
+        enriched_direction = self._determine_h1_direction(
+            scalp_data, analysis=analysis
+        )
+        if enriched_direction is not None:
+            scalp_data.h1_direction = enriched_direction
+
         if scalp_data.h1_direction is None:
             logger.debug(
                 f"Scalping: no H1 direction for {scalp_data.instrument} — skipping"
@@ -280,12 +405,28 @@ class ScalpingAnalyzer:
         signal = self._enforce_fibonacci_sl(signal, scalp_analysis)
 
         # Validate scalping-specific conditions
-        if not self._validate_scalping_conditions(scalp_data, signal.direction):
+        validation = self._validate_scalping_conditions(scalp_data, signal.direction)
+        if not validation["valid"]:
             logger.debug(
                 f"Scalping: conditions not met for {signal.instrument} "
                 f"{signal.direction}"
             )
             return None
+
+        # Apply confidence adjustments from optional indicators and
+        # deceleration detection
+        if validation["confidence_adj"] != 0:
+            original_conf = signal.confidence
+            signal.confidence = max(0, min(100, signal.confidence + validation["confidence_adj"]))
+            adj_reasons = "; ".join(validation["reasons"])
+            logger.info(
+                f"Scalping confidence adjusted for {signal.instrument}: "
+                f"{original_conf:.0f}% -> {signal.confidence:.0f}% ({adj_reasons})"
+            )
+
+        # Override TP to nearest swing high/low if closer (Workshop: "safest"
+        # TP for scalping is recent highs/lows on H1)
+        signal = self._apply_swing_tp_override(signal, scalp_data)
 
         self._scalping_setups_found += 1
         logger.info(
@@ -426,43 +567,77 @@ class ScalpingAnalyzer:
 
     def _validate_scalping_conditions(
         self, scalp_data: ScalpingData, direction: str
-    ) -> bool:
+    ) -> Dict[str, Any]:
         """
-        Validate scalping-specific entry conditions:
+        Validate scalping-specific entry conditions and return a confidence
+        adjustment instead of a binary pass/fail for optional indicators.
+
+        Hard requirements (reject if failed):
         1. M15 EMA 50 break confirms structure (price on correct side)
-        2. M5 MACD confirms direction
         3. M1 EMA 50 break confirms execution timing
         4. Volume on M5 above average (confirmation)
+
+        Soft/optional indicators (reduce confidence, do not reject):
+        2. M5 MACD agreement — the mentor says "I don't usually use MACD
+           on M5" and it's "not obligatory." Disagreement reduces confidence
+           by 10-15 points instead of rejecting.
+
+        Returns:
+            Dict with:
+              - valid (bool): False only if a hard requirement fails.
+              - confidence_adj (int): Confidence adjustment (negative = penalty).
+              - reasons (list[str]): Explanation of adjustments applied.
         """
+        result = {"valid": True, "confidence_adj": 0, "reasons": []}
+
         # Condition 1: M15 structure - price must be on correct side of EMA 50
         if scalp_data.close_m15 is not None and scalp_data.ema50_m15 is not None:
             if direction == "BUY" and scalp_data.close_m15 < scalp_data.ema50_m15:
-                return False
+                result["valid"] = False
+                return result
             if direction == "SELL" and scalp_data.close_m15 > scalp_data.ema50_m15:
-                return False
+                result["valid"] = False
+                return result
 
-        # Condition 2: M5 MACD should agree with direction
+        # Condition 2: M5 MACD — OPTIONAL, not a hard requirement.
+        # Per the mentor: "I don't usually use MACD on M5" / "not obligatory."
+        # Disagreement reduces confidence by 10-15 points instead of rejecting.
         if scalp_data.macd_m5:
             macd_bullish = scalp_data.macd_m5.get("bullish", False)
-            if direction == "BUY" and not macd_bullish:
-                return False
-            if direction == "SELL" and macd_bullish:
-                return False
+            macd_disagrees = (
+                (direction == "BUY" and not macd_bullish)
+                or (direction == "SELL" and macd_bullish)
+            )
+            if macd_disagrees:
+                penalty = -12  # 10-15 range, use midpoint
+                result["confidence_adj"] += penalty
+                result["reasons"].append(
+                    f"M5 MACD disagrees with {direction} direction "
+                    f"(confidence {penalty}pts — optional indicator)"
+                )
+                logger.debug(
+                    f"Scalping: M5 MACD disagrees on {scalp_data.instrument} "
+                    f"{direction} — applying {penalty}pt confidence penalty "
+                    f"(not rejecting, MACD on M5 is optional per mentor)"
+                )
 
-        # Condition 3: M1 execution trigger — diagonal/trendline break or EMA 50 break
-        # The scalping workshop says M1 execution should be based on a diagonal
-        # break or EMA 50 break in the signal direction, NOT MACD agreement.
+        # Condition 3: M1 execution trigger — EMA 50 break in signal direction.
+        # TODO: M1 diagonal/trendline break is an alternative execution trigger
+        # per the Scalping Workshop (step 6: "entry on M1 via diagonal break or
+        # EMA 50 break"). Diagonal/trendline detection on M1 is NOT YET
+        # IMPLEMENTED. Currently the code only uses EMA 50 positioning on M1
+        # as the execution trigger. Implementing diagonal detection would
+        # require identifying swing highs/lows on M1 and fitting trendlines,
+        # which is a significant addition.
         if scalp_data.close_m1 is not None and scalp_data.ema50_m1 is not None:
             if direction == "BUY" and scalp_data.close_m1 < scalp_data.ema50_m1:
                 # Price below M1 EMA 50 — no BUY execution trigger
-                return False
+                result["valid"] = False
+                return result
             if direction == "SELL" and scalp_data.close_m1 > scalp_data.ema50_m1:
                 # Price above M1 EMA 50 — no SELL execution trigger
-                return False
-        # NOTE: Diagonal/trendline break detection requires candle pattern analysis
-        # on M1 which is handled by the strategy detection in detect_scalping_setup().
-        # Here we validate the minimum condition: price must have broken through
-        # M1 EMA 50 in the signal direction as the execution trigger.
+                result["valid"] = False
+                return result
 
         # Condition 4: Volume confirmation on M5 (at least 0.8x average)
         if scalp_data.volume_m5:
@@ -472,9 +647,222 @@ class ScalpingAnalyzer:
                     f"Scalping: low volume on M5 for {scalp_data.instrument} "
                     f"(ratio={vol_ratio:.2f})"
                 )
-                return False
+                result["valid"] = False
+                return result
 
-        return True
+        # Deceleration detection on H1 and M5 (Workshop steps 2 and 5)
+        # Adds confluence scoring, not hard rejection.
+        h1_decel = self._detect_deceleration(
+            scalp_data.candles.get("H1", pd.DataFrame()), direction
+        )
+        if h1_decel:
+            result["confidence_adj"] += h1_decel["adj"]
+            result["reasons"].append(f"H1 deceleration: {h1_decel['reason']}")
+
+        m5_decel = self._detect_deceleration(
+            scalp_data.candles.get("M5", pd.DataFrame()), direction
+        )
+        if m5_decel:
+            result["confidence_adj"] += m5_decel["adj"]
+            result["reasons"].append(f"M5 deceleration: {m5_decel['reason']}")
+
+        return result
+
+    # ── Deceleration Detection (Workshop Steps 2 & 5) ─────────────────
+
+    def _detect_deceleration(
+        self,
+        df: pd.DataFrame,
+        direction: str,
+        lookback: int = 5,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Detect deceleration and potential reversal on a timeframe by checking
+        for decreasing candle body sizes and increasing wick sizes over the
+        last 3-5 candles.
+
+        Workshop steps 2 (H1) and 5 (M5) require detecting "deceleration and
+        reversal" as part of the scalping analysis. This is used as confluence
+        scoring, not hard rejection.
+
+        Deceleration indicators:
+        - Decreasing candle body sizes (momentum fading)
+        - Increasing upper wicks (for BUY = selling pressure)
+          or increasing lower wicks (for SELL = buying pressure)
+
+        Args:
+            df: OHLCV DataFrame for the timeframe.
+            direction: "BUY" or "SELL" — the current trade direction.
+            lookback: Number of recent candles to examine (3-5).
+
+        Returns:
+            Dict with 'adj' (confidence adjustment) and 'reason', or None
+            if no deceleration detected.
+        """
+        if df.empty or len(df) < lookback:
+            return None
+
+        tail = df.tail(lookback)
+        bodies = abs(tail["close"] - tail["open"]).values
+        upper_wicks = (tail["high"] - tail[["close", "open"]].max(axis=1)).values
+        lower_wicks = (tail[["close", "open"]].min(axis=1) - tail["low"]).values
+
+        # Check for decreasing body sizes: compare first half vs second half
+        mid = lookback // 2
+        first_bodies = bodies[:mid]
+        second_bodies = bodies[mid:]
+
+        avg_first_body = float(np.mean(first_bodies)) if len(first_bodies) > 0 else 0
+        avg_second_body = float(np.mean(second_bodies)) if len(second_bodies) > 0 else 0
+
+        bodies_decreasing = (
+            avg_first_body > 0
+            and avg_second_body < avg_first_body * 0.7  # 30%+ decrease
+        )
+
+        # Check for increasing rejection wicks against the direction
+        if direction == "BUY":
+            # For BUY: increasing upper wicks = selling pressure (bad)
+            wicks = upper_wicks
+        else:
+            # For SELL: increasing lower wicks = buying pressure (bad)
+            wicks = lower_wicks
+
+        first_wicks = wicks[:mid]
+        second_wicks = wicks[mid:]
+        avg_first_wick = float(np.mean(first_wicks)) if len(first_wicks) > 0 else 0
+        avg_second_wick = float(np.mean(second_wicks)) if len(second_wicks) > 0 else 0
+
+        wicks_increasing = (
+            avg_first_wick > 0
+            and avg_second_wick > avg_first_wick * 1.3  # 30%+ increase
+        )
+
+        if bodies_decreasing and wicks_increasing:
+            # Strong deceleration signal
+            return {
+                "adj": -10,
+                "reason": (
+                    f"decreasing body sizes ({avg_first_body:.5f} -> "
+                    f"{avg_second_body:.5f}) and increasing rejection wicks "
+                    f"({avg_first_wick:.5f} -> {avg_second_wick:.5f}) over "
+                    f"last {lookback} candles"
+                ),
+            }
+        elif bodies_decreasing:
+            # Mild deceleration
+            return {
+                "adj": -5,
+                "reason": (
+                    f"decreasing body sizes ({avg_first_body:.5f} -> "
+                    f"{avg_second_body:.5f}) over last {lookback} candles"
+                ),
+            }
+        elif wicks_increasing:
+            # Rejection wicks increasing
+            return {
+                "adj": -5,
+                "reason": (
+                    f"increasing rejection wicks ({avg_first_wick:.5f} -> "
+                    f"{avg_second_wick:.5f}) over last {lookback} candles"
+                ),
+            }
+
+        return None
+
+    # ── TP Override to Nearest Swing High/Low (Workshop) ─────────────
+
+    def _apply_swing_tp_override(
+        self,
+        signal: SetupSignal,
+        scalp_data: ScalpingData,
+        swing_lookback: int = 50,
+    ) -> SetupSignal:
+        """
+        Override TP1 to the nearest swing high (for BUY) or swing low
+        (for SELL) from the H1 timeframe, if it is closer than the
+        strategy-generated TP.
+
+        Workshop says the "safest" TP for scalping is recent highs/lows.
+        This ensures we take profit at a known level rather than
+        projecting too far.
+
+        Args:
+            signal: The SetupSignal with strategy-generated TP.
+            scalp_data: ScalpingData with H1 candles.
+            swing_lookback: Number of H1 candles to scan for swing points.
+
+        Returns:
+            The signal, potentially with TP1 overridden.
+        """
+        h1_df = scalp_data.candles.get("H1", pd.DataFrame())
+        if h1_df.empty or len(h1_df) < 5:
+            return signal
+
+        recent = h1_df.tail(swing_lookback)
+
+        if signal.direction == "BUY":
+            # Find swing highs: candles where high > neighbors
+            swing_levels = []
+            highs = recent["high"].values
+            for i in range(1, len(highs) - 1):
+                if highs[i] > highs[i - 1] and highs[i] > highs[i + 1]:
+                    swing_levels.append(float(highs[i]))
+
+            # Only consider swing highs above entry price
+            candidates = [s for s in swing_levels if s > signal.entry_price]
+            if not candidates:
+                return signal
+
+            nearest_swing = min(candidates)  # nearest swing high above entry
+
+            # Override TP1 if the swing high is closer (safer)
+            if hasattr(signal, "take_profit_1") and signal.take_profit_1 is not None:
+                if nearest_swing < signal.take_profit_1:
+                    original_tp = signal.take_profit_1
+                    signal.take_profit_1 = nearest_swing
+                    # Recalculate R:R
+                    sl_distance = abs(signal.entry_price - signal.stop_loss)
+                    tp_distance = abs(signal.take_profit_1 - signal.entry_price)
+                    if sl_distance > 0:
+                        signal.risk_reward_ratio = tp_distance / sl_distance
+                    logger.info(
+                        f"Scalping TP override: {signal.instrument} BUY TP1 "
+                        f"{original_tp:.5f} -> {nearest_swing:.5f} (nearest H1 "
+                        f"swing high, R:R {signal.risk_reward_ratio:.2f}:1)"
+                    )
+
+        elif signal.direction == "SELL":
+            # Find swing lows: candles where low < neighbors
+            swing_levels = []
+            lows = recent["low"].values
+            for i in range(1, len(lows) - 1):
+                if lows[i] < lows[i - 1] and lows[i] < lows[i + 1]:
+                    swing_levels.append(float(lows[i]))
+
+            # Only consider swing lows below entry price
+            candidates = [s for s in swing_levels if s < signal.entry_price]
+            if not candidates:
+                return signal
+
+            nearest_swing = max(candidates)  # nearest swing low below entry
+
+            # Override TP1 if the swing low is closer (safer)
+            if hasattr(signal, "take_profit_1") and signal.take_profit_1 is not None:
+                if nearest_swing > signal.take_profit_1:
+                    original_tp = signal.take_profit_1
+                    signal.take_profit_1 = nearest_swing
+                    sl_distance = abs(signal.entry_price - signal.stop_loss)
+                    tp_distance = abs(signal.take_profit_1 - signal.entry_price)
+                    if sl_distance > 0:
+                        signal.risk_reward_ratio = tp_distance / sl_distance
+                    logger.info(
+                        f"Scalping TP override: {signal.instrument} SELL TP1 "
+                        f"{original_tp:.5f} -> {nearest_swing:.5f} (nearest H1 "
+                        f"swing low, R:R {signal.risk_reward_ratio:.2f}:1)"
+                    )
+
+        return signal
 
     def _enforce_fibonacci_sl(
         self, signal: SetupSignal, analysis: AnalysisResult

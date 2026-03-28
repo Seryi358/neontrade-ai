@@ -314,7 +314,7 @@ export default function SettingsScreen() {
     const numValue = parseFloat(rawValue);
     if (isNaN(numValue)) return;
     // Convert display percentage to decimal for percentage fields
-    const isPercentField = ['risk_day_trading', 'risk_scalping', 'risk_swing', 'max_total_risk', 'move_sl_to_be_at'].includes(field);
+    const isPercentField = ['risk_day_trading', 'risk_scalping', 'risk_swing', 'max_total_risk', 'move_sl_to_be_pct_to_tp1', 'correlated_risk_pct'].includes(field);
     const apiValue = isPercentField ? numValue / 100 : numValue;
     try {
       const res = await authFetch(`${API_URL}/api/v1/risk-config`, {
@@ -530,25 +530,53 @@ export default function SettingsScreen() {
         {fundedEnabled && fundedStatus && (
           <View style={{ marginTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }}>
             <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Diario Max</Text>
-              <Text style={[styles.configValue, { color: theme.colors.neonOrange }]}>
-                {((fundedStatus.daily_dd_limit || 0.05) * 100).toFixed(0)}%
+              <Text style={styles.configLabel}>Tipo Cuenta</Text>
+              <Text style={[styles.configValue, { color: theme.colors.neonCyan }]}>
+                {(fundedStatus.account_type || 'swing').toUpperCase()}
               </Text>
             </View>
             <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Diario Actual</Text>
+              <Text style={styles.configLabel}>Evaluacion</Text>
+              <Text style={[styles.configValue, { color: theme.colors.neonCyan }]}>
+                {(fundedStatus.evaluation_type || '2phase').toUpperCase()} — Fase {fundedStatus.current_phase || 1}
+              </Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Diario Max</Text>
+              <Text style={[styles.configValue, { color: theme.colors.neonOrange }]}>
+                {(fundedStatus.daily_dd_limit || 5).toFixed(0)}%
+              </Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Diario Usado</Text>
               <Text style={[styles.configValue,
-                Math.abs(fundedStatus.daily_pnl_pct || 0) > 3 ? styles.loss : styles.profit
+                (fundedStatus.daily_dd_used_pct || 0) > 60 ? styles.loss : styles.profit
               ]}>
-                {((fundedStatus.daily_pnl_pct || 0) * 100).toFixed(2)}%
+                {(fundedStatus.daily_dd_used_pct || 0).toFixed(1)}%
               </Text>
             </View>
             <View style={styles.configRow}>
               <Text style={styles.configLabel}>DD Total Max</Text>
               <Text style={[styles.configValue, { color: theme.colors.neonOrange }]}>
-                {((fundedStatus.total_dd_limit || 0.10) * 100).toFixed(0)}%
+                {(fundedStatus.total_dd_limit || 10).toFixed(0)}%
               </Text>
             </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>DD Total Actual</Text>
+              <Text style={[styles.configValue,
+                (fundedStatus.total_dd_pct || 0) > 5 ? styles.loss : styles.profit
+              ]}>
+                {(fundedStatus.total_dd_pct || 0).toFixed(2)}%
+              </Text>
+            </View>
+            {(fundedStatus.profit_target_pct || 0) > 0 && (
+              <View style={styles.configRow}>
+                <Text style={styles.configLabel}>Objetivo Profit</Text>
+                <Text style={[styles.configValue, { color: theme.colors.neonGreen }]}>
+                  {(fundedStatus.profit_progress_pct || 0).toFixed(1)}% / {(fundedStatus.profit_target_pct || 0).toFixed(0)}%
+                </Text>
+              </View>
+            )}
             <View style={styles.configRow}>
               <Text style={styles.configLabel}>No Overnight</Text>
               <Text style={styles.configValue}>{fundedStatus.no_overnight ? 'Si' : 'No'}</Text>
@@ -556,6 +584,10 @@ export default function SettingsScreen() {
             <View style={styles.configRow}>
               <Text style={styles.configLabel}>No News Trading</Text>
               <Text style={styles.configValue}>{fundedStatus.no_news_trading ? 'Si' : 'No'}</Text>
+            </View>
+            <View style={styles.configRow}>
+              <Text style={styles.configLabel}>No Weekend</Text>
+              <Text style={styles.configValue}>{fundedStatus.no_weekend ? 'Si' : 'No'}</Text>
             </View>
           </View>
         )}
@@ -716,9 +748,9 @@ export default function SettingsScreen() {
           { key: 'risk_scalping', label: 'Scalping', fmt: (v: number) => `${(v * 100).toFixed(1)}%` },
           { key: 'risk_swing', label: 'Swing', fmt: (v: number) => `${(v * 100).toFixed(1)}%` },
           { key: 'max_total_risk', label: 'Max Total Risk', fmt: (v: number) => `${(v * 100).toFixed(1)}%` },
-          { key: 'correlated_risk_factor', label: 'Factor Correlacion', fmt: (v: number) => `${v.toFixed(2)}x` },
+          { key: 'correlated_risk_pct', label: 'Riesgo Correlacion', fmt: (v: number) => `${(v * 100).toFixed(2)}%` },
           { key: 'min_rr_ratio', label: 'Min R:R', fmt: (v: number) => `1:${v.toFixed(2)}` },
-          { key: 'move_sl_to_be_at', label: 'Mover SL a BE', fmt: (v: number) => `${(v * 100).toFixed(0)}%` },
+          { key: 'move_sl_to_be_pct_to_tp1', label: 'BE a % de TP1', fmt: (v: number) => `${(v * 100).toFixed(0)}%` },
         ].map((item) => (
           <View key={item.key} style={styles.configRow}>
             <Text style={styles.configLabel}>{item.label}</Text>
@@ -736,7 +768,7 @@ export default function SettingsScreen() {
             ) : (
               <TouchableOpacity onPress={() => {
                 const val = riskConfig[item.key];
-                const isPercent = ['risk_day_trading', 'risk_scalping', 'risk_swing', 'max_total_risk', 'move_sl_to_be_at'].includes(item.key);
+                const isPercent = ['risk_day_trading', 'risk_scalping', 'risk_swing', 'max_total_risk', 'move_sl_to_be_pct_to_tp1', 'correlated_risk_pct'].includes(item.key);
                 setEditValue(isPercent ? (val * 100).toFixed(1) : val?.toFixed(2) || '0');
                 setEditingRisk(item.key);
               }}>

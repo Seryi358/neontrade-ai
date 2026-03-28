@@ -5,7 +5,7 @@ Implements all risk management rules from the TradingLab Trading Plan.
 Rules:
 - 1% risk per Day Trade
 - 0.5% risk per Scalping trade
-- 1% risk per Swing Trade
+- 3% risk per Swing Trade (Trading Plan PDF)
 - Max 7% total risk at any time
 - Correlated pairs: 0.75% each instead of full risk
 - No trading before major news
@@ -94,6 +94,9 @@ class RiskManager:
         # Funded account tracking
         self._funded_daily_pnl: float = 0.0
         self._funded_daily_pnl_date: str = ""
+        # Start-of-day balance for funded account DD calculation
+        # Most prop firms calculate daily DD from start-of-day equity (or highest equity of day)
+        self._funded_start_of_day_balance: float = 0.0
 
     # ── Drawdown Management (ch18.7) ────────────────────────────────
 
@@ -347,23 +350,32 @@ class RiskManager:
     def _adjust_for_correlation(self, instrument: str, base_risk: float) -> float:
         """
         If there's already an open trade on a correlated pair,
-        reduce risk to 0.75% (correlation factor).
+        reduce risk to a fixed 0.75% each (TradingLab Trading Plan).
+        Mentorship: "entrar con el 0,75% de riesgo en cada uno"
+        This is a fixed absolute value, not a multiplier of the adjusted risk.
         """
         active_instruments = set()
-        # This will be populated from open trades
         for trade_id, risk in self._active_risks.items():
             parts = trade_id.split(":")
             if len(parts) > 1:
                 active_instruments.add(parts[0])
 
-        for group in settings.correlation_groups:
+        # Check all correlation groups (forex, indices, crypto)
+        all_groups = (
+            settings.correlation_groups
+            + getattr(settings, 'indices_correlation_groups', [])
+            + getattr(settings, 'crypto_correlation_groups', [])
+        )
+
+        for group in all_groups:
             if instrument in group:
                 for active_inst in active_instruments:
                     if active_inst in group and active_inst != instrument:
-                        adjusted = base_risk * settings.correlated_risk_factor
+                        # Fixed 0.75% per correlated trade (mentorship rule)
+                        adjusted = settings.correlated_risk_pct  # 0.0075 = 0.75%
                         logger.info(
                             f"Correlation detected: {instrument} <-> {active_inst}. "
-                            f"Risk adjusted from {base_risk:.2%} to {adjusted:.2%}"
+                            f"Risk set to fixed {adjusted:.2%} (mentorship: 0.75% each)"
                         )
                         return adjusted
         return base_risk
@@ -503,10 +515,13 @@ class RiskManager:
         if self._funded_daily_pnl_date != today:
             self._funded_daily_pnl = 0.0
             self._funded_daily_pnl_date = today
+            # Snapshot start-of-day balance for accurate DD calculation
+            self._funded_start_of_day_balance = self._current_balance
 
-        # Check daily DD: realized daily loss vs max daily DD
-        if self._current_balance > 0:
-            daily_dd_limit = settings.funded_max_daily_dd * self._current_balance
+        # Use start-of-day balance for daily DD (most prop firms use this method)
+        sod_balance = self._funded_start_of_day_balance or self._current_balance
+        if sod_balance > 0:
+            daily_dd_limit = settings.funded_max_daily_dd * sod_balance
             if self._funded_daily_pnl < 0 and abs(self._funded_daily_pnl) >= daily_dd_limit:
                 return (
                     False,
@@ -549,16 +564,34 @@ class RiskManager:
         else:
             daily_pnl = self._funded_daily_pnl
 
+        sod_balance = self._funded_start_of_day_balance or self._current_balance
         daily_dd_limit = (
-            settings.funded_max_daily_dd * self._current_balance
-            if self._current_balance > 0 else 0.0
+            settings.funded_max_daily_dd * sod_balance
+            if sod_balance > 0 else 0.0
         )
         total_dd = self.get_current_drawdown()
+
+        # Profit target tracking for evaluation phases
+        profit_target = 0.0
+        if settings.funded_current_phase == 1:
+            profit_target = settings.funded_profit_target_phase1
+        elif settings.funded_current_phase == 2:
+            profit_target = settings.funded_profit_target_phase2
+
+        # Calculate profit progress
+        profit_progress = 0.0
+        if self._peak_balance > 0 and profit_target > 0:
+            initial_balance = self._peak_balance / (1 + total_dd) if total_dd < 1 else self._peak_balance
+            current_profit_pct = (self._current_balance - initial_balance) / initial_balance if initial_balance > 0 else 0
+            profit_progress = (current_profit_pct / profit_target * 100) if profit_target > 0 else 0
 
         can_trade, reason = self.check_funded_account_limits()
 
         return {
             "enabled": settings.funded_account_mode,
+            "account_type": settings.funded_account_type,
+            "evaluation_type": settings.funded_evaluation_type,
+            "current_phase": settings.funded_current_phase,
             "can_trade": can_trade,
             "blocked_reason": reason,
             "daily_pnl": round(daily_pnl, 2),
@@ -568,10 +601,14 @@ class RiskManager:
             ),
             "daily_dd_limit": round(settings.funded_max_daily_dd * 100, 2),
             "daily_dd_limit_amount": round(daily_dd_limit, 2),
+            "start_of_day_balance": round(sod_balance, 2),
             "total_dd_pct": round(total_dd * 100, 2),
             "total_dd_limit": round(settings.funded_max_total_dd * 100, 2),
+            "profit_target_pct": round(profit_target * 100, 2),
+            "profit_progress_pct": round(profit_progress, 2),
             "no_overnight": settings.funded_no_overnight,
             "no_news_trading": settings.funded_no_news_trading,
+            "no_weekend": settings.funded_no_weekend,
         }
 
     def get_risk_status(self) -> Dict:

@@ -944,8 +944,8 @@ def test_h_cross_module_consistency():
     settings_fields = set(settings_obj.model_fields.keys())
     used_settings = [
         "risk_day_trading", "risk_scalping", "risk_swing",
-        "max_total_risk", "correlated_risk_factor", "min_rr_ratio",
-        "min_rr_black", "min_rr_green", "move_sl_to_be_at",
+        "max_total_risk", "correlated_risk_pct", "min_rr_ratio",
+        "min_rr_black", "min_rr_green", "move_sl_to_be_pct_to_tp1",
         "scale_in_require_be", "partial_taking", "allow_partial_profits",
         "sl_management_style", "drawdown_method", "drawdown_level_1",
         "drawdown_level_2", "drawdown_level_3", "drawdown_risk_1",

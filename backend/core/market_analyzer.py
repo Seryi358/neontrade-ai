@@ -191,9 +191,12 @@ class MarketAnalyzer:
         except Exception as e:
             logger.debug(f"Chart pattern detection failed for {instrument}: {e}")
 
-        # Step 8: MACD (from scalping workshop - H1, M15, M5 + Daily from TradingLab)
+        # Step 8: MACD (H1, M15 + Daily from TradingLab)
+        # M5 MACD removed: mentorship says "en cinco minutos no utilizo MACD ni
+        # RSI porque lo veo ya demasiado volatil". M5 MACD only available via
+        # scalping engine explicit opt-in (scalping_engine.py).
         macd_values = {}
-        for tf in ("D", "H1", "M15", "M5"):
+        for tf in ("D", "H1", "M15"):
             df = candles.get(tf, pd.DataFrame())
             if not df.empty:
                 macd_data = self._calculate_macd(df)
@@ -223,12 +226,14 @@ class MarketAnalyzer:
             candles.get("H4", pd.DataFrame())
         )
 
-        # Step 11: Order Blocks (from SMC workshop)
-        order_blocks = self._detect_order_blocks(candles.get("H1", pd.DataFrame()))
-
-        # Step 12: BOS/CHOCH (from SMC workshop)
+        # Step 11: BOS/CHOCH first (needed by OB detection)
         structure_breaks = self._detect_structure_breaks(
             candles.get("H1", pd.DataFrame())
+        )
+
+        # Step 12: Order Blocks (from SMC workshop) - linked to structure breaks
+        order_blocks = self._detect_order_blocks(
+            candles.get("H1", pd.DataFrame()), structure_breaks
         )
 
         # Step 12b: Extract swing highs/lows from H1 (used by PINK/WHITE TP calc)
@@ -254,8 +259,9 @@ class MarketAnalyzer:
                 if vol_data:
                     volume_analysis[tf] = vol_data
 
-        # Step 13b: Extract EMA_W_8 and SMA_D_200 for convenience fields
-        ema_w8_val = ema_values.get("EMA_W_8")
+        # Step 13b: Extract SMA_D_200 for convenience field
+        # EMA_W_8 removed: not from mentorship
+        ema_w8_val = None
         sma_d200_val = sma_values.get("SMA_D_200")
 
         # Step 14: HTF/LTF convergence
@@ -451,28 +457,99 @@ class MarketAnalyzer:
         return df
 
     def _detect_trend(self, df: pd.DataFrame) -> Trend:
-        """Detect trend using EMA crossover and price structure."""
+        """
+        Detect trend using structure-based swing analysis (primary) with
+        EMA 20/50 as confirmation and SMA 200 as long-term filter.
+
+        Structure rules:
+          - Higher Highs + Higher Lows = BULLISH
+          - Lower Highs + Lower Lows = BEARISH
+          - Mixed = RANGING (unless EMA/SMA override)
+
+        EMA 20/50 confirmation: must agree with structure for a definitive call.
+        SMA 200: long-term trend filter (price above = bullish bias, below = bearish).
+        """
         if df.empty or len(df) < 50:
             return Trend.RANGING
 
+        data = df.reset_index(drop=True)
+
+        # ── Step 1: Swing high/low analysis (primary) ──
+        swing_highs: List[Tuple[int, float]] = []
+        swing_lows: List[Tuple[int, float]] = []
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                data["high"].iloc[i] > data["high"].iloc[i + 1]):
+                swing_highs.append((i, float(data["high"].iloc[i])))
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                data["low"].iloc[i] < data["low"].iloc[i + 1]):
+                swing_lows.append((i, float(data["low"].iloc[i])))
+
+        structure_trend = Trend.RANGING
+        if len(swing_highs) >= 2 and len(swing_lows) >= 2:
+            hh = swing_highs[-1][1] > swing_highs[-2][1]  # higher high
+            hl = swing_lows[-1][1] > swing_lows[-2][1]    # higher low
+            lh = swing_highs[-1][1] < swing_highs[-2][1]  # lower high
+            ll = swing_lows[-1][1] < swing_lows[-2][1]    # lower low
+
+            if hh and hl:
+                structure_trend = Trend.BULLISH
+            elif lh and ll:
+                structure_trend = Trend.BEARISH
+
+        # ── Step 2: EMA 20/50 confirmation ──
         ema_20 = df["close"].ewm(span=20).mean()
         ema_50 = df["close"].ewm(span=50).mean()
+        current_price = float(df["close"].iloc[-1])
+        ema20_val = float(ema_20.iloc[-1])
+        ema50_val = float(ema_50.iloc[-1])
 
-        current_price = df["close"].iloc[-1]
-        ema20_val = ema_20.iloc[-1]
-        ema50_val = ema_50.iloc[-1]
+        ema_bullish = current_price > ema20_val > ema50_val
+        ema_bearish = current_price < ema20_val < ema50_val
 
-        if current_price > ema20_val > ema50_val:
+        # ── Step 3: SMA 200 long-term filter ──
+        sma_200_bullish = False
+        sma_200_bearish = False
+        if len(df) >= 200:
+            sma_200 = float(df["close"].rolling(200).mean().iloc[-1])
+            sma_200_bullish = current_price > sma_200
+            sma_200_bearish = current_price < sma_200
+
+        # ── Step 4: Combine signals ──
+        # Structure is primary; EMA confirms; SMA 200 is the long-term filter
+        if structure_trend == Trend.BULLISH:
+            # Structure says bullish — confirmed if EMA agrees or SMA 200 agrees
+            if ema_bullish or sma_200_bullish:
+                return Trend.BULLISH
+            # Structure bullish but no confirmation — still bullish (structure wins)
             return Trend.BULLISH
-        elif current_price < ema20_val < ema50_val:
+        elif structure_trend == Trend.BEARISH:
+            if ema_bearish or sma_200_bearish:
+                return Trend.BEARISH
             return Trend.BEARISH
-        return Trend.RANGING
+        else:
+            # Structure is ranging — fall back to EMA + SMA 200
+            if ema_bullish and sma_200_bullish:
+                return Trend.BULLISH
+            elif ema_bearish and sma_200_bearish:
+                return Trend.BEARISH
+            return Trend.RANGING
 
     def _detect_condition(self, df: pd.DataFrame) -> MarketCondition:
-        """Detect overbought/oversold using RSI-like calculation."""
-        if df.empty or len(df) < 14:
+        """
+        Detect market condition: overbought/oversold AND acceleration/deceleration.
+
+        Acceleration/deceleration is critical for BLUE, RED, BLACK strategy detection:
+        - ACCELERATING: candles getting larger, price moving away from EMA 50
+        - DECELERATING: candles getting smaller, price approaching EMA 50
+
+        Priority: overbought/oversold extremes take precedence, then accel/decel,
+        then neutral.
+        """
+        if df.empty or len(df) < 50:
             return MarketCondition.NEUTRAL
 
+        # ── RSI for overbought/oversold ──
         delta = df["close"].diff()
         gain = delta.where(delta > 0, 0).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
@@ -480,16 +557,60 @@ class MarketAnalyzer:
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
         rsi = rsi.fillna(100.0)
-        current_rsi = rsi.iloc[-1]
+        current_rsi = float(rsi.iloc[-1])
 
+        # Overbought/oversold take priority (extreme conditions)
         if current_rsi > 70:
             return MarketCondition.OVERBOUGHT
         elif current_rsi < 30:
             return MarketCondition.OVERSOLD
+
+        # ── Acceleration / Deceleration detection ──
+        # Metric 1: Candle body size trend (last 5 vs previous 5)
+        if len(df) < 10:
+            return MarketCondition.NEUTRAL
+
+        bodies = (df["close"] - df["open"]).abs()
+        recent_bodies = bodies.iloc[-5:]
+        prev_bodies = bodies.iloc[-10:-5]
+        avg_recent_body = float(recent_bodies.mean())
+        avg_prev_body = float(prev_bodies.mean())
+
+        # Metric 2: Distance from EMA 50 (expanding = accel, contracting = decel)
+        ema_50 = df["close"].ewm(span=50).mean()
+        recent_dist = float((df["close"].iloc[-5:] - ema_50.iloc[-5:]).abs().mean())
+        prev_dist = float((df["close"].iloc[-10:-5] - ema_50.iloc[-10:-5]).abs().mean())
+
+        # Combine both metrics
+        body_expanding = avg_recent_body > avg_prev_body * 1.15  # 15% larger
+        body_contracting = avg_recent_body < avg_prev_body * 0.85  # 15% smaller
+        dist_expanding = recent_dist > prev_dist * 1.1  # moving away from EMA 50
+        dist_contracting = recent_dist < prev_dist * 0.9  # approaching EMA 50
+
+        # ACCELERATING: candles getting larger AND/OR moving away from EMA 50
+        if body_expanding and dist_expanding:
+            return MarketCondition.ACCELERATING
+        elif body_expanding or dist_expanding:
+            # One signal is enough if the other is not contradicting
+            if not body_contracting and not dist_contracting:
+                return MarketCondition.ACCELERATING
+
+        # DECELERATING: candles getting smaller AND/OR approaching EMA 50
+        if body_contracting and dist_contracting:
+            return MarketCondition.DECELERATING
+        elif body_contracting or dist_contracting:
+            if not body_expanding and not dist_expanding:
+                return MarketCondition.DECELERATING
+
         return MarketCondition.NEUTRAL
 
     def _find_key_levels(self, candles: Dict[str, pd.DataFrame]) -> Dict[str, List]:
-        """Find support, resistance, and Fair Value Gap (FVG) levels."""
+        """
+        Find support, resistance, and Fair Value Gap (FVG) levels.
+
+        S/R levels include zone width (not just exact prices), touch count,
+        and recency weighting for prioritization.
+        """
         levels: Dict[str, List] = {
             "supports": [],
             "resistances": [],
@@ -501,21 +622,89 @@ class MarketAnalyzer:
         if daily.empty:
             return levels
 
-        # Find swing highs and lows from daily
+        total_candles = len(daily)
+
+        # Find swing highs and lows from daily with index for recency
+        raw_resistances: List[Tuple[float, int]] = []  # (price, index)
+        raw_supports: List[Tuple[float, int]] = []
         for i in range(2, len(daily) - 2):
             # Swing high
             if (daily["high"].iloc[i] > daily["high"].iloc[i-1] and
                 daily["high"].iloc[i] > daily["high"].iloc[i-2] and
                 daily["high"].iloc[i] > daily["high"].iloc[i+1] and
                 daily["high"].iloc[i] > daily["high"].iloc[i+2]):
-                levels["resistances"].append(daily["high"].iloc[i])
+                raw_resistances.append((float(daily["high"].iloc[i]), i))
 
             # Swing low
             if (daily["low"].iloc[i] < daily["low"].iloc[i-1] and
                 daily["low"].iloc[i] < daily["low"].iloc[i-2] and
                 daily["low"].iloc[i] < daily["low"].iloc[i+1] and
                 daily["low"].iloc[i] < daily["low"].iloc[i+2]):
-                levels["supports"].append(daily["low"].iloc[i])
+                raw_supports.append((float(daily["low"].iloc[i]), i))
+
+        # Cluster nearby levels into zones with touch count and recency
+        def _cluster_levels(
+            raw_levels: List[Tuple[float, int]],
+            zone_tolerance: float = 0.002,
+        ) -> List[Dict]:
+            """
+            Cluster raw price levels within zone_tolerance (0.2%) into zones.
+            Returns list of dicts with price, zone_high, zone_low, touches, recency_score.
+            """
+            if not raw_levels:
+                return []
+            sorted_levels = sorted(raw_levels, key=lambda x: x[0])
+            clusters: List[List[Tuple[float, int]]] = []
+            current_cluster = [sorted_levels[0]]
+
+            for price, idx in sorted_levels[1:]:
+                cluster_avg = sum(p for p, _ in current_cluster) / len(current_cluster)
+                if cluster_avg > 0 and abs(price - cluster_avg) / cluster_avg <= zone_tolerance:
+                    current_cluster.append((price, idx))
+                else:
+                    clusters.append(current_cluster)
+                    current_cluster = [(price, idx)]
+            clusters.append(current_cluster)
+
+            result = []
+            for cluster in clusters:
+                prices = [p for p, _ in cluster]
+                indices = [idx for _, idx in cluster]
+                avg_price = sum(prices) / len(prices)
+                zone_high = max(prices)
+                zone_low = min(prices)
+                touches = len(cluster)
+                # Recency: higher score for more recent levels (0.0 to 1.0)
+                max_idx = max(indices)
+                recency_score = max_idx / total_candles if total_candles > 0 else 0.5
+                result.append({
+                    "price": round(avg_price, 5),
+                    "zone_high": round(zone_high, 5),
+                    "zone_low": round(zone_low, 5),
+                    "touches": touches,
+                    "recency": round(recency_score, 3),
+                })
+            return result
+
+        support_zones = _cluster_levels(raw_supports)
+        resistance_zones = _cluster_levels(raw_resistances)
+
+        # Sort by combined score: touches * recency (most relevant first)
+        for zone in support_zones:
+            zone["score"] = round(zone["touches"] * zone["recency"], 3)
+        for zone in resistance_zones:
+            zone["score"] = round(zone["touches"] * zone["recency"], 3)
+
+        support_zones.sort(key=lambda z: z["score"], reverse=True)
+        resistance_zones.sort(key=lambda z: z["score"], reverse=True)
+
+        # Store as plain floats for backward compatibility with strategies/base.py
+        # (strategies expect sorted lists of float prices, not zone dicts)
+        levels["supports"] = [z["price"] for z in support_zones[:10]]
+        levels["resistances"] = [z["price"] for z in resistance_zones[:10]]
+        # Also store full zone data for advanced SMC analysis
+        levels["support_zones"] = support_zones[:10]
+        levels["resistance_zones"] = resistance_zones[:10]
 
         # Find FVGs (Fair Value Gaps) from 1H — full data model (Gap 7)
         h1 = candles.get("H1", pd.DataFrame())
@@ -609,9 +798,71 @@ class MarketAnalyzer:
                             fvg["direction"] = "bullish"  # flip
                             break
 
-        # Keep only recent levels
-        levels["supports"] = sorted(levels["supports"])[-10:]
-        levels["resistances"] = sorted(levels["resistances"])[-10:]
+        # --- M15 FVG detection (critical for entry timing per workshop) ---
+        m15 = candles.get("M15", pd.DataFrame())
+        if not m15.empty:
+            for i in range(2, len(m15)):
+                # Bullish FVG: candle[i] low > candle[i-2] high
+                if m15["low"].iloc[i] > m15["high"].iloc[i-2]:
+                    high_boundary = float(m15["low"].iloc[i])
+                    low_boundary = float(m15["high"].iloc[i-2])
+                    midpoint = (high_boundary + low_boundary) / 2
+                    levels["fvg"].append(midpoint)
+                    fvg_zones.append({
+                        "high": high_boundary,
+                        "low": low_boundary,
+                        "mid": midpoint,
+                        "direction": "bullish",
+                        "filled": False,
+                        "timeframe": "M15",
+                        "index": i,
+                    })
+                # Bearish FVG: candle[i] high < candle[i-2] low
+                elif m15["high"].iloc[i] < m15["low"].iloc[i-2]:
+                    high_boundary = float(m15["low"].iloc[i-2])
+                    low_boundary = float(m15["high"].iloc[i])
+                    midpoint = (high_boundary + low_boundary) / 2
+                    levels["fvg"].append(midpoint)
+                    fvg_zones.append({
+                        "high": high_boundary,
+                        "low": low_boundary,
+                        "mid": midpoint,
+                        "direction": "bearish",
+                        "filled": False,
+                        "timeframe": "M15",
+                        "index": i,
+                    })
+
+            # Check M15 FVG fills
+            m15_fvgs = [f for f in fvg_zones if f.get("timeframe") == "M15"]
+            for fvg in m15_fvgs:
+                fvg_idx = fvg["index"]
+                for j in range(fvg_idx + 1, len(m15)):
+                    candle_low = float(m15["low"].iloc[j])
+                    candle_high = float(m15["high"].iloc[j])
+
+                    if fvg["direction"] == "bullish":
+                        if candle_low <= fvg["low"]:
+                            fvg["filled"] = True
+                            break
+                    else:
+                        if candle_high >= fvg["high"]:
+                            fvg["filled"] = True
+                            break
+
+                    if not fvg.get("reacted"):
+                        if fvg["direction"] == "bullish" and candle_low <= fvg["high"]:
+                            fvg["reacted"] = True
+                        elif fvg["direction"] == "bearish" and candle_high >= fvg["low"]:
+                            fvg["reacted"] = True
+
+                    if not fvg.get("partially_filled"):
+                        if fvg["direction"] == "bullish" and candle_low <= fvg["mid"]:
+                            fvg["partially_filled"] = True
+                        elif fvg["direction"] == "bearish" and candle_high >= fvg["mid"]:
+                            fvg["partially_filled"] = True
+
+        # Keep only recent FVG levels (S/R already limited in clustering above)
         levels["fvg"] = levels["fvg"][-20:]
         levels["fvg_zones"] = fvg_zones[-20:]
 
@@ -621,7 +872,7 @@ class MarketAnalyzer:
         """Calculate EMA values for multiple timeframes."""
         emas = {}
         ema_configs = {
-            "W": [8, 50],
+            "W": [50],  # EMA 8 removed: not from mentorship
             "D": [20, 50],
             "H4": [50],
             "H1": [50],
@@ -644,27 +895,100 @@ class MarketAnalyzer:
         return emas
 
     def _calculate_fibonacci(self, df: pd.DataFrame) -> Dict[str, float]:
-        """Calculate Fibonacci retracement and extension levels from daily swing."""
+        """
+        Calculate Fibonacci retracement and extension levels from the most
+        recent significant impulse swing (not a generic 60-day range).
+
+        Identifies swing highs/lows, finds the last significant impulse move,
+        and calculates Fibonacci from that specific swing. Includes both
+        bearish (downward) and bullish (upward) extension projections.
+        """
         if df.empty or len(df) < 20:
             return {}
 
-        recent = df.tail(60)
-        swing_high = recent["high"].max()
-        swing_low = recent["low"].min()
-        diff = swing_high - swing_low
+        data = df.reset_index(drop=True)
 
-        return {
+        # Find swing highs and lows (5-bar pivots for significance)
+        swing_points: List[Tuple[int, float, str]] = []
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i - 1] and
+                data["high"].iloc[i] > data["high"].iloc[i - 2] and
+                data["high"].iloc[i] > data["high"].iloc[i + 1] and
+                data["high"].iloc[i] > data["high"].iloc[i + 2]):
+                swing_points.append((i, float(data["high"].iloc[i]), "H"))
+            if (data["low"].iloc[i] < data["low"].iloc[i - 1] and
+                data["low"].iloc[i] < data["low"].iloc[i - 2] and
+                data["low"].iloc[i] < data["low"].iloc[i + 1] and
+                data["low"].iloc[i] < data["low"].iloc[i + 2]):
+                swing_points.append((i, float(data["low"].iloc[i]), "L"))
+
+        swing_points.sort(key=lambda s: s[0])
+
+        swing_high = None
+        swing_low = None
+        impulse_direction = None  # "bearish" (H->L) or "bullish" (L->H)
+
+        if len(swing_points) >= 2:
+            # Find the most recent significant impulse swing
+            for k in range(len(swing_points) - 1, 0, -1):
+                curr = swing_points[k]
+                prev = swing_points[k - 1]
+                if curr[2] != prev[2]:
+                    diff_candidate = abs(curr[1] - prev[1])
+                    mid_price = (curr[1] + prev[1]) / 2
+                    # Require minimum significance: at least 0.3% range
+                    if mid_price > 0 and diff_candidate / mid_price < 0.003:
+                        continue
+                    if curr[2] == "L" and prev[2] == "H":
+                        swing_high = prev[1]
+                        swing_low = curr[1]
+                        impulse_direction = "bearish"
+                    elif curr[2] == "H" and prev[2] == "L":
+                        swing_high = curr[1]
+                        swing_low = prev[1]
+                        impulse_direction = "bullish"
+                    break
+
+        # Fallback to simple high/low if no significant impulse found
+        if swing_high is None or swing_low is None:
+            recent = df.tail(60)
+            swing_high = float(recent["high"].max())
+            swing_low = float(recent["low"].min())
+
+        diff = swing_high - swing_low
+        if diff <= 0:
+            return {}
+
+        levels: Dict[str, float] = {
+            # Retracement levels (from swing high down)
             "0.0": swing_high,
             "0.382": swing_high - diff * 0.382,
             "0.5": swing_high - diff * 0.5,
             "0.618": swing_high - diff * 0.618,
             "0.750": swing_high - diff * 0.750,
             "1.0": swing_low,
-            "ext_0.618": swing_low - diff * 0.618,  # Extension
-            "ext_1.0": swing_low - diff * 1.0,  # Extension
-            "ext_1.272": swing_low - diff * 1.272,  # Extension
-            "ext_1.618": swing_low - diff * 1.618,  # Extension
+            # Bearish extensions (below swing low)
+            "ext_bear_0.618": swing_low - diff * 0.618,
+            "ext_bear_1.0": swing_low - diff * 1.0,
+            "ext_bear_1.272": swing_low - diff * 1.272,
+            "ext_bear_1.618": swing_low - diff * 1.618,
+            # Bullish extensions (above swing high)
+            "ext_bull_0.618": swing_high + diff * 0.618,
+            "ext_bull_1.0": swing_high + diff * 1.0,
+            "ext_bull_1.272": swing_high + diff * 1.272,
+            "ext_bull_1.618": swing_high + diff * 1.618,
+            # Backward-compatible aliases (legacy format used by strategies)
+            "ext_0.618": swing_low - diff * 0.618,
+            "ext_1.0": swing_low - diff * 1.0,
+            "ext_1.272": swing_low - diff * 1.272,
+            "ext_1.618": swing_low - diff * 1.618,
         }
+
+        # Include impulse direction metadata for downstream consumers
+        if impulse_direction:
+            levels["_impulse_direction"] = 1.0 if impulse_direction == "bullish" else -1.0
+
+        return levels
 
     def _detect_candlestick_patterns(self, df: pd.DataFrame) -> List[str]:
         """Detect common candlestick patterns from the course PDFs."""
@@ -689,19 +1013,9 @@ class MarketAnalyzer:
         if body3 / total_range3 < 0.1:
             patterns.append("DOJI")
 
-        # Hammer (bullish reversal)
-        if (body3 > 0 and
-            wick_lower3 > body3 * 2 and
-            wick_upper3 < body3 * 0.5 and
-            c3["close"] > c3["open"]):
-            patterns.append("HAMMER")
-
-        # Shooting Star (bearish reversal)
-        if (body3 > 0 and
-            wick_upper3 > body3 * 2 and
-            wick_lower3 < body3 * 0.5 and
-            c3["close"] < c3["open"]):
-            patterns.append("SHOOTING_STAR")
+        # NOTE: HAMMER and SHOOTING_STAR removed — they are the same concept as
+        # LOW_TEST and HIGH_TEST (mentorship terminology). Keeping only LOW_TEST
+        # and HIGH_TEST below to avoid double-counting.
 
         # Engulfing Bullish
         if (c2["close"] < c2["open"] and  # c2 bearish
@@ -858,9 +1172,9 @@ class MarketAnalyzer:
 
         # Market condition bonus (+15 for extreme + confirmation)
         reversal_bullish = any(p in patterns for p in
-            ["HAMMER", "ENGULFING_BULLISH", "MORNING_STAR"])
+            ["LOW_TEST", "ENGULFING_BULLISH", "MORNING_STAR"])
         reversal_bearish = any(p in patterns for p in
-            ["SHOOTING_STAR", "ENGULFING_BEARISH", "EVENING_STAR"])
+            ["HIGH_TEST", "ENGULFING_BEARISH", "EVENING_STAR"])
 
         if condition == MarketCondition.OVERSOLD and reversal_bullish:
             score += 20.0
@@ -921,7 +1235,7 @@ class MarketAnalyzer:
     ) -> Optional[Dict[str, float]]:
         """
         Calculate MACD (Moving Average Convergence Divergence).
-        Used in scalping: H1 direction, M5 setup validation, M1 execution.
+        Used on D, H1, M15 for standard analysis. M5 MACD only via scalping engine.
         """
         if df.empty or len(df) < slow + signal:
             return None
@@ -1025,14 +1339,30 @@ class MarketAnalyzer:
 
     # ── Order Blocks (from SMC workshop ch416-418) ───────────────────
 
-    def _detect_order_blocks(self, df: pd.DataFrame) -> List[Dict]:
+    def _detect_order_blocks(
+        self, df: pd.DataFrame, structure_breaks: Optional[List[Dict]] = None
+    ) -> List[Dict]:
         """
         Detect Order Blocks from H1 candles.
         An Order Block is the last candle(s) opposite to an impulse move.
         Where institutions accumulated orders before price moved.
+
+        Per the workshop, OBs form at structure-break points: the impulse after
+        the OB candidate must have produced a BOS or CHOCH.  When structure_breaks
+        is provided, candidates whose impulse candle index does not correspond to
+        any known BOS/CHOCH are filtered out.
         """
         if df.empty or len(df) < 10:
             return []
+
+        # Build a set of indices near structure breaks for OB validation.
+        # Allow +-3 bar window since impulse and break may not align exactly.
+        break_indices: set = set()
+        if structure_breaks:
+            for sb in structure_breaks:
+                sb_idx = sb.get("index", 0)
+                for _off in range(-3, 4):
+                    break_indices.add(sb_idx + _off)
 
         order_blocks = []
         data = df.reset_index(drop=True)
@@ -1045,6 +1375,9 @@ class MarketAnalyzer:
                 ob_size = data["open"].iloc[i-1] - data["close"].iloc[i-1]
                 # Impulse must be significantly larger than the OB candle
                 if impulse_size > ob_size * 1.5:
+                    # Verify impulse produced a BOS/CHOCH (if structure data available)
+                    if break_indices and i not in break_indices:
+                        continue
                     # Extend OB to include prior small contrary candles (dojis)
                     # "la última vela o CONJUNTO DE VELAS contrarias"
                     ob_high = data["high"].iloc[i-1]
@@ -1081,6 +1414,9 @@ class MarketAnalyzer:
                 ob_size = data["close"].iloc[i-1] - data["open"].iloc[i-1]
                 # Filtro de calidad: impulso mínimo 1.5x OB (no especificado en mentoría)
                 if impulse_size > ob_size * 1.5:
+                    # Verify impulse produced a BOS/CHOCH (if structure data available)
+                    if break_indices and i not in break_indices:
+                        continue
                     # Extend OB to include prior small contrary candles (dojis)
                     ob_high = data["high"].iloc[i-1]
                     ob_low = data["low"].iloc[i-1]
@@ -1141,7 +1477,9 @@ class MarketAnalyzer:
             return breaks
 
         # Analyze last few swing points for BOS and CHOCH
-        # BOS requires established trend context: at least 2 prior HH/HL or LL/LH
+        # BOS requires established trend context: at least 1 prior HH (established
+        # trend after CHOCH). The workshop counts the FIRST break after a CHOCH as
+        # BOS, so only 1 prior HH/LL is needed to confirm the trend is established.
         # CHOCH = price breaks the LAST swing low in uptrend (bearish) or
         #         LAST swing high in downtrend (bullish)
 
@@ -1153,12 +1491,12 @@ class MarketAnalyzer:
 
             if curr_high > prev_high:
                 # Potential BOS bullish: new higher high
-                # Require established uptrend: at least 2 prior HH
+                # Require established uptrend: at least 1 prior HH
                 prior_hh_count = 0
                 for k in range(1, j):
                     if swing_highs[k][1] > swing_highs[k - 1][1]:
                         prior_hh_count += 1
-                if prior_hh_count >= 2:
+                if prior_hh_count >= 1:
                     breaks.append({
                         "type": "BOS",
                         "direction": "bullish",
@@ -1174,12 +1512,12 @@ class MarketAnalyzer:
 
             if curr_low < prev_low:
                 # Potential BOS bearish: new lower low
-                # Require established downtrend: at least 2 prior LL
+                # Require established downtrend: at least 1 prior LL
                 prior_ll_count = 0
                 for k in range(1, j):
                     if swing_lows[k][1] < swing_lows[k - 1][1]:
                         prior_ll_count += 1
-                if prior_ll_count >= 2:
+                if prior_ll_count >= 1:
                     breaks.append({
                         "type": "BOS",
                         "direction": "bearish",
@@ -1260,22 +1598,28 @@ class MarketAnalyzer:
         """
         Return the currently active trading session based on UTC hour.
 
-        Sessions:
+        Sessions (corrected per mentorship):
           ASIAN     : 00:00-08:00 UTC (Tokyo/Sydney)
-          LONDON    : 08:00-12:00 UTC
-          OVERLAP   : 12:00-16:00 UTC (London+NY overlap - highest volatility)
-          NEW_YORK  : 16:00-21:00 UTC
+          LONDON    : 08:00-16:00 UTC (full London session)
+          OVERLAP   : 13:00-17:00 UTC (London+NY overlap - highest volatility)
+          NEW_YORK  : 13:00-21:00 UTC (full NY session)
           OFF_HOURS : 21:00-00:00 UTC
+
+        Note: OVERLAP is a subset of both LONDON and NEW_YORK.
+        Priority: OVERLAP > LONDON > NEW_YORK (overlap has highest volatility).
         """
         utc_hour = datetime.now(timezone.utc).hour
 
         if 0 <= utc_hour < 8:
             return "ASIAN"
-        elif 8 <= utc_hour < 12:
-            return "LONDON"
-        elif 12 <= utc_hour < 16:
+        elif 13 <= utc_hour < 17:
+            # Overlap takes priority (subset of both London and NY)
             return "OVERLAP"
-        elif 16 <= utc_hour < 21:
+        elif 8 <= utc_hour < 13:
+            # London-only hours (before NY opens)
+            return "LONDON"
+        elif 17 <= utc_hour < 21:
+            # NY-only hours (after London closes)
             return "NEW_YORK"
         else:
             return "OFF_HOURS"
@@ -1604,15 +1948,53 @@ class MarketAnalyzer:
                             break
 
             # Step 3: Mitigation Block = broken OB WITHOUT prior liquidity sweep
+            # AND with momentum convergence approaching the OB (workshop
+            # defining characteristic).
             if not liquidity_swept:
-                mitigation_blocks.append({
-                    "type": f"mitigation_{ob_type}",
-                    "high": ob_high,
-                    "low": ob_low,
-                    "mid": (ob_high + ob_low) / 2,
-                    "original_index": ob_idx,
-                    "break_index": break_idx,
-                })
+                # Step 3b: Momentum check — verify price showed decreasing
+                # highs (for bearish OB mitigation) or increasing lows (for
+                # bullish OB mitigation) as it approached the OB before breaking.
+                has_momentum_convergence = False
+                # Look at candles between OB and break for the pattern
+                approach_start = max(ob_idx + 1, break_idx - 6)
+                approach_end = break_idx
+
+                if approach_end - approach_start >= 2:
+                    if ob_type == "bearish_ob":
+                        # Price approaching from below: check for increasing lows
+                        approach_lows = [
+                            float(data["low"].iloc[k])
+                            for k in range(approach_start, approach_end)
+                        ]
+                        increasing = sum(
+                            1 for k in range(1, len(approach_lows))
+                            if approach_lows[k] > approach_lows[k - 1]
+                        )
+                        has_momentum_convergence = increasing >= len(approach_lows) // 2
+                    elif ob_type == "bullish_ob":
+                        # Price approaching from above: check for decreasing highs
+                        approach_highs = [
+                            float(data["high"].iloc[k])
+                            for k in range(approach_start, approach_end)
+                        ]
+                        decreasing = sum(
+                            1 for k in range(1, len(approach_highs))
+                            if approach_highs[k] < approach_highs[k - 1]
+                        )
+                        has_momentum_convergence = decreasing >= len(approach_highs) // 2
+                else:
+                    # Too few candles to check, allow it
+                    has_momentum_convergence = True
+
+                if has_momentum_convergence:
+                    mitigation_blocks.append({
+                        "type": f"mitigation_{ob_type}",
+                        "high": ob_high,
+                        "low": ob_low,
+                        "mid": (ob_high + ob_low) / 2,
+                        "original_index": ob_idx,
+                        "break_index": break_idx,
+                    })
 
         return mitigation_blocks[-10:]
 
@@ -1668,10 +2050,12 @@ class MarketAnalyzer:
                 body_high = max(candle_open, candle_close)
                 body_low = min(candle_open, candle_close)
 
-                if ob_type == "bullish_ob" and body_low < ob_low and body_high < ob_low:
+                if ob_type == "bullish_ob" and candle_close < ob_low:
+                    # Workshop: "body breaks through" = close beyond OB boundary
                     break_idx = j
                     break
-                elif ob_type == "bearish_ob" and body_low > ob_high and body_high > ob_high:
+                elif ob_type == "bearish_ob" and candle_close > ob_high:
+                    # Workshop: "body breaks through" = close beyond OB boundary
                     break_idx = j
                     break
 
@@ -1805,7 +2189,27 @@ class MarketAnalyzer:
         }
 
         if session == "ASIAN":
-            result["phase"] = "accumulation"
+            # Check accumulation quality: Asian session should show
+            # lateral/consolidation behavior.  If Asian range is too wide
+            # (high volatility), it is not proper "accumulation".
+            # Compare Asian range to average daily range of last 10 days.
+            is_proper_accumulation = True
+            if not daily.empty and len(daily) >= 10:
+                recent_daily_ranges = [
+                    float(daily["high"].iloc[-k] - daily["low"].iloc[-k])
+                    for k in range(1, min(11, len(daily)))
+                ]
+                avg_daily_range = sum(recent_daily_ranges) / len(recent_daily_ranges)
+                # Asian range should be less than 40% of avg daily range
+                # to qualify as consolidation/lateral movement
+                if avg_daily_range > 0 and asian_range > avg_daily_range * 0.4:
+                    is_proper_accumulation = False
+
+            if is_proper_accumulation:
+                result["phase"] = "accumulation"
+            else:
+                result["phase"] = "accumulation_wide"
+                result["accumulation_quality"] = "poor"
         elif session == "LONDON":
             result["phase"] = "manipulation"
             # Capture the London manipulation price range as entry zone
@@ -2097,6 +2501,36 @@ class MarketAnalyzer:
         if asian_low is not None:
             pools.append({"level": asian_low, "type": "asian_low", "strength": 1})
 
+        # --- London session High / Low (08:00-16:00 UTC) ---
+        if not h1.empty and isinstance(h1.index, pd.DatetimeIndex):
+            now_liq = datetime.now(timezone.utc)
+            london_start = now_liq.replace(hour=8, minute=0, second=0, microsecond=0)
+            london_end = now_liq.replace(hour=16, minute=0, second=0, microsecond=0)
+            london_candles = h1[
+                (h1.index >= london_start) & (h1.index < london_end)
+            ]
+            if london_candles.empty:
+                from datetime import timedelta as _td_liq
+                london_start_y = london_start - _td_liq(days=1)
+                london_end_y = london_end - _td_liq(days=1)
+                london_candles = h1[
+                    (h1.index >= london_start_y) & (h1.index < london_end_y)
+                ]
+            if not london_candles.empty:
+                london_high = float(london_candles["high"].max())
+                london_low = float(london_candles["low"].min())
+                pools.append({"level": london_high, "type": "london_high", "strength": 1})
+                pools.append({"level": london_low, "type": "london_low", "strength": 1})
+
+        # --- S/R levels from key_levels as liquidity targets ---
+        for res in key_levels.get("resistances", []):
+            # S/R levels can be zone dicts or plain floats
+            level = res["price"] if isinstance(res, dict) else float(res)
+            pools.append({"level": level, "type": "resistance", "strength": 1})
+        for sup in key_levels.get("supports", []):
+            level = sup["price"] if isinstance(sup, dict) else float(sup)
+            pools.append({"level": level, "type": "support", "strength": 1})
+
         # --- Trendline Liquidity Zones ---
         # Detect diagonal trendlines connecting swing lows (uptrend) or swing
         # highs (downtrend). Where multiple swing points align along a line,
@@ -2161,6 +2595,7 @@ class MarketAnalyzer:
 
                 # Swept highs: wick went above level but close came back below
                 if ptype in ("equal_highs", "pdh", "asian_high",
+                             "london_high", "resistance",
                              "trendline_resistance"):
                     if recent_high > lvl and current_price < lvl and prev_close < lvl:
                         sweep = {"level": lvl, "direction": "swept_highs"}
@@ -2168,6 +2603,7 @@ class MarketAnalyzer:
 
                 # Swept lows: wick went below level but close came back above
                 if ptype in ("equal_lows", "pdl", "asian_low",
+                             "london_low", "support",
                              "trendline_support"):
                     if recent_low < lvl and current_price > lvl and prev_close > lvl:
                         sweep = {"level": lvl, "direction": "swept_lows"}
@@ -2248,8 +2684,9 @@ class MarketAnalyzer:
 
         # Fibonacci levels relative to this impulse swing
         equilibrium = impulse_low + rng * 0.5
-        # Sweet spot: 50-70% retracement (institutional order zone)
-        sweet_spot_high = impulse_low + rng * 0.7
+        # Sweet spot: 50-75% retracement (institutional order zone)
+        # TradingLab uses 0.618 and 0.75 Fibonacci levels
+        sweet_spot_high = impulse_low + rng * 0.75
         sweet_spot_low = impulse_low + rng * 0.5
 
         # Position within the swing (0.0 = swing low, 1.0 = swing high)
@@ -2260,7 +2697,7 @@ class MarketAnalyzer:
         else:
             zone = "discount"
 
-        in_sweet_spot = 0.5 <= position <= 0.7
+        in_sweet_spot = 0.5 <= position <= 0.75
 
         return {
             "zone": zone,

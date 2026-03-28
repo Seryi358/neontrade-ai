@@ -605,7 +605,7 @@
         "Test: viernes antes del cierre (cierra posiciones)",
         "TODOS los tests pasan sin excepciones"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "BUGFIX-008",

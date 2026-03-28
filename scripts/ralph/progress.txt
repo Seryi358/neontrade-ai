@@ -15,6 +15,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - MarketCondition enum in `market_analyzer.py` — add new values there and check `test_round9_final.py` for enum assertions
 - Wedge/channel targets per TradingLab = start of pattern (not height projection like H&S/double top)
 - Some test files (test_round4, test_round10) use `sys.exit()` at module level — pytest crashes on collect; run them directly with `python3`
+- Global `settings` singleton is mutable — other tests can change `funded_account_mode`, `max_total_risk` etc. Always save/restore in setup/teardown
+- `RiskManager._current_balance` defaults to 0.0 — set it explicitly in tests or funded-mode zero-balance check blocks everything
 - Pre-existing failures: ALL FIXED in BUGFIX-001. Openai-dependent tests now skip gracefully.
 - _classify_blue_variant() checks chart_patterns and swing_lows/highs, NOT candlestick_patterns — test with chart_patterns
 - _has_reversal_pattern() checks candlestick_patterns — HAMMER (bullish), SHOOTING_STAR (bearish) now included
@@ -1124,4 +1126,21 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Dashboard uses `.catch(() => null)` per fetch in Promise.all — testing error state requires Promise.reject(), not {ok:false}
   - `@testing-library/react-native@12` is needed for React 18.3 compat (v13 requires React 19)
   - lightweight-charts must be mocked (web-only lib crashes in test env)
+---
+
+## 2026-03-28 - BUGFIX-007
+- **What was implemented:** Edge case tests covering 5 critical scenarios: circuit breaker (no broker connection), incomplete market data handling, multiple simultaneous trades (risk limit enforcement), trading outside session hours, and Friday close behavior.
+- **Files changed:**
+  - `backend/test_bugfix007_edge_cases.py` — New test file with 42 tests across 5 test classes
+- **Test coverage:**
+  - **CircuitBreaker (9 tests):** State transitions CLOSED→OPEN→HALF_OPEN, failure threshold, success reset, recovery timeout, half-open success/failure paths, reset, global config verification
+  - **Incomplete market data (5 tests):** Missing entry_price, missing current_price, missing SL/TP, empty open trades, zero SL distance (no division by zero)
+  - **Multiple simultaneous trades (7 tests):** Max total risk enforcement, unregister frees risk, unregister_all clears all, correlated pair risk reduction, uncorrelated keeps full risk, compound key tracking, zero-balance funded block
+  - **Market hours (11 tests):** Saturday/Sunday closed, before/after trading hours, London/overlap sessions open, boundary conditions, session quality scores, _tick skips scan when closed
+  - **Friday close (10 tests):** Close at 20 UTC, not before, not on Thursday, no new trades after 18, close near SL, close near TP, keep mid-range, mixed selective close, error resilience
+- **Learnings for future iterations:**
+  - Global `settings` object can be mutated by other test files (e.g., `funded_account_mode` set to True). Always save/restore in setup/teardown when testing risk.
+  - `RiskManager._current_balance` defaults to 0.0 — must set explicitly in tests or funded-mode zero-balance check blocks all trades.
+  - Actual config values: `max_total_risk=0.05` (5%), `correlated_risk_pct=0.005` (0.5%) — don't assume PRD description values; read from `settings`.
+  - Some test files (test_05_ai_prompt.py, test_round4, test_round10) use `sys.exit()` — run test_bugfix* pattern to avoid pytest crash.
 ---

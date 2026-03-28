@@ -505,3 +505,22 @@ Started: vie 27 mar 2026 21:45:20 -05
   - OTHERS/BTC (excluding top 10) consistently falls during current cycle — strongest for short positions as you go lower in market cap
   - Each BTC cycle: longer duration + smaller percentage gains = market maturing toward traditional asset behavior
 ---
+
+## 2026-03-28 - AUDIT-018
+- **What was implemented:** Audited all 7 info.md files from Esp. Criptomonedas/01_General/08_Indicadores cripto y su función against crypto_cycle.py and market_analyzer.py. No discrepancies found — all indicators already correctly implemented.
+- **Files changed:**
+  - `scripts/ralph/prd.json` — Marked AUDIT-018 as passes: true
+- **Audit findings (all pass):**
+  - EMA 50: used in `market_analyzer.py:_detect_trend()` as EMA 20/50 confirmation, and in `crypto_cycle.py:get_crypto_trailing_ema()` for weekly trailing stop ✅
+  - EMA 8 Weekly: `crypto_cycle.py:_check_ema8_weekly()` correctly checks BTC weekly close vs EMA 8 ✅
+  - SMA 200: `market_analyzer.py:_detect_trend()` line 513-519 as long-term trend filter (price above=bullish, below=bearish) ✅
+  - RSI 14: `market_analyzer.py:_calculate_rsi()` period=14 default. `crypto_cycle.py:_analyze_rsi()` RSI 14 on weekly candles with extreme thresholds (>80 top, <25 bottom) ✅
+  - BMSB (SMA 20 + EMA 21): Calculated in `market_analyzer.py` line 344-363 on weekly candles. Applied in `crypto_cycle.py:_apply_bmsb()` with 2+ consecutive close confirmation logic ✅
+  - Pi Cycle Top/Bottom: `market_analyzer.py` line 365-382 — SMA 111 vs 2×SMA 350 (top), SMA 150 vs SMA 471 (bottom). Applied in `crypto_cycle.py:_apply_pi_cycle()` ✅
+  - Daily candle count (500) covers Pi Cycle's 471-day SMA requirement ✅
+- **Learnings for future iterations:**
+  - Only info.md files exist for this module (no transcripcion.txt) — lesson descriptions provide key points but not full lecture content
+  - BMSB confirmation logic (2+ consecutive weekly closes) is a defensive addition from the mentorship — a single wick below doesn't count
+  - Pi Cycle uses daily SMAs (not weekly) — the market_analyzer correctly uses the "D" timeframe candles
+  - crypto_cycle.py RSI uses extreme thresholds (80/25) vs standard (70/30) because crypto sustains high RSI during bull runs on HTF
+---

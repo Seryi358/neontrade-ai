@@ -253,7 +253,7 @@
         "BMSB (SMA 20 + EMA 21) implementado exactamente",
         "Pi Cycle Top/Bottom fórmulas correctas"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-019",

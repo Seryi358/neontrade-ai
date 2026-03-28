@@ -1009,3 +1009,19 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Trend detection needs oscillating data (impulse-pullback), not monotonic linear data
   - BMSB confirmation requires 2+ consecutive bearish weekly closes — first close is just "warning"
 ---
+
+## 2026-03-28 - BUGFIX-002
+- **What was implemented:** Comprehensive unit tests for risk_manager.py (68 tests) and position_manager.py (55 tests) — 123 total
+- **Files changed:**
+  - `backend/test_bugfix002_risk_manager.py` — NEW: 68 tests covering 16 test classes
+  - `backend/test_bugfix002_position_manager.py` — NEW: 55 tests covering 17 test classes
+- **Test coverage areas:**
+  - RiskManager: base risk per style (1%/0.5%/3%), position sizing (Alex's formula with int truncation), drawdown management (fixed_1pct, variable, fixed_levels), correlation handling (fixed 0.75%), R:R validation, trade registration/unregistration, scale-in rule (require BE), delta algorithm (levels 0-3, cap, reset on loss, history trim), win rate, recovery math, DD alerts, funded account limits, risk status reporting
+  - PositionManager: all 5 phase transitions (INITIAL→SL_MOVED→BREAK_EVEN→TRAILING→AGGRESSIVE), both BE trigger methods (risk_distance, pct_to_tp1), EMA-based trailing with buffer (2%/1% aggressive), price action trailing (swing highs/lows), CPA auto-trigger conditions, partial profits (on/off), crypto vs forex EMA grid, EMA fallback chain, percentage fallback trailing, emergency exit on dual EMA break, TP_max close, full lifecycle tests (buy + sell)
+- **Learnings for future iterations:**
+  - Float imprecision at boundaries: `1.1050 - 1.1000 = 0.00499...` not `0.005`. Use prices slightly beyond thresholds in tests.
+  - `int()` truncation in position sizing: `int(100 / 0.005)` = 19999 not 20000. Use tolerance in assertions.
+  - `settings` is imported locally inside position_manager methods (`from config import settings`), so patch `config.settings` not `core.position_manager.settings`
+  - History trim in risk_manager: triggers at >200, keeps last 100, but remaining loop iterations add more — final count is ~109 not 100
+  - Existing `test_03_position_manager.py` only tests instantiation (135 lines). The new tests cover actual phase logic and trailing.
+---

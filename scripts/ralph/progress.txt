@@ -49,6 +49,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - CPA auto-trigger is external: `position_manager.set_cpa_trigger(trade_id, reason)` — called by trading_engine when it detects double patterns, news, Friday close, or indecision
 - Trading profiles are in `config.py:TRADING_PROFILES` dict. Apply via `apply_trading_profile(id)` or `POST /profiles/apply`. Only risk-related keys are persisted to `data/risk_config.json`.
 - When adding methods to core modules (trade_journal.py, etc.), always verify routes.py has a corresponding API endpoint — methods without endpoints are invisible to the frontend
+- `data/risk_config.json` persists runtime overrides; path MUST use `os.path.dirname(os.path.abspath(__file__))` not relative "data/..." to avoid CWD-dependent behavior
+- `conftest.py` autouse fixture saves/restores settings + risk_config.json — prevents API tests from contaminating subsequent test files
 - Frontend tests use jest-expo preset + @testing-library/react-native@12 — mock `authFetch` from `services/api` with URL-specific responses ordered by specificity (longer paths first)
 - Dashboard's `.catch(() => null)` in Promise.all means testing error state requires `Promise.reject()`, NOT `{ok: false}`
 
@@ -1143,4 +1145,29 @@ Started: vie 27 mar 2026 21:45:20 -05
   - `RiskManager._current_balance` defaults to 0.0 — must set explicitly in tests or funded-mode zero-balance check blocks all trades.
   - Actual config values: `max_total_risk=0.05` (5%), `correlated_risk_pct=0.005` (0.5%) — don't assume PRD description values; read from `settings`.
   - Some test files (test_05_ai_prompt.py, test_round4, test_round10) use `sys.exit()` — run test_bugfix* pattern to avoid pytest crash.
+---
+
+## 2026-03-28 - BUGFIX-008
+- **What was implemented:** Third verification round — full test suite, type checking, linting. Found and fixed 3 bugs:
+  1. **Stale `data/risk_config.json` files** contaminating test runs with wrong config values (conservative profile overrides). Root cause: `_load_risk_overrides()` and `apply_trading_profile()` used relative path `"data/risk_config.json"` which resolved differently based on CWD.
+  2. **Missing `conftest.py`** — API tests that call `/profiles/apply` or `/watchlist/categories` persisted overrides to `risk_config.json`, contaminating standalone test files that run afterward.
+  3. **TypeScript error in `ManualModeScreen.tsx`** — `checklist` property used in JSX but missing from `PendingSetup` interface.
+- **Files changed:**
+  - `backend/config.py` — Fixed `_load_risk_overrides()` and `apply_trading_profile()` to use absolute paths via `os.path.dirname(os.path.abspath(__file__))`
+  - `backend/api/routes.py` — Fixed 2 occurrences of relative `data/risk_config.json` path to use absolute paths
+  - `backend/conftest.py` — NEW: autouse fixture that saves/restores settings singleton and risk_config.json around each pytest test
+  - `backend/data/risk_config.json` — Reset to empty `{}`
+  - `data/risk_config.json` — Reset to empty `{}`
+  - `frontend/src/screens/ManualModeScreen.tsx` — Added `checklist?: string[]` to `PendingSetup` interface
+- **Test results:**
+  - pytest: 472/472 passed (0 failures, 2 non-critical warnings: Pydantic v2 deprecation, asyncio event loop)
+  - Standalone: round4=104/104, round5=126/126, round6=268/268, round7=284/284, round9=483/483, round10=724/724, final_integration=116/116, full_system=8/8, ai_prompt=9/9
+  - Frontend jest: 52/52 passed
+  - TypeScript: 0 errors
+  - Python syntax: all files compile clean
+- **Learnings for future iterations:**
+  - ALWAYS use `os.path.dirname(os.path.abspath(__file__))` for file paths in Python modules, never relative paths
+  - Tests that call API endpoints which persist state MUST have cleanup (conftest.py autouse fixture handles this now)
+  - The root-level `data/` dir AND `backend/data/` dir can both contain `risk_config.json` — they serve different CWD contexts
+  - No linting/type-checking tools installed in venv — use `py_compile` for Python syntax and `npx tsc --noEmit` for TypeScript
 ---

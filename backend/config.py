@@ -447,7 +447,8 @@ settings = Settings()
 def _load_risk_overrides():
     """Load any runtime risk config overrides from data/risk_config.json."""
     import json
-    risk_path = os.path.join("data", "risk_config.json")
+    _config_dir = os.path.dirname(os.path.abspath(__file__))
+    risk_path = os.path.join(_config_dir, "data", "risk_config.json")
     if os.path.exists(risk_path):
         try:
             with open(risk_path) as f:
@@ -581,7 +582,8 @@ def apply_trading_profile(profile_id: str) -> dict:
     }
     risk_updates = {k: v for k, v in applied.items() if k in risk_keys}
     if risk_updates:
-        config_path = os.path.join("data", "risk_config.json")
+        _config_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(_config_dir, "data", "risk_config.json")
         existing = {}
         if os.path.exists(config_path):
             try:
@@ -590,7 +592,7 @@ def apply_trading_profile(profile_id: str) -> dict:
             except Exception:
                 pass
         existing.update(risk_updates)
-        os.makedirs("data", exist_ok=True)
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
         with open(config_path, "w") as f:
             json.dump(existing, f, indent=2)
 

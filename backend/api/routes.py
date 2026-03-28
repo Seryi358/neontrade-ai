@@ -1117,7 +1117,8 @@ async def set_risk_config(request: RiskConfigRequest):
         raise HTTPException(400, "No se especificaron cambios")
 
     # Persist to data/risk_config.json
-    config_path = os.path.join("data", "risk_config.json")
+    _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(_backend_dir, "data", "risk_config.json")
     existing = {}
     if os.path.exists(config_path):
         try:
@@ -1126,7 +1127,7 @@ async def set_risk_config(request: RiskConfigRequest):
         except Exception:
             pass
     existing.update(updates)
-    os.makedirs("data", exist_ok=True)
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
     with open(config_path, "w") as f:
         json.dump(existing, f, indent=2)
 
@@ -1668,7 +1669,8 @@ async def update_watchlist_categories(req: WatchlistCategoriesRequest):
     settings.active_watchlist_categories = req.categories
     # Persist to risk_config.json
     import json, os
-    risk_path = os.path.join("data", "risk_config.json")
+    _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    risk_path = os.path.join(_backend_dir, "data", "risk_config.json")
     overrides = {}
     if os.path.exists(risk_path):
         try:
@@ -1677,7 +1679,7 @@ async def update_watchlist_categories(req: WatchlistCategoriesRequest):
         except Exception:
             pass
     overrides["active_watchlist_categories"] = req.categories
-    os.makedirs("data", exist_ok=True)
+    os.makedirs(os.path.dirname(risk_path), exist_ok=True)
     with open(risk_path, "w") as f:
         json.dump(overrides, f, indent=2)
     return {"status": "updated", "active_categories": req.categories}

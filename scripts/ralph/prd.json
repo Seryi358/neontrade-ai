@@ -618,7 +618,7 @@
         "No hay warnings críticos",
         "Código limpio y funcional"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DEPLOY-001",

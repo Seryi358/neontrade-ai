@@ -31,6 +31,7 @@ interface PendingSetup {
   confidence: number;
   risk_reward_ratio: number;
   reasoning: string;
+  checklist?: string[];
   status: string;
   expires_at: string;
 }

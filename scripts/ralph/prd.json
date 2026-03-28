@@ -456,7 +456,7 @@
         "AI sugiere CPA cuando detecta doble techo/suelo, noticias cercanas, fin de semana",
         "Explicaciones en español como Alex las daría"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-008",

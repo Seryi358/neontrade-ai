@@ -903,3 +903,21 @@ Started: vie 27 mar 2026 21:45:20 -05
   - ALEX-006 overlaps entirely with AUDIT-002 — both verify the same news filter configuration
   - The news filter has two paths: `has_upcoming_news()` blocks new setups, `should_close_for_news()` manages existing positions
 ---
+
+## 2026-03-28 - ALEX-007
+- **What was implemented:** Updated TRADINGLAB_SYSTEM_PROMPT in openai_analyzer.py with Alex Ruiz's trading personality, CPA trigger recommendations, indecision handling, and Spanish language instruction. Added 2 new sections to the AI system prompt.
+- **Files changed:**
+  - `backend/ai/openai_analyzer.py` — Added "ALEX RUIZ'S TRADING PERSONALITY & STYLE" section with: (1) Quick exit philosophy with Alex's exact quotes ("salir rápido y olvidarme"), (2) CPA recommendations for 4 specific triggers (double top/bottom, news, Friday, indecision), (3) Indecision handling rules ("como menos implicación emocional mejor"), (4) R:R validation in Alex's style (1.5-2.5 range, accepts lower end). Updated "RESPONSE GUIDELINES" with: Spanish language instruction, indecision exit rule (#11), CPA suggestion rule (#12).
+- **Audit findings vs acceptance criteria:**
+  - ✅ System prompt updated with Alex's style — new personality section added
+  - ✅ AI validates R:R like Alex — accepts 1.5:1, ideal 2.0-2.5:1
+  - ✅ AI prioritizes capital preservation — "PRIMARY PURPOSE is capital preservation" (line 95, unchanged) + new quick exit philosophy
+  - ✅ AI recommends quick exit on indecision — new guideline #11: "recommend quick exit or SKIP — never hold through uncertainty"
+  - ✅ AI suggests CPA on double top/bottom, news, Friday, indecision — new dedicated section with Alex's quote
+  - ✅ Explanations in Spanish — "Respond in SPANISH (español)" directive added to Response Guidelines
+- **Learnings for future iterations:**
+  - The system prompt was already comprehensive on STRATEGY RULES but lacked Alex's PERSONALITY — the difference between a generic trading bot and Alex's personal assistant
+  - Alex's quick exit style (1.2-1.5 R:R actual vs 2.5:1 theoretical benchmark) is a key personality trait that affects trade validation scoring
+  - CPA trigger situations come from position_manager config flags (`cpa_auto_on_double_pattern`, etc.) — the AI should reinforce these same conditions in its analysis
+  - Spanish language was missing entirely — Alex teaches in Spanish and uses specific terminology ("sobrecompra", "confluencia", "rentabilidad riesgo")
+---

@@ -486,7 +486,7 @@
         "Monthly review incluye estadísticas como Alex las pide",
         "Campos del journal coinciden con el Trading Plan PDF"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-010",

@@ -1535,6 +1535,99 @@ async def get_journal_trades(
     return engine.trade_journal.get_trades(limit=limit, offset=offset)
 
 
+# ── Journal Notes Update (Documentación/02_Journaling) ─────────────
+# Alex: "lo mínimo es explicar el estilo, las 4 temporalidades,
+# SL, TP, R:R, captura, gestión de la posición y resultado"
+
+class JournalNotesRequest(BaseModel):
+    trade_summary: Optional[str] = None
+    management_notes: Optional[str] = None
+    screenshots: Optional[List[str]] = None
+
+
+@router.put("/journal/trades/{trade_id}/notes")
+async def update_journal_notes(trade_id: str, req: JournalNotesRequest):
+    """Update visual journaling notes for a trade (TradingLab Journaling).
+
+    Notes should be written ASAP after the trade to capture emotional state.
+    Screenshots should include entry, exit, and optionally 'now' for ASR context.
+    """
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        raise HTTPException(503, "Trade journal not initialized")
+
+    success = engine.trade_journal.update_journal_notes(
+        trade_id=trade_id,
+        trade_summary=req.trade_summary,
+        management_notes=req.management_notes,
+        screenshots=req.screenshots,
+    )
+    if not success:
+        raise HTTPException(404, f"Trade {trade_id} not found")
+    return {"status": "updated", "trade_id": trade_id}
+
+
+# ── ASR (Auto Self Review) - Documentación/03_ASR ──────────────────
+# Alex: "correcto o incorrecto no viene relacionado con el resultado
+# del trade, viene relacionado con vuestro plan de trading"
+
+class ASRRequest(BaseModel):
+    htf_correct: Optional[bool] = None
+    ltf_correct: Optional[bool] = None
+    strategy_correct: Optional[bool] = None
+    sl_correct: Optional[bool] = None
+    tp_correct: Optional[bool] = None
+    management_correct: Optional[bool] = None
+    would_enter_again: Optional[bool] = None
+    lessons: Optional[str] = None
+
+
+@router.put("/journal/trades/{trade_id}/asr")
+async def update_trade_asr(trade_id: str, req: ASRRequest):
+    """Submit ASR (Auto Self Review) checklist for a trade.
+
+    Should be done with emotional distance (not immediately after the trade).
+    Evaluates execution quality AGAINST the trading plan, not against result.
+    """
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        raise HTTPException(503, "Trade journal not initialized")
+
+    success = engine.trade_journal.update_asr(
+        trade_id=trade_id,
+        htf_correct=req.htf_correct,
+        ltf_correct=req.ltf_correct,
+        strategy_correct=req.strategy_correct,
+        sl_correct=req.sl_correct,
+        tp_correct=req.tp_correct,
+        management_correct=req.management_correct,
+        would_enter_again=req.would_enter_again,
+        lessons=req.lessons,
+    )
+    if not success:
+        raise HTTPException(404, f"Trade {trade_id} not found")
+    return {"status": "updated", "trade_id": trade_id, "asr_completed": True}
+
+
+@router.get("/journal/asr-stats")
+async def get_asr_stats():
+    """Get ASR completion statistics.
+
+    Proceso de Revisión: track how many trades have been reviewed
+    and what percentage had perfect execution per the trading plan.
+    """
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        return {
+            "total": 0,
+            "asr_completed": 0,
+            "asr_completion_rate": 0.0,
+            "perfect_execution_count": 0,
+            "perfect_execution_rate": 0.0,
+        }
+    return engine.trade_journal.get_asr_stats()
+
+
 # ── Watchlist Categories ────────────────────────────────────────────
 
 class WatchlistCategoriesRequest(BaseModel):
@@ -1837,6 +1930,27 @@ async def get_weekly_review(
     ]
     avg_rr_achieved = round(sum(rr_values) / len(rr_values), 4) if rr_values else 0.0
 
+    # ASR completion for this week's trades
+    asr_completed_count = sum(1 for t in week_trades if t.get("asr_completed", False))
+    asr_completion_rate = round(asr_completed_count / total * 100, 1) if total > 0 else 0.0
+    # Identify common ASR errors this week
+    asr_error_fields = {
+        "asr_htf_correct": "Análisis HTF incorrecto",
+        "asr_ltf_correct": "Análisis LTF incorrecto",
+        "asr_strategy_correct": "Estrategia mal ejecutada",
+        "asr_sl_correct": "SL mal colocado",
+        "asr_tp_correct": "TP incorrecto",
+        "asr_management_correct": "Gestión de posición incorrecta",
+    }
+    asr_errors = []
+    for field_key, label in asr_error_fields.items():
+        error_count = sum(
+            1 for t in week_trades
+            if t.get("asr_completed") and t.get(field_key) is False
+        )
+        if error_count > 0:
+            asr_errors.append(f"{label} ({error_count} trades)")
+
     # Analysis note
     if total == 0:
         analysis_note = (
@@ -1874,6 +1988,9 @@ async def get_weekly_review(
         "pnl_by_strategy": pnl_by_strategy,
         "pnl_by_instrument": pnl_by_instrument,
         "avg_rr_achieved": avg_rr_achieved,
+        "asr_completed": asr_completed_count,
+        "asr_completion_rate": asr_completion_rate,
+        "asr_common_errors": asr_errors,
         "analysis_note": analysis_note,
     }
 

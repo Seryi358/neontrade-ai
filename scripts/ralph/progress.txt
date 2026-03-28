@@ -36,6 +36,7 @@ Started: vie 27 mar 2026 21:45:20 -05
 - BE trigger has 2 methods: "risk_distance" (Alex's 1% = 1x risk) vs "pct_to_tp1" (50% to TP1). Config `be_trigger_method` selects which. Both coincide at 2:1 R:R.
 - CPA auto-trigger is external: `position_manager.set_cpa_trigger(trade_id, reason)` — called by trading_engine when it detects double patterns, news, Friday close, or indecision
 - Trading profiles are in `config.py:TRADING_PROFILES` dict. Apply via `apply_trading_profile(id)` or `POST /profiles/apply`. Only risk-related keys are persisted to `data/risk_config.json`.
+- When adding methods to core modules (trade_journal.py, etc.), always verify routes.py has a corresponding API endpoint — methods without endpoints are invisible to the frontend
 
 ---
 
@@ -935,4 +936,27 @@ Started: vie 27 mar 2026 21:45:20 -05
   - The `active_watchlist_categories` field on Settings controls which watchlist tabs are active — profiles can set this to expand/restrict instrument coverage
   - Frontend `fetchData()` callback refreshes all settings panels after profile apply — no need to reload individual endpoints
   - The TradingLab Recommended profile uses `position_management_style: "cp"` (Alex's preference for quick exits), while Conservative uses `"lp"` (wider trailing for beginners)
+---
+
+## 2026-03-28 - ALEX-009
+- **What was implemented:** Audited journaling, ASR, and monthly review against all 4 transcriptions (Trading Plan, Journaling, ASR, Ponencia ASR) + TradingPlan_2024.pdf. Core modules (trade_journal.py, monthly_review.py) already had correct fields matching Alex's teachings. Added 3 missing API endpoints and enhanced weekly review with ASR data.
+- **Files changed:**
+  - `backend/api/routes.py` — Added `PUT /journal/trades/{trade_id}/notes` (expose `update_journal_notes()` for trade_summary, management_notes, screenshots), `PUT /journal/trades/{trade_id}/asr` (expose `update_asr()` for ASR checklist submission), `GET /journal/asr-stats` (expose `get_asr_stats()` for ASR completion tracking). Enhanced `GET /weekly-review` with ASR completion count, rate, and common errors per week.
+  - `scripts/ralph/prd.json` — Marked ALEX-009 as passes: true
+- **Audit findings vs acceptance criteria:**
+  - ✅ Transcriptions of Documentación (4 lessons) read completely
+  - ✅ Journal records: screenshot (screenshots list supports entry/exit/"now"), análisis pre-trade (trade_summary), estrategia usada (strategy), método ejecución (management_notes)
+  - ✅ ASR implemented: 8 fields matching Alex's template exactly (HTF correct, LTF correct, strategy correct, SL correct, TP correct, management correct, would enter again, lessons). Plus emotional notes (pre/during/post) via separate endpoint
+  - ✅ Monthly review includes: by-strategy, by-instrument, by-day, by-session, emotional patterns, ASR completion rate, common ASR errors, discretionary vs systematic, risk management, recommendations
+  - ✅ Journal fields match Trading Plan PDF: trade number, asset, date, strategy, direction, result, P&L, SL, TP, R:R achieved, trading style, timeframes, duration, screenshots, management notes, emotional notes, discretionary tracking, ASR checklist
+- **What was missing before (now fixed):**
+  - `update_asr()` existed in trade_journal.py but had NO API endpoint — users couldn't submit ASR reviews
+  - `update_journal_notes()` existed but had NO API endpoint — users couldn't update trade summaries or screenshots
+  - `get_asr_stats()` existed but had NO API endpoint — no way to check ASR completion rates
+  - Weekly review lacked ASR completion data — now includes asr_completed count, rate, and common errors
+- **Learnings for future iterations:**
+  - Core modules can have methods that are never exposed via API — always verify routes.py has endpoints for every public method users need
+  - ASR "correct/incorrect" evaluates against the TRADING PLAN, not the trade result — this philosophy is documented in both the method docstrings and Alex's quotes
+  - Alex teaches that journaling notes must be written IN THE MOMENT (emotional bias capture), while ASR should be done LATER with emotional distance — the separate endpoints support this workflow
+  - The weekly review endpoint (GET /weekly-review) was labeled "ASR" but was purely a P&L summary — now it includes actual ASR completion tracking
 ---

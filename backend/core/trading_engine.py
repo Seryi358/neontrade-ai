@@ -124,7 +124,13 @@ class TradingEngine:
     def __init__(self):
         self.broker = _create_broker()
         self.risk_manager = RiskManager(self.broker)
-        self.position_manager = PositionManager(self.broker, risk_manager=self.risk_manager)
+        self.position_manager = PositionManager(
+            self.broker,
+            risk_manager=self.risk_manager,
+            management_style=settings.position_management_style,
+            trading_style=settings.trading_style,
+            allow_partial_profits=settings.allow_partial_profits,
+        )
 
         # OpenAI analyzer for AI-enhanced trade validation
         if _AI_AVAILABLE:

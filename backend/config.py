@@ -103,11 +103,23 @@ class Settings(BaseSettings):
     min_confluence_points: int = 2  # Minimum positive confluence points required (mentorship doesn't specify 3)
 
     # Position management (ch21 Avanzado)
-    # Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
-    # This means BE is set at 50% of the distance to TP1, NOT at a fixed 1% profit.
-    # For a 2:1 R:R trade with 1% risk, 50% to TP1 = 1% profit (coincides).
-    # For other R:R ratios, the 50% rule diverges from fixed 1%.
-    move_sl_to_be_pct_to_tp1: float = 0.50  # Move SL to BE at 50% of distance to TP1
+    # Default management style: "cp" (short-term, Alex's preference), "lp" (long-term), "cpa" (aggressive)
+    # Alex: "personas como yo, que lo que buscamos es salir cuanto antes" → CP
+    # LP gives trades more room (wider EMA), CP locks profit sooner (tighter EMA)
+    # CPA is NOT standalone — only used combined with LP/CP at key levels
+    position_management_style: str = "cp"
+
+    # Break Even trigger method:
+    #   "risk_distance" (Alex's preference): BE when profit >= 1x risk distance
+    #     Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"
+    #     For 1% risk, this means BE at 1% profit (R:R 1:1 point)
+    #   "pct_to_tp1": BE at a percentage of distance to TP1
+    #     Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
+    # For a 2:1 R:R trade at 1% risk, both methods coincide (1% profit = 50% to TP1).
+    # For other R:R ratios, "risk_distance" is simpler and matches Alex's oral instruction.
+    be_trigger_method: str = "risk_distance"
+    move_sl_to_be_pct_to_tp1: float = 0.50  # Only used when be_trigger_method="pct_to_tp1"
+
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
     partial_taking: bool = False      # Alex does NOT take partials — prefers quick exit at TP1
     # Partial profit taking: Alex personally doesn't use it, but the mentorship
@@ -116,6 +128,16 @@ class Settings(BaseSettings):
     allow_partial_profits: bool = False
     # SL management style: "ema" (recommended), "price_action" (swing highs/lows alternative)
     sl_management_style: str = "ema"
+
+    # CPA auto-trigger conditions (Short-term Aggressive)
+    # Alex: CPA is used in specific situations, not from the start of a trade.
+    # When enabled, the position manager will automatically switch to CPA trailing
+    # when any of these conditions are detected at an advanced phase of the trade.
+    # Alex: "doble techo, noticias, fin de semana, indecisión cerca del TP"
+    cpa_auto_on_double_pattern: bool = True    # Switch to CPA near double top/bottom
+    cpa_auto_on_news: bool = True              # Switch to CPA before high-impact news
+    cpa_auto_on_friday_close: bool = True      # Switch to CPA approaching Friday close
+    cpa_auto_on_indecision: bool = True        # Switch to CPA on indecision near TP/key levels
 
     # Drawdown-based risk adjustment (ch18.7)
     # Methods: "fixed_1pct" (always 1%, recommended for beginners),

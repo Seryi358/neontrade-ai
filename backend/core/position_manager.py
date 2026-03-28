@@ -162,7 +162,7 @@ class PositionManager:
         self,
         broker_client,
         risk_manager=None,
-        management_style: str = "lp",
+        management_style: str = "cp",
         trading_style: str = "day_trading",
         allow_partial_profits: bool = False,
     ):
@@ -240,6 +240,38 @@ class PositionManager:
         if self._is_crypto(instrument):
             return self._crypto_cpa_ema_key
         return self._cpa_ema_key
+
+    def set_cpa_trigger(self, trade_id: str, reason: str):
+        """Signal that CPA (aggressive trailing) should activate for a position.
+
+        Called by trading_engine when it detects conditions that warrant
+        switching to aggressive management mid-trade:
+          - double top/bottom forming near position's TP
+          - high-impact news approaching
+          - Friday close approaching (weekend gap risk)
+          - price indecision near key levels
+
+        Alex: "en momentos donde estemos llegando a puntos determinantes,
+        como soportes o resistencias, en momentos donde vayan a haber noticias,
+        o en momentos donde vaya a finalizar la semana"
+        """
+        pos = self.positions.get(trade_id)
+        if pos is None:
+            return
+
+        # Only trigger CPA on positions already past BE (not too early)
+        if pos.phase not in (PositionPhase.BREAK_EVEN, PositionPhase.TRAILING_TO_TP1):
+            logger.debug(
+                f"{trade_id}: CPA trigger '{reason}' ignored — phase {pos.phase.value} too early"
+            )
+            return
+
+        cpa_key = self._get_cpa_ema_key(pos.instrument)
+        pos.phase = PositionPhase.BEYOND_TP1
+        logger.info(
+            f"{trade_id}: CPA AUTO-TRIGGER '{reason}' — switching to aggressive trailing "
+            f"(CPA: {cpa_key})"
+        )
 
     def set_ema_values(self, instrument: str, emas: Dict[str, float]):
         """Update EMA values for an instrument (called by trading engine after analysis)."""
@@ -375,20 +407,32 @@ class PositionManager:
 
     async def _handle_sl_moved_phase(self, pos: ManagedPosition, current_price: float):
         """
-        Phase 2: Move to Break Even at 50% of distance to TP1.
-        Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
-        For a 2:1 R:R trade risking 1%, 50% to TP1 = 1% profit (coincides with old rule).
-        For other R:R ratios, this is more accurate than a fixed percentage.
+        Phase 2: Move to Break Even.
+
+        Two trigger methods (configured via be_trigger_method):
+          "risk_distance" (Alex's preference): BE when profit >= 1x initial risk distance
+            Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"
+            For 1% risk this means BE at 1% profit — the R:R 1:1 point.
+          "pct_to_tp1": BE at a percentage of distance to TP1
+            Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
+
+        For a standard 2:1 R:R trade at 1% risk, both methods coincide.
         """
         from config import settings
         distance_to_tp1 = abs(pos.take_profit_1 - pos.entry_price)
+        risk_distance = abs(pos.entry_price - pos.original_sl)
         current_profit = (
             (current_price - pos.entry_price) if pos.direction == "BUY"
             else (pos.entry_price - current_price)
         )
 
-        # Move to BE when at 50% of distance to TP1 (Trading Plan PDF rule)
-        be_threshold = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
+        # Calculate BE threshold based on configured method
+        if settings.be_trigger_method == "risk_distance":
+            # Alex's rule: BE when unrealized profit >= 1x risk distance (e.g., 1% profit at 1% risk)
+            be_threshold = risk_distance
+        else:
+            # Trading Plan PDF rule: BE at X% of distance to TP1
+            be_threshold = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
         if current_profit >= be_threshold:
             # BE = entry price (+ small buffer for spread)
             spread_buffer = abs(pos.entry_price - pos.original_sl) * 0.02
@@ -418,9 +462,12 @@ class PositionManager:
         )
 
         # Start trailing when beyond BE + 20% more toward TP1
-        # (i.e., ~60-70% to TP1 depending on BE placement)
         from config import settings
-        be_distance = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
+        risk_distance = abs(pos.entry_price - pos.original_sl)
+        if settings.be_trigger_method == "risk_distance":
+            be_distance = risk_distance
+        else:
+            be_distance = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
         trailing_trigger = be_distance + distance_to_tp1 * 0.20
         if current_profit >= trailing_trigger:
             pos.phase = PositionPhase.TRAILING_TO_TP1

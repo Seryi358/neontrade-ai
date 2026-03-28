@@ -32,6 +32,9 @@ Started: vie 27 mar 2026 21:45:20 -05
 - M2 approximation: broker APIs don't provide M2 candles, use `EMA_M5_20` as proxy (EMA 50 on M2 ≈ EMA 20 on M5)
 - TradeRisk `units` and `risk_percent` must stay in sync — when scaling risk post-creation, always scale both
 - Use RiskManager public methods (e.g., `unregister_all_trades()`) instead of accessing `_active_risks` directly
+- PositionManager defaults must come from config.py — always pass `management_style`, `trading_style`, `allow_partial_profits` from settings, never rely on constructor defaults
+- BE trigger has 2 methods: "risk_distance" (Alex's 1% = 1x risk) vs "pct_to_tp1" (50% to TP1). Config `be_trigger_method` selects which. Both coincide at 2:1 R:R.
+- CPA auto-trigger is external: `position_manager.set_cpa_trigger(trade_id, reason)` — called by trading_engine when it detects double patterns, news, Friday close, or indecision
 
 ---
 
@@ -807,4 +810,26 @@ Started: vie 27 mar 2026 21:45:20 -05
 - **Learnings for future iterations:**
   - Config was already well-configured for Day Trading — the ALEX-* stories are primarily about verifying defaults and adding documentation
   - The `trading_style` field propagates to NewsFilter, PositionManager, TradeJournal — changing it automatically adjusts behavior across modules
+---
+
+## 2026-03-28 - ALEX-002
+- **What was implemented:** Configured default position management with Alex's preferences from Trading Mastery/04_Avanzado/02_Manejo de la posición (LP, CP, CPA transcriptions)
+- **Files changed:**
+  - `backend/config.py` — Added `position_management_style: str = "cp"` (Alex prefers quick exits/short-term), `be_trigger_method: str = "risk_distance"` (BE at 1x risk distance, Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"), CPA auto-trigger conditions (`cpa_auto_on_double_pattern`, `cpa_auto_on_news`, `cpa_auto_on_friday_close`, `cpa_auto_on_indecision`)
+  - `backend/core/position_manager.py` — Changed default management_style from "lp" to "cp". Updated `_handle_sl_moved_phase()` to support `be_trigger_method="risk_distance"` (BE at profit >= 1x risk) vs `"pct_to_tp1"` (BE at % of TP1 distance). Updated `_handle_be_phase()` trailing trigger calculation for risk_distance method. Added `set_cpa_trigger()` method for external CPA auto-switching (double patterns, news, Friday close, indecision)
+  - `backend/core/trading_engine.py` — Updated PositionManager instantiation to pass `position_management_style`, `trading_style`, and `allow_partial_profits` from config (was using hardcoded defaults)
+  - `scripts/ralph/prd.json` — Marked ALEX-002 as passes: true
+- **Audit findings vs acceptance criteria:**
+  - ✅ Default management style: CP (short-term, quick exit) — Alex: "personas como yo, que lo que buscamos es salir cuanto antes"
+  - ✅ Partial profits disabled by default (was already False)
+  - ✅ BE at 1% profit (risk_distance method) — Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"
+  - ✅ LP Day Trading: EMA 50 on H1 (was already correct in grid)
+  - ✅ CP Day Trading: EMA 50 on M5 (was already correct in grid)
+  - ✅ CPA Day Trading: M2 chart (M5 fallback since M2 unavailable from broker API)
+  - ✅ CPA trigger conditions: double top/bottom, news, Friday close, indecision — config flags added
+- **Learnings for future iterations:**
+  - PositionManager was instantiated in trading_engine.py with hardcoded defaults instead of reading from config — always pass config values explicitly
+  - BE trigger has TWO valid interpretations: "50% to TP1" (Trading Plan PDF) vs "1x risk distance" (Alex oral instruction) — these coincide at 2:1 R:R but diverge otherwise. Config now supports both methods
+  - CPA auto-trigger is an external signal — the position_manager can't detect double patterns or news by itself, needs trading_engine to call `set_cpa_trigger()`
+  - The `position_management_style` is separate from `sl_management_style` — the former controls which EMA timeframe (LP/CP/CPA), the latter controls EMA vs price_action trailing
 ---

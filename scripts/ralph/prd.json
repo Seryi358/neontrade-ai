@@ -387,7 +387,7 @@
         "CPA: gráfico de 2 minutos para gestión agresiva",
         "CPA se usa en: doble techo/suelo, antes de noticias, fin de semana, indecisión"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-003",

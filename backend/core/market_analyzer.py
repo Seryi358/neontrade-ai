@@ -262,9 +262,9 @@ class MarketAnalyzer:
                 if vol_data:
                     volume_analysis[tf] = vol_data
 
-        # Step 13b: Extract SMA_D_200 for convenience field
-        # EMA_W_8 removed: not from mentorship
-        ema_w8_val = None
+        # Step 13b: Extract convenience fields
+        # EMA_W_8: mentorship Class 3 — weekly close below EMA 8 signals corrective move
+        ema_w8_val = ema_values.get("EMA_W_8")
         sma_d200_val = sma_values.get("SMA_D_200")
 
         # Step 14: HTF/LTF convergence
@@ -934,7 +934,7 @@ class MarketAnalyzer:
         """Calculate EMA values for multiple timeframes."""
         emas = {}
         ema_configs = {
-            "W": [50],  # EMA 8 removed: not from mentorship
+            "W": [8, 50],  # EMA 8 Weekly: mentorship Class 3 (trend/close signal)
             "D": [20, 50],
             "H4": [50],
             "H1": [50],

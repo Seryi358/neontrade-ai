@@ -1007,8 +1007,71 @@ class TradingEngine:
 
             prices = await self.broker.get_prices_bulk(instruments)
             await self.position_manager.update_all_positions(prices)
+
+            # CPA auto-trigger checks (TradingLab: double pattern, news, Friday, indecision)
+            self._check_cpa_auto_triggers(prices)
         except Exception as e:
             logger.error(f"Error managing positions: {e}")
+
+    def _check_cpa_auto_triggers(self, prices: dict):
+        """Check CPA auto-trigger conditions for open positions (TradingLab mentorship).
+
+        Conditions: double pattern near TP, upcoming news, Friday close, indecision.
+        """
+        import datetime as _dt
+
+        now = _dt.datetime.now(_dt.timezone.utc)
+        is_friday = now.weekday() == 4
+        friday_close_soon = is_friday and now.hour >= settings.no_new_trades_friday_hour
+
+        # Check upcoming news
+        news_active = False
+        if self.news_filter:
+            try:
+                news_active, _ = asyncio.get_event_loop().run_until_complete(
+                    self.news_filter.has_upcoming_news()
+                ) if not asyncio.get_event_loop().is_running() else (False, "")
+            except Exception:
+                pass
+            # Simpler sync check for running loop
+            if hasattr(self, '_news_active'):
+                news_active = self._news_active
+
+        for pos in list(self.position_manager.positions.values()):
+            # Only trigger CPA on positions past BE
+            if pos.phase.value not in ("break_even", "trailing"):
+                continue
+
+            # Condition 1: Friday close approaching
+            if friday_close_soon and settings.cpa_auto_on_friday_close:
+                self.position_manager.set_cpa_trigger(pos.trade_id, "friday_close_approaching")
+                continue
+
+            # Condition 2: High-impact news approaching
+            if news_active and settings.cpa_auto_on_news:
+                self.position_manager.set_cpa_trigger(pos.trade_id, "high_impact_news")
+                continue
+
+            # Condition 3: Double pattern near TP (check chart patterns)
+            if settings.cpa_auto_on_double_pattern:
+                analysis = self._last_scan_results.get(pos.instrument)
+                if analysis and analysis.chart_patterns:
+                    for cp in analysis.chart_patterns:
+                        cp_name = cp.get("pattern", "").lower() if isinstance(cp, dict) else str(cp).lower()
+                        if "double" in cp_name:
+                            self.position_manager.set_cpa_trigger(pos.trade_id, f"double_pattern:{cp_name}")
+                            break
+
+            # Condition 4: Indecision near TP (DOJI patterns)
+            if settings.cpa_auto_on_indecision:
+                analysis = self._last_scan_results.get(pos.instrument)
+                if analysis and "DOJI" in analysis.candlestick_patterns:
+                    price = prices.get(pos.instrument)
+                    if price and pos.take_profit_1:
+                        tp_dist = abs(pos.take_profit_1 - price)
+                        entry_dist = abs(pos.take_profit_1 - pos.entry_price)
+                        if entry_dist > 0 and tp_dist / entry_dist < 0.3:
+                            self.position_manager.set_cpa_trigger(pos.trade_id, "indecision_near_tp")
 
     # ── Analysis-Only Scan (off-hours / news active) ───────────
 

@@ -28,6 +28,7 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 
+from config import settings
 from strategies.base import SetupSignal, StrategyColor, get_best_setup
 from core.market_analyzer import AnalysisResult, Trend, MarketCondition
 

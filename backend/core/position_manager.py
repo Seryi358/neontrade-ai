@@ -81,14 +81,19 @@ class TradingStyle(Enum):
 # All values reference EMA 50 on the given timeframe
 #
 # FOREX/EQUITIES/INDICES — from Trading Mastery position management module
+# Mentorship grid (4-timeframe box per style):
+#   Swing:       Weekly -> Daily  -> H1   -> M15
+#   Day Trading: H4     -> H1    -> M15  -> M2/M5
+#   Scalping:    M15    -> M5    -> M1   -> 30s/M1
+# LP = first box, CP = third box, CPA = fourth box
 _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
-    # LP (Long-term): Swing=Daily, Day=H1. (Optional wider: Swing=Weekly, Day=H4)
-    (ManagementStyle.LP, TradingStyle.SWING): "EMA_D_50",
-    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H1_50",
+    # LP (Long-term): Swing=Weekly, Day=H4, Scalp=M15
+    (ManagementStyle.LP, TradingStyle.SWING): "EMA_W_50",
+    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H4_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
-    # CP (Short-term): Swing=H1, Day=M5. (Optional wider: Swing=H4, Day=M15)
+    # CP (Short-term): Swing=H1, Day=M15, Scalp=M1
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
-    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
+    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",
     (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
     # CPA (Short-term Aggressive): Swing=M15, Day=M2 (M5 fallback), Scalp=M1
     (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",

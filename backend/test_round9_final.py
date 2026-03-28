@@ -541,11 +541,11 @@ def test_block_4_position_manager():
 
     # EMA timeframe grid (9 entries = 3 styles x 3 trading styles)
     check("EMA grid has 9 entries", len(_EMA_TIMEFRAME_GRID) == 9)
-    check("LP+swing -> EMA_D_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_D_50")
-    check("LP+daytrading -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.DAY_TRADING)] == "EMA_H1_50")
+    check("LP+swing -> EMA_W_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_W_50")
+    check("LP+daytrading -> EMA_H4_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.DAY_TRADING)] == "EMA_H4_50")
     check("LP+scalping -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SCALPING)] == "EMA_M15_50")
     check("CP+swing -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SWING)] == "EMA_H1_50")
-    check("CP+daytrading -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M5_50")
+    check("CP+daytrading -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M15_50")
     check("CP+scalping -> EMA_M1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SCALPING)] == "EMA_M1_50")
     check("CPA+swing -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.SWING)] == "EMA_M15_50")
     check("CPA+daytrading -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.DAY_TRADING)] == "EMA_M5_50")
@@ -553,11 +553,11 @@ def test_block_4_position_manager():
 
     # PositionManager initialization
     pm_lp = PositionManager(broker, management_style="lp", trading_style="day_trading")
-    check("PM base_ema is EMA_H1_50 for LP+daytrading", pm_lp._base_ema_key == "EMA_H1_50")
+    check("PM base_ema is EMA_H4_50 for LP+daytrading", pm_lp._base_ema_key == "EMA_H4_50")
     check("PM cpa_ema is EMA_M5_50 for CPA+daytrading", pm_lp._cpa_ema_key == "EMA_M5_50")
 
     pm_cp = PositionManager(broker, management_style="cp", trading_style="day_trading")
-    check("CP+daytrading base=EMA_M5_50", pm_cp._base_ema_key == "EMA_M5_50")
+    check("CP+daytrading base=EMA_M15_50", pm_cp._base_ema_key == "EMA_M15_50")
 
     pm_pa = PositionManager(broker, management_style="price_action", trading_style="day_trading")
     check("PRICE_ACTION base_ema is None", pm_pa._base_ema_key is None)

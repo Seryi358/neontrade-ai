@@ -749,10 +749,10 @@ def block_4_position_manager():
 
     # LP/CP/CPA EMA key correctness
     pm_lp_swing = PositionManager(broker, management_style="lp", trading_style="swing")
-    check("B4-EMA LP/swing = D_50", pm_lp_swing._base_ema_key == "EMA_D_50")
+    check("B4-EMA LP/swing = W_50", pm_lp_swing._base_ema_key == "EMA_W_50")
 
     pm_cp_dt = PositionManager(broker, management_style="cp", trading_style="day_trading")
-    check("B4-EMA CP/day = M5_50", pm_cp_dt._base_ema_key == "EMA_M5_50")
+    check("B4-EMA CP/day = M15_50", pm_cp_dt._base_ema_key == "EMA_M15_50")
 
     pm_cpa_scalp = PositionManager(broker, management_style="cpa", trading_style="scalping")
     check("B4-EMA CPA/scalp = M1_50", pm_cpa_scalp._base_ema_key == "EMA_M1_50")

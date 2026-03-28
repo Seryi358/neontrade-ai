@@ -901,8 +901,8 @@ def test_position_risk():
     pm = PositionManager(broker, management_style="lp", trading_style="day_trading")
     check("T151: PM management_style is LP", pm.management_style == ManagementStyle.LP)
     check("T152: PM trading_style is DAY_TRADING", pm.trading_style == TradingStyle.DAY_TRADING)
-    check("T153: PM base EMA key for LP/DayTrading is EMA_H1_50",
-          pm._base_ema_key == "EMA_H1_50")
+    check("T153: PM base EMA key for LP/DayTrading is EMA_H4_50",
+          pm._base_ema_key == "EMA_H4_50")
     check("T154: PM CPA EMA key for DayTrading is EMA_M5_50",
           pm._cpa_ema_key == "EMA_M5_50")
 
@@ -917,8 +917,8 @@ def test_position_risk():
     check("T158: PRICE_ACTION CPA EMA still set", pm_pa._cpa_ema_key == "EMA_M5_50")
 
     # All 9 grid combos
-    check("T159: Grid has LP/SWING -> EMA_D_50",
-          _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_D_50")
+    check("T159: Grid has LP/SWING -> EMA_W_50",
+          _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_W_50")
     check("T160: Grid has CP/SCALPING -> EMA_M1_50",
           _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SCALPING)] == "EMA_M1_50")
 
@@ -1369,6 +1369,11 @@ def test_ai_explanation_alerts():
         ms.funded_max_daily_dd = 0.05
         ms.funded_max_total_dd = 0.10
         ms.scale_in_require_be = False
+        ms.funded_no_overnight = False
+        ms.funded_no_weekend = False
+        ms.funded_no_news_trading = False
+        ms.trading_start_hour = 0
+        ms.trading_end_hour = 24
         rm4._current_balance = 10000
         rm4._peak_balance = 10000
         can2, reason2 = rm4.check_funded_account_limits()

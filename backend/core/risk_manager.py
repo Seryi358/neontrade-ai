@@ -548,6 +548,28 @@ class RiskManager:
                 f"({total_dd:.2%} >= {settings.funded_max_total_dd:.2%})",
             )
 
+        # Enforce funded account restrictions (normal accounts only)
+        now = datetime.now(timezone.utc)
+
+        # News restriction: block new trades during news windows
+        if getattr(settings, 'funded_no_news_trading', False):
+            # Delegates to news_filter; caller must check externally
+            pass  # handled by trading_engine's news check
+
+        # Weekend restriction: block trades on Saturday/Sunday
+        if getattr(settings, 'funded_no_weekend', False):
+            if now.weekday() >= 5:  # Saturday=5, Sunday=6
+                return (False, "Funded (normal): no weekend trading allowed")
+
+        # Overnight restriction: block trades outside session hours
+        if getattr(settings, 'funded_no_overnight', False):
+            if now.hour < settings.trading_start_hour or now.hour >= settings.trading_end_hour:
+                return (
+                    False,
+                    f"Funded (normal): no overnight trading "
+                    f"(current hour {now.hour} UTC, session {settings.trading_start_hour}-{settings.trading_end_hour})",
+                )
+
         return (True, "")
 
     def record_funded_pnl(self, pnl_amount: float):

@@ -34,6 +34,9 @@ class CryptoMarketCycle:
     dominance_transition: Optional[Dict[str, str]] = None  # From get_dominance_transition()
     crypto_trailing_ema50: Optional[float] = None  # EMA 50 value for trailing stop
     using_fixed_tp_warning: bool = False  # True if fixed TPs detected instead of EMA trailing
+    # USDT.D tracking — critical for distinguishing true altseason from risk-off.
+    # Mentorship: "If USDT.D is rising while BTC.D falls, money going to stablecoins (NOT altcoins)"
+    usdt_dominance_rising: Optional[bool] = None  # True = risk-off, False = capital flowing to alts
     last_updated: Optional[str] = None
 
 
@@ -164,13 +167,18 @@ class CryptoCycleAnalyzer:
                     # could be rotating to USDT (risk-off). Require BOTH falling
                     # dominance AND ETH outperforming BTC as confirmation that
                     # capital is flowing into alts, not stablecoins.
-                    # TODO: Future enhancement -- track USDT.D (USDT dominance)
-                    # to distinguish risk-off (USDT.D rising) from true altseason
-                    # (USDT.D stable/falling while BTC.D falls).
-                    cycle.altcoin_season = (
-                        cycle.btc_dominance_trend == "falling"
-                        and cycle.eth_outperforming_btc
-                    )
+                    # Mentorship: "If USDT.D is rising while BTC.D falls, money
+                    # going to stablecoins (NOT altcoins) - bearish signal."
+                    # When usdt_dominance_rising is available (from external feed),
+                    # use it to filter false altseason signals.
+                    if cycle.usdt_dominance_rising is True:
+                        # USDT.D rising = risk-off, NOT altseason
+                        cycle.altcoin_season = False
+                    else:
+                        cycle.altcoin_season = (
+                            cycle.btc_dominance_trend == "falling"
+                            and cycle.eth_outperforming_btc
+                        )
 
         except Exception as e:
             logger.debug(f"Dominance analysis failed: {e}")
@@ -566,6 +574,8 @@ class CryptoCycleAnalyzer:
                 "Mentorship recommends EMA 50 weekly as trailing stop for crypto "
                 "positions -- fixed TPs leave money on the table in bull runs."
             )
+        if cycle.usdt_dominance_rising is True:
+            reason += " | WARNING: USDT.D rising — money flowing to stablecoins (risk-off, NOT altseason)"
         if ema50 is not None:
             reason += f" | EMA 50 weekly trailing stop: {ema50:.2f}"
         return True, reason

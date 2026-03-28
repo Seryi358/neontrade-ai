@@ -8,16 +8,18 @@ Scalping temporal hierarchy (compressed from day trading):
 - M5: Confirmation (like 1H in day trading) -> EMA 50 + MACD + Volume
 - M1: Execution (like 5M in day trading) -> EMA 50 break (diagonal/trendline)
 
-Position Management:
-- Method 1 (fast): Exit when price closes below EMA 50 on M1 (~7-10% profit)
-- Method 2 (slow): Exit when price closes below EMA 50 on M5 (~10%+ profit)
+Position Management (TradingLab Scalping Workshop, Section 7):
+- Method 1 (fixed_tp): Set TP at Fibonacci Extension levels and walk away (safest, default)
+- Method 2 (fast): Exit when price closes below EMA 50 on M1 (~7-10% profit)
+- Method 3 (slow): Exit when price closes below EMA 50 on M5 (~10%+ profit)
 
-Risk: 0.5% per trade (from config), max daily DD 5%, max total DD 10%
+Risk: 0.5% per trade (NeonTrade AI default — see note below)
 
-NOTE: The 5% daily drawdown and 10% total drawdown limits are app-added
-safety features implemented by NeonTrade AI. They are NOT from the
-TradingLab Scalping Workshop itself. The workshop focuses on per-trade
-risk (0.5%) and proper SL placement at the 0.618 Fibonacci level.
+NOTE: The 0.5% per-trade risk, 5% daily drawdown, and 10% total drawdown
+limits are ALL NeonTrade AI defaults, NOT from the TradingLab Scalping
+Workshop. The workshop says "in scalping you must risk less" but defers
+the exact percentage to future upgrades. The 0.5% is a reasonable
+app-chosen value. The DD limits match funded account rules for safety.
 """
 
 from typing import Optional, Dict, List, Any
@@ -247,29 +249,31 @@ class ScalpingAnalyzer:
                 ):
                     sell_confluence += 1
 
-        # RSI divergence on H1 — workshop emphasizes this is "much more
+        # MACD divergence on H1 — workshop emphasizes this is "much more
         # evident" on H1 than on lower timeframes.
-        if analysis is not None and analysis.rsi_divergence:
-            rsi_div = analysis.rsi_divergence
-            if isinstance(rsi_div, dict):
-                h1_rsi_div = rsi_div.get("H1") or rsi_div.get("D")  # D slot = H1 in scalping remap
-            elif isinstance(rsi_div, str):
-                h1_rsi_div = rsi_div
+        # NOTE: The Scalping Workshop mentions MACD divergence (NOT RSI) on H1.
+        # RSI is NOT part of the Scalping Workshop indicator set.
+        if analysis is not None and hasattr(analysis, 'macd_divergence') and analysis.macd_divergence:
+            macd_div = analysis.macd_divergence
+            if isinstance(macd_div, dict):
+                h1_macd_div = macd_div.get("H1") or macd_div.get("D")  # D slot = H1 in scalping remap
+            elif isinstance(macd_div, str):
+                h1_macd_div = macd_div
             else:
-                h1_rsi_div = None
+                h1_macd_div = None
 
-            if h1_rsi_div:
-                div_str = str(h1_rsi_div).lower()
+            if h1_macd_div:
+                div_str = str(h1_macd_div).lower()
                 if "bullish" in div_str:
-                    buy_confluence += 2  # RSI div on H1 is strong signal
+                    buy_confluence += 2  # MACD div on H1 is strong signal
                     logger.info(
-                        f"Scalping H1: RSI bullish divergence on "
+                        f"Scalping H1: MACD bullish divergence on "
                         f"{data.instrument} — BUY confluence +2"
                     )
                 elif "bearish" in div_str:
                     sell_confluence += 2
                     logger.info(
-                        f"Scalping H1: RSI bearish divergence on "
+                        f"Scalping H1: MACD bearish divergence on "
                         f"{data.instrument} — SELL confluence +2"
                     )
 
@@ -389,12 +393,21 @@ class ScalpingAnalyzer:
         if signal is None:
             return None
 
-        # TradingLab: BLUE is complex in scalping but clean BLUEs can form
-        # Require higher confidence (80%+) instead of total exclusion
+        # TradingLab Scalping Workshop (Section 10): Three options for BLUE:
+        # 1. "aggressive" — trade all BLUEs regardless
+        # 2. "skip_all" — skip all BLUEs entirely
+        # 3. "clean_only" — only trade clean BLUEs with 80%+ confidence (recommended, but rare)
+        # Configurable via settings.scalping_blue_mode (default: "clean_only")
         if signal.strategy == StrategyColor.BLUE or signal.strategy_variant in ("BLUE_A", "BLUE_B", "BLUE_C"):
-            if signal.confidence < 80:
-                logger.debug(f"Scalping: BLUE setup rejected (confidence {signal.confidence:.0f}% < 80%)")
+            blue_mode = getattr(settings, 'scalping_blue_mode', 'clean_only')
+            if blue_mode == "skip_all":
+                logger.debug(f"Scalping: BLUE setup skipped (scalping_blue_mode='skip_all')")
                 return None
+            elif blue_mode == "clean_only":
+                if signal.confidence < 80:
+                    logger.debug(f"Scalping: BLUE setup rejected (confidence {signal.confidence:.0f}% < 80%, mode='clean_only')")
+                    return None
+            # else: "aggressive" — accept all BLUEs
 
         # Tag as scalping setup
         signal.reasoning = f"[SCALPING] {signal.reasoning}"
@@ -590,14 +603,53 @@ class ScalpingAnalyzer:
         """
         result = {"valid": True, "confidence_adj": 0, "reasons": []}
 
-        # Condition 1: M15 structure - price must be on correct side of EMA 50
+        # Condition 1: M15 EMA 50 BREAKOUT confirmation (Workshop Step 3)
+        # Workshop: "Confirm the EMA 50 on the 15-minute chart HAS BEEN BROKEN"
+        # This requires a recent crossover, not just current positioning.
+        # Check: (a) price is on correct side AND (b) a recent breakout occurred.
         if scalp_data.close_m15 is not None and scalp_data.ema50_m15 is not None:
+            # (a) Price must be on correct side
             if direction == "BUY" and scalp_data.close_m15 < scalp_data.ema50_m15:
                 result["valid"] = False
                 return result
             if direction == "SELL" and scalp_data.close_m15 > scalp_data.ema50_m15:
                 result["valid"] = False
                 return result
+
+            # (b) Detect recent M15 EMA 50 breakout (crossover within last N candles)
+            m15_df = scalp_data.candles.get("M15", pd.DataFrame())
+            if not m15_df.empty and len(m15_df) >= 10:
+                closes = m15_df["close"].values
+                # Calculate EMA 50 for recent M15 candles to find crossover
+                if len(closes) >= 52:
+                    ema_values = pd.Series(closes).ewm(span=50, adjust=False).values
+                    # Check last 8 candles for a crossover
+                    recent_breakout = False
+                    lookback = min(8, len(ema_values) - 1)
+                    for i in range(-lookback, 0):
+                        prev_close = closes[i - 1]
+                        curr_close = closes[i]
+                        prev_ema = ema_values[i - 1]
+                        curr_ema = ema_values[i]
+                        if direction == "BUY":
+                            # Breakout up: was below, now above
+                            if prev_close < prev_ema and curr_close > curr_ema:
+                                recent_breakout = True
+                                break
+                        else:  # SELL
+                            # Breakout down: was above, now below
+                            if prev_close > prev_ema and curr_close < curr_ema:
+                                recent_breakout = True
+                                break
+
+                    if not recent_breakout:
+                        logger.debug(
+                            f"Scalping: M15 EMA 50 not recently broken for "
+                            f"{scalp_data.instrument} {direction} — "
+                            f"workshop requires a breakout, not just positioning"
+                        )
+                        result["valid"] = False
+                        return result
 
         # Condition 2: M5 MACD — OPTIONAL, not a hard requirement.
         # Per the mentor: "I don't usually use MACD on M5" / "not obligatory."
@@ -621,43 +673,83 @@ class ScalpingAnalyzer:
                     f"(not rejecting, MACD on M5 is optional per mentor)"
                 )
 
-        # Condition 3: M1 execution trigger — EMA 50 break in signal direction.
-        # TODO: M1 diagonal/trendline break is an alternative execution trigger
-        # per the Scalping Workshop (step 6: "entry on M1 via diagonal break or
-        # EMA 50 break"). Diagonal/trendline detection on M1 is NOT YET
-        # IMPLEMENTED. Currently the code only uses EMA 50 positioning on M1
-        # as the execution trigger. Implementing diagonal detection would
-        # require identifying swing highs/lows on M1 and fitting trendlines,
-        # which is a significant addition.
+        # Condition 3: M1 execution trigger — breakout + confirmation (Workshop Step 6)
+        # Workshop: "Requires both: breakout + confirmation (not just the breakout candle)"
+        # The breakout can be of the EMA 50 OR a diagonal/trendline.
+        # TODO: Diagonal/trendline break detection on M1 is not yet implemented.
         if scalp_data.close_m1 is not None and scalp_data.ema50_m1 is not None:
+            # (a) Price must be on correct side of M1 EMA 50
             if direction == "BUY" and scalp_data.close_m1 < scalp_data.ema50_m1:
-                # Price below M1 EMA 50 — no BUY execution trigger
                 result["valid"] = False
                 return result
             if direction == "SELL" and scalp_data.close_m1 > scalp_data.ema50_m1:
-                # Price above M1 EMA 50 — no SELL execution trigger
                 result["valid"] = False
                 return result
 
-        # Condition 4: Volume confirmation on M5 (at least 0.8x average)
+            # (b) Breakout + confirmation: verify that the previous candle also
+            # closed on the correct side (two consecutive candle closes = confirmation)
+            m1_df = scalp_data.candles.get("M1", pd.DataFrame())
+            if not m1_df.empty and len(m1_df) >= 3:
+                closes = m1_df["close"].values
+                if len(closes) >= 52:
+                    ema_vals = pd.Series(closes).ewm(span=50, adjust=False).values
+                    # Check: current candle (confirmation) AND previous candle (breakout)
+                    # both closed on the correct side of EMA 50
+                    prev_close = closes[-2]
+                    prev_ema = ema_vals[-2]
+                    if direction == "BUY" and prev_close < prev_ema:
+                        # Previous candle was still below EMA — no confirmed breakout yet
+                        # (current candle is the breakout, needs one more for confirmation)
+                        result["confidence_adj"] -= 15
+                        result["reasons"].append(
+                            "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
+                        )
+                    elif direction == "SELL" and prev_close > prev_ema:
+                        result["confidence_adj"] -= 15
+                        result["reasons"].append(
+                            "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
+                        )
+
+        # Condition 4: Volume on M5 — Workshop says volume is "important" on M5
+        # but does NOT make it a hard entry requirement. Treat as confluence
+        # scoring: low volume reduces confidence, does not reject.
         if scalp_data.volume_m5:
             vol_ratio = scalp_data.volume_m5.get("ratio", 0)
             if vol_ratio < 0.8:
+                penalty = -10
+                result["confidence_adj"] += penalty
+                result["reasons"].append(
+                    f"M5 volume low ({vol_ratio:.2f}x avg) — "
+                    f"confidence {penalty}pts (workshop: important, not required)"
+                )
                 logger.debug(
                     f"Scalping: low volume on M5 for {scalp_data.instrument} "
-                    f"(ratio={vol_ratio:.2f})"
+                    f"(ratio={vol_ratio:.2f}) — applying {penalty}pt penalty"
                 )
-                result["valid"] = False
-                return result
+            elif vol_ratio > 1.5:
+                bonus = 5
+                result["confidence_adj"] += bonus
+                result["reasons"].append(
+                    f"M5 volume strong ({vol_ratio:.2f}x avg) — confidence +{bonus}pts"
+                )
 
         # Deceleration detection on H1 and M5 (Workshop steps 2 and 5)
-        # Adds confluence scoring, not hard rejection.
+        # Workshop Step 2: H1 deceleration "must" occur — HARD requirement for RED setups.
+        # Workshop Step 5: M5 deceleration — "Do NOT enter without it" — HARD requirement.
         h1_decel = self._detect_deceleration(
             scalp_data.candles.get("H1", pd.DataFrame()), direction
         )
         if h1_decel:
             result["confidence_adj"] += h1_decel["adj"]
             result["reasons"].append(f"H1 deceleration: {h1_decel['reason']}")
+        else:
+            # Workshop Step 2: H1 deceleration is REQUIRED (hard rejection)
+            logger.debug(
+                f"Scalping: H1 deceleration NOT detected for {scalp_data.instrument} "
+                f"{direction} — workshop requires this (Step 2)"
+            )
+            result["valid"] = False
+            return result
 
         m5_decel = self._detect_deceleration(
             scalp_data.candles.get("M5", pd.DataFrame()), direction
@@ -665,6 +757,14 @@ class ScalpingAnalyzer:
         if m5_decel:
             result["confidence_adj"] += m5_decel["adj"]
             result["reasons"].append(f"M5 deceleration: {m5_decel['reason']}")
+        else:
+            # Workshop Step 5: M5 deceleration is REQUIRED — "Do NOT enter" without it
+            logger.debug(
+                f"Scalping: M5 deceleration NOT detected for {scalp_data.instrument} "
+                f"{direction} — workshop requires this (Step 5)"
+            )
+            result["valid"] = False
+            return result
 
         return result
 
@@ -780,26 +880,36 @@ class ScalpingAnalyzer:
     ) -> SetupSignal:
         """
         Override TP1 to the nearest swing high (for BUY) or swing low
-        (for SELL) from the H1 timeframe, if it is closer than the
+        (for SELL) from M15 or H1 timeframes, if it is closer than the
         strategy-generated TP.
 
         Workshop says the "safest" TP for scalping is recent highs/lows.
-        This ensures we take profit at a known level rather than
-        projecting too far.
+        The workshop context is the pullback zone analysis on 15-min and
+        5-min charts, so M15 swing points are preferred. H1 is the bias
+        chart — its swing points may be too far for scalping targets.
+
+        Priority: check M15 first, then H1 as fallback.
 
         Args:
             signal: The SetupSignal with strategy-generated TP.
-            scalp_data: ScalpingData with H1 candles.
-            swing_lookback: Number of H1 candles to scan for swing points.
+            scalp_data: ScalpingData with candles.
+            swing_lookback: Number of candles to scan for swing points.
 
         Returns:
             The signal, potentially with TP1 overridden.
         """
+        # Try M15 first (closer to scalping context), then H1 as fallback
+        m15_df = scalp_data.candles.get("M15", pd.DataFrame())
         h1_df = scalp_data.candles.get("H1", pd.DataFrame())
-        if h1_df.empty or len(h1_df) < 5:
-            return signal
 
-        recent = h1_df.tail(swing_lookback)
+        if not m15_df.empty and len(m15_df) >= 5:
+            recent = m15_df.tail(swing_lookback)
+            tf_label = "M15"
+        elif not h1_df.empty and len(h1_df) >= 5:
+            recent = h1_df.tail(swing_lookback)
+            tf_label = "H1"
+        else:
+            return signal
 
         if signal.direction == "BUY":
             # Find swing highs: candles where high > neighbors
@@ -828,8 +938,8 @@ class ScalpingAnalyzer:
                         signal.risk_reward_ratio = tp_distance / sl_distance
                     logger.info(
                         f"Scalping TP override: {signal.instrument} BUY TP1 "
-                        f"{original_tp:.5f} -> {nearest_swing:.5f} (nearest H1 "
-                        f"swing high, R:R {signal.risk_reward_ratio:.2f}:1)"
+                        f"{original_tp:.5f} -> {nearest_swing:.5f} (nearest"
+                        f"swing high on {tf_label}, R:R {signal.risk_reward_ratio:.2f}:1)"
                     )
 
         elif signal.direction == "SELL":
@@ -858,8 +968,8 @@ class ScalpingAnalyzer:
                         signal.risk_reward_ratio = tp_distance / sl_distance
                     logger.info(
                         f"Scalping TP override: {signal.instrument} SELL TP1 "
-                        f"{original_tp:.5f} -> {nearest_swing:.5f} (nearest H1 "
-                        f"swing low, R:R {signal.risk_reward_ratio:.2f}:1)"
+                        f"{original_tp:.5f} -> {nearest_swing:.5f} (nearest"
+                        f"swing low on {tf_label}, R:R {signal.risk_reward_ratio:.2f}:1)"
                     )
 
         return signal
@@ -870,9 +980,15 @@ class ScalpingAnalyzer:
         """
         Enforce the 0.618 Fibonacci retracement level as SL for scalping.
 
-        The mentorship explicitly states that scalping SL should be placed
-        at the 0.618 Fibonacci level of the current swing. If the analysis
-        contains a valid 0.618 level, override the strategy-generated SL.
+        The mentorship explicitly states: "Stop Loss at the 0.618 Fibonacci
+        retracement of the impulse move on the 15-minute chart."
+
+        IMPORTANT: The Fibonacci used here should ideally come from the
+        15-minute impulse move specifically (not from H4/Daily analysis).
+        Currently the code uses whatever Fibonacci levels are in the
+        AnalysisResult, which may come from a different timeframe. This is
+        a known limitation — the remapped analysis should provide M15-based
+        Fibonacci levels for maximum accuracy.
         """
         fib_618 = (analysis.fibonacci_levels or {}).get("0.618")
         if fib_618 is None or fib_618 <= 0:
@@ -926,14 +1042,16 @@ class ScalpingAnalyzer:
         2. Only triggers a hard exit when the full candle body closes
            aggressively through EMA 50 (not just a wick touch).
 
-        Methods:
-        - "fast": Trail / exit based on EMA 50 on M1 (~7-10% profit)
-        - "slow": Trail / exit based on EMA 50 on M5 (~10%+ profit)
+        Methods (TradingLab Scalping Workshop, Section 7):
+        - "fixed_tp": Method 1 — Hold until TP is hit (set at Fibonacci Extension).
+                      No trailing logic. Safest and instructor's default.
+        - "fast": Method 2 — Trail / exit based on EMA 50 on M1 (~7-10% profit)
+        - "slow": Method 3 — Trail / exit based on EMA 50 on M5 (~10%+ profit)
 
         Args:
             scalp_data: Current scalping analysis data
             direction: Current position direction ("BUY" or "SELL")
-            method: Exit method - "fast" (M1) or "slow" (M5)
+            method: Exit method - "fixed_tp", "fast" (M1), or "slow" (M5)
             ema_buffer_pct: Buffer as fraction of EMA for trailing SL
                             (default 0.1% = 0.001)
 
@@ -943,6 +1061,15 @@ class ScalpingAnalyzer:
               - new_trailing_sl (float | None): Suggested trailing SL level
               - reason (str): Human-readable explanation
         """
+        # Method 1 (fixed_tp): No trailing — just hold until TP or SL hits.
+        # Workshop: "Set TP at Fibonacci Extension levels and walk away"
+        if method == "fixed_tp":
+            return {
+                "should_exit": False,
+                "new_trailing_sl": None,
+                "reason": "Method 1 (fixed_tp): holding until TP/SL hit — no trailing",
+            }
+
         if method == "fast":
             close = scalp_data.close_m1
             ema = scalp_data.ema50_m1

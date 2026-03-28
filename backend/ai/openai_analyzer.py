@@ -150,6 +150,10 @@ Wave-to-Strategy Mapping:
 Order Blocks (OB):
 - Bullish OB: last bearish candle before a strong bullish impulse
 - Bearish OB: last bullish candle before a strong bearish impulse
+- OBs form at structural breaks — must identify a BOS or CHOCH first
+- Small/doji candles: combine 2-3 candles to define the OB zone
+- Sensitive zones: 0% (start), 50% (midpoint), 100% (end of OB)
+- "Wicks do the damage, bodies tell the story" — wick can pierce OB, but BODY should respect the zone
 - Price tends to return to OBs before continuing the move
 - Use as entry zones, SL placement behind the OB
 
@@ -157,6 +161,7 @@ Break of Structure (BOS) & Change of Character (CHOCH):
 - BOS: price breaks a significant swing high/low in the direction of the trend (continuation)
 - CHOCH: price breaks a significant swing high/low AGAINST the trend (potential reversal)
 - CHOCH on HTF + confirmation on LTF = high-probability reversal setup
+- Sequence flow: BOS -> BOS (trend continues) -> CHOCH (trend reversal) -> BOS (new trend confirmed)
 
 Premium and Discount Zones:
 - Measure the range from swing low to swing high
@@ -165,12 +170,59 @@ Premium and Discount Zones:
 - ALWAYS buy in discount, sell in premium
 - Equilibrium (50%) acts as a magnet
 
+Liquidity (Most Important SMC Concept):
+- Liquidity = clusters of stop-loss orders at swing highs/lows, session levels, trendlines, equal highs/lows
+- Session liquidity levels: PDH (Previous Day High), PDL (Previous Day Low), Asian H/L, London H/L, NY H/L
+- Equal highs/lows = double tops/bottoms where stops cluster — prime liquidity targets
+- Liquidity sweep (grab): price pierces a liquidity level (wick) but closes back — signals reversal
+- After a sweep, 3 possible reactions: (1) full reversal, (2) reaction + continuation, (3) consolidation
+- A liquidity sweep + FVG in discount + OB = highest probability setup
+
 Fair Value Gaps (FVG):
 - Three-candle pattern where middle candle creates a gap between candle 1 high and candle 3 low
 - Bullish FVG: gap left below (price tends to fill before continuing up)
 - Bearish FVG: gap left above (price tends to fill before continuing down)
 - Unmitigated FVGs act as magnets — price often returns to fill them
+- Sensitive zones: 0% (start of FVG), 50% (midpoint), 100% (end) — each level can trigger a reaction
+- FVGs in the Discount zone of a move are MORE reliable than those in the Premium zone
+- IFVG (Inverted FVG): when a candle BODY closes beyond the FVG boundary, the FVG flips direction
+  - Bullish FVG broken by bearish body becomes bearish resistance, and vice versa
+- Large FVGs caused by news events tend to get filled 100%
 - Use as entry zones and target zones
+
+Breaker Blocks:
+- A failed Order Block where: (1) OB forms, (2) price initially respects OB, (3) liquidity is grabbed from previous swing, (4) OB is broken by candle body, (5) role flips
+- Bullish OB that fails becomes bearish resistance; bearish OB that fails becomes bullish support
+- KEY differentiator: liquidity MUST be swept before the OB breaks (otherwise it is a Mitigation Block)
+- Higher reliability than fresh OBs because they have already proven the stop-hunt occurred
+
+Mitigation Blocks:
+- A failed Order Block WITHOUT liquidity grab before the break
+- Price forms lower highs (bearish) or higher lows (bullish) approaching the OB, then breaks it directly
+- After break, role flips similar to Breaker Blocks but with lower reliability
+- Differentiator from Breaker: NO liquidity was swept before the break
+
+Power of Three / AMD (Accumulation-Manipulation-Distribution):
+- Candle formation through 3 phases mapped to trading sessions:
+  - Accumulation (Asia 00:00-08:00 UTC): range-bound, low volatility
+  - Manipulation (London 08:00-13:00 UTC): the FALSE move — breaks one side of Asian range
+  - Distribution (New York 13:00-21:00 UTC): the REAL move — reverses manipulation
+- If daily bias is bearish: London breaks ABOVE Asian range (manipulation UP), enter SHORT for distribution down
+- If daily bias is bullish: London breaks BELOW Asian range (manipulation DOWN), enter LONG for distribution up
+- TP should be at previous session lows/highs, PDL, PDH, or liquidity pools
+
+SMT Divergence (Smart Money Technique):
+- Compare correlated assets at liquidity levels to find divergence
+- If Asset A takes liquidity from a high but Asset B fails to make the same high → Asset B is weaker
+- Trade the weaker asset for sells, the stronger for buys
+- Compare at: PDH/PDL, Asia H/L, London H/L, NY H/L, significant swing highs/lows
+- Common pairs: EUR/USD vs GBP/USD (positive), EUR/USD vs DXY (negative)
+
+SMC Confluence Hierarchy (highest to lowest probability):
+1. Liquidity Grab + FVG in Discount + OB = highest probability
+2. CHOCH + OB in Discount = high reversal probability
+3. BOS + FVG + OB = high continuation probability
+4. AMD + SMT = high session trade probability
 
 ═══════════════════════════════════════════════════════════════════
              ALL 6 COLOR STRATEGIES (Complete Steps)
@@ -250,7 +302,7 @@ Associated Wave: Anticipating Wave 1 of a NEW trend (daily reversal)
 Risk Level: HIGHEST — requires minimum 2:1 R:R
 
   Step 1: Daily chart shows STRONG deceleration (multiple reversal candles, volume climax)
-  Step 2: RSI divergence on daily chart (price makes new high/low but RSI does not)
+  Step 2: RSI divergence on H4 chart (price makes new high/low but RSI does not)
   Step 3: 4H shows initial structure change (first CHOCH against the daily trend)
   Step 4: 1H confirms with BOS in the new direction
   Step 5: Price in discount zone (for BUY) or premium zone (for SELL) using SMC
@@ -299,11 +351,25 @@ Scalping Indicators (M5/M1):
 - MACD divergence on M5 = potential reversal signal for quick scalps
 
 Scalping Rules:
-- Risk: 0.5% per scalp trade (half of day trading risk)
+- Risk: 0.5% per scalp trade (NeonTrade AI default; workshop defers exact %)
 - Must be within London or NY session hours
 - Quick management: move to BE at first sign of stalling
 - TP at next M15 level or MACD signal reversal
 - Scalp ONLY in the direction of the H1 trend (SMA 200 slope)
+
+Scalping RED Strategy Steps (7-Step Process):
+1. Identify S/R level on H1 chart
+2. H1 MUST show deceleration pattern (pullback, wedge, triangle, MACD divergence)
+3. M15 EMA 50 must be BROKEN (recent crossover, not just positioning)
+4. Wait for pullback to convergence zone: M15 EMA 50 + Fibonacci + M5 EMA 50
+5. M5 MUST show deceleration at pullback zone
+6. M1 entry: breakout + confirmation (2 candle closes) of EMA 50 or trendline
+7. SL at 0.618 Fibonacci of 15-min impulse move
+
+Scalping Position Management Methods:
+- Method 1 (Fixed TP): Set TP at Fibonacci Extension and walk away (safest, default)
+- Method 2 (Fast): Trail with EMA 50 on M1
+- Method 3 (Slow): Trail with EMA 50 on M5
 
 ═══════════════════════════════════════════════════════════════════
                     EMA MANAGEMENT
@@ -346,12 +412,12 @@ Confluence Rule: an entry level must have AT LEAST 2 of these:
 
 Risk Per Trade:
 - Day Trading: 1% of account per trade
-- Scalping: 0.5% of account per trade
-- Swing Trading: 1% of account per trade
+- Scalping: 0.5% of account per trade (NeonTrade AI default; workshop defers exact %)
+- Swing Trading: 3% of account per trade (Trading Plan PDF)
 - Maximum total risk at any time: 7% of account
 
 Minimum R:R Ratios:
-- All strategies: minimum 2.0:1 to TP1
+- Default (BLUE, RED, PINK, WHITE): minimum 1.5:1 to TP1
 - BLACK strategy: minimum 2.0:1 (counter-trend requires higher R:R)
 - GREEN strategy: minimum 2.0:1 (potential up to 10:1, best R:R of all strategies)
 
@@ -386,7 +452,7 @@ Phase 2 — SL_MOVED:
   This locks in partial protection without being at BE yet
 
 Phase 3 — BREAK_EVEN (BE):
-  Triggered when unrealized profit reaches ~1% of account
+  Triggered when price reaches 50% of the distance to TP1 (Trading Plan: "por la mitad del beneficio hasta el TP1")
   SL moved to entry price (zero-risk position)
   RULE: No new trades on the same or correlated pairs until BE is set on existing trade
 
@@ -407,8 +473,8 @@ Phase 5 — AGGRESSIVE (Beyond TP1):
 
 Entry Types:
 - Market entry on 2m or 5m timeframe (preferred — immediate execution)
-- Limit entry: ONLY when 3 levels converge (both EMAs + Fibonacci + extra S/R or diagonal)
-  # Note: Scalping workshop recommends 4 confluences, but 3 is the configured minimum in code
+- Limit entry: ONLY when 4 levels converge (both EMAs + Fibonacci + extra S/R or diagonal)
+  Day Trading minimum: 3 levels. Scalping: 4 levels required (Workshop de Scalping: both EMAs + Fib + extra)
 - Stop entry: ONLY when you cannot monitor AND all timeframes fully align
 
 Trading Hours:
@@ -463,11 +529,12 @@ EMA 8 Weekly Close:
 - Important: must be a close, not just a wick below
 - Often the first warning sign before a larger correction
 
-BTC Halving Cycle Phases:
-- Post-halving (0-25% of cycle): Explosion phase — most bullish, supply shock in effect
-- Expansion (25-50%): Continued bull run, strong momentum
-- Distribution (50-75%): Market top area, bearish, watch for reversal signals
-- Pre-halving (75-100%): Accumulation phase, price starts rising in anticipation — neutral to slightly bullish
+BTC Halving Cycle Phases (approximately 4-year cycle):
+- Post-halving (~0-25% of cycle): Explosion phase — most bullish, supply shock in effect
+- Expansion (~25-50%): Continued bull run, strong momentum
+- Distribution (~50-75%): Market top area, bearish, watch for reversal signals
+- Pre-halving (~75-100%): Accumulation phase, price starts rising in anticipation — neutral to slightly bullish
+Note: Phase boundaries are approximate. Code extends post-halving to ~33% to cover the peak year after halving.
 
 BTC Dominance Analysis:
 - BTC.D > 50%: BTC phase, money in Bitcoin, altcoins underperform

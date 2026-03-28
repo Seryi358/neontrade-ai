@@ -1987,8 +1987,17 @@ class MarketAnalyzer:
                     has_momentum_convergence = True
 
                 if has_momentum_convergence:
+                    # Role flip: like Breaker Blocks, the failed OB flips direction.
+                    # Bullish OB broken down -> becomes bearish resistance
+                    # Bearish OB broken up -> becomes bullish support
+                    if ob_type == "bullish_ob":
+                        flipped_type = "bearish"  # Was bullish support, now bearish resistance
+                    else:
+                        flipped_type = "bullish"  # Was bearish resistance, now bullish support
+
                     mitigation_blocks.append({
                         "type": f"mitigation_{ob_type}",
+                        "flipped_direction": flipped_type,
                         "high": ob_high,
                         "low": ob_low,
                         "mid": (ob_high + ob_low) / 2,
@@ -2194,10 +2203,10 @@ class MarketAnalyzer:
             # (high volatility), it is not proper "accumulation".
             # Compare Asian range to average daily range of last 10 days.
             is_proper_accumulation = True
-            if not daily.empty and len(daily) >= 10:
+            if not data.empty and len(data) >= 10:
                 recent_daily_ranges = [
-                    float(daily["high"].iloc[-k] - daily["low"].iloc[-k])
-                    for k in range(1, min(11, len(daily)))
+                    float(data["high"].iloc[-k] - data["low"].iloc[-k])
+                    for k in range(1, min(11, len(data)))
                 ]
                 avg_daily_range = sum(recent_daily_ranges) / len(recent_daily_ranges)
                 # Asian range should be less than 40% of avg daily range

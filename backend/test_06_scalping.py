@@ -56,7 +56,7 @@ check("Comment confirms MACD on M5 is optional",
 # --- Test _validate_scalping_conditions with mock data ---
 print("\n[6.2] Scalping validation with mock data")
 
-# BUY direction, price above all EMAs
+# BUY direction, price above all EMAs + H1/M5 deceleration
 data_buy = ScalpingData(instrument="EUR_USD")
 data_buy.close_m15 = 1.1010
 data_buy.ema50_m15 = 1.1000
@@ -64,8 +64,13 @@ data_buy.close_m1 = 1.1015
 data_buy.ema50_m1 = 1.1005
 data_buy.macd_m5 = {"bullish": True, "line": 0.001, "signal": 0.0005}
 data_buy.volume_m5 = {"ratio": 1.2, "current": 1200, "average": 1000}
+# Workshop Steps 2 & 5 require H1 and M5 deceleration (now hard requirements).
+# Mock _detect_deceleration to always return a valid result for this test.
+original_detect = analyzer._detect_deceleration
+analyzer._detect_deceleration = lambda df, direction, lookback=5: {"adj": 5, "reason": "mock deceleration"}
 
 result = analyzer._validate_scalping_conditions(data_buy, "BUY")
+analyzer._detect_deceleration = original_detect  # restore
 # Now returns Dict with "valid" key instead of bool
 check("BUY with all conditions met = valid", result["valid"] is True)
 

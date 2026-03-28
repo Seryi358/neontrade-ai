@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
-    risk_scalping: float = 0.005          # 0.5%
+    risk_scalping: float = 0.005          # 0.5% (NeonTrade AI default; workshop defers exact %)
     risk_swing: float = 0.03             # Trading Plan PDF: 3% en Swing trading
     max_total_risk: float = 0.07          # 7% max simultaneous open risk
 
@@ -141,6 +141,7 @@ class Settings(BaseSettings):
 
     # Days to avoid
     close_before_friday_hour: int = 20  # Close positions before Friday 20:00 UTC
+    no_new_trades_friday_hour: int = 18  # No NEW trades after Friday 18:00 UTC (Trading Plan)
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
     avoid_news_minutes_after: int = 15   # Don't trade 15 min after major news
 
@@ -162,8 +163,17 @@ class Settings(BaseSettings):
     # RED is the recommended strategy for scalping. Avoid BLUE in scalping
     # (15M-to-5M ratio is 3x, making ruptures too similar between timeframes).
     scalping_enabled: bool = False
-    scalping_max_daily_dd: float = 0.05  # 5% max daily drawdown
-    scalping_max_total_dd: float = 0.10  # 10% max total drawdown
+    # NeonTrade AI defaults (NOT from workshop — workshop defers DD limits)
+    scalping_max_daily_dd: float = 0.05  # 5% max daily drawdown (app-added safety)
+    scalping_max_total_dd: float = 0.10  # 10% max total drawdown (app-added safety)
+    # BLUE strategy handling in scalping (Workshop Section 10):
+    # "aggressive" = trade all BLUEs, "skip_all" = skip all, "clean_only" = 80%+ confidence only
+    scalping_blue_mode: str = "clean_only"
+    # Exit method (Workshop Section 7):
+    # "fixed_tp" = Method 1 (hold until TP, safest, instructor default)
+    # "fast" = Method 2 (M1 EMA 50 trailing)
+    # "slow" = Method 3 (M5 EMA 50 trailing)
+    scalping_exit_method: str = "fixed_tp"
 
     # Funded account mode (Workshop de Cuentas Fondeadas)
     # Only enable after 3 consecutive months of profitability
@@ -256,6 +266,10 @@ class Settings(BaseSettings):
     # Crypto — separate allocation per Trading Plan (10% of trading capital)
     # Mentoría: GREEN es la ÚNICA estrategia para crypto
     crypto_default_strategy: str = "GREEN"
+    # Mentorship: "Memecoins to be AVOIDED for strategy trading (too manipulated, no patterns)"
+    # These are included in watchlist for capital rotation monitoring only.
+    memecoins_monitor_only: bool = True
+    memecoin_symbols: List[str] = ["DOGE_USD", "SHIB_USD", "PEPE_USD", "WIF_USD", "BONK_USD"]
     # Mentoría: up to ~150 cryptos. Organized by capitalization tiers.
     # Below ~1B market cap = extreme volatility, manipulation, less pattern reliability.
     crypto_watchlist: List[str] = [

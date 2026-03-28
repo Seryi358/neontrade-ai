@@ -608,6 +608,63 @@ def _check_smc_confluence(analysis, direction: str, entry_price: float) -> tuple
                 details.append(f"CHOCH bajista (cambio de caracter)")
             break
 
+    # Liquidity sweep — high-probability trigger per workshop
+    if hasattr(analysis, 'liquidity_sweep') and analysis.liquidity_sweep:
+        sweep = analysis.liquidity_sweep
+        sweep_dir = sweep.get("direction", "")
+        if (direction == "BUY" and sweep_dir == "bullish") or \
+           (direction == "SELL" and sweep_dir == "bearish"):
+            bonus += 6.0
+            level = sweep.get("level", "unknown")
+            details.append(f"Liquidity sweep en {level} ({sweep_dir})")
+
+    # Mitigation Blocks — failed OB without liquidity grab, role flips
+    if hasattr(analysis, 'mitigation_blocks') and analysis.mitigation_blocks:
+        for mb in analysis.mitigation_blocks:
+            mb_type = mb.get("type", "")
+            mb_high = mb.get("high", 0)
+            mb_low = mb.get("low", 0)
+            if mb_high == 0 or mb_low == 0:
+                continue
+            tolerance = abs(mb_high - mb_low) * 1.5
+
+            # Mitigation blocks flip direction (like breaker blocks)
+            # mitigation_bullish_ob -> after break becomes bearish resistance
+            # mitigation_bearish_ob -> after break becomes bullish support
+            if direction == "BUY" and "bearish_ob" in mb_type:
+                if mb_low - tolerance <= entry_price <= mb_high + tolerance:
+                    bonus += 4.0
+                    details.append(f"Mitigation Block soporte ({mb_low:.5f}-{mb_high:.5f})")
+                    break
+            elif direction == "SELL" and "bullish_ob" in mb_type:
+                if mb_low - tolerance <= entry_price <= mb_high + tolerance:
+                    bonus += 4.0
+                    details.append(f"Mitigation Block resistencia ({mb_low:.5f}-{mb_high:.5f})")
+                    break
+
+    # IFVG check — inverted FVGs should be treated as S/R in flipped direction
+    fvg_details = analysis.key_levels.get("fvg_details", [])
+    if fvg_details and entry_price:
+        for fvg_item in fvg_details[-10:]:
+            if not isinstance(fvg_item, dict):
+                continue
+            if not fvg_item.get("inverted", False):
+                continue
+            fvg_orig_dir = fvg_item.get("original_direction", "")
+            fvg_mid = fvg_item.get("midpoint", 0)
+            if fvg_mid <= 0:
+                continue
+            tolerance = entry_price * 0.003
+            # IFVG: bullish FVG inverted = now bearish resistance, vice versa
+            if direction == "BUY" and fvg_orig_dir == "bearish" and abs(entry_price - fvg_mid) < tolerance:
+                bonus += 4.0
+                details.append(f"IFVG soporte (FVG bajista invertida en {fvg_mid:.5f})")
+                break
+            elif direction == "SELL" and fvg_orig_dir == "bullish" and abs(entry_price - fvg_mid) < tolerance:
+                bonus += 4.0
+                details.append(f"IFVG resistencia (FVG alcista invertida en {fvg_mid:.5f})")
+                break
+
     has = bonus > 0
     desc = "SMC: " + ", ".join(details) if details else "Sin confluencia SMC"
     return has, bonus, desc
@@ -2891,6 +2948,23 @@ class BlackStrategy(BaseStrategy):
             else:
                 failed.append(f"Paso 5a: EMA 50 1H puede estar actuando como S/R (distancia {dist_1h:.2f}%)")
 
+        # TradingLab: "1H corrective pattern should be triangle or wedge
+        # (not channel — channels invalidate BLACK)"
+        chart_patterns = getattr(analysis, 'chart_patterns', [])
+        if chart_patterns:
+            for cp in chart_patterns:
+                cp_name = ""
+                if isinstance(cp, dict):
+                    cp_name = cp.get("pattern", "").lower()
+                elif isinstance(cp, str):
+                    cp_name = cp.lower()
+                if "channel" in cp_name:
+                    logger.debug(
+                        f"[BLACK] Channel pattern detected on {analysis.instrument} — "
+                        f"channels invalidate BLACK strategy"
+                    )
+                    return None
+
         # Patron de reversal en LTF
         has_reversal, rev_desc = _has_reversal_pattern(analysis, direction)
         if has_reversal:
@@ -3773,6 +3847,15 @@ def get_best_setup(
     # Safety filter: even if detect_all_setups missed it, enforce GREEN-only for crypto.
     if _is_crypto_instrument(analysis.instrument):
         signals = [s for s in signals if s.strategy == StrategyColor.GREEN]
+
+    # TradingLab: "Memecoins to be AVOIDED for strategy trading (too manipulated, no patterns)"
+    # Block trade signals on memecoin symbols when monitor-only mode is enabled.
+    if settings.memecoins_monitor_only and analysis.instrument in settings.memecoin_symbols:
+        logger.info(
+            f"[MEMECOIN] {analysis.instrument} is a memecoin — "
+            f"monitor only, no trading signals (mentorship rule)"
+        )
+        return None
 
     # Apply Elliott Wave prioritization before selecting the best
     signals = _apply_elliott_wave_priority(analysis, signals)

@@ -654,8 +654,12 @@ class TradingEngine:
             # Record equity snapshot every 10 minutes
             await self._maybe_record_equity_snapshot(now)
 
-            # Step 2: Scan for new opportunities (with trade execution)
-            await self._scan_for_setups()
+            # Trading Plan: No new trades after Friday 18:00 UTC
+            if self._is_friday_no_new_trades(now):
+                logger.info("Friday rule: no new trades after 18:00 UTC — only managing open positions")
+            else:
+                # Step 2: Scan for new opportunities (with trade execution)
+                await self._scan_for_setups()
         else:
             # Market closed — still scan for analysis data every 10 minutes
             # so the UI always has fresh data
@@ -741,6 +745,11 @@ class TradingEngine:
         """Check if we should close all positions (Friday rule)."""
         return (now.weekday() == 4 and
                 now.hour >= settings.close_before_friday_hour)
+
+    def _is_friday_no_new_trades(self, now: datetime) -> bool:
+        """Trading Plan: No new trades after Friday 18:00 UTC."""
+        return (now.weekday() == 4 and
+                now.hour >= settings.no_new_trades_friday_hour)
 
     async def _handle_friday_close(self):
         """Close only positions near SL or TP before Friday market close (Trading Plan rule).

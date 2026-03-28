@@ -10,7 +10,7 @@ Rules:
 - Correlated pairs: 0.75% each instead of full risk
 - No trading before major news
 - Close positions before Friday market close
-- Minimum R:R ratio of 2.0 to TP1
+- Minimum R:R ratio of 1.5 to TP1 (2.0 for BLACK and GREEN)
 
 Drawdown Management (ch18.7):
 - Fixed 1%: always use base risk
@@ -519,8 +519,9 @@ class RiskManager:
             self._funded_start_of_day_balance = self._current_balance
 
         # Use start-of-day balance for daily DD (most prop firms use this method)
+        # Workshop: Instant Funding has NO daily DD limit — skip this check.
         sod_balance = self._funded_start_of_day_balance or self._current_balance
-        if sod_balance > 0:
+        if settings.funded_evaluation_type != "instant" and sod_balance > 0:
             daily_dd_limit = settings.funded_max_daily_dd * sod_balance
             if self._funded_daily_pnl < 0 and abs(self._funded_daily_pnl) >= daily_dd_limit:
                 return (
@@ -565,10 +566,14 @@ class RiskManager:
             daily_pnl = self._funded_daily_pnl
 
         sod_balance = self._funded_start_of_day_balance or self._current_balance
-        daily_dd_limit = (
-            settings.funded_max_daily_dd * sod_balance
-            if sod_balance > 0 else 0.0
-        )
+        # Instant Funding has NO daily DD limit
+        if settings.funded_evaluation_type == "instant":
+            daily_dd_limit = 0.0  # No daily DD limit for Instant Funding
+        else:
+            daily_dd_limit = (
+                settings.funded_max_daily_dd * sod_balance
+                if sod_balance > 0 else 0.0
+            )
         total_dd = self.get_current_drawdown()
 
         # Profit target tracking for evaluation phases

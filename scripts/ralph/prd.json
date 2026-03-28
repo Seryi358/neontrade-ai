@@ -298,7 +298,7 @@
         "Power of Three & AMD implementado",
         "SMT (Smart Money Technique) implementado"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-022",

@@ -598,3 +598,25 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Limit orders need 4 converging levels. Market orders are for when you see the turn in real-time. Neither is "better" — each suits different scenarios
   - Alex's personal limit entry rule came from backtesting 300-400 trades — empirical, not theoretical
 ---
+
+## 2026-03-28 - AUDIT-021
+- **What was implemented:** Audited all 11 transcriptions from Workshop de Smart Money Concepts/01_General/01_Contenido Workshop against market_analyzer.py. All 9 SMC concepts verified.
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - Liquidez (03): Pools from equal H/L (0.1% tolerance), PDH/PDL, Asian/London extremes, trendlines, S/R. Sweep-then-reverse detection present ✅
+  - BOS & CHOCH (04): BOS requires ≥1 prior HH/LL (established trend). CHOCH breaks last swing low/high for reversal ✅
+  - Premium & Discount (05): Impulse-based Fibonacci. Sweet spot 50-75% matches mentorship ("minimum 50%, good 60-70%, excellent 70-80%") ✅
+  - FVG (06): 3-candle pattern correct (C[i] low > C[i-2] high for bullish). Tracks filled/partially_filled(50%)/reacted. IFVG flips direction on body break. H1 + M15 timeframes ✅
+  - Order Blocks (07): Last opposing candle(s) before impulse. Doji extension (up to 2 prior). 1.5x quality filter. Validated against BOS/CHOCH. Zones: high/mid/low ✅
+  - Breaker Blocks (08): Requires liquidity sweep (new extreme beyond previous swing) THEN body breaking OB. Direction flips correctly ✅
+  - Mitigation Blocks (09): Broken OB WITHOUT prior liquidity sweep + momentum convergence. Correctly distinct from Breaker Blocks ✅
+  - Power of Three/AMD (10): Asia=Accumulation (40% quality threshold), London=Manipulation (direction inversion), NY/Overlap=Distribution. Session hours correct ✅
+  - SMT (11): Positive correlation divergence (HH vs no-HH). Negative correlation (EUR/USD vs DXY): same direction = divergence. NEGATIVE_CORRELATIONS dict and cache system correct ✅
+- **Learnings for future iterations:**
+  - SMC workshop is explicitly a "separate from TradingLab strategies" module — concepts are used as confluence/analysis, not standalone entry signals
+  - Disclaimer (Lesson 02) states TradingLab team is conducting backtesting before integration — SMC is educational, not yet a primary strategy framework
+  - IFVG logic: body_high < fvg_low (bullish→bearish) or body_low > fvg_high (bearish→bullish) — uses full body, not just close
+  - Breaker vs Mitigation distinction is solely whether liquidity was swept before the OB break — code correctly separates these two paths
+  - SMT requires cross-instrument cached data (_smt_cache) — only works when multiple correlated instruments are analyzed in the same analyzer session
+  - Power of Three accumulation quality uses H1 candle ranges (not daily), compared to 40% of avg daily range from last 10 bars
+---

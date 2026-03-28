@@ -146,7 +146,7 @@
         "SLs más ajustados que otras estrategias verificado",
         "R:R mínimo 2.0:1 y confianza 60% verificados"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-012",

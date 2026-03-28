@@ -21,6 +21,7 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Strategy variant classification is in `_classify_blue_variant()` — separate from the strategy class itself
 - When price action conflicts with indicator (e.g., double top + EMA rejection), price action wins per Alex
 - Swing strategies use same code as Day but with shifted timeframes — controlled by config.py `trading_style`
+- Alex's "añadido" = bonus/extra, not hard requirement. RSI overbought + divergence in BLACK are extras, not gates
 
 ---
 
@@ -263,4 +264,40 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Channel patterns for PINK: Alex prefers to skip PINK on channels and wait for WHITE instead. "una pink en forma de canal no es tan atractiva como una pink en forma de triángulo o de cuña"
   - WHITE typically yields smaller % moves than PINK ("no esperéis que siempre haya tanto espacio") since trend is ending
   - WHITE helps manage PINK positions: knowing a pullback (WHITE setup) is coming means don't trail too aggressively with 15M EMA on PINK
+---
+
+## 2026-03-27 - AUDIT-011
+- **What was implemented:** Audited all 3 transcriptions from Trading Mastery/03_Intermedio/03_Estrategias (14_Introducción Black, 15_Black Day, 16_Black Swing) against BlackStrategy in strategies/base.py. Fixed 3 discrepancies where code was too restrictive vs mentorship.
+- **Files changed:**
+  - `backend/strategies/base.py` — (1) Changed H4 RSI >70/<30 from hard block to confidence bonus (+15). Alex says RSI overbought/oversold is "un añadido" / "un extra" within Step 4, not the definition of overbought. The actual "sobrecompra innegociable" is price structure (separation from EMA 4H + candle type). (2) Changed RSI divergence H4 from hard block to confidence bonus (+15) / penalty (-10 if wrong direction). Alex explicitly says "Esto no es un paso como tal. Esto es simplemente un añadido" and "no es obligatorio que estén presentes." (3) Changed channel pattern from hard block to confidence penalty (-10). Alex says "muy pocas veces será un canal" — channels are possible but rare, not invalid.
+  - `scripts/ralph/prd.json` — Marked AUDIT-011 as passes: true
+- **Audit findings:**
+  - 7-step process correctly implemented ✅:
+    1. Daily S/R level (OBLIGATORIO, non-negotiable) ✅
+    2. Daily overbought/oversold attacking the level ✅ (scoring, not hard block — matches "no es el mejor gráfico diario... pero no vamos a poner trades 100% perfectos")
+    3. Daily deceleration (preferential — "no hay una clara desaceleración diaria, no hay ningún problema") ✅
+    4. 4H overbought INNEGOCIABLE by price structure (separation from EMA + candle type + consolidation) ✅
+    5. 1H reversal pattern (triangle/wedge, rarely channel) ✅ (FIXED channel from hard block to penalty)
+    6. Wait for pattern completion + 1H candlestick + 5M execution (RCC) ✅
+    7. SL above previous extreme, TP at EMA 50 4H, min 2:1 R:R ✅
+  - **FIXED:** RSI H4 overbought/oversold was hard block, now confidence bonus. Alex: "Dentro de este paso podemos AÑADIR dos cosas, primero la sobrecompra en el RSI y segundo las divergencias"
+  - **FIXED:** RSI divergence was hard block (return None), now confidence scoring. Alex: "Esto no es un paso como tal. Esto es simplemente un añadido." Day short example: "no es obligatorio que estén presentes"
+  - **FIXED:** Channel patterns were hard-blocked. Alex: "muy pocas veces será un canal" = possible but rare, not invalid
+  - Counter-trend direction logic correct (bullish HTF → SELL, bearish HTF → BUY) ✅
+  - EMA 50 1H dynamic S/R hard block correct: "Si la media móvil de 50 de 1 hora está actuando como soporte o como resistencia dinámica, no hay black" ✅
+  - No EMA 8 Weekly filter for BLACK (correct — counter-trend exempt) ✅
+  - min_confidence = 60.0 — reasonable for highest-risk strategy ✅
+  - R:R min 2.0:1 — "mínimo un rentabilidad riesgo de 2 a 1, mínimo, esto es obligatorio" ✅
+  - TP at EMA 50 4H — "take profit siempre en la media móvil de 50 de 4 horas" ✅
+  - TP tip: don't put TP right at EMA, leave room ("no queremos ser el último en salir") — code doesn't implement this micro-optimization, acceptable
+  - Alex's avg R:R for BLACK is ~2.80:1 — code gives confidence bonus at ≥2.80 ✅
+  - Swing mapping (Monthly→Weekly→Daily→1H) handled by config.py trading_style upstream ✅
+  - Elliott Wave 1 context correctly reflected ✅
+- **Learnings for future iterations:**
+  - BLACK's RSI requirements are EXTRAS, not obligations. Alex uses "añadido" = addition. The real non-negotiables are: Daily S/R + 4H price structure overbought + 1H reversal pattern + 2:1 R:R
+  - Alex says "qué, cómo, cuándo" — WHEN is crucial for BLACK. Entry timing at pattern completion matters more than in other strategies
+  - Alex prefers to leave room before EMA for TP: "no queremos ser el último en salir" — sacrifice 10 pips to avoid the one time it doesn't reach
+  - BLACK has lowest win rate but highest R:R (~2.80:1 avg). "Es la que tiene menos porcentaje de acierto, por eso tiene más normas"
+  - For SL in extreme situations (large low test): Alex uses 2:1 R:R distance to determine SL, ensuring it covers previous extreme
+  - EMA 50 1H as dynamic S/R = 2+ consecutive rejections means no BLACK trade
 ---

@@ -7,7 +7,7 @@ Estrategias (por color):
 - RED:   Cambio de tendencia en 4H (Onda Elliott 2-3) - Requiere AMBAS EMA 50 1H y 4H rotas
 - PINK:  Continuacion por patron correctivo (Onda Elliott 4->5) - 1H EMA 50 rota, 4H NO rota
 - WHITE: Continuacion post-Pink (Onda 3 de Onda 5) - Entradas mas ajustadas, mayor win rate que Pink
-- BLACK: Contratendencia ONLY (Onda Elliott 1) - Requiere RSI div H4 + S/R diario. Min R:R 2.0:1
+- BLACK: Contratendencia ONLY (Onda Elliott 1) - Requiere S/R diario. RSI div H4 = bonus. Min R:R 2.0:1
 - GREEN: Direccion semanal + Patron diario + Entrada 15M - UNICA estrategia para crypto. Hasta 10:1 R:R
 
 Cada estrategia implementa:
@@ -2803,16 +2803,19 @@ class BlackStrategy(BaseStrategy):
     TradingLab REQUIREMENTS:
     - Counter-trend ONLY (trades against the current trend)
     - Min R:R must be 2.0:1 (mentorship avg ~2.80:1)
-    - REQUIRES RSI divergence on H4 (non-negotiable)
     - REQUIRES daily S/R level (non-negotiable)
+    - RSI divergence on H4 = strong bonus ("añadido", NOT obligatorio per Alex)
+    - RSI H4 overbought/oversold = extra confirmation, NOT hard requirement
+    - Channels: possible but rare ("muy pocas veces"), penalty not hard block
 
     7 Pasos:
     1. Nivel S/R diario (OBLIGATORIO, no negociable)
     2. Precio diario ataca el nivel con condicion de sobrecompra/sobreventa
-    3. Desaceleracion/senales de reversal en diario
-    4. 4H sobrecompra: precio lejos de EMA 50 4H + consolidacion/desaceleracion
-    5. 1H: patron de reversal (triangulo/cuna). EMA 50 1H NO debe actuar como S/R dinamico.
-       Divergencia RSI en 4H (OBLIGATORIO)
+    3. Desaceleracion/senales de reversal en diario (preferencial)
+    4. 4H sobrecompra INNEGOCIABLE: precio lejos de EMA 50 4H + consolidacion
+       + RSI sobrecompra y divergencias como EXTRAS ("añadido")
+    5. 1H: patron de reversal (triangulo/cuna, raro canal).
+       EMA 50 1H NO debe actuar como S/R dinamico.
     6. Esperar que el patron se complete, buscar patron de velas de reversal,
        luego ejecutar en rompimiento 5M
     7. SL encima del maximo anterior. TP en EMA 50 4H. R:R MINIMO de 2:1
@@ -2908,22 +2911,14 @@ class BlackStrategy(BaseStrategy):
         else:
             return None
 
-        # --- H4 RSI overbought/oversold HARD REQUIREMENT ---
-        # TradingLab: BLACK requires H4 RSI > 70 (overbought for SELL) or
-        # H4 RSI < 30 (oversold for BUY) as a non-negotiable condition.
+        # --- H4 RSI overbought/oversold — EXTRA confirmation, not hard block ---
+        # TradingLab Intro: "Dentro de este paso podemos AÑADIR dos cosas,
+        # primero la sobrecompra en el RSI y segundo las divergencias en el RSI
+        # en 4 horas." — Alex treats RSI as "un extra" within Step 4.
+        # Day short example: "no es obligatorio que estén presentes"
+        # The actual "sobrecompra innegociable" is determined by price structure
+        # (separation from EMA 4H + candle type), checked in check_htf_conditions().
         rsi_h4 = analysis.rsi_values.get("H4", 50)
-        if direction == "SELL" and rsi_h4 <= 70:
-            logger.debug(
-                f"[BLACK] H4 RSI {rsi_h4:.1f} not overbought (need >70 for SELL) "
-                f"on {analysis.instrument} - rejecting"
-            )
-            return None
-        if direction == "BUY" and rsi_h4 >= 30:
-            logger.debug(
-                f"[BLACK] H4 RSI {rsi_h4:.1f} not oversold (need <30 for BUY) "
-                f"on {analysis.instrument} - rejecting"
-            )
-            return None
 
         # TradingLab: Volume confirmation - confluence scoring, not hard block
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
@@ -2939,11 +2934,15 @@ class BlackStrategy(BaseStrategy):
         met: List[str] = []
         failed: List[str] = []
 
-        # Add H4 RSI confirmation to met
-        if direction == "SELL":
-            met.append(f"H4 RSI sobrecomprado: {rsi_h4:.1f} > 70 (OBLIGATORIO para BLACK SELL)")
+        # H4 RSI overbought/oversold — strong bonus, not hard block
+        if direction == "SELL" and rsi_h4 > 70:
+            confidence += 15.0
+            met.append(f"H4 RSI sobrecomprado: {rsi_h4:.1f} > 70 (extra confirmacion para SELL)")
+        elif direction == "BUY" and rsi_h4 < 30:
+            confidence += 15.0
+            met.append(f"H4 RSI sobrevendido: {rsi_h4:.1f} < 30 (extra confirmacion para BUY)")
         else:
-            met.append(f"H4 RSI sobrevendido: {rsi_h4:.1f} < 30 (OBLIGATORIO para BLACK BUY)")
+            failed.append(f"H4 RSI {rsi_h4:.1f} no en zona extrema (extra, no obligatorio)")
 
         # Volume confluence scoring (not hard block)
         if vol_ok and vol_ratio > 1.2:
@@ -2963,8 +2962,10 @@ class BlackStrategy(BaseStrategy):
             else:
                 failed.append(f"Paso 5a: EMA 50 1H puede estar actuando como S/R (distancia {dist_1h:.2f}%)")
 
-        # TradingLab: "1H corrective pattern should be triangle or wedge
-        # (not channel — channels invalidate BLACK)"
+        # TradingLab Intro: "este patrón de aquí, que normalmente será una
+        # especie de cuña, una especie de triángulo, MUY POCAS VECES será un
+        # canal" — channels are possible but rare, NOT invalid. Penalize
+        # confidence rather than hard-blocking.
         chart_patterns = getattr(analysis, 'chart_patterns', [])
         if chart_patterns:
             for cp in chart_patterns:
@@ -2974,11 +2975,11 @@ class BlackStrategy(BaseStrategy):
                 elif isinstance(cp, str):
                     cp_name = cp.lower()
                 if "channel" in cp_name:
-                    logger.debug(
-                        f"[BLACK] Channel pattern detected on {analysis.instrument} — "
-                        f"channels invalidate BLACK strategy"
+                    confidence -= 10.0
+                    failed.append(
+                        f"Paso 5: Canal detectado — raro para BLACK, "
+                        f"preferible cuña/triángulo (penalizacion -10)"
                     )
-                    return None
 
         # Patron de reversal en LTF
         has_reversal, rev_desc = _has_reversal_pattern(analysis, direction)
@@ -2988,20 +2989,23 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 5b: {rev_desc}")
 
-        # RSI Divergence on H4 (REQUIRED for Black - TradingLab mentorship)
-        # TradingLab: BLACK requires RSI divergence on H4 as confirmation
+        # RSI Divergence on H4 — strong bonus, NOT hard block
+        # TradingLab Intro: "Esto no es un paso como tal. Esto es simplemente
+        # un añadido a las confirmaciones que buscamos y que queremos."
+        # Day short example: "no es obligatorio que estén presentes"
+        # Alex: "Si vemos algún tipo de divergencia en RSI en gráfico de 4 horas,
+        # es mucho más probable que veamos ese movimiento."
         rsi_div = analysis.rsi_divergence
         if rsi_div:
             expected_div = "bullish" if direction == "BUY" else "bearish"
             if rsi_div == expected_div:
                 confidence += 15.0
-                met.append(f"Paso 5c: Divergencia RSI {rsi_div} detectada en 4H (CONFIRMACION OBLIGATORIA)")
+                met.append(f"Paso 5c: Divergencia RSI {rsi_div} en 4H (hace el trade mucho mas probable)")
             else:
-                failed.append(f"Paso 5c: Divergencia RSI {rsi_div} no coincide con {direction}")
-                return None  # Wrong divergence direction = no Black trade
+                confidence -= 10.0
+                failed.append(f"Paso 5c: Divergencia RSI {rsi_div} en direccion contraria a {direction} (penalizacion)")
         else:
-            failed.append("Paso 5c: Sin divergencia RSI en 4H (OBLIGATORIO para BLACK)")
-            return None  # No RSI divergence = no Black trade
+            failed.append("Paso 5c: Sin divergencia RSI en 4H (añadido deseable, no obligatorio)")
 
         # Consolidacion (patron correctivo formandose)
         if "DOJI" in analysis.candlestick_patterns:

@@ -429,7 +429,7 @@
         "No trading fuera de sesiones configuradas",
         "Viernes: cierre antes de las 20:00 UTC, sin nuevos trades después de 18:00 UTC"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-006",

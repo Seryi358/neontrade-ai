@@ -871,3 +871,20 @@ Started: vie 27 mar 2026 21:45:20 -05
   - COMMODITIES.txt uses futures symbols (CL1!, ZW1!) — only a subset has Oanda CFD equivalents
   - market_view was not exposed as a selectable category in routes.py — always add to all 3 locations when adding categories
 ---
+
+## 2026-03-28 - ALEX-005
+- **What was implemented:** Verified all session/hours/alert/Friday configuration against Alex's trading style transcription. All 5 acceptance criteria already implemented — no code changes needed.
+- **Files changed:** None — code already matches Alex's workflow exactly
+- **Audit findings (all pass):**
+  - London + NY sessions: `trading_start_hour=7`, `trading_end_hour=22` UTC covers both sessions ✅
+  - Automatic alerts: `send_setup_pending()` (line 1556) + `send_trade_executed()` (line 1733) + WebSocket broadcast + push notifications ✅
+  - Morning routine: `_initial_scan()` at startup scans all watchlist pairs, `_maybe_send_morning_heartbeat()` at 08:00 UTC sends pre-session checklist, NY checklist at 13:00 UTC ✅
+  - No trading outside sessions: `_is_market_open()` enforces 7-22 UTC Mon-Fri. Session quality system reduces risk in ASIAN/SYDNEY sessions and skips OFF_HOURS entirely for day trading ✅
+  - Friday rules: `close_before_friday_hour=20` triggers `_handle_friday_close()` (closes positions near SL/TP), `no_new_trades_friday_hour=18` blocks new setups via `_is_friday_no_new_trades()` ✅
+  - Alex's exact quote: "me levanto por la mañana, hago mi lista de seguimiento, me pongo mis alertas... en el momento en el que me saltan las alertas estoy pendiente de si tengo que ejecutar alguna posición o no" — this is exactly what the engine does
+- **Learnings for future iterations:**
+  - The engine's morning routine is more comprehensive than Alex's manual workflow: auto-scan + pre-session psychological checklist + NY session reminder
+  - Friday close logic is conservative: only closes positions within 30% of SL or TP, keeps mid-range positions through weekend
+  - CPA auto-trigger on Friday (`cpa_auto_on_friday_close=True`) adds an extra layer of protection beyond just closing positions
+  - Session quality tiers (OVERLAP 1.0 > LONDON 0.9 > NY 0.8 > ASIAN 0.5 > SYDNEY 0.4 > OFF_HOURS 0.3) create a graduated response instead of binary open/closed
+---

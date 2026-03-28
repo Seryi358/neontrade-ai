@@ -416,7 +416,7 @@
         "Watchlist por defecto de la app coincide 100% con los archivos de Alex",
         "Los instrumentos están organizados por categoría como Alex los tiene"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-005",

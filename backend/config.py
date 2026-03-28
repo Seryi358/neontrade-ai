@@ -292,12 +292,16 @@ class Settings(BaseSettings):
     # Commodities — NOT recommended by TradingLab for primary trading.
     # Available only for backtesting/analysis.
     commodities_watchlist: List[str] = [
-        # Energy (COMMODITIES.txt: CL, NG, HO, RB)
+        # Energy (COMMODITIES.txt: CL, QM, HO, NG, QG, EH, RB)
         "BCO_USD", "WTICO_USD", "NATGAS_USD",
-        # Agricultural (COMMODITIES.txt: ZW, ZC, ZS, SB, KC, CC)
+        # Agricultural (COMMODITIES.txt: ZW, KE, ZC, ZO, ZS, ZL, ZM, ZR, SB, KC, CC, LBS + livestock)
+        # Oanda CFDs available:
         "WHEAT_USD", "CORN_USD", "SOYBN_USD", "SUGAR_USD",
+        # Not available as Oanda CFDs: oats (ZO), soybean oil (ZL), soybean meal (ZM),
+        # rough rice (ZR), KC wheat (KE), cocoa (CC), coffee (KC), lumber (LBS),
+        # lean hogs (HE), live cattle (LE), feeder cattle (GF), milk (DC)
         # Metals (COMMODITIES.txt: PL, PA, SI, GC, HG)
-        "XPT_USD", "XPD_USD", "XCU_USD",
+        "XAU_USD", "XAG_USD", "XPT_USD", "XPD_USD", "XCU_USD",
     ]
 
     # Indices — from FOREX.txt (US500, SX5E, US2000)
@@ -312,36 +316,45 @@ class Settings(BaseSettings):
     # Alex: "yo enfoco el trading en acciones como swing trading en acciones de EEUU"
     # Available only via IBKR (not Oanda/Capital.com).
     equities_watchlist: List[str] = [
-        # Innovation (ARK)
-        "ARKK", "ARKW", "ARKF", "ARKG", "ARKQ",
+        # Innovation (ARK) — EQUITIES_IND.txt
+        "ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX", "PRNT", "IZRL",
         # Airlines
-        "JETS",
+        "JETS", "AAL", "DAL", "UAL",
         # Banking
-        "KBE", "JPM", "BAC", "GS",
-        # Semiconductors
-        "SOXX", "SMH",
+        "KBE", "JPM", "BAC", "GS", "MS", "WFC",
         # Software / Cybersecurity
-        "HACK", "IGV",
+        "HACK", "IGV", "PSJ",
+        # Semiconductors
+        "SOXX", "PSI", "XSD",
+        # Networking
+        "PXQ",
         # Internet / Cloud
-        "FDN", "CLOU", "SKYY",
+        "FDN", "CLOU", "SKYY", "CIBR", "EMQQ", "IHAK", "PNQI",
         # Clean Energy
-        "ICLN", "TAN",
+        "ICLN", "TAN", "FAN", "KRBN",
         # Aerospace / Defense
-        "XAR", "ITA", "BA", "LMT",
+        "XAR", "ITA", "PPA", "BA", "LMT", "RTX", "NOC", "GD", "TDG",
+        "AVAV", "IRDM", "SPCE",
         # Biotechnology
-        "XBI", "IBB",
+        "XBI", "IBB", "FBT",
         # Gaming
-        "ESPO", "HERO",
+        "ESPO", "HERO", "GAMR", "NERD", "EA",
         # Uranium
-        "URA",
+        "URA", "CCJ", "NXE", "DNN", "UUUU",
+        # Agriculture
+        "COW", "MOO",
+        # Electric Car
+        "NIO", "FCEL", "PLUG",
         # AI
-        "NVDA", "IBM",
+        "NVDA", "IBM", "BIDU",
         # Cannabis
-        "MJ", "MSOS",
+        "MJ", "MSOS", "TLRY", "CGC", "ACB",
+        # VR
+        "VUZI",
         # Crypto-related equities
-        "COIN", "MSTR", "MARA",
+        "COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK", "BITO",
         # Basic Materials
-        "GDX", "GLD", "SLV", "XME",
+        "GDX", "GLD", "SLV", "XME", "PALL", "PPLT",
     ]
 
     # Crypto — separate allocation per Trading Plan (10% of trading capital)
@@ -376,17 +389,17 @@ class Settings(BaseSettings):
     # Market View — macro dashboard symbols (from MARKET_VIEW.txt)
     # NOT for trading — for context analysis (inflation, interest rates, global indices)
     market_view_symbols: List[str] = [
-        # Europe indices
-        "DE30_EUR", "FR40_EUR", "UK100_GBP",
-        # US indices
+        # Europe indices (MARKET_VIEW.txt: DE30, SX5E, FR40, ESP35, ITA40, UK100)
+        "DE30_EUR", "EU50_EUR", "FR40_EUR", "ESP35_EUR", "UK100_GBP",
+        # US indices (MARKET_VIEW.txt: US30, US2000, NAS100, US500, NDQ, SPX, DJI, RTY)
         "US30_USD", "US2000_USD", "NAS100_USD", "SPX500_USD",
-        # World indices
+        # World indices (MARKET_VIEW.txt: CN50, HK33, IX0118, JP225, AU200, NZ50G)
         "CN50_USD", "HK33_HKD", "JP225_USD", "AU200_AUD",
-        # Metals (macro view)
+        # Metals (MARKET_VIEW.txt: XAUXAG ratio, XAUUSD, XAGUSD, XPDUSD, XPTUSD, XCUUSD)
         "XAU_USD", "XAG_USD", "XPD_USD", "XPT_USD", "XCU_USD",
-        # Energy (macro view)
-        "NATGAS_USD", "WTICO_USD",
-        # Crypto (macro view — BTC + ETH only)
+        # Energy / Commodities (MARKET_VIEW.txt: NATGAS, NG, SOYBN, WHEAT, KC, UKOIL, WTICO)
+        "NATGAS_USD", "BCO_USD", "WTICO_USD", "SOYBN_USD", "WHEAT_USD",
+        # Crypto (macro view — BTC + ETH only, per MARKET_VIEW.txt)
         "BTC_USD", "ETH_USD",
     ]
 

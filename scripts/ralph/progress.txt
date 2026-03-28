@@ -852,3 +852,22 @@ Started: vie 27 mar 2026 21:45:20 -05
   - The validate_reward_risk docstring was stale — said 2.0 but config default was 1.5. Always check docstrings match actual config defaults.
   - reference_win_rate and reference_min_trades are informational fields — not used as gates anywhere in the code, just benchmarks from the mentorship.
 ---
+
+## 2026-03-28 - ALEX-004
+- **What was implemented:** Compared ALL 5 TradingLab watchlist files (FOREX.txt, CRYPTO_USDT.txt, EQUITIES_IND.txt, COMMODITIES.txt, MARKET_VIEW.txt) against config.py watchlists. Added missing instruments and exposed market_view as a watchlist category.
+- **Files changed:**
+  - `backend/config.py` — Expanded equities_watchlist with ~30 missing ETFs/stocks from EQUITIES_IND.txt (new sectors: Networking, Agriculture, Electric Car, VR; expanded Aerospace, Banking, Gaming, Uranium, Cannabis, Crypto-related, Basic Materials). Added XAU_USD/XAG_USD to commodities (metals from COMMODITIES.txt). Added ESP35_EUR, EU50_EUR, BCO_USD, SOYBN_USD, WHEAT_USD to market_view_symbols. Documented unavailable commodity futures as comments.
+  - `backend/api/routes.py` — Added "market_view" to all 3 watchlist endpoint locations: `valid` set in PUT /watchlist/categories, `category_map` in GET /watchlist/full, and `available` dict in GET /watchlist/categories.
+  - `scripts/ralph/prd.json` — Marked ALEX-004 as passes: true
+- **Audit findings (category by category):**
+  - FOREX.txt: 100% match — all 28 main pairs + 15 exotics + metals already in config ✅
+  - CRYPTO_USDT.txt: 32 main section pairs all present ✅. SECTION 1 (200+ pairs) includes many delisted/obscure tokens — config has curated modern set with additional tier-based organization
+  - EQUITIES_IND.txt: Was missing ~30 instruments across sectors — now added. Excluded: TSX-listed stocks (AC, WEED, EU, UEX, FSY — Canadian exchange), some delisted (ATVI→merged, MAXR→acquired, AJRD→acquired, VORB→bankrupt), MOON/IZRL (low relevance)
+  - COMMODITIES.txt: Most agricultural futures (oats, rice, livestock, lumber, cocoa, coffee, milk) have no Oanda/Capital.com CFD equivalent — documented as comments. Energy and metals complete ✅
+  - MARKET_VIEW.txt: Added ESP35, EU50 (SX5E), BCO_USD (UK Oil), SOYBN_USD, WHEAT_USD. Some items not available as tradeable instruments (inflation indices, unemployment data, interbank rates) — these are TradingView economic indicators, not broker instruments
+- **Learnings for future iterations:**
+  - TradingView watchlists mix tradeable instruments with economic indicators (ECONOMICS:USINTR, FRED:UNRATE) — these can't be mapped to broker symbols
+  - EQUITIES_IND.txt contains both ETFs and individual stocks. Config should include ALL ETFs and key individual stocks per sector, skipping TSX-only and delisted/acquired companies
+  - COMMODITIES.txt uses futures symbols (CL1!, ZW1!) — only a subset has Oanda CFD equivalents
+  - market_view was not exposed as a selectable category in routes.py — always add to all 3 locations when adding categories
+---

@@ -1494,7 +1494,7 @@ async def get_journal_trades(
 # ── Watchlist Categories ────────────────────────────────────────────
 
 class WatchlistCategoriesRequest(BaseModel):
-    categories: List[str]  # ["forex", "forex_exotic", "commodities", "indices", "equities", "crypto"]
+    categories: List[str]  # ["forex", "forex_exotic", "commodities", "indices", "equities", "crypto", "market_view"]
 
 
 @router.get("/watchlist/categories")
@@ -1510,6 +1510,7 @@ async def get_watchlist_categories():
             "indices": {"count": len(settings.indices_watchlist), "instruments": settings.indices_watchlist},
             "equities": {"count": len(settings.equities_watchlist), "instruments": settings.equities_watchlist},
             "crypto": {"count": len(settings.crypto_watchlist), "instruments": settings.crypto_watchlist},
+            "market_view": {"count": len(settings.market_view_symbols), "instruments": settings.market_view_symbols},
         },
         "allocation": {
             "trading_pct": settings.allocation_trading_pct,
@@ -1523,7 +1524,7 @@ async def get_watchlist_categories():
 async def update_watchlist_categories(req: WatchlistCategoriesRequest):
     """Update active watchlist categories."""
     from config import settings
-    valid = {"forex", "forex_exotic", "commodities", "indices", "equities", "crypto"}
+    valid = {"forex", "forex_exotic", "commodities", "indices", "equities", "crypto", "market_view"}
     for cat in req.categories:
         if cat not in valid:
             raise HTTPException(400, f"Invalid category: {cat}. Valid: {', '.join(valid)}")
@@ -1557,6 +1558,7 @@ async def get_full_watchlist():
         "indices": settings.indices_watchlist,
         "equities": settings.equities_watchlist,
         "crypto": settings.crypto_watchlist,
+        "market_view": settings.market_view_symbols,
     }
     for cat in settings.active_watchlist_categories:
         if cat in category_map:

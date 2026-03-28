@@ -360,7 +360,7 @@
         "Flujo trading_engine → openai_analyzer verificado",
         "Datos pasados entre módulos son consistentes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-001",

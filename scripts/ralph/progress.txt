@@ -30,6 +30,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Crypto uses WIDER EMA timeframes than forex for position management (LP: Weekly/H4 vs Daily/H1; CP Day: M15 vs M5) — `_EMA_TIMEFRAME_GRID_CRYPTO` in position_manager.py
 - EMA naming: `EMA_{TF}_{PERIOD}` — e.g. `EMA_M5_50` = period 50 on M5. TradingLab uses EMA 50 on EVERY timeframe. Entry triggers use `EMA_M5_50`, price proxies use `EMA_M5_5` (fast).
 - M2 approximation: broker APIs don't provide M2 candles, use `EMA_M5_20` as proxy (EMA 50 on M2 ≈ EMA 20 on M5)
+- TradeRisk `units` and `risk_percent` must stay in sync — when scaling risk post-creation, always scale both
+- Use RiskManager public methods (e.g., `unregister_all_trades()`) instead of accessing `_active_risks` directly
 
 ---
 
@@ -766,4 +768,28 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Alex's BE rule "at 1% gain" is specifically for 2:1 R:R trades. The code's "50% to TP1" generalizes this correctly for any R:R ratio.
   - The "6 trend changes in 1H within 1 daily trend change" is a key insight for LP vs CP decision — conceptual, not algorithmic
   - CPA's 4 trigger situations (approaching S/R, news incoming, near TP with decel, Friday close) are partially implemented (only beyond-TP1 generic trigger). Full event-based CPA would need news calendar + pattern detection integration.
+---
+
+## 2026-03-28 - AUDIT-026
+- **What was implemented:** Cross-module audit of all data flows in trading_engine.py. Verified 10+ module interfaces: market_analyzer, strategies (get_best_setup), risk_manager, position_manager, news_filter, openai_analyzer, trade_journal, alert_manager, scalping_analyzer, explanation_engine, screenshot_generator. Fixed 2 bugs, 1 encapsulation issue.
+- **Files changed:**
+  - `backend/core/trading_engine.py` — Fixed reentry units not scaled with risk_percent (×0.75), fixed session quality units not scaled (×0.85), replaced direct `_active_risks` dict access with `unregister_all_trades()` call
+  - `backend/core/risk_manager.py` — Added `unregister_all_trades()` public method to avoid tight coupling from trading_engine accessing private `_active_risks` dict
+- **Audit findings:**
+  - ✅ trading_engine → market_analyzer: `full_analysis(instrument)` returns `AnalysisResult` with all required fields (ema_values always populated)
+  - ✅ trading_engine → strategies: `get_best_setup(analysis, enabled_strategies)` returns `Optional[SetupSignal]`, correctly converted to `TradeRisk`
+  - ✅ trading_engine → risk_manager: `can_take_trade()`, `calculate_position_size()`, `validate_reward_risk()`, `register_trade()`, `unregister_trade()` — all signatures match
+  - ✅ trading_engine → position_manager: `set_ema_values()`, `update_all_positions()`, `track_position()`, `remove_position()` — all signatures match
+  - ✅ trading_engine → news_filter: `has_upcoming_news()` returns `Tuple[bool, Optional[str]]`, `should_close_for_news()` returns `Tuple[bool, str]` — both match
+  - ✅ trading_engine → openai_analyzer: `validate_setup_with_ai(signal, analysis)` returns dict with ai_score, ai_recommendation, suggested_adjustments
+  - ✅ trading_engine → trade_journal: `record_trade()` passes all required positional args, optional params have defaults
+  - ✅ trading_engine → alert_manager: all send methods (send_engine_status, send_trade_closed, send_setup_pending, send_trade_executed, send_daily_summary, send_alert) match signatures
+  - 🔧 **FIXED** Reentry risk_percent was reduced to 75% but units stayed at 100% — risk_manager tracked 0.75% but actual position was sized for 1.0%
+  - 🔧 **FIXED** Same issue for low-quality session risk reduction (×0.85)
+  - 🔧 **FIXED** Direct `_active_risks` dict access replaced with public `unregister_all_trades()` method
+- **Learnings for future iterations:**
+  - When modifying `risk_percent` post-creation, ALWAYS scale `units` proportionally — they are derived from the same risk calculation
+  - `TradeRisk.units` and `TradeRisk.risk_percent` must stay in sync — both are used downstream (units for broker order, risk_percent for risk tracking)
+  - The `int() or fallback` pattern prevents zero-unit trades when scaling small positions
+  - Pre-existing test failures (6 total): 3 from missing `openai` module, 1 async test, 1 KeyError in test_round6, 1 test_round3 edge case — none related to AUDIT-026
 ---

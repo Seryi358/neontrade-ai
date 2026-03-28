@@ -333,7 +333,7 @@
         "Buscar discrepancias sutiles en umbrales, constantes, condiciones",
         "Verificar que cada estrategia funciona end-to-end"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-025",

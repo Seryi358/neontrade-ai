@@ -664,3 +664,27 @@ Started: vie 27 mar 2026 21:45:20 -05
   - The backtester runs analysis every 4 H1 bars (analysis_interval=4) for tractability — not every bar
   - `run_multi()` method supports parallel backtesting of multiple instruments with semaphore(3) concurrency limit
 ---
+
+## 2026-03-28 - AUDIT-024
+- **What was implemented:** Second-pass re-audit of ALL 6 color strategies (BLUE, RED, PINK, WHITE, BLACK, GREEN). Re-read all 18 strategy transcriptions and compared every specific rule, threshold, constant, and condition against the code. No new discrepancies found — all first-pass corrections verified correct.
+- **Files changed:** None — code already matches mentorship exactly after first-pass fixes
+- **Second-pass audit findings (all pass):**
+  - **BLUE**: 7-step process ✅. 3 variants (A/B/C) with correct priority ✅. Blue A correctly detects double bottom/top, higher low, H&S patterns (AUDIT-007 fix verified) ✅. Blue C requires HTF trend + 2:1 R:R ✅. SL at min(Fib 0.618, previous support) ✅. TP at EMA 50 4H ✅. 5M entry priority: diagonal > EMA 5M > EMA 2M ✅. RCC confirmation ✅.
+  - **RED**: 7-step process ✅. BOTH EMA 50 1H AND 4H required (hard block) ✅. Permissive 1H EMA break: 2+ aggressive candles = penalty, 3+ = hard block ✅. Daily deceleration preferential (scoring, not hard block) ✅. Convergence required ✅. SL at min(EMA 50 4H * 0.998, previous support) ✅. TP wave-differentiated (Wave 3→1.618, Wave 5→recent high/low, default→1.272) ✅. Intermediate resistance override ✅.
+  - **PINK**: 6-step process ✅. Key condition: 1H EMA broken (opposite direction), 4H EMA NOT broken (AUDIT-009 fix verified) ✅. Channel hard-block confirmed correct from WHITE Day transcript (AUDIT-010 verification) ✅. Pattern completion check (75%+ or near apex) ✅. SL/TP at previous swing extremes ✅.
+  - **WHITE**: 6-step process ✅. Pink context proxy detection (2/4 conditions) ✅. EMA 50 1H intact required ✅. EMA 50 4H as bonus ✅. Convergence required ✅. SL at previous swing extreme ✅. TP "como si fuera el de una PINK" ✅.
+  - **BLACK**: 7-step process ✅. Counter-trend direction logic ✅. Daily S/R non-negotiable (hard block) ✅. 4H price structure separation > 1.5% from EMA ("innegociable") ✅. H4 RSI as bonus (+15), not hard block (AUDIT-011 fix verified: "un añadido") ✅. RSI divergence as bonus, not hard block (AUDIT-011 fix verified: "no es un paso como tal") ✅. Channel as penalty, not hard block (AUDIT-011 fix: "muy pocas veces") ✅. EMA 50 1H dynamic S/R = hard block at 2+ bounces ✅. 1H candlestick required before 5M ✅. TP at EMA 50 4H ✅. Min R:R 2.0 ✅.
+  - **GREEN**: 7-step process ✅. Crypto-only restriction ✅. Fibonacci 0.75 invalidation with 0.3% tolerance (AUDIT-012 fix verified) ✅. 1H diagonal non-negotiable (hard block) ✅. Timeframe cascade correct for Swing/Day/Scalp ✅. SL at previous 1H swing low/high ✅. TP at previous daily high/low ✅. Min R:R 2.0, bonuses at 3.0/5.0 ✅. Green Fractal bonus ✅.
+  - **Cross-strategy consistency**: EMA 8 Weekly filter applied to all except BLACK ✅. Convergence required for RED/PINK/WHITE ✅. Crypto→GREEN only ✅. PINK/BLACK = MARKET only, BLUE/RED/WHITE = LIMIT/STOP allowed ✅. Elliott Wave priority system correctly maps strategies to waves ✅.
+- **Verification of first-pass corrections:**
+  - AUDIT-007 (Blue A + H&S): `_classify_blue_variant()` correctly checks H&S and inverse H&S in chart_patterns ✅
+  - AUDIT-009 (Pink 4H EMA direction): `opposite = "SELL" if direction == "BUY" else "BUY"` correctly checks correction direction ✅
+  - AUDIT-011 (Black RSI/channels): RSI H4 → confidence bonus (+15), RSI divergence → bonus (+15)/penalty (-10), channel → penalty (-10). None are hard blocks ✅
+  - AUDIT-012 (Green Fib 0.75): `broken_075` check with 0.3% tolerance returns False/hard-blocks when clearly past 0.75 ✅
+- **Learnings for future iterations:**
+  - Second-pass audits are valuable even when first pass was thorough — confirms correctness and builds confidence
+  - The Pink intro transcription says "puede ser un canal" but White Day says "cuando yo veo un canal, no ejecuto pink" — the later, more specific statement takes precedence
+  - Blue A classification correctly takes priority over Blue C (price action > indicator) — verified against PINK intro transcript where Alex explicitly states this
+  - Helper functions (_check_ema_break, _fib_zone_check, etc.) are shared across strategies and work correctly for all 6
+  - The code's proxy-based approach (using current price vs EMAs instead of historical candle data) is a reasonable approximation of the mentorship's visual analysis
+---

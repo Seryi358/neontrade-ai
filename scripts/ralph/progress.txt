@@ -47,6 +47,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - CPA auto-trigger is external: `position_manager.set_cpa_trigger(trade_id, reason)` — called by trading_engine when it detects double patterns, news, Friday close, or indecision
 - Trading profiles are in `config.py:TRADING_PROFILES` dict. Apply via `apply_trading_profile(id)` or `POST /profiles/apply`. Only risk-related keys are persisted to `data/risk_config.json`.
 - When adding methods to core modules (trade_journal.py, etc.), always verify routes.py has a corresponding API endpoint — methods without endpoints are invisible to the frontend
+- Frontend tests use jest-expo preset + @testing-library/react-native@12 — mock `authFetch` from `services/api` with URL-specific responses ordered by specificity (longer paths first)
+- Dashboard's `.catch(() => null)` in Promise.all means testing error state requires `Promise.reject()`, NOT `{ok: false}`
 
 ---
 
@@ -1095,4 +1097,31 @@ Started: vie 27 mar 2026 21:45:20 -05
   - MagicMock for async methods like `engine.stop()` must use `AsyncMock`, not plain `MagicMock` (causes `TypeError: object MagicMock can't be used in 'await' expression`)
   - FastAPI path parameters split on `/` before reaching the handler — `../../etc/passwd` in a `{filename}` param becomes just `passwd`, not a path traversal. Test special chars like `!` or spaces for regex validation tests.
   - pytest-asyncio `mode=Mode.STRICT` requires explicit `@pytest.mark.asyncio` on each async test
+---
+
+## 2026-03-28 - BUGFIX-006
+- **What was implemented:** Full frontend test suite (52 tests) covering all 8 screens, WebSocket integration, and API service calls
+- **Files changed:**
+  - `frontend/package.json` — Added test dependencies (jest-expo, @testing-library/react-native, jest, @types/jest) and test scripts
+  - `frontend/jest.config.js` — New: Jest configuration with jest-expo preset, transform patterns, asset mocks
+  - `frontend/jest.setup.js` — New: Test setup mocking expo-font, expo-status-bar, expo-notifications, lightweight-charts, console.error suppression
+  - `frontend/__mocks__/fileMock.js` — New: Asset file mock (fonts, images)
+  - `frontend/__tests__/screens.test.tsx` — New: 52 tests covering all 8 screens + WebSocket + API service
+- **Test coverage by screen:**
+  - **Dashboard (7 tests):** header, balance, status, positions, daily activity, WebSocket subscription, error state
+  - **Analysis (5 tests):** header, watchlist loading, score display, strategy detection, analysis fetch
+  - **Chart (4 tests):** instrument display, timeframe selectors, candle data fetch, price data fetch
+  - **Journal (5 tests):** header, stats fetch, profit factor, trade list, API endpoint verification
+  - **Manual Mode (6 tests):** header, pending setups, strategy/direction, R:R ratio, approve/reject buttons, empty state
+  - **Settings (6 tests):** header, mode toggle, broker selection, strategy toggles, engine controls, risk config
+  - **History (6 tests):** header, win rate stats, P&L display, trade list, filter tabs, empty state
+  - **Watchlist (6 tests):** pair display, scores, strategy detection, convergence, trend icons, error state
+  - **WebSocket (4 tests):** engine_status, trade_executed, trade_closed subscriptions, connect call
+  - **API Service (3 tests):** Dashboard endpoints, watchlist endpoint, history endpoints
+- **Learnings for future iterations:**
+  - jest-expo@52 requires separate `jest` package install (not bundled)
+  - URL substring matching for API mocks needs specificity ordering — `/api/v1/history/stats` before `/api/v1/history` or the stats URL matches the trades mock
+  - Dashboard uses `.catch(() => null)` per fetch in Promise.all — testing error state requires Promise.reject(), not {ok:false}
+  - `@testing-library/react-native@12` is needed for React 18.3 compat (v13 requires React 19)
+  - lightweight-charts must be mocked (web-only lib crashes in test env)
 ---

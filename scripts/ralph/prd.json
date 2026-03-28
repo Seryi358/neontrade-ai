@@ -280,7 +280,7 @@
         "0.5% riesgo por trade y 5% DD diario verificados",
         "Tipos de órdenes para scalping implementados"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-021",

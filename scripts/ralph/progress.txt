@@ -553,3 +553,48 @@ Started: vie 27 mar 2026 21:45:20 -05
   - CPA partial closes: 25%, 50%, 75%, or 100% — any percentage, not just 50%. Code's half-close is a reasonable default
   - Alex emphasizes "como menos implicación emocional mejor" — position management should be mechanical via EMA, not discretionary
 ---
+
+## 2026-03-28 - AUDIT-020
+- **What was implemented:** Audited all 6 transcriptions from Workshop de Scalping/01_Contenido (Introducción, Comparativa de layout, Gráfico horario, Estrategia RED, Gestión de la posición, Tipos de órdenes) against scalping_engine.py and config.py. Fixed 1 discrepancy: deceleration detection had inverted wick direction and negative confidence for a positive confirmation signal.
+- **Files changed:**
+  - `backend/core/scalping_engine.py` — Fixed `_detect_deceleration()`: (1) Flipped wick direction — for BUY now checks lower wicks (buying pressure absorbing bearish pullback) instead of upper wicks; for SELL checks upper wicks instead of lower. The workshop's "desaceleración y giro" refers to PULLBACK deceleration, not trade-direction deceleration. (2) Changed confidence adjustments from negative (-5 to -10) to positive (+5 to +10) — deceleration is a REQUIRED confirmation signal per Workshop Steps 2 and 5, not a penalty.
+  - `scripts/ralph/prd.json` — Marked AUDIT-020 as passes: true
+- **Audit findings:**
+  - Lesson 1 (Introducción): Conceptual — scalping compresses day trading to lower TFs, market is fractal. No code rules. ✅ N/A
+  - Lesson 2 (Comparativa de layout): Timeframe mapping Day→Scalp (Daily→H1, H4→M15, H1→M5, M5→M1) ✅. `SCALPING_TIMEFRAMES` dict matches exactly ✅
+  - Indicators per TF: H1=MACD+EMA50+SMA200 ✅, M15=EMA50 only ✅, M5=EMA50+MACD(optional)+Volume ✅, M1=EMA50+MACD ✅
+  - SMA 200 on H1 "increíblemente utilizada" — correctly implemented as `sma200_h1` ✅
+  - MACD divergences "much more evident" on H1 — correctly prioritized in `_determine_h1_direction()` ✅
+  - Volume "more powerful" on M5 — correctly tracked in `volume_m5` ✅
+  - M5 MACD "no sería obligatorio" — correctly treated as optional with confidence penalty, not hard block ✅
+  - Lesson 3 (Gráfico horario): Conceptual — H1 is the direction chart for scalping, like Daily for day trading. Need S/R, MACD divergences, patterns, Fibonacci, Elliott for direction. No specific code rules beyond existing analysis. ✅ N/A
+  - Lesson 4 (Estrategia RED): 7 steps correctly implemented ✅:
+    1. S/R level on H1 ✅
+    2. Deceleration and reversal on H1 ✅ (FIXED wick direction)
+    3. EMA 50 M15 broken — `_validate_scalping_conditions()` Condition 1 with breakout detection ✅
+    4. Pullback to M15 EMA + Fib + M5 EMA — handled by strategy detection on remapped analysis ✅
+    5. Deceleration and reversal on M5 ✅ (FIXED wick direction)
+    6. M1 breakout + confirmation — `_validate_scalping_conditions()` Condition 3 with 2-candle confirmation ✅
+    7. SL at Fib 0.618, TP at recent highs/lows — `_enforce_fibonacci_sl()` + `_apply_swing_tp_override()` ✅
+  - BLUE complexity in scalping (M15/M5 too close, 3x vs 4x multiplier): 3 modes (aggressive, skip_all, clean_only) in `scalping_blue_mode` ✅
+  - M1 execution can be EMA OR diagonal — EMA implemented, diagonal noted as TODO ✅ (acceptable)
+  - Lesson 5 (Gestión de la posición): 3 exit methods ✅:
+    - Method 1 (fixed_tp): Hold until TP/SL — `get_scalping_exit_signal(method="fixed_tp")` ✅
+    - Method 2 (fast): Trail with EMA 50 on M1 — `get_scalping_exit_signal(method="fast")` ✅
+    - Method 3 (slow): Trail with EMA 50 on M5 — `get_scalping_exit_signal(method="slow")` ✅
+  - Trailing SL gives space to EMA (buffer) — `ema_buffer_pct` parameter ✅
+  - Alex's preference "salir rápido" — `scalping_exit_method = "fixed_tp"` default (safest) ✅
+  - Partial exits mentioned as future upgrade — not implemented, correctly deferred ✅
+  - Risk: "hay que arriesgar menos" — `risk_scalping = 0.005` (0.5%) ✅. Exact % deferred to future upgrades per mentorship ✅
+  - DD limits: `scalping_max_daily_dd = 0.05` (5%), `scalping_max_total_dd = 0.10` (10%) — app-added safety, correctly documented as non-mentorship ✅
+  - Lesson 6 (Tipos de órdenes): Market vs Limit orders ✅
+  - Limit requires 4 confluence parameters: EMA M5, EMA M15, Fibonacci, extra level (S/R/diagonal) — `check_limit_entry_confluence()` checks all 4 ✅
+  - Alex's backtesting conclusion: "ejecuto límites cuando tengo las dos medias móviles, Fibonacci y otro nivel extra" — exactly matches the 4-parameter check ✅
+- **Learnings for future iterations:**
+  - The ONLY strategy explicitly developed in the Scalping Workshop is RED. Alex says: "lo vamos a desarrollar en base a la forma con la que yo he operado Scalping" and "no creo que sea necesario poner un ejemplo en todas y cada una de las estrategias"
+  - BLUE is problematic in scalping: M15 and M5 are only 3x apart (vs H4/H1 = 4x in day trading), so M15 and M5 EMA breaks are too similar. Three options: aggressive (all BLUEs), skip (no BLUEs), clean_only (80%+ confidence)
+  - Alex no longer scalps: "ya no lo llevo a cabo desde hace unos cuantos años" — he switched to day trading when he left his bank job
+  - Partial exits, risk management details, and session timing are planned as future workshop upgrades — not in current transcriptions
+  - Limit orders need 4 converging levels. Market orders are for when you see the turn in real-time. Neither is "better" — each suits different scenarios
+  - Alex's personal limit entry rule came from backtesting 300-400 trades — empirical, not theoretical
+---

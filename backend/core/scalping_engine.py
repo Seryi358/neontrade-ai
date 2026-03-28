@@ -777,18 +777,21 @@ class ScalpingAnalyzer:
         lookback: int = 5,
     ) -> Optional[Dict[str, Any]]:
         """
-        Detect deceleration and potential reversal on a timeframe by checking
-        for decreasing candle body sizes and increasing wick sizes over the
-        last 3-5 candles.
+        Detect deceleration of the PULLBACK on a timeframe by checking
+        for decreasing candle body sizes and increasing absorption wicks
+        over the last 3-5 candles.
 
-        Workshop steps 2 (H1) and 5 (M5) require detecting "deceleration and
-        reversal" as part of the scalping analysis. This is used as confluence
-        scoring, not hard rejection.
+        Workshop steps 2 (H1) and 5 (M5) require detecting "desaceleración
+        y giro" (deceleration and reversal) of the pullback as a required
+        confirmation before entry. This is a POSITIVE signal — the pullback
+        is losing steam, confirming the trade setup.
 
-        Deceleration indicators:
-        - Decreasing candle body sizes (momentum fading)
-        - Increasing upper wicks (for BUY = selling pressure)
-          or increasing lower wicks (for SELL = buying pressure)
+        Pullback deceleration indicators:
+        - Decreasing candle body sizes (pullback momentum fading)
+        - For BUY: increasing lower wicks = buying pressure absorbing
+          the bearish pullback (market pushing back up)
+        - For SELL: increasing upper wicks = selling pressure absorbing
+          the bullish pullback (market pushing back down)
 
         Args:
             df: OHLCV DataFrame for the timeframe.
@@ -796,8 +799,8 @@ class ScalpingAnalyzer:
             lookback: Number of recent candles to examine (3-5).
 
         Returns:
-            Dict with 'adj' (confidence adjustment) and 'reason', or None
-            if no deceleration detected.
+            Dict with 'adj' (positive confidence boost) and 'reason',
+            or None if no deceleration detected.
         """
         if df.empty or len(df) < lookback:
             return None
@@ -820,13 +823,15 @@ class ScalpingAnalyzer:
             and avg_second_body < avg_first_body * 0.7  # 30%+ decrease
         )
 
-        # Check for increasing rejection wicks against the direction
+        # Check for increasing absorption wicks that fight the pullback
         if direction == "BUY":
-            # For BUY: increasing upper wicks = selling pressure (bad)
-            wicks = upper_wicks
-        else:
-            # For SELL: increasing lower wicks = buying pressure (bad)
+            # For BUY: increasing lower wicks = buying pressure absorbing
+            # the bearish pullback (good — pullback losing steam)
             wicks = lower_wicks
+        else:
+            # For SELL: increasing upper wicks = selling pressure absorbing
+            # the bullish pullback (good — pullback losing steam)
+            wicks = upper_wicks
 
         first_wicks = wicks[:mid]
         second_wicks = wicks[mid:]
@@ -839,32 +844,34 @@ class ScalpingAnalyzer:
         )
 
         if bodies_decreasing and wicks_increasing:
-            # Strong deceleration signal
+            # Strong pullback deceleration — highly confirms setup
             return {
-                "adj": -10,
+                "adj": +10,
                 "reason": (
-                    f"decreasing body sizes ({avg_first_body:.5f} -> "
-                    f"{avg_second_body:.5f}) and increasing rejection wicks "
-                    f"({avg_first_wick:.5f} -> {avg_second_wick:.5f}) over "
-                    f"last {lookback} candles"
+                    f"pullback decelerating: body sizes shrinking "
+                    f"({avg_first_body:.5f} -> {avg_second_body:.5f}) and "
+                    f"absorption wicks increasing ({avg_first_wick:.5f} -> "
+                    f"{avg_second_wick:.5f}) over last {lookback} candles"
                 ),
             }
         elif bodies_decreasing:
-            # Mild deceleration
+            # Mild pullback deceleration
             return {
-                "adj": -5,
+                "adj": +5,
                 "reason": (
-                    f"decreasing body sizes ({avg_first_body:.5f} -> "
-                    f"{avg_second_body:.5f}) over last {lookback} candles"
+                    f"pullback decelerating: body sizes shrinking "
+                    f"({avg_first_body:.5f} -> {avg_second_body:.5f}) "
+                    f"over last {lookback} candles"
                 ),
             }
         elif wicks_increasing:
-            # Rejection wicks increasing
+            # Absorption wicks increasing
             return {
-                "adj": -5,
+                "adj": +5,
                 "reason": (
-                    f"increasing rejection wicks ({avg_first_wick:.5f} -> "
-                    f"{avg_second_wick:.5f}) over last {lookback} candles"
+                    f"pullback absorption: wicks increasing "
+                    f"({avg_first_wick:.5f} -> {avg_second_wick:.5f}) "
+                    f"over last {lookback} candles"
                 ),
             }
 

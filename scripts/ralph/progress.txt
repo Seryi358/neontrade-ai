@@ -688,3 +688,15 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Helper functions (_check_ema_break, _fib_zone_check, etc.) are shared across strategies and work correctly for all 6
   - The code's proxy-based approach (using current price vs EMAs instead of historical candle data) is a reasonable approximation of the mentorship's visual analysis
 ---
+
+## 2026-03-28 - AUDIT-024 (Addendum: EMA Fix)
+- **What was implemented:** Fixed critical EMA period discrepancy in 5M entry triggers across ALL 6 strategies. Also fixed 2M entry approximation.
+- **Files changed:**
+  - `backend/strategies/base.py` — Changed all entry-trigger EMA references from `EMA_M5_5` (period 5) to `EMA_M5_50` (period 50). Changed M2 approximation from `EMA_M5_2` (period 2) to `EMA_M5_20` (period 20). Affected: BLUE, RED, PINK, WHITE, BLACK, GREEN entry checks + RCC confirmations + minimum candle count check.
+- **Root cause:** The naming convention `EMA_{TF}_{Period}` made `EMA_M5_5` look like "EMA of M5" when it's actually "EMA period 5 on M5." Alex says "la media móvil de 50 de 5 minutos" (EMA 50 on M5 chart), which is `EMA_M5_50`.
+- **Note:** `EMA_M5_5` is still correctly used in price-proxy functions (_get_current_price_proxy, _is_at_key_level, _check_ema_break, _check_ema_pullback) where a fast EMA approximates current price.
+- **Learnings for future iterations:**
+  - EMA naming: `EMA_{TF}_{PERIOD}` — always verify the period matches the mentorship. TradingLab standard is EMA 50 on EVERY timeframe.
+  - M2 approximation: EMA 50 on M2 ≈ EMA 20 on M5 (since M5 candles are 2.5x longer than M2 candles)
+  - Entry triggers and price proxies have DIFFERENT EMA requirements — don't conflate them
+---

@@ -321,7 +321,7 @@
         "Métricas de backtesting coinciden con lo enseñado",
         "Backtesting avanzado con las 6 estrategias de colores"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-024",

@@ -643,3 +643,24 @@ Started: vie 27 mar 2026 21:45:20 -05
   - All technical parameters (DD limits, account types, restrictions) were already implemented in prior rounds
   - The funded account feature set is complete: config, risk checks, API, daily PnL tracking
 ---
+
+## 2026-03-28 - AUDIT-023
+- **What was implemented:** Audited all 7 backtesting transcriptions (Básico I: 3 lessons, Básico II: 2 lessons, Avanzado: 2 lessons) against backtester.py (1,154 lines). No code changes needed — all pass.
+- **Files changed:** None — code already matches mentorship methodology
+- **Audit findings (all pass):**
+  - 7 transcripciones leídas: Qué es backtesting, Backtesting en TradingView, Cuándo empezar, Intro básico II, Ejemplo básico (46 min), Intro avanzado, Ejemplo avanzado (45 min)
+  - Backtester implements multi-timeframe walk-forward methodology: W, D, H4, H1, M15, M5 — exceeds the 3-chart layout (D+H4+H1) taught in advanced class ✅
+  - All 6 color strategies available via `enabled_strategies` dict and `get_best_setup()` ✅
+  - 5-phase position management (INITIAL→SL_MOVED→BREAK_EVEN→TRAILING→BEYOND_TP1) mirrors position_manager.py ✅
+  - Risk management: 1% per trade default, position sizing formula correct ✅
+  - Performance metrics comprehensive: win rate, profit factor, Sharpe ratio, Sortino ratio, max drawdown, equity curve, per-strategy breakdown, MFE/MAE ✅
+  - No look-ahead bias: `_build_tf_index_map()` slices each timeframe independently ✅
+  - Slippage and spread simulation applied to entry prices ✅
+  - Cooldown bars between trades prevent rapid re-entry ✅
+  - Documentation/tracking: BacktestResult captures everything the class says to record in spreadsheets/Notion
+- **Note:** Transcriptions are educational/philosophical about backtesting methodology (practice 3-5x video duration, start immediately, use TradingView Replay, random pair selection, concentration). No specific numeric parameters to implement — the automated backtester correctly captures the methodology in code.
+- **Learnings for future iterations:**
+  - Backtesting transcriptions are methodology-focused, not parameter-focused — they teach HOW to approach backtesting, not specific configs
+  - The backtester runs analysis every 4 H1 bars (analysis_interval=4) for tractability — not every bar
+  - `run_multi()` method supports parallel backtesting of multiple instruments with semaphore(3) concurrency limit
+---

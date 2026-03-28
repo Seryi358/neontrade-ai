@@ -1005,7 +1005,7 @@ def block_8_config():
     check("B8-12 delta_enabled off", settings.delta_enabled is False)
     check("B8-13 app_port = 8000", settings.app_port == 8000)
     check("B8-14 trading_start 7", settings.trading_start_hour == 7)
-    check("B8-15 trading_end 21", settings.trading_end_hour == 21)
+    check("B8-15 trading_end 22", settings.trading_end_hour == 22)
     check("B8-16 correlation_groups has entries", len(settings.correlation_groups) >= 5)
     check("B8-17 XAU_USD in watchlist", "XAU_USD" in settings.forex_watchlist)
     check("B8-18 BTC_USD in crypto", "BTC_USD" in settings.crypto_watchlist)

@@ -840,10 +840,32 @@ class IBKRClient(BaseBroker):
     # ── Instrument Info ──────────────────────────────────────
 
     async def get_pip_value(self, instrument: str) -> float:
-        """Get pip value for an instrument."""
+        """Get pip value for an instrument.
+
+        TradingLab units of measure (Lesson 8):
+        - Forex: pip = 0.0001 (4th decimal), JPY pairs = 0.01 (2nd decimal)
+        - Gold (XAU): pip = 0.1, Silver (XAG): pip = 0.01
+        - Indices: point = 1.0
+        - Crypto: point = 1.0
+        """
         pair = instrument.upper().replace("/", "_")
         if "JPY" in pair:
             return 0.01
+        if pair in ("XAU_USD", "GOLD"):
+            return 0.1
+        if pair in ("XAG_USD", "SILVER"):
+            return 0.01
+        if any(pair.startswith(c) for c in (
+            "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
+            "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB", "FTM", "ALGO",
+            "XLM", "EOS", "XTZ", "VET",
+        )):
+            return 1.0
+        if any(pair.startswith(idx) for idx in (
+            "US30", "US2000", "NAS100", "SPX500", "DE30", "FR40",
+            "UK100", "JP225", "AU200", "HK33", "CN50",
+        )):
+            return 1.0
         return 0.0001
 
     async def get_instrument_info(self, instrument: str) -> Dict[str, Any]:

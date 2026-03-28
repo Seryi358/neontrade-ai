@@ -48,7 +48,7 @@ check("sl_management_style default 'ema'", settings.sl_management_style == "ema"
 # --- Trading hours ---
 print("\n[7.3] Trading hours")
 check("trading_start_hour default 7", settings.trading_start_hour == 7)
-check("trading_end_hour default 21", settings.trading_end_hour == 21)
+check("trading_end_hour default 22", settings.trading_end_hour == 22)
 check("close_before_friday_hour default 20", settings.close_before_friday_hour == 20)
 
 # --- Watchlists ---

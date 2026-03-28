@@ -607,7 +607,7 @@ class TestAPIEndpoints:
                     mock_settings.sl_management_style = "ema"
                     mock_settings.forex_watchlist = ["EUR_USD"]
                     mock_settings.trading_start_hour = 7
-                    mock_settings.trading_end_hour = 21
+                    mock_settings.trading_end_hour = 22
                     mock_settings.close_before_friday_hour = 20
                     mock_settings.avoid_news_minutes_before = 30
                     mock_settings.avoid_news_minutes_after = 15

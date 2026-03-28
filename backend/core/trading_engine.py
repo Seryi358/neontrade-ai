@@ -712,22 +712,31 @@ class TradingEngine:
         """
         Return (session_name, quality_score) based on current UTC hour.
 
-        High-liquidity sessions produce better setups:
-        - OVERLAP (London+NY, 12:00-16:00 UTC): 1.0
-        - LONDON (08:00-12:00 UTC): 0.9
-        - NEW_YORK (16:00-21:00 UTC): 0.8
-        - ASIAN (00:00-08:00 UTC): 0.5
-        - OFF_HOURS: 0.3
+        TradingLab mentorship (all times originally in ET, converted to UTC):
+        - SYDNEY (Australian): 5:00 PM - 2:00 AM ET → ~22:00-07:00 UTC
+        - ASIAN (Tokyo):       7:00 PM - 4:00 AM ET → ~00:00-09:00 UTC
+        - LONDON (European):   3:00 AM - 12:00 PM ET → ~08:00-17:00 UTC
+        - NEW_YORK:            8:00 AM - 5:00 PM ET → ~13:00-22:00 UTC
+        - OVERLAP (London+NY): 8:00 AM - 12:00 PM ET → ~13:00-17:00 UTC
+
+        Note: ET shifts with DST (EST=UTC-5, EDT=UTC-4). These fixed UTC
+        boundaries approximate the EDT window. During EST the actual session
+        boundaries shift ~1h later in UTC.
+
+        Quality scores reflect TradingLab guidance: overlap is peak volatility,
+        London is the most liquid session, NY carries major news impact.
         """
         hour = now.hour
-        if 12 <= hour < 16:
+        if 13 <= hour < 17:
             return ("OVERLAP", 1.0)
-        elif 8 <= hour < 12:
+        elif 8 <= hour < 13:
             return ("LONDON", 0.9)
-        elif 16 <= hour < 21:
+        elif 17 <= hour < 22:
             return ("NEW_YORK", 0.8)
         elif 0 <= hour < 8:
             return ("ASIAN", 0.5)
+        elif 22 <= hour or hour < 0:
+            return ("SYDNEY", 0.4)
         else:
             return ("OFF_HOURS", 0.3)
 
@@ -1143,8 +1152,8 @@ class TradingEngine:
                                 f"(quality={session_quality:.1f}) — not suitable for {setup.style.value}"
                             )
                             setup = None
-                    elif session_quality < 0.5:
-                        # ASIAN session: reduce risk (proxy for confidence penalty of -15 pts)
+                    elif session_quality <= 0.5:
+                        # SYDNEY/ASIAN sessions: reduce risk (proxy for confidence penalty of -15 pts)
                         setup.risk_percent *= 0.85
                         logger.info(
                             f"Reduced risk for {instrument}: {session_name} session "

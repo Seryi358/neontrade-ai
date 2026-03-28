@@ -782,7 +782,7 @@ def test_block_7_config():
 
     # Trading hours
     check("trading_start_hour 7", settings.trading_start_hour == 7)
-    check("trading_end_hour 21", settings.trading_end_hour == 21)
+    check("trading_end_hour 22", settings.trading_end_hour == 22)
     check("close_before_friday_hour 20", settings.close_before_friday_hour == 20)
 
     # Watchlist

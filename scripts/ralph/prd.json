@@ -1,0 +1,649 @@
+{
+  "projectName": "NeonTrade AI - TradingLab Full Audit & Bug Fix",
+  "branchName": "ralph/tradinglab-full-audit",
+  "description": "Auditoría exhaustiva de NeonTrade AI contra todo el material de la mentoría TradingLab (transcripciones, notas, documentos) + configuración de la app con las preferencias y recomendaciones personales de Alex Ruiz + corrección de bugs + pruebas completas. Cada story analiza una sección específica del curso, compara letra por letra con el código, y corrige discrepancias.",
+  "stories": [
+    {
+      "id": "AUDIT-001",
+      "title": "Auditar Trading Mastery - Iniciación: Introducción al trading",
+      "description": "Leer TODAS las transcripciones y notas de Trading Mastery/01_Iniciación/03_Introducción al trading (9 lecciones: Qué es el trading, AT vs AF, Inversión vs Trading, Activos, Sesiones de mercado, Instrumentos, Estilos de trading, Unidades de medida, TP/SL/BE). Comparar cada concepto mencionado con la implementación en el código (config.py, trading_engine.py, etc). Corregir cualquier discrepancia encontrada.",
+      "acceptanceCriteria": [
+        "Todas las 9 transcripciones de 01_Iniciación/03_Introducción al trading leídas y comparadas",
+        "Sesiones de mercado en config.py coinciden exactamente con lo descrito en la clase",
+        "Estilos de trading (swing, day, scalping) implementados como dice la mentoría",
+        "Unidades de medida (pips, puntos, ticks) calculadas correctamente",
+        "TP, SL y BE implementados según las definiciones de la clase"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-002",
+      "title": "Auditar Trading Mastery - Iniciación: Calendario económico",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/01_Iniciación/05_Calendario económico (4 lecciones: Qué son las noticias, Noticias más importantes, Cómo afecta a cada estilo, Páginas web). Comparar con news_filter.py y economic_calendar.py. Las ventanas de bloqueo por noticias deben coincidir EXACTAMENTE con lo que dice Alex Ruiz para cada estilo.",
+      "acceptanceCriteria": [
+        "Todas las 4 transcripciones de calendario económico leídas",
+        "Lista de noticias importantes coincide con lo enseñado (FOMC, ECB, NFP, CPI, GDP, Interest Rates)",
+        "Ventanas de bloqueo por estilo (scalping ±60min, day -30/+15, swing -15/+5) verificadas contra transcripción",
+        "Fuentes de calendario (FairEconomy/ForexFactory) correctas"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-003",
+      "title": "Auditar Trading Mastery - Básico: Análisis técnico básico",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/02_Básico/03_Análisis técnico básico (6 lecciones: Base Price Action, Formaciones de velas, Patrones, Diferencia patrones PA vs velas, Soportes y Resistencias, Aceleración/desaceleración/consolidación). Comparar con market_analyzer.py y chart_patterns.py. Cada patrón mencionado debe estar implementado.",
+      "acceptanceCriteria": [
+        "Todas las 6 transcripciones leídas y comparadas",
+        "Formaciones de velas detectadas coinciden con las enseñadas",
+        "Patrones de price action implementados según la clase",
+        "Soportes y resistencias calculados como explica Alex Ruiz",
+        "Aceleración/desaceleración/consolidación detectados correctamente"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-004",
+      "title": "Auditar Trading Mastery - Básico: Fibonacci y Ondas de Elliott",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/02_Básico/04_Análisis técnico avanzado (3 lecciones: Qué es Fibonacci, Teoría de Ondas de Elliott, Fibonacci aplicado a Elliott). Comparar niveles de Fibonacci (retrocesos y extensiones) y fases de Elliott con market_analyzer.py. Deben coincidir EXACTAMENTE.",
+      "acceptanceCriteria": [
+        "Niveles Fibonacci (0.382, 0.5, 0.618, extensiones 1.272, 1.618) verificados contra transcripción",
+        "Fases de Elliott (impulso 1-5, correctivas ABC) implementadas como en la clase",
+        "Fibonacci aplicado a Elliott (retrocesos en ondas 2,4, extensiones en 3,5) correcto",
+        "Código coincide letra por letra con la teoría explicada"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-005",
+      "title": "Auditar Trading Mastery - Básico: Indicadores",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/02_Básico/05_Indicadores (8 lecciones: Introducción, EMA, RSI, MACD, PIVOT, VOLUMEN, Sesiones, Resumen layout). Comparar cada indicador con su implementación en market_analyzer.py. Parámetros, períodos y uso deben coincidir.",
+      "acceptanceCriteria": [
+        "EMA 50 configurada y usada exactamente como en la clase",
+        "RSI período y niveles (sobrecompra/sobreventa) coinciden",
+        "MACD parámetros coinciden con los enseñados",
+        "Pivot points calculados según la explicación",
+        "Volumen analizado como describe Alex Ruiz",
+        "Layout de indicadores en la app refleja lo del resumen"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-006",
+      "title": "Auditar Trading Mastery - Intermedio: MTFA (Multi-Timeframe Analysis)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/02_MTFA (6 lecciones: Layout, Tendencia, Patrones MTFA, Formaciones MTFA, Aceleración/Desaceleración MTFA, Elliott y MTFA). Comparar jerarquía de timeframes y análisis multi-temporal con market_analyzer.py.",
+      "acceptanceCriteria": [
+        "Jerarquía de timeframes (W→D→H4→H1→M15→M5→M1) coincide con la clase",
+        "Detección de tendencia en múltiples timeframes implementada correctamente",
+        "Patrones MTFA reconocidos según la mentoría",
+        "Convergencia HTF/LTF implementada como explica Alex Ruiz",
+        "Elliott aplicado en contexto MTFA correcto"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-007",
+      "title": "Auditar Estrategia BLUE (Day + Swing)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/03_Estrategias (lecciones 02-04: Introducción Blue, Blue Day, Blue Swing). Comparar CADA regla, condición de entrada, SL, TP, variantes A/B/C con la implementación en strategies/. Debe ser 100% idéntico.",
+      "acceptanceCriteria": [
+        "Transcripciones de Blue Intro, Blue Day, Blue Swing leídas completamente",
+        "3 variantes (A/B/C) implementadas exactamente como en la clase",
+        "Condiciones HTF (EMA 50 1H break) verificadas",
+        "Condiciones LTF de entrada coinciden",
+        "SL placement correcto según cada variante",
+        "TP levels y R:R mínimo (2.0:1) verificados",
+        "Confianza mínima configurada como dice la clase"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-008",
+      "title": "Auditar Estrategia RED (Day + Swing)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/03_Estrategias (lecciones 05-07: Introducción Red, Red Day, Red Swing). Comparar regla de AMBAS EMA 50 (1H+4H) rotas, convergencia HTF/LTF.",
+      "acceptanceCriteria": [
+        "Transcripciones de Red Intro, Red Day, Red Swing leídas",
+        "Condición: AMBAS EMA 50 1H Y 4H deben estar rotas - verificado",
+        "Convergencia HTF/LTF implementada según la clase",
+        "SL, TP, R:R correcto para Red",
+        "Diferencia entre Red Day y Red Swing correcta"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-009",
+      "title": "Auditar Estrategia PINK (Day + Swing)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/03_Estrategias (lecciones 08-10: Introducción Pink, Pink Day, Pink Swing). Pink es correctiva (Elliott 4→5), EMA 1H rota pero 4H NO.",
+      "acceptanceCriteria": [
+        "Transcripciones de Pink Intro, Pink Day, Pink Swing leídas",
+        "Condición correctiva (Elliott 4→5) implementada",
+        "Regla: EMA 1H rota pero 4H NO rota - verificada",
+        "Sin canales (channel restriction) implementado",
+        "R:R mínimo 1.5:1 verificado",
+        "Confianza mínima correcta"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-010",
+      "title": "Auditar Estrategia WHITE (Day + Swing)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/03_Estrategias (lecciones 11-13: Introducción White, White Day, White Swing). White es post-Pink continuation.",
+      "acceptanceCriteria": [
+        "Transcripciones de White Intro, White Day, White Swing leídas",
+        "Validación de patrón Pink previo implementada",
+        "Reglas similares a Blue pero con validación Pink verificadas",
+        "SL, TP, R:R correcto para White"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-011",
+      "title": "Auditar Estrategia BLACK (Day + Swing)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/03_Estrategias (lecciones 14-16: Introducción Black, Black Day, Black Swing). Black es counter-trend (Elliott onda 1), requiere RSI divergencia H4.",
+      "acceptanceCriteria": [
+        "Transcripciones de Black Intro, Black Day, Black Swing leídas",
+        "Counter-trend (Elliott onda 1) implementado",
+        "RSI divergencia H4 requerida - verificado",
+        "Daily S/R como confluencia verificado",
+        "SLs más ajustados que otras estrategias verificado",
+        "R:R mínimo 2.0:1 y confianza 60% verificados"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-012",
+      "title": "Auditar Estrategia GREEN (Day + Swing - Solo Crypto)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/03_Estrategias (lecciones 17-18: Introducción Green, Green Day Swing) Y TAMBIÉN Esp. Criptomonedas/01_Contenido/09_Estrategia de trading (8 lecciones completas sobre Green). Comparar ambas fuentes con la implementación.",
+      "acceptanceCriteria": [
+        "Transcripciones de Green en Trading Mastery leídas",
+        "TODAS las 8 transcripciones de Green en Esp. Criptomonedas leídas",
+        "Timeframe hierarchy (Weekly→Daily→15M) verificado",
+        "Solo crypto - restricción implementada",
+        "R:R potencial hasta 10:1 verificado",
+        "Green Fractal (estrategias combinadas) implementado",
+        "Reentradas efectivas implementadas según la clase",
+        "Ejemplos de la clase verificados contra la lógica"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-013",
+      "title": "Auditar Gestión Monetaria completa",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/03_Intermedio/06_Gestión monetaria (9 lecciones) + los archivos Excel (Cálculo_riesgo). Comparar regla del 1%, tamaño de posición, apalancamiento, drawdown, algoritmos de riesgo avanzados con risk_manager.py.",
+      "acceptanceCriteria": [
+        "9 transcripciones de gestión monetaria leídas",
+        "Excel de cálculo de riesgo analizado y comparado",
+        "Regla del 1% implementada exactamente",
+        "0.5% scalping, 1% day, 3% swing verificados",
+        "7% máximo riesgo simultáneo verificado",
+        "Pares correlacionados (0.75%) verificado",
+        "DrawDown management (3 métodos) verificados contra clase",
+        "Algoritmo Delta risk implementado correctamente",
+        "Cálculo de lotaje/tamaño posición correcto"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-014",
+      "title": "Auditar Manejo de la Posición (Avanzado)",
+      "description": "Leer TODAS las transcripciones de Trading Mastery/04_Avanzado/02_Manejo de la posición (8 lecciones: Intro, Run vs Pullback, Long Term, Short Term, Short Term Agresivo, SL por price action, Toma de parciales, Reentradas). Comparar con position_manager.py.",
+      "acceptanceCriteria": [
+        "8 transcripciones de manejo de posición leídas",
+        "5 fases (INITIAL→SL_MOVED→BREAK_EVEN→TRAILING→AGGRESSIVE) verificadas",
+        "3 estilos LP/CP/CPA implementados según clase",
+        "Run vs Pullback diferenciados correctamente",
+        "SL por price action implementado",
+        "Toma de parciales según la clase",
+        "Reentradas implementadas correctamente",
+        "EMAs usadas por cada estilo/timeframe coinciden"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-015",
+      "title": "Auditar Trading Plan y Journaling (Documentación Avanzada)",
+      "description": "Leer transcripciones de Trading Mastery/04_Avanzado/03_Documentación (Trading Plan, Journaling, ASR, Ponencia ASR) + el PDF TradingPlan_2024.pdf. Comparar con trade_journal.py y monthly_review.py.",
+      "acceptanceCriteria": [
+        "PDF TradingPlan_2024.pdf leído y comparado",
+        "Transcripciones de documentación leídas",
+        "Trade journal registra los campos que pide la clase",
+        "Monthly review genera los reportes como indica la mentoría",
+        "ASR (análisis semanal de resultados) implementado"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-016",
+      "title": "Auditar Watchlists completas",
+      "description": "Leer transcripciones de Trading Mastery/03_Intermedio/05_Watchlist (4 lecciones) + TODOS los archivos .txt de watchlists (FOREX.txt, CRYPTO_USDT.txt, EQUITIES_IND.txt, COMMODITIES.txt, MARKET_VIEW.txt). Comparar con los instrumentos configurados en la app.",
+      "acceptanceCriteria": [
+        "4 transcripciones de watchlist leídas",
+        "FOREX.txt comparado con instrumentos forex en la app",
+        "CRYPTO_USDT.txt comparado con instrumentos crypto",
+        "EQUITIES_IND.txt comparado con equities/indices",
+        "COMMODITIES.txt comparado con commodities",
+        "MARKET_VIEW.txt comparado",
+        "Todos los instrumentos de las listas están en la app"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-017",
+      "title": "Auditar Esp. Criptomonedas: Ciclos de mercado y dominancia BTC",
+      "description": "Leer TODAS las transcripciones de Esp. Criptomonedas/01_Contenido/06_Fundamentos del trading y ciclos (6 lecciones: Importancia cripto, Diferencias con otros activos, Dominancia BTC, Relación BTC-ETH, Transición a altcoins, Halving/Bullrun/Bear). Comparar con crypto_cycle.py.",
+      "acceptanceCriteria": [
+        "6 transcripciones de ciclos cripto leídas",
+        "Dominancia BTC tracking implementada según clase",
+        "Relación BTC-ETH analizada correctamente",
+        "Detección de altcoin season según la mentoría",
+        "Fases del halving cycle correctas",
+        "BMSB implementado según la clase",
+        "Pi Cycle Top/Bottom implementado"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-018",
+      "title": "Auditar Esp. Criptomonedas: Indicadores cripto específicos",
+      "description": "Leer TODAS las transcripciones de Esp. Criptomonedas/01_Contenido/08_Indicadores cripto (7 lecciones: Intro, EMA 50, EMA 8 semanal, SMA 200, RSI 14 días, BMSB SMA20+EMA21, Pi Cycle Top/Bottom). Comparar con crypto_cycle.py y market_analyzer.py.",
+      "acceptanceCriteria": [
+        "7 transcripciones de indicadores cripto leídas",
+        "EMA 50 en cripto configurada como dice la clase",
+        "EMA 8 semanal implementada",
+        "SMA 200 en cripto verificada",
+        "RSI 14 días configurado correctamente",
+        "BMSB (SMA 20 + EMA 21) implementado exactamente",
+        "Pi Cycle Top/Bottom fórmulas correctas"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-019",
+      "title": "Auditar Esp. Criptomonedas: Gestión de posiciones cripto",
+      "description": "Leer TODAS las transcripciones de Esp. Criptomonedas/01_Contenido/10_Gestión de posiciones y riesgos (4 lecciones: Intro, LP largo plazo, CP corto plazo, CPA agresivo). Comparar gestión de posiciones cripto vs forex en position_manager.py.",
+      "acceptanceCriteria": [
+        "4 transcripciones de gestión posiciones cripto leídas",
+        "LP cripto implementado según la clase",
+        "CP cripto implementado según la clase",
+        "CPA cripto implementado según la clase",
+        "Diferencias entre gestión cripto y forex correctas"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-020",
+      "title": "Auditar Workshop de Scalping completo",
+      "description": "Leer TODAS las transcripciones de Workshop de Scalping/01_Contenido (6 lecciones: Introducción, Comparativa layout, Gráfico horario, Estrategia RED scalping, Gestión posición, Tipos de órdenes). Comparar con scalping_engine.py.",
+      "acceptanceCriteria": [
+        "6 transcripciones del workshop de scalping leídas",
+        "Layout scalping (H1→M15→M5→M1) implementado",
+        "Estrategia RED adaptada a scalping verificada",
+        "3 métodos de salida (Fixed TP, Fast, Slow) implementados",
+        "0.5% riesgo por trade y 5% DD diario verificados",
+        "Tipos de órdenes para scalping implementados"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-021",
+      "title": "Auditar Workshop de Smart Money Concepts completo",
+      "description": "Leer TODAS las transcripciones de Workshop de Smart Money Concepts/01_Contenido (11 lecciones: Intro, Disclaimer, Liquidez, BOS&CHOCH, Premium&Discount, FVG, Order Block, Breaker Block, Mitigation Block, Power of Three & AMD, SMT). Comparar con market_analyzer.py y chart_patterns.py.",
+      "acceptanceCriteria": [
+        "11 transcripciones de SMC leídas completamente",
+        "Liquidez (sweeps, pools) implementada según la clase",
+        "BOS & CHOCH detección correcta",
+        "Premium & Discount zones implementadas",
+        "FVG (Fair Value Gaps) detectados correctamente",
+        "Order Blocks implementados según la clase",
+        "Breaker Blocks implementados",
+        "Mitigation Blocks implementados",
+        "Power of Three & AMD implementado",
+        "SMT (Smart Money Technique) implementado"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-022",
+      "title": "Auditar Workshop de Cuentas Fondeadas",
+      "description": "Leer TODAS las transcripciones de Workshop de Cuentas Fondeadas/01_Contenido (7 lecciones). Verificar si la app contempla reglas de cuentas fondeadas (límites de DD, reglas especiales).",
+      "acceptanceCriteria": [
+        "7 transcripciones del workshop leídas",
+        "Si aplica: reglas de cuentas fondeadas (DD limits) configurables en la app",
+        "Consejos de la clase reflejados en la configuración de riesgo"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-023",
+      "title": "Auditar Backtesting (Básico I, II y Avanzado)",
+      "description": "Leer TODAS las transcripciones de backtesting: 02_Básico/02_Backtesting básico I (3 lecciones), 02_Básico/06_Backtesting básico II (2 lecciones), 03_Intermedio/04_Backtesting avanzado (2 lecciones). Comparar con backtester.py.",
+      "acceptanceCriteria": [
+        "7 transcripciones de backtesting leídas",
+        "Backtester implementa metodología de la clase",
+        "Métricas de backtesting coinciden con lo enseñado",
+        "Backtesting avanzado con las 6 estrategias de colores"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-024",
+      "title": "Segunda pasada: Re-auditar TODAS las estrategias de colores",
+      "description": "Segunda revisión completa de las 6 estrategias. Releer las transcripciones de BLUE, RED, PINK, WHITE, BLACK, GREEN y comparar de nuevo. Buscar discrepancias que se hayan pasado en la primera pasada. Comparar constantes, umbrales, condiciones exactas.",
+      "acceptanceCriteria": [
+        "Releer todas las transcripciones de estrategias (18 lecciones)",
+        "Verificar que las correcciones de la primera pasada son correctas",
+        "Buscar discrepancias sutiles en umbrales, constantes, condiciones",
+        "Verificar que cada estrategia funciona end-to-end"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-025",
+      "title": "Segunda pasada: Re-auditar gestión monetaria y posiciones",
+      "description": "Segunda revisión de risk_manager.py y position_manager.py contra todas las transcripciones relevantes. Verificar edge cases y cálculos numéricos.",
+      "acceptanceCriteria": [
+        "Releer transcripciones de gestión monetaria (9 lecciones)",
+        "Releer transcripciones de manejo posición (8 lecciones)",
+        "Verificar cálculos numéricos con el Excel de riesgo",
+        "Edge cases verificados (ej: múltiples posiciones abiertas, pares correlacionados)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "AUDIT-026",
+      "title": "Tercera pasada: Auditoría cruzada entre módulos",
+      "description": "Verificar que la comunicación entre módulos es correcta: trading_engine.py llama a market_analyzer con los parámetros correctos, risk_manager valida antes de ejecutar, position_manager recibe los datos correctos, etc.",
+      "acceptanceCriteria": [
+        "Flujo trading_engine → market_analyzer verificado",
+        "Flujo trading_engine → strategies verificado",
+        "Flujo trading_engine → risk_manager verificado",
+        "Flujo trading_engine → position_manager verificado",
+        "Flujo trading_engine → news_filter verificado",
+        "Flujo trading_engine → openai_analyzer verificado",
+        "Datos pasados entre módulos son consistentes"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-001",
+      "title": "Configurar estilo de trading por defecto como Day Trading (como opera Alex)",
+      "description": "Alex Ruiz dice explícitamente que su estilo preferido es Day Trading. La app debe venir configurada por defecto con Day Trading como estilo principal. Leer transcripción de Trading Mastery/01_Iniciación/03_Introducción al trading/07_Estilos de trading/transcripcion.txt donde Alex explica por qué prefiere day trading. Configurar config.py con: timeframe direccional = Daily (1D), análisis = H4, entrada/gestión = H1, ejecución = M5.",
+      "acceptanceCriteria": [
+        "Estilo por defecto en config.py es DAY_TRADING",
+        "Timeframes configurados: Directional=1D, Analysis=H4, Entry/Management=1H, Execution=5M",
+        "Transcripción de estilos de trading leída para verificar exactitud",
+        "El usuario puede cambiar el estilo pero el default es Day Trading como Alex"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-002",
+      "title": "Configurar gestión de posición por defecto con preferencias de Alex",
+      "description": "Alex prefiere salir rápido, NO usa toma de parciales. Dice: 'en el momento en que el precio llega al máximo o mínimo anterior, me voy, cierro'. Leer transcripciones de Trading Mastery/04_Avanzado/02_Manejo de la posición/03_Long Term, 04_Short Term, 05_Short term agresivo. Configurar position_manager con: salida rápida como opción por defecto, sin parciales, BE al 1% de profit, LP usa EMA 50 en H1, CP usa EMA 50 en M5, CPA usa gráfico de 2 minutos.",
+      "acceptanceCriteria": [
+        "Modo de salida por defecto: rápida (al máximo/mínimo anterior)",
+        "Toma de parciales desactivada por defecto (opción disponible pero off)",
+        "Break Even se activa al 1% de profit como recomienda Alex",
+        "LP Day Trading: EMA 50 en H1 para trailing",
+        "CP Day Trading: EMA 50 en M5 para trailing",
+        "CPA: gráfico de 2 minutos para gestión agresiva",
+        "CPA se usa en: doble techo/suelo, antes de noticias, fin de semana, indecisión"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-003",
+      "title": "Configurar risk management con valores exactos de Alex",
+      "description": "Alex usa 1% de riesgo por trade, R:R entre 1.5:1 y 2.5:1, y la fórmula exacta: Risk $ ÷ % Distancia al SL × 100 = Tamaño posición. Leer transcripción de Trading Mastery/03_Intermedio/06_Gestión monetaria/03_Regla del 1%. El SL se mueve: primero a 50% del riesgo cuando el precio se mueve a favor, luego a BE al 1%, luego con EMA.",
+      "acceptanceCriteria": [
+        "Riesgo por defecto: 1% por trade",
+        "R:R target: 1.5:1 a 2.5:1 (Alex prefiere 1.5:1 mínimo)",
+        "Fórmula de position sizing implementada exactamente",
+        "SL progression: Original → 50% riesgo → BE al 1% → EMA trailing",
+        "Win rate target de referencia: 30% (con R:R adecuado es rentable)",
+        "Mínimo 100 trades antes de juzgar el sistema"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-004",
+      "title": "Configurar watchlists exactas de Alex Ruiz",
+      "description": "Leer TODOS los archivos de watchlist en Trading Mastery/03_Intermedio/05_Watchlist/ (FOREX.txt, CRYPTO_USDT.txt, EQUITIES_IND.txt, COMMODITIES.txt, MARKET_VIEW.txt) y configurar la app con EXACTAMENTE los mismos instrumentos. Forex: EURUSD, GBPUSD, AUDUSD, NZDUSD, USDCAD, USDCHF, EURGBP, EURCHF, EURJPY, CADJPY, GBPJPY. Crypto: BTCUSDT, ETHUSDT, BNBUSDT, ADAUSDT, SOLUSDT, XRPUSDT, DOGEUSDT, AVAXUSDT. Plus equities, indices y commodities de los archivos.",
+      "acceptanceCriteria": [
+        "FOREX.txt leído y todos los pares configurados en la app",
+        "CRYPTO_USDT.txt leído y todos los pares configurados",
+        "EQUITIES_IND.txt leído y todos los instrumentos configurados",
+        "COMMODITIES.txt leído y todos los instrumentos configurados",
+        "MARKET_VIEW.txt leído e integrado",
+        "Watchlist por defecto de la app coincide 100% con los archivos de Alex",
+        "Los instrumentos están organizados por categoría como Alex los tiene"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-005",
+      "title": "Configurar sesiones de trading y horarios como Alex",
+      "description": "Alex opera en sesión de Londres + New York. Para Day Trading se levanta por la mañana, hace su lista de seguimiento, se pone alertas, y ejecuta cuando saltan. Configurar horarios de trading, sistema de alertas, y rutina diaria automatizada como describe Alex.",
+      "acceptanceCriteria": [
+        "Sesiones London + NY configuradas como horario principal",
+        "Sistema de alertas automáticas cuando se detecta setup",
+        "Rutina matutina: scan de watchlist al abrir sesión",
+        "No trading fuera de sesiones configuradas",
+        "Viernes: cierre antes de las 20:00 UTC, sin nuevos trades después de 18:00 UTC"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-006",
+      "title": "Configurar manejo de noticias económicas como Alex",
+      "description": "Alex para Day Trading recomienda usar break-evens antes de noticias de alto impacto pero mejor evitarlas. Para Swing puede ejecutar con cautela. Leer Trading Mastery/01_Iniciación/05_Calendario económico/03_Cómo afecta a cada estilo. Configurar news_filter.py con las reglas exactas de Alex.",
+      "acceptanceCriteria": [
+        "Transcripción de calendario económico releída para extraer reglas exactas de Alex",
+        "Scalping: pausa total ±60 minutos en noticias alto impacto",
+        "Day Trading: mover a BE si hay posición, no abrir nuevas -30/+15 min",
+        "Swing: puede ejecutar con cautela -15/+5 min",
+        "Noticias críticas según Alex: FOMC, ECB, NFP, CPI, GDP, tipos de interés"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-007",
+      "title": "Configurar AI system prompt con la personalidad y estilo de Alex",
+      "description": "El prompt del sistema para GPT-4 (openai_analyzer.py) debe reflejar EXACTAMENTE cómo piensa y opera Alex. Incluir: preferencia por salidas rápidas, R:R de 1.5-2.5, conservación del capital primero, no parciales, BE al 1%, CPA en situaciones específicas. El AI debe validar trades como lo haría Alex.",
+      "acceptanceCriteria": [
+        "System prompt de GPT-4 actualizado con estilo de Alex",
+        "AI valida R:R como Alex (acepta 1.5:1, ideal 2:1+)",
+        "AI prioriza conservación de capital como Alex",
+        "AI recomienda salida rápida en situaciones de indecisión",
+        "AI sugiere CPA cuando detecta doble techo/suelo, noticias cercanas, fin de semana",
+        "Explicaciones en español como Alex las daría"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-008",
+      "title": "Crear perfil 'Alex Mode' como preset de configuración",
+      "description": "Crear un preset/perfil llamado 'Alex Mode' o 'TradingLab Recommended' que configure TODO automáticamente con las preferencias de Alex: Day Trading, 1% riesgo, salida rápida, sin parciales, BE al 1%, watchlists de Alex, horarios London+NY. El usuario puede seleccionar este perfil desde Settings.",
+      "acceptanceCriteria": [
+        "Perfil 'TradingLab Recommended' creado como preset",
+        "Al seleccionarlo configura: estilo Day Trading",
+        "Riesgo 1%, R:R min 1.5:1",
+        "Salida rápida, sin parciales, BE al 1%",
+        "Watchlists completas de Alex",
+        "Horarios London+NY",
+        "LP como gestión por defecto, CP y CPA disponibles",
+        "Perfil accesible desde la pantalla de Settings",
+        "También crear perfil 'Conservative' para principiantes (swing, menos riesgo)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-009",
+      "title": "Configurar journaling y ASR como Alex recomienda",
+      "description": "Alex recomienda journaling obligatorio con screenshots, análisis, método de ejecución. También recomienda ASR (Auto Self Review) para analizar cada trade. Leer Trading Mastery/04_Avanzado/03_Documentación/. El trade_journal.py debe registrar EXACTAMENTE los campos que Alex pide.",
+      "acceptanceCriteria": [
+        "Transcripciones de Documentación leídas",
+        "Journal registra: screenshot, análisis pre-trade, estrategia usada, método ejecución",
+        "ASR implementado: análisis de errores, factores emocionales, calidad de ejecución",
+        "Monthly review incluye estadísticas como Alex las pide",
+        "Campos del journal coinciden con el Trading Plan PDF"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ALEX-010",
+      "title": "Implementar recovery mathematics de Alex en el dashboard",
+      "description": "Alex enseña las matemáticas de recuperación: -10% necesita +11.1%, -20% necesita +25%, -50% necesita +100%. Esto debe mostrarse en el dashboard cuando hay drawdown. También configurar alerta cuando el drawdown supera niveles críticos.",
+      "acceptanceCriteria": [
+        "Dashboard muestra % de recuperación necesario cuando hay DD",
+        "Tabla de recovery math: 10%→11.1%, 20%→25%, 30%→42.8%, 50%→100%",
+        "Alerta automática cuando DD supera 5%, 10%, 15%",
+        "Visualización clara del DD actual vs máximo permitido",
+        "El usuario entiende cuánto necesita recuperar"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-001",
+      "title": "Pruebas unitarias de TODAS las estrategias",
+      "description": "Ejecutar TODOS los tests existentes. Si fallan, corregir. Crear tests faltantes para cada estrategia de color. Verificar que cada test cubre los acceptance criteria de la mentoría.",
+      "acceptanceCriteria": [
+        "Todos los tests existentes pasan (0 failures)",
+        "Tests para BLUE strategy (variantes A/B/C, day/swing)",
+        "Tests para RED strategy (day/swing)",
+        "Tests para PINK strategy (day/swing)",
+        "Tests para WHITE strategy (day/swing)",
+        "Tests para BLACK strategy (day/swing)",
+        "Tests para GREEN strategy (day/swing, crypto only)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-002",
+      "title": "Pruebas unitarias de risk_manager y position_manager",
+      "description": "Tests exhaustivos del cálculo de riesgo y manejo de posiciones. Verificar edge cases: múltiples posiciones, drawdown, pares correlacionados, transición entre fases.",
+      "acceptanceCriteria": [
+        "Tests de regla del 1% con diferentes balances",
+        "Tests de lotaje/tamaño posición",
+        "Tests de drawdown (3 métodos)",
+        "Tests de pares correlacionados",
+        "Tests de transición entre fases (INITIAL→AGGRESSIVE)",
+        "Tests de LP, CP, CPA",
+        "Tests de break even automático",
+        "Todos los tests pasan"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-003",
+      "title": "Pruebas de integración del trading engine",
+      "description": "Tests end-to-end: simular un ciclo completo de scan → detección → validación → ejecución → manejo posición → cierre. Para cada estrategia de color.",
+      "acceptanceCriteria": [
+        "Test E2E para ciclo BLUE completo",
+        "Test E2E para ciclo RED completo",
+        "Test E2E para ciclo PINK completo",
+        "Test E2E para ciclo WHITE completo",
+        "Test E2E para ciclo BLACK completo",
+        "Test E2E para ciclo GREEN completo",
+        "Tests de news filter blocking",
+        "Tests de AI validation flow",
+        "Todos los tests pasan"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-004",
+      "title": "Pruebas del módulo crypto",
+      "description": "Tests para crypto_cycle.py: dominancia BTC, altcoin season, halving phases, BMSB, Pi Cycle. Tests para Green strategy en contexto crypto.",
+      "acceptanceCriteria": [
+        "Tests de dominancia BTC",
+        "Tests de detección altcoin season",
+        "Tests de fases halving",
+        "Tests de BMSB",
+        "Tests de Pi Cycle Top/Bottom",
+        "Tests de Green strategy con datos crypto reales",
+        "Todos los tests pasan"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-005",
+      "title": "Pruebas de API y WebSocket",
+      "description": "Tests de todos los endpoints de api/routes.py. Tests de conexión WebSocket. Tests de notificaciones (Telegram, Discord, Email).",
+      "acceptanceCriteria": [
+        "Todos los endpoints REST responden correctamente",
+        "WebSocket envía actualizaciones en tiempo real",
+        "Notificaciones se envían correctamente (o mock test)",
+        "Error handling correcto en todos los endpoints",
+        "Todos los tests pasan"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-006",
+      "title": "Pruebas del frontend",
+      "description": "Verificar que las 8 pantallas del frontend renderizan correctamente. Verificar conexión WebSocket frontend→backend. Verificar que los datos se muestran correctamente.",
+      "acceptanceCriteria": [
+        "Dashboard muestra datos correctos",
+        "Analysis screen muestra análisis correctos",
+        "Chart screen renderiza gráficos",
+        "Journal screen muestra historial",
+        "Manual mode muestra cola de setups",
+        "Settings screen guarda configuración",
+        "History screen filtra correctamente",
+        "Watchlist screen muestra instrumentos"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-007",
+      "title": "Segunda ronda de bug hunting",
+      "description": "Ejecutar TODOS los tests de nuevo. Buscar bugs en edge cases: qué pasa sin conexión a broker, con datos incompletos, con múltiples trades simultáneos, en horarios fuera de sesión, viernes cerca del cierre.",
+      "acceptanceCriteria": [
+        "Test: sin conexión a broker (circuit breaker funciona)",
+        "Test: datos de mercado incompletos (graceful handling)",
+        "Test: múltiples trades simultáneos (risk limit respetado)",
+        "Test: fuera de horario de trading (no ejecuta)",
+        "Test: viernes antes del cierre (cierra posiciones)",
+        "TODOS los tests pasan sin excepciones"
+      ],
+      "passes": false
+    },
+    {
+      "id": "BUGFIX-008",
+      "title": "Tercera ronda de verificación completa",
+      "description": "Correr TODA la suite de tests una vez más. Verificar que no hay regresiones. Linting y type checking sin errores.",
+      "acceptanceCriteria": [
+        "pytest ejecuta sin failures",
+        "Linting sin errores",
+        "Type checking sin errores",
+        "No hay warnings críticos",
+        "Código limpio y funcional"
+      ],
+      "passes": false
+    },
+    {
+      "id": "DEPLOY-001",
+      "title": "Verificar Docker y preparar para deploy",
+      "description": "Verificar que docker-compose.yml y Dockerfile están correctos. Build exitoso. Verificar que la app arranca correctamente en Docker.",
+      "acceptanceCriteria": [
+        "docker build exitoso",
+        "docker-compose up arranca sin errores",
+        "Backend responde en el puerto configurado",
+        "Frontend se sirve correctamente",
+        "Logs sin errores al arrancar"
+      ],
+      "passes": false
+    },
+    {
+      "id": "DEPLOY-002",
+      "title": "Push a GitHub",
+      "description": "Asegurar que el repo está limpio, sin secretos expuestos. Push del branch ralph/tradinglab-full-audit a GitHub. Crear PR hacia main.",
+      "acceptanceCriteria": [
+        "No hay secretos/API keys en el código (.env en .gitignore)",
+        "Todos los cambios commiteados",
+        "Push exitoso a GitHub",
+        "PR creado con resumen de todos los cambios"
+      ],
+      "passes": false
+    }
+  ]
+}

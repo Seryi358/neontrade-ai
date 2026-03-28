@@ -296,7 +296,7 @@ async def run_tests():
         (settings.scalping_enabled == False, "Scalping disabled"),
         (settings.funded_account_mode == False, "Funded mode disabled"),
         (settings.trading_start_hour == 7, "London open 07:00"),
-        (settings.trading_end_hour == 21, "NY close 21:00"),
+        (settings.trading_end_hour == 22, "NY close 22:00"),
         (settings.close_before_friday_hour == 20, "Friday close 20:00"),
         (settings.avoid_news_minutes_before == 30, "News 30m before"),
         (settings.avoid_news_minutes_after == 15, "News 15m after"),

@@ -179,7 +179,7 @@
         "Algoritmo Delta risk implementado correctamente",
         "Cálculo de lotaje/tamaño posición correcto"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-014",

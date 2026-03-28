@@ -343,3 +343,36 @@ Started: vie 27 mar 2026 21:45:20 -05
   - The 4H chart is optional in GREEN — only D, 1H, 15M are mandatory: "estos 3 gráficos 100% tienen que estar"
   - Code uses M5 EMA as proxy for M2 execution (Day Trading) since brokers typically don't provide M2 data — acceptable workaround
 ---
+
+## 2026-03-28 - AUDIT-013
+- **What was implemented:** Audited all 9 transcriptions from Trading Mastery/03_Intermedio/06_Gestión monetaria + the Excel calculator (Cálculo_riesgo_Forex_acciones_índices.xlsx) against risk_manager.py and config.py. No discrepancies found — code already matches mentorship exactly.
+- **Files changed:** None — code already matches mentorship exactly
+- **Audit findings (all pass):**
+  - Lesson 1 (Intro): Conceptual — defines monetary management vs position management. No code rules. ✅ N/A
+  - Lesson 2 (Order Types): Market, Stop, Limit supported in TradeRisk dataclass (entry_type field). Alex notes Blue/Red/White can use Limit, Pink/Black cannot. Strategy-level enforcement is in strategies/base.py, not risk_manager ✅
+  - Lesson 3 (Rule of 1%): `risk_day_trading = 0.01` ✅. Recovery math table (-10%→+11.1%, -20%→+25%, -50%→+100%) is dashboard display (ALEX-010 story). Alex's benchmark: 1% risk + 2.5:1 R:R + 30% win rate ≈ breakeven ✅
+  - Lesson 4 (Position Size & Leverage): Formula `Risk$ / SL_distance% × 100`. Code: `units = risk_amount / sl_distance` — equivalent when using absolute price distance. Verified with Alex's example: $10 / 4.17% = 240 USDT position size ✅
+  - Lesson 5 (Capital Distribution): Portfolio allocation 10% crypto / 20% stocks / 70% trading — conceptual, not bot code ✅ N/A
+  - Lesson 6 (Template): Journaling numeric template with auto-calculated fields (win rate, drawdown, acumulado) — relates to trade_journal.py (AUDIT-015) ✅ N/A
+  - Lesson 7 (Drawdown): Three methods correctly implemented ✅:
+    - Fixed 1%: `drawdown_method = "fixed_1pct"` — always base risk ✅
+    - Variable: `"variable"` — uses win_rate × base_risk × multiplier at DD levels ✅
+    - Fixed levels: `"fixed_levels"` — step-down: 1% → 0.75% at -5% DD → 0.50% at -7.5% → 0.25% at -10% ✅
+  - Lesson 8 (Delta Algorithm): Delta parameter 0.20-0.90, 0.60 recommended ✅. Progression: 1% → 1.5% → 2.0% → 3.0% ✅. Resets on losing trade ✅. `delta_enabled = False` by default (correct — Alex says beginners use fixed 1%) ✅
+  - Lesson 9 (Lotaje Calculator): Excel provides calculators for stocks (Nº Acciones = Risk$/Diff), forex (units = Risk$/SL_pips, lots = units/100K), commodities (contracts). Code's `calculate_position_size()` uses same formula ✅
+  - Config verification: `risk_scalping=0.005` (0.5%), `risk_day_trading=0.01` (1%), `risk_swing=0.03` (3%) ✅
+  - `max_total_risk=0.07` (7% max simultaneous risk) ✅
+  - `correlated_risk_pct=0.0075` (0.75% fixed per correlated trade) ✅
+  - `min_rr_ratio=1.5`, `min_rr_black=2.0`, `min_rr_green=2.0` — matches mentorship ✅
+  - `scale_in_require_be=True` — no new trade unless BE set on existing ✅
+- **Notes:**
+  - `pip_value` is fetched in `calculate_position_size()` but never used in the calculation — dead code, not a mentorship discrepancy
+  - The 0.5%/3% risk values for scalping/swing come from Trading Plan PDF and scalping workshop, not these 9 transcriptions (which focus on 1% universal rule). Already correctly implemented from prior audit stories.
+  - Alex says delta algorithm is NOT for beginners — correctly disabled by default
+- **Learnings for future iterations:**
+  - Alex's position sizing formula: `Risk$ ÷ SL_distance% × 100 = Position Size` — this gives dollar-denominated position size, not units. Code divides by absolute price distance to get units — mathematically equivalent
+  - Order type restrictions per strategy: Limit OK for Blue/Red/White, NOT for Pink/Black (counter-trend of counter-trend). Green is "polémico"
+  - Alex's own R:R is lower than 2.5:1 because he exits quickly at prior high/low: "yo siempre voy al máximo o al mínimo anterior para salir rápido y olvidarme"
+  - The Excel calculator handles 3 asset types differently: stocks (shares), forex (lots = units/100K), commodities (contracts × units/contract)
+  - Delta algorithm uses max historical drawdown × delta parameter as the threshold per level — so the gain needed to advance depends on your worst drawdown
+---

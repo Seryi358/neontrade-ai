@@ -562,7 +562,7 @@
         "Tests de Green strategy con datos crypto reales",
         "Todos los tests pasan"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "BUGFIX-005",

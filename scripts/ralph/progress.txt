@@ -1047,3 +1047,30 @@ Started: vie 27 mar 2026 21:45:20 -05
   - `simulate_detect_and_execute()` helper replicates the exact logic of `_detect_setup()` + `_execute_setup()` — useful for unit testing without instantiating the full TradingEngine (which creates real broker connections).
   - MockBroker needs `get_open_trades()` and `get_prices_bulk()` for position manager integration.
 ---
+
+## 2026-03-28 - BUGFIX-004
+- **What was implemented:** Comprehensive pytest test suite for the crypto module (crypto_cycle.py). 71 tests covering all crypto-specific functionality.
+- **Files changed:**
+  - `backend/test_bugfix004_crypto.py` — New file with 71 tests across 14 test classes:
+    - TestCryptoMarketCycleFields: All dataclass fields exist with correct defaults
+    - TestHalvingPhase: All 4 phases (post_halving, expansion, distribution, pre_halving) with correct sentiments. Verifies pre_halving is NOT bearish. Verifies all 5 halving dates match TradingLab.
+    - TestBMSB: 2-consecutive-close confirmation logic. Warning on first close, bearish on second, reset on bullish.
+    - TestPiCycle: near_top, near_bottom, neutral, None input.
+    - TestDominanceTransition: All 5 rows of TradingLab transition table + stable/neutral cases.
+    - TestMarketPhase: Vote counting (bull_run >=2 bull, bear_market >=2 bear, accumulation, distribution). Pi Cycle 0.5 vote. BMSB warning not counted. pre_halving not counted as bear.
+    - TestDominanceAnalysis: Rising/falling/stable dominance from BTC vs ETH performance. No-broker graceful handling.
+    - TestAltcoinSeason: Requires falling dom + ETH outperforming. USDT.D rising blocks altseason. BTC.D thresholds (>50%, <40%, 40-50%).
+    - TestCapitalRotation: BTC phase on rising dom, ETH phase on falling dom + ETH outperforming.
+    - TestEMA8Weekly: Break detection on downtrend, intact on uptrend.
+    - TestRSI14Weekly: Calculation, strong uptrend high RSI, extreme triggers phase.
+    - TestCryptoTrailingEMA: EMA 50 calculation, no broker, insufficient data.
+    - TestShouldTradeCrypto: Bear market blocks, bull run allows, all warning strings (EMA8, BMSB, Pi Cycle, USDT.D, fixed TP, EMA50 value).
+    - TestGreenStrategyCrypto: Green is crypto-only, exists in strategy list, min confidence set.
+    - TestEdgeCases: None candles, broker exceptions, no-broker sync methods, close().
+  - `scripts/ralph/prd.json` — Marked BUGFIX-004 as passes: true
+- **Learnings for future iterations:**
+  - MockBroker with falsy default overrides (empty list `[]`) falls through to default candle generation — use `None` sentinel or MagicMock with explicit return values instead
+  - crypto_cycle.py methods are well-isolated: sync methods (_analyze_halving_phase, _apply_bmsb, _apply_pi_cycle, get_dominance_transition, _determine_market_phase) can be tested without async
+  - The BMSB confirmation logic tracks state on the analyzer instance (_bmsb_bearish_streak), not on the cycle object — important for multi-call test scenarios
+  - pytest-asyncio with `mode=Mode.STRICT` requires explicit `@pytest.mark.asyncio` on every async test
+---

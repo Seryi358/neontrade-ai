@@ -2,6 +2,8 @@
 Started: vie 27 mar 2026 21:45:20 -05
 
 ## Codebase Patterns
+- To test API routes, build a bare `FastAPI()` app + mount the router — do NOT use `main.app` (its lifespan starts the real engine). See `test_bugfix005_api_ws_notifications.py` for the pattern.
+- `engine.start()` and `engine.stop()` are async — always use `AsyncMock()` not `MagicMock()` when mocking them
 - `news_filter.py` has its own `TradingStyle(str, Enum)` — NOT the same as `risk_manager.TradingStyle(Enum)`. Import as `NfTradingStyle` when using `NEWS_WINDOWS`.
 - Market sessions are defined in `trading_engine.py:_get_session_quality()`, not in config.py
 - Pip values are per-broker in `broker/*_client.py:get_pip_value()` — keep all 3 clients in sync
@@ -1073,4 +1075,24 @@ Started: vie 27 mar 2026 21:45:20 -05
   - crypto_cycle.py methods are well-isolated: sync methods (_analyze_halving_phase, _apply_bmsb, _apply_pi_cycle, get_dominance_transition, _determine_market_phase) can be tested without async
   - The BMSB confirmation logic tracks state on the analyzer instance (_bmsb_bearish_streak), not on the cycle object — important for multi-call test scenarios
   - pytest-asyncio with `mode=Mode.STRICT` requires explicit `@pytest.mark.asyncio` on every async test
+---
+
+## 2026-03-28 - BUGFIX-005
+- **What was implemented:** Comprehensive test suite for API endpoints, WebSocket, and notification system
+- **Files changed:**
+  - `backend/test_bugfix005_api_ws_notifications.py` — NEW: 122 tests covering all REST endpoints, WebSocket commands, and AlertManager notifications
+  - `scripts/ralph/prd.json` — Marked BUGFIX-005 as passes: true
+- **Test coverage:**
+  - **REST API (80 tests):** All endpoints in routes.py tested — status, mode, pending-setups, positions, analysis, watchlist, account, engine control, broker, candles, price, strategies, history, risk-config, alerts, notifications, calendar, news, scalping, security, funded, journal, screenshots, profiles, monthly-review, diagnostic, weekly-review
+  - **WebSocket (7 tests):** Connect + receive initial status, approve/reject commands, subscribe, unknown action error, invalid JSON error
+  - **ConnectionManager (2 tests):** Properties, empty broadcast
+  - **AlertManager (25 tests):** Config defaults, sensitive field masking, all 4 channels (Telegram, Discord, Email, Gmail) with mocked HTTP, disabled notification types, test_channel success/failure, safe_send exception handling, high-level alert methods (trade_executed, trade_closed, setup_pending, daily_summary, position_update, engine_status, risk_alert)
+  - **Error handling (4 tests):** No-db scenarios, no-journal scenarios
+  - **Health (1 test):** /health endpoint
+- **Learnings for future iterations:**
+  - FastAPI TestClient with lifespan that starts real services requires building a separate test app — can't just patch `main.engine` because lifespan runs `engine.start()` during `__enter__`
+  - Build test apps by importing the router and mounting it on a bare FastAPI() — avoids lifespan entirely
+  - MagicMock for async methods like `engine.stop()` must use `AsyncMock`, not plain `MagicMock` (causes `TypeError: object MagicMock can't be used in 'await' expression`)
+  - FastAPI path parameters split on `/` before reaching the handler — `../../etc/passwd` in a `{filename}` param becomes just `passwd`, not a path traversal. Test special chars like `!` or spaces for regex validation tests.
+  - pytest-asyncio `mode=Mode.STRICT` requires explicit `@pytest.mark.asyncio` on each async test
 ---

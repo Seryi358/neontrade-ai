@@ -442,7 +442,7 @@
         "Swing: puede ejecutar con cautela -15/+5 min",
         "Noticias críticas según Alex: FOMC, ECB, NFP, CPI, GDP, tipos de interés"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "ALEX-007",

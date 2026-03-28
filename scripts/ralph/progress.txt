@@ -888,3 +888,18 @@ Started: vie 27 mar 2026 21:45:20 -05
   - CPA auto-trigger on Friday (`cpa_auto_on_friday_close=True`) adds an extra layer of protection beyond just closing positions
   - Session quality tiers (OVERLAP 1.0 > LONDON 0.9 > NY 0.8 > ASIAN 0.5 > SYDNEY 0.4 > OFF_HOURS 0.3) create a graduated response instead of binary open/closed
 ---
+
+## 2026-03-28 - ALEX-006
+- **What was implemented:** Verified news filter configuration against Alex's calendar económico transcriptions. All 5 acceptance criteria already implemented — no code changes needed. Previously verified in AUDIT-002.
+- **Files changed:** None — code already matches Alex's news rules exactly
+- **Audit findings (all pass):**
+  - Scalping: ±60 min total pause — `NEWS_WINDOWS[SCALPING] = (60, 60)` ✅
+  - Day Trading: no new trades -30/+15 min, move to BE — `NEWS_WINDOWS[DAY_TRADING] = (30, 15)` ✅
+  - Swing: cautious -15/+5 min — `NEWS_WINDOWS[SWING] = (15, 5)` ✅
+  - Critical news: FOMC, ECB, BOE, NFP, CPI, GDP, interest rates, unemployment rate — all in `CRITICAL_EVENT_KEYWORDS` ✅
+  - BE enforcement during news: trading_engine.py Step 0c checks `should_close_for_news()` for open positions ✅
+  - Config defaults: `avoid_news_minutes_before=30`, `avoid_news_minutes_after=15` match day trading style ✅
+- **Learnings for future iterations:**
+  - ALEX-006 overlaps entirely with AUDIT-002 — both verify the same news filter configuration
+  - The news filter has two paths: `has_upcoming_news()` blocks new setups, `should_close_for_news()` manages existing positions
+---

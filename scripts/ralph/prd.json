@@ -208,7 +208,7 @@
         "Monthly review genera los reportes como indica la mentoría",
         "ASR (análisis semanal de resultados) implementado"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-016",

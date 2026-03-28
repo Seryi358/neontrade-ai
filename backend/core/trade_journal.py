@@ -2,13 +2,22 @@
 NeonTrade AI - Trade Journal
 Implements the complete TradingLab trade tracking system from Registro de trades.xlsx.
 
-Fields tracked:
+Numeric fields (from Excel Registro_de_trades.xlsx):
 - Month, Trade #, Date, Asset, $ P/L, % P&L
 - Result classification: TP (>= +0.1%), SL (<= -0.1%), BE (between)
 - Running balance, P&L accumulated from initial capital
 - Maximum balance (peak), Drawdown %, Drawdown $
 - Winning streak tracking, Max winning streak
 - Win rate (total), Win rate excluding BE
+
+Visual journaling fields (from 04_Avanzado/03_Documentación/02_Journaling):
+- trading_style, timeframes_used, tp_price, management_notes
+- screenshots (entry + exit + "now"), trade_summary, duration_minutes
+
+ASR (Auto Self Review) fields (from 04_Avanzado/03_Documentación/03_ASR):
+- Checklist: HTF correct, LTF correct, strategy correct, SL correct,
+  TP correct, position management correct
+- Would enter again, lessons learned
 """
 
 import json
@@ -56,6 +65,10 @@ class TradeJournal:
         discretionary_notes: str = "",
         open_time: Optional[str] = None,
         sl: Optional[float] = None,
+        tp: Optional[float] = None,
+        trading_style: str = "",
+        timeframes_used: Optional[List[str]] = None,
+        duration_minutes: Optional[float] = None,
     ):
         """Record a completed trade into the journal."""
         now = datetime.now(timezone.utc)
@@ -142,6 +155,7 @@ class TradeJournal:
             "entry_price": entry_price,
             "exit_price": exit_price,
             "sl": sl,
+            "tp": tp,
             "rr_achieved": rr_achieved,
             "pnl_dollars": round(pnl_dollars, 2),
             "pnl_pct": round(pnl_pct, 4),
@@ -153,13 +167,35 @@ class TradeJournal:
             "pnl_accumulated_pct": round(pnl_accumulated_pct, 4),
             "winning_streak": self._current_winning_streak,
             "accumulator": round(self._accumulator, 6),
-            # Emotional journal fields (Psychology Manual - 3-moment journaling)
+            # ── Visual journaling fields (Documentación/02_Journaling) ───
+            # Alex: "lo mínimo es explicar el estilo, las 4 temporalidades,
+            # SL, TP, R:R, captura, gestión de la posición y resultado"
+            "trading_style": trading_style,           # scalping/day/swing
+            "timeframes_used": timeframes_used or [],  # e.g. ["D", "4H", "1H", "5M"]
+            "duration_minutes": duration_minutes,      # how long the trade lasted
+            "trade_summary": "",                       # 2-3 line written summary
+            "management_notes": "",                    # how position was managed
+            "screenshots": [],                         # paths/refs: entry, exit, "now"
+            # ── Emotional journal fields (Psychology Manual - 3-moment journaling) ──
             "emotional_notes_pre": "",    # Before/during analysis
             "emotional_notes_during": "",  # While position is open
             "emotional_notes_post": "",    # After trade closes
-            # Discretionary tracking (Trading Plan: 80% decisions from backtesting/data)
+            # ── Discretionary tracking (Trading Plan: 80% from backtesting/data) ──
             "is_discretionary": is_discretionary,
             "discretionary_notes": discretionary_notes,
+            # ── ASR fields (Documentación/03_ASR) ───────────────────────
+            # Alex: "análisis de temporalidad grande y pequeña correctos,
+            # estrategia ejecutada correctamente, SL en su sitio, TP correcto,
+            # gestión de la posición correcta, parte emocional, ¿volverías a entrar?"
+            "asr_completed": False,
+            "asr_htf_correct": None,            # Was HTF analysis correct?
+            "asr_ltf_correct": None,            # Was LTF analysis correct?
+            "asr_strategy_correct": None,       # Was strategy executed correctly?
+            "asr_sl_correct": None,             # Was SL in correct position?
+            "asr_tp_correct": None,             # Was TP in correct position?
+            "asr_management_correct": None,     # Was position managed correctly?
+            "asr_would_enter_again": None,      # Would you enter again?
+            "asr_lessons": "",                  # Lessons/comments/points to note
         }
 
         self._trades.append(trade_record)
@@ -368,6 +404,128 @@ class TradeJournal:
         logger.warning(f"Trade {trade_id} not found for discretionary marking")
         return False
 
+    # ── Journal Notes Update ────────────────────────────────────────
+
+    def update_journal_notes(
+        self,
+        trade_id: str,
+        trade_summary: Optional[str] = None,
+        management_notes: Optional[str] = None,
+        screenshots: Optional[List[str]] = None,
+        emotional_notes_pre: Optional[str] = None,
+        emotional_notes_during: Optional[str] = None,
+        emotional_notes_post: Optional[str] = None,
+    ) -> bool:
+        """Update visual journaling notes for a trade.
+
+        Per TradingLab Journaling lesson: notes should be written ASAP
+        after the trade to avoid emotional bias. Screenshots should include
+        entry, exit, and optionally a "now" view for ASR context.
+        """
+        for trade in self._trades:
+            if trade["trade_id"] == trade_id:
+                if trade_summary is not None:
+                    trade["trade_summary"] = trade_summary
+                if management_notes is not None:
+                    trade["management_notes"] = management_notes
+                if screenshots is not None:
+                    trade["screenshots"] = screenshots
+                if emotional_notes_pre is not None:
+                    trade["emotional_notes_pre"] = emotional_notes_pre
+                if emotional_notes_during is not None:
+                    trade["emotional_notes_during"] = emotional_notes_during
+                if emotional_notes_post is not None:
+                    trade["emotional_notes_post"] = emotional_notes_post
+                self._save()
+                logger.info(f"Journal notes updated for trade {trade_id}")
+                return True
+        logger.warning(f"Trade {trade_id} not found for journal notes update")
+        return False
+
+    # ── ASR (Auto Self Review) ────────────────────────────────────
+
+    def update_asr(
+        self,
+        trade_id: str,
+        htf_correct: Optional[bool] = None,
+        ltf_correct: Optional[bool] = None,
+        strategy_correct: Optional[bool] = None,
+        sl_correct: Optional[bool] = None,
+        tp_correct: Optional[bool] = None,
+        management_correct: Optional[bool] = None,
+        would_enter_again: Optional[bool] = None,
+        lessons: Optional[str] = None,
+    ) -> bool:
+        """Fill in the ASR (Auto Self Review) checklist for a completed trade.
+
+        Per TradingLab ASR lesson: should be done with emotional distance
+        (not immediately after the trade). Evaluates execution quality
+        AGAINST the trading plan, not against the trade result.
+
+        Alex: "correcto o incorrecto no viene relacionado con el resultado
+        del trade, viene relacionado con vuestro plan de trading"
+        """
+        for trade in self._trades:
+            if trade["trade_id"] == trade_id:
+                if htf_correct is not None:
+                    trade["asr_htf_correct"] = htf_correct
+                if ltf_correct is not None:
+                    trade["asr_ltf_correct"] = ltf_correct
+                if strategy_correct is not None:
+                    trade["asr_strategy_correct"] = strategy_correct
+                if sl_correct is not None:
+                    trade["asr_sl_correct"] = sl_correct
+                if tp_correct is not None:
+                    trade["asr_tp_correct"] = tp_correct
+                if management_correct is not None:
+                    trade["asr_management_correct"] = management_correct
+                if would_enter_again is not None:
+                    trade["asr_would_enter_again"] = would_enter_again
+                if lessons is not None:
+                    trade["asr_lessons"] = lessons
+                trade["asr_completed"] = True
+                self._save()
+                logger.info(f"ASR completed for trade {trade_id}")
+                return True
+        logger.warning(f"Trade {trade_id} not found for ASR update")
+        return False
+
+    def get_asr_stats(self) -> dict:
+        """Return ASR completion statistics.
+
+        Proceso de Revisión: "cada vez que ejecuto un trade, lo anoto en el Journaling"
+        and unusual situations get "un ASR intenso".
+        """
+        total = len(self._trades)
+        if total == 0:
+            return {"total": 0, "asr_completed": 0, "asr_completion_rate": 0.0}
+
+        completed = sum(1 for t in self._trades if t.get("asr_completed", False))
+
+        # Count how many ASR checklists had all items correct
+        perfect_asr = 0
+        checklist_fields = [
+            "asr_htf_correct", "asr_ltf_correct", "asr_strategy_correct",
+            "asr_sl_correct", "asr_tp_correct", "asr_management_correct",
+        ]
+        for t in self._trades:
+            if t.get("asr_completed"):
+                all_correct = all(
+                    t.get(f) is True for f in checklist_fields
+                )
+                if all_correct:
+                    perfect_asr += 1
+
+        return {
+            "total": total,
+            "asr_completed": completed,
+            "asr_completion_rate": round(completed / total * 100, 1),
+            "perfect_execution_count": perfect_asr,
+            "perfect_execution_rate": round(
+                perfect_asr / completed * 100, 1
+            ) if completed > 0 else 0.0,
+        }
+
     # ── Classification ────────────────────────────────────────────
 
     def _classify_result(self, pnl_pct: float) -> str:
@@ -419,6 +577,24 @@ class TradeJournal:
                     trade.setdefault("open_time", None)
                     trade.setdefault("rr_achieved", None)
                     trade.setdefault("sl", None)
+                    trade.setdefault("tp", None)
+                    # Visual journaling fields
+                    trade.setdefault("trading_style", "")
+                    trade.setdefault("timeframes_used", [])
+                    trade.setdefault("duration_minutes", None)
+                    trade.setdefault("trade_summary", "")
+                    trade.setdefault("management_notes", "")
+                    trade.setdefault("screenshots", [])
+                    # ASR fields
+                    trade.setdefault("asr_completed", False)
+                    trade.setdefault("asr_htf_correct", None)
+                    trade.setdefault("asr_ltf_correct", None)
+                    trade.setdefault("asr_strategy_correct", None)
+                    trade.setdefault("asr_sl_correct", None)
+                    trade.setdefault("asr_tp_correct", None)
+                    trade.setdefault("asr_management_correct", None)
+                    trade.setdefault("asr_would_enter_again", None)
+                    trade.setdefault("asr_lessons", "")
                 self._current_balance = data.get("current_balance", self._initial_capital)
                 self._peak_balance = data.get("peak_balance", self._initial_capital)
                 self._max_drawdown_pct = data.get("max_drawdown_pct", 0.0)

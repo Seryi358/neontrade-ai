@@ -75,6 +75,12 @@ class MonthlyReport:
     emotional_patterns: List[str] = field(default_factory=list)
     # e.g., ["Trades taken while stressed had 30% lower win rate", ...]
 
+    # ASR (Auto Self Review) completion
+    asr_completed_count: int = 0
+    asr_completion_rate: float = 0.0
+    asr_perfect_execution_count: int = 0
+    asr_common_errors: List[str] = field(default_factory=list)
+
     # Risk management
     dd_levels_hit: List[str] = field(default_factory=list)
     delta_adjustments: int = 0
@@ -289,6 +295,49 @@ class MonthlyReviewGenerator:
             sim_risk = trade.get("simultaneous_risk", 0.0)
             if sim_risk and sim_risk > report.max_simultaneous_risk:
                 report.max_simultaneous_risk = sim_risk
+
+        # ── ASR completion analysis ──────────────────────────────────────
+        asr_error_counts: Dict[str, int] = {
+            "HTF analysis": 0,
+            "LTF analysis": 0,
+            "Strategy execution": 0,
+            "SL placement": 0,
+            "TP placement": 0,
+            "Position management": 0,
+        }
+        asr_field_map = {
+            "asr_htf_correct": "HTF analysis",
+            "asr_ltf_correct": "LTF analysis",
+            "asr_strategy_correct": "Strategy execution",
+            "asr_sl_correct": "SL placement",
+            "asr_tp_correct": "TP placement",
+            "asr_management_correct": "Position management",
+        }
+        for trade in trades:
+            if trade.get("asr_completed"):
+                report.asr_completed_count += 1
+                all_correct = True
+                for field_name, label in asr_field_map.items():
+                    if trade.get(field_name) is False:
+                        asr_error_counts[label] += 1
+                        all_correct = False
+                if all_correct:
+                    report.asr_perfect_execution_count += 1
+
+        if report.total_trades > 0:
+            report.asr_completion_rate = (
+                report.asr_completed_count / report.total_trades
+            )
+
+        # Surface most common ASR errors
+        for label, count in sorted(
+            asr_error_counts.items(), key=lambda x: x[1], reverse=True
+        ):
+            if count > 0:
+                report.asr_common_errors.append(
+                    f"{label}: {count} error(s) in "
+                    f"{report.asr_completed_count} reviewed trades"
+                )
 
         # ── Derived summary metrics ───────────────────────────────────────
         total_decided = report.winning_trades + report.losing_trades
@@ -671,6 +720,20 @@ class MonthlyReviewGenerator:
                     )
                     break
 
+        # ASR completion
+        if report.asr_completion_rate < 0.80 and report.total_trades >= 3:
+            recs.append(
+                f"ASR completion rate is {report.asr_completion_rate:.0%}. "
+                f"Alex: 'si no haces ASR no vas a poder revisar y encontrar "
+                f"esos errores'. Review every trade."
+            )
+        if report.asr_common_errors:
+            top_error = report.asr_common_errors[0]
+            recs.append(
+                f"Most common execution error: {top_error}. "
+                f"Focus ASR sessions on this area."
+            )
+
         # Correlated trades
         if report.correlated_trades_count > 3:
             recs.append(
@@ -833,6 +896,21 @@ class MonthlyReviewGenerator:
                 f"  Discretionary: {report.discretionary_trades} trades, "
                 f"WR={report.discretionary_win_rate:.0%}"
             )
+
+        # ASR completion
+        lines.append("")
+        lines.append("--- ASR (AUTO SELF REVIEW) ---")
+        lines.append(
+            f"  Completed:     {report.asr_completed_count}/{report.total_trades} "
+            f"({report.asr_completion_rate:.0%})"
+        )
+        lines.append(
+            f"  Perfect Exec:  {report.asr_perfect_execution_count}"
+        )
+        if report.asr_common_errors:
+            lines.append("  Common errors:")
+            for err in report.asr_common_errors:
+                lines.append(f"    - {err}")
 
         # Emotional patterns
         if report.emotional_patterns:

@@ -22,6 +22,8 @@ Started: vie 27 mar 2026 21:45:20 -05
 - When price action conflicts with indicator (e.g., double top + EMA rejection), price action wins per Alex
 - Swing strategies use same code as Day but with shifted timeframes — controlled by config.py `trading_style`
 - Alex's "añadido" = bonus/extra, not hard requirement. RSI overbought + divergence in BLACK are extras, not gates
+- ASR fields in trade_journal.py are filled post-trade via `update_asr()` — not at record time. Journaling notes via `update_journal_notes()`
+- ASR evaluates execution vs trading plan, NOT vs trade result. Alex: "correcto o incorrecto viene relacionado con vuestro plan de trading"
 
 ---
 
@@ -405,4 +407,28 @@ Started: vie 27 mar 2026 21:45:20 -05
   - Alex emphasizes: "no puedes salir siempre igual, porque las condiciones del mercado nunca son iguales" — LP vs CP vs CPA is a per-trade decision, not a fixed setting
   - Re-entry financing rule: first position should be at 1% profit (not just BE) to fund the second position's risk
   - Within one EMA 50 daily trend change, there can be ~6 EMA 50 hourly trend changes — this is why LP uses larger TF EMAs
+---
+
+## 2026-03-28 - AUDIT-015
+- **What was implemented:** Audited all 4 transcriptions from Trading Mastery/04_Avanzado/03_Documentación (Trading Plan, Journaling, ASR, Ponencia en directo sobre ASR) + TradingPlan_2024.pdf + Registro_de_trades.xlsx against trade_journal.py and monthly_review.py. Fixed 2 categories of discrepancies: missing visual journaling fields and missing ASR (Auto Self Review) system.
+- **Files changed:**
+  - `backend/core/trade_journal.py` — Added visual journaling fields from Lesson 2 (trading_style, timeframes_used, tp_price, duration_minutes, trade_summary, management_notes, screenshots). Added complete ASR checklist fields from Lesson 3 (asr_completed, asr_htf_correct, asr_ltf_correct, asr_strategy_correct, asr_sl_correct, asr_tp_correct, asr_management_correct, asr_would_enter_again, asr_lessons). Added `update_journal_notes()` method for post-trade journaling. Added `update_asr()` method for post-trade ASR review. Added `get_asr_stats()` for ASR completion metrics. Updated `_load()` to backfill all new fields for existing trades.
+  - `backend/core/monthly_review.py` — Added ASR completion tracking to MonthlyReport dataclass (asr_completed_count, asr_completion_rate, asr_perfect_execution_count, asr_common_errors). Added ASR analysis to generate_report() that identifies most common execution errors from ASR checklists. Added ASR section to text report formatter. Added ASR-related recommendations (low completion rate warning, most common error focus area).
+  - `scripts/ralph/prd.json` — Marked AUDIT-015 as passes: true
+- **Audit findings:**
+  - Trading Plan (Lesson 1): 18-section template — conceptual/personal document, not code. Confirms risk parameters (1%/3%/0.5%, 7% max) already in config.py ✅. Confirms position management (SL→BE→EMA trailing) already in position_manager.py ✅. Confirms targets (TP1 at prior high/low, TP max per strategy) already in strategies ✅.
+  - Trading Plan PDF: Confirms all numeric values match config.py ✅. "80% precisión, 20% discreción" — discretionary tracking already implemented ✅. Evolución metrics (1.22% avg win, 0.73% avg loss, 61% WR, 1.64 avg R:R) — stats calculated in get_stats() ✅. Proceso de Revisión (journal every trade + monthly review) — implemented ✅.
+  - Journaling (Lesson 2): **FIXED** — trade_journal.py was missing fields Alex specifies as "lo mínimo": trading style, 4 timeframes, management notes, screenshots, trade summary, duration. Now added.
+  - ASR (Lesson 3): **FIXED** — No ASR system existed. Alex's template requires: trade summary, screenshots before/after/now, analysis checklist (HTF/LTF/strategy/SL/TP/management correct?), emotional section, "would you enter again?", lessons learned. All now implemented as fields + update_asr() method + get_asr_stats().
+  - ASR Live Lecture (Lesson 4): Conceptual/motivational — reinforces ASR importance. Error types (perception→technical→routine→emotional) are not code-level but inform the emotional_patterns analysis in monthly_review.py ✅.
+  - Registro_de_trades.xlsx: All 15 numeric columns (Month, Trade#, Date, Par, $P/L, %P&L, Result, Balance, P&L Acc, Maximum, DD$, DD%, Winning Streak, WS%, Accumulator) already tracked in trade_journal.py ✅.
+  - Monthly review generates reports matching mentorship: by-strategy, by-instrument, by-day, by-session, discretionary vs systematic, emotional patterns, recommendations ✅. **FIXED** — Now also tracks ASR completion rate and common execution errors.
+- **Learnings for future iterations:**
+  - ASR = Auto Self Review (not "análisis semanal de resultados" as PRD says). Alex: "viene de las siglas en inglés autoself review"
+  - Alex emphasizes: "correcto o incorrecto no viene relacionado con el resultado del trade, viene relacionado con vuestro plan de trading" — ASR evaluates execution quality, not trade outcome
+  - The 3-step documentation process: Trading Plan (define rules) → Journaling (record trades ASAP) → ASR (review with emotional distance)
+  - Alex: notes must be written same day as trade, not later: "si lo hacéis a toro pasado, estáis omitiendo información"
+  - Screenshots needed: entry + exit + "now" (for ASR to see what happened after exit)
+  - Error progression in traders: perception → technical → routine → emotional. The ASR checklist fields map to these categories.
+  - Alex's Trading Plan has 18 sections — the code doesn't need to replicate all of them (many are personal/conceptual), but the numeric and process sections must match
 ---

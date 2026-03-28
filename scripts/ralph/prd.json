@@ -195,7 +195,7 @@
         "Reentradas implementadas correctamente",
         "EMAs usadas por cada estilo/timeframe coinciden"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-015",

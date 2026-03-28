@@ -27,6 +27,7 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Watchlists in config.py: forex_watchlist, forex_exotic_watchlist, commodities_watchlist, indices_watchlist, equities_watchlist, crypto_watchlist, market_view_symbols
 - routes.py `/watchlist/categories` must mirror config watchlist fields — add new categories to `valid` set AND `category_map` AND response dict
 - TradingLab watchlist .txt files are TradingView format (BROKER:SYMBOL,BROKER:SYMBOL) — config uses Oanda format (BASE_QUOTE)
+- Crypto uses WIDER EMA timeframes than forex for position management (LP: Weekly/H4 vs Daily/H1; CP Day: M15 vs M5) — `_EMA_TIMEFRAME_GRID_CRYPTO` in position_manager.py
 
 ---
 
@@ -523,4 +524,32 @@ Started: vie 27 mar 2026 21:45:20 -05
   - BMSB confirmation logic (2+ consecutive weekly closes) is a defensive addition from the mentorship — a single wick below doesn't count
   - Pi Cycle uses daily SMAs (not weekly) — the market_analyzer correctly uses the "D" timeframe candles
   - crypto_cycle.py RSI uses extreme thresholds (80/25) vs standard (70/30) because crypto sustains high RSI during bull runs on HTF
+---
+
+## 2026-03-28 - AUDIT-019
+- **What was implemented:** Audited all 4 transcriptions from Esp. Criptomonedas/01_Contenido/10_Gestión de posiciones y riesgos (Intro, LP largo plazo, CP corto plazo, CPA agresivo) against position_manager.py. Fixed 3 discrepancies: crypto uses wider EMA timeframes than forex for position management.
+- **Files changed:**
+  - `backend/core/position_manager.py` — Added `_EMA_TIMEFRAME_GRID_CRYPTO` with crypto-specific wider EMA timeframes per the crypto module. Added `_get_base_ema_key()` and `_get_cpa_ema_key()` methods that return crypto or forex grid values based on instrument type. Updated `_handle_trailing_phase()` and `_handle_aggressive_phase()` to use instrument-aware EMA keys.
+  - `scripts/ralph/prd.json` — Marked AUDIT-019 as passes: true
+- **Audit findings:**
+  - EMA 50 as the position management indicator — correctly implemented ✅
+  - 3 management styles (LP, CP, CPA) — all correctly implemented ✅
+  - CPA not standalone — correctly used only in Phase 5 (beyond TP1) ✅
+  - Give space to EMA (buffer) — correctly implemented via `_ema_buffer()` ✅
+  - Break even independent of EMA trailing — correctly handled in phase transitions ✅
+  - **FIXED:** LP Swing for crypto: changed from Daily (`EMA_D_50`) to Weekly (`EMA_W_50`) per mentorship
+  - **FIXED:** LP Day for crypto: changed from H1 (`EMA_H1_50`) to H4 (`EMA_H4_50`) per mentorship
+  - **FIXED:** CP Day for crypto: changed from M5 (`EMA_M5_50`) to M15 (`EMA_M15_50`) per mentorship
+  - CPA remains the same for crypto and forex (M15/M5/M1) ✅
+  - Hybrid approach (LP/CP base + CPA at key levels): correctly implemented via Phase 5 transition ✅
+  - Partial closing at key levels: configurable via `allow_partial_profits` ✅
+  - Crypto timeframe grid from transcription: Swing (W/D/1H/15M), Day (4H/1H/15M/2M), Scalp (15M/5M/1M/30s) ✅
+  - LP uses row 1 (W/4H/15M), CP uses row 3 (1H/15M/1M), CPA uses row 4 (15M/2M/30s) ✅
+  - Row 2 (D/1H/5M) not used for management — can go down but not up ✅
+- **Learnings for future iterations:**
+  - The crypto module's "primary" timeframes are Trading Mastery's "optional wider" timeframes. Alex: crypto is more volatile, needs wider EMAs
+  - When Alex says "puedes ir de arriba abajo pero no de abajo arriba" — you can relax management TF (go wider) but not tighten beyond the style's row
+  - CPA in crypto: recommended as hybrid with LP/CP. Mark key levels (prior highs, Fib extensions, weekly resistance), switch to CPA only at those levels
+  - CPA partial closes: 25%, 50%, 75%, or 100% — any percentage, not just 50%. Code's half-close is a reasonable default
+  - Alex emphasizes "como menos implicación emocional mejor" — position management should be mechanical via EMA, not discretionary
 ---

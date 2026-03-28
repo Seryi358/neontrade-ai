@@ -4,17 +4,29 @@ Manages open positions: SL movement, BE, trailing stops.
 
 From TradingLab Mentorship - Position Management Styles (all based on EMA 50):
 
-Style LP (Long-term) — PRIMARY timeframes from mentorship:
-  - Swing: trail with Daily EMA 50 (optional wider: Weekly)
-  - Day Trading: trail with H1 EMA 50 (optional wider: H4)
-  - Scalping: trail with M15 EMA 50
+FOREX/EQUITIES/INDICES (Trading Mastery module):
+  Style LP (Long-term) — PRIMARY timeframes:
+    - Swing: trail with Daily EMA 50 (optional wider: Weekly)
+    - Day Trading: trail with H1 EMA 50 (optional wider: H4)
+    - Scalping: trail with M15 EMA 50
 
-Style CP (Short-term) — PRIMARY timeframes from mentorship:
-  - Swing: trail with H1 EMA 50 (optional wider: H4)
-  - Day Trading: trail with M5 EMA 50 (optional wider: M15)
-  - Scalping: trail with M1 EMA 50
+  Style CP (Short-term) — PRIMARY timeframes:
+    - Swing: trail with H1 EMA 50 (optional wider: H4)
+    - Day Trading: trail with M5 EMA 50 (optional wider: M15)
+    - Scalping: trail with M1 EMA 50
 
-Style CPA (Short-term Aggressive):
+CRYPTO (Esp. Criptomonedas module — wider due to volatility):
+  Style LP (Long-term) — PRIMARY timeframes:
+    - Swing: trail with Weekly EMA 50
+    - Day Trading: trail with H4 EMA 50
+    - Scalping: trail with M15 EMA 50
+
+  Style CP (Short-term) — PRIMARY timeframes:
+    - Swing: trail with H1 EMA 50
+    - Day Trading: trail with M15 EMA 50
+    - Scalping: trail with M1 EMA 50
+
+Style CPA (Short-term Aggressive) — same for all assets:
   - Swing: trail with M15 EMA 50
   - Day Trading: trail with M2 EMA 50 (M5 if M2 unavailable)
   - Scalping: trail with M1 EMA 50 (30s not available)
@@ -67,21 +79,40 @@ class TradingStyle(Enum):
 # EMA 50 timeframe grid per management style and trading style
 # Maps (ManagementStyle, TradingStyle) -> EMA key suffix for _latest_emas
 # All values reference EMA 50 on the given timeframe
+#
+# FOREX/EQUITIES/INDICES — from Trading Mastery position management module
 _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
-    # LP (Long-term): PRIMARY timeframes from mentorship ch21
-    # Mentorship: Swing=Daily, Day=H1. (Optional wider: Swing=Weekly, Day=H4)
+    # LP (Long-term): Swing=Daily, Day=H1. (Optional wider: Swing=Weekly, Day=H4)
     (ManagementStyle.LP, TradingStyle.SWING): "EMA_D_50",
     (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H1_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
-    # CP (Short-term): PRIMARY timeframes from mentorship ch21
-    # Mentorship: Swing=H1, Day=M5. (Optional wider: Swing=H4, Day=M15)
+    # CP (Short-term): Swing=H1, Day=M5. (Optional wider: Swing=H4, Day=M15)
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
     (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
-    # CPA (Short-term Aggressive): tightest timeframes
-    # Mentorship: Swing=M15, Day=M2 (M5 fallback), Scalp=M1
+    # CPA (Short-term Aggressive): Swing=M15, Day=M2 (M5 fallback), Scalp=M1
     (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
     # M2 not available from broker API; M5 is the best available approximation
+    (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M5_50",
+    (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M1_50",
+}
+
+# CRYPTO — from Esp. Criptomonedas position management module
+# Crypto uses wider timeframes due to higher volatility:
+# Alex: "las criptomonedas son activos volátiles" — the "optional wider"
+# timeframes from Trading Mastery become the PRIMARY for crypto.
+# Only LP and CP differ; CPA is the same across all asset classes.
+_EMA_TIMEFRAME_GRID_CRYPTO: Dict[tuple, str] = {
+    # LP (Long-term): Swing=Weekly, Day=H4, Scalp=M15
+    (ManagementStyle.LP, TradingStyle.SWING): "EMA_W_50",
+    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H4_50",
+    (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
+    # CP (Short-term): Swing=H1, Day=M15, Scalp=M1
+    (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
+    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",
+    (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
+    # CPA (Short-term Aggressive): same as forex — Swing=M15, Day=M2 (M5), Scalp=30s (M1)
+    (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
     (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M5_50",
     (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M1_50",
 }
@@ -151,19 +182,31 @@ class PositionManager:
         self.management_style = ManagementStyle(management_style.lower())
         self.trading_style = TradingStyle(trading_style.lower())
 
-        # For PRICE_ACTION style, we don't use the EMA grid
+        # Resolve default EMA keys from the forex grid (overridden per-instrument for crypto)
         if self.management_style == ManagementStyle.PRICE_ACTION:
             self._base_ema_key = None
             self._cpa_ema_key = _EMA_TIMEFRAME_GRID[
                 (ManagementStyle.CPA, self.trading_style)
             ]
         else:
-            # Resolve EMA keys from the grid
             self._base_ema_key = _EMA_TIMEFRAME_GRID[
                 (self.management_style, self.trading_style)
             ]
-            # CPA key for aggressive phase (beyond TP1) or key-level trailing
             self._cpa_ema_key = _EMA_TIMEFRAME_GRID[
+                (ManagementStyle.CPA, self.trading_style)
+            ]
+
+        # Crypto-specific EMA keys (wider timeframes due to volatility)
+        if self.management_style == ManagementStyle.PRICE_ACTION:
+            self._crypto_base_ema_key = None
+            self._crypto_cpa_ema_key = _EMA_TIMEFRAME_GRID_CRYPTO[
+                (ManagementStyle.CPA, self.trading_style)
+            ]
+        else:
+            self._crypto_base_ema_key = _EMA_TIMEFRAME_GRID_CRYPTO[
+                (self.management_style, self.trading_style)
+            ]
+            self._crypto_cpa_ema_key = _EMA_TIMEFRAME_GRID_CRYPTO[
                 (ManagementStyle.CPA, self.trading_style)
             ]
 
@@ -171,12 +214,32 @@ class PositionManager:
             f"PositionManager initialized: style={self.management_style.value}, "
             f"trading={self.trading_style.value}, "
             f"base_ema={self._base_ema_key}, cpa_ema={self._cpa_ema_key}, "
+            f"crypto_base_ema={self._crypto_base_ema_key}, "
+            f"crypto_cpa_ema={self._crypto_cpa_ema_key}, "
             f"partial_profits={self.allow_partial_profits}"
         )
 
     def _is_crypto(self, instrument: str) -> bool:
         """Check if an instrument is a crypto pair."""
         return any(instrument.upper().startswith(p) for p in self._CRYPTO_PREFIXES)
+
+    def _get_base_ema_key(self, instrument: str) -> Optional[str]:
+        """Get the base EMA key for trailing, using crypto-specific wider
+        timeframes when the instrument is a crypto pair.
+
+        Crypto uses wider EMA timeframes per Esp. Criptomonedas module:
+        LP: Swing=Weekly (vs Daily), Day=H4 (vs H1)
+        CP: Day=M15 (vs M5)
+        """
+        if self._is_crypto(instrument):
+            return self._crypto_base_ema_key
+        return self._base_ema_key
+
+    def _get_cpa_ema_key(self, instrument: str) -> str:
+        """Get the CPA EMA key, using crypto-specific grid when applicable."""
+        if self._is_crypto(instrument):
+            return self._crypto_cpa_ema_key
+        return self._cpa_ema_key
 
     def set_ema_values(self, instrument: str, emas: Dict[str, float]):
         """Update EMA values for an instrument (called by trading engine after analysis)."""
@@ -361,9 +424,10 @@ class PositionManager:
         trailing_trigger = be_distance + distance_to_tp1 * 0.20
         if current_profit >= trailing_trigger:
             pos.phase = PositionPhase.TRAILING_TO_TP1
+            base_key = self._get_base_ema_key(pos.instrument)
             logger.info(
                 f"{pos.trade_id}: Phase -> TRAILING_TO_TP1 "
-                f"(style={self.management_style.value}, ema={self._base_ema_key})"
+                f"(style={self.management_style.value}, ema={base_key})"
             )
 
     async def _handle_trailing_phase(self, pos: ManagedPosition, current_price: float):
@@ -399,10 +463,11 @@ class PositionManager:
                     except Exception as e:
                         logger.error(f"{pos.trade_id}: Failed partial close at TP1: {e}")
 
+            cpa_key = self._get_cpa_ema_key(pos.instrument)
             pos.phase = PositionPhase.BEYOND_TP1
             logger.info(
                 f"{pos.trade_id}: TP1 REACHED -> Phase AGGRESSIVE "
-                f"(switching to CPA: {self._cpa_ema_key})"
+                f"(switching to CPA: {cpa_key})"
             )
             return
 
@@ -412,7 +477,9 @@ class PositionManager:
             return
 
         # EMA-based styles (LP/CP): get the EMA 50 value
-        trail_ema = self._get_trail_ema(pos.instrument, self._base_ema_key)
+        # Use crypto-specific wider timeframes for crypto instruments
+        base_key = self._get_base_ema_key(pos.instrument)
+        trail_ema = self._get_trail_ema(pos.instrument, base_key)
 
         if trail_ema is not None:
             # Give space to the EMA — do not place SL exactly on it
@@ -425,7 +492,7 @@ class PositionManager:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
                         f"{pos.trade_id}: Trailing SL -> {new_sl:.5f} "
-                        f"({self.management_style.value} {self._base_ema_key}={trail_ema:.5f})"
+                        f"({self.management_style.value} {base_key}={trail_ema:.5f})"
                     )
             else:
                 new_sl = trail_ema + buffer
@@ -434,7 +501,7 @@ class PositionManager:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
                         f"{pos.trade_id}: Trailing SL -> {new_sl:.5f} "
-                        f"({self.management_style.value} {self._base_ema_key}={trail_ema:.5f})"
+                        f"({self.management_style.value} {base_key}={trail_ema:.5f})"
                     )
         else:
             # Fallback: trail with percentage if no EMA data available
@@ -465,6 +532,9 @@ class PositionManager:
                 except Exception as e:
                     logger.error(f"{pos.trade_id}: Failed to close at TP_max: {e}")
 
+        # Resolve CPA EMA key based on instrument type (crypto uses different grid)
+        cpa_key = self._get_cpa_ema_key(pos.instrument)
+
         # Emergency exit: if both EMA M5 2-period and EMA M5 5-period broken against position
         # NOTE: EMA_M5_2 and EMA_M5_5 may not be available; using CPA EMA as proxy.
         # If dedicated M5 EMA 2 & 5 are added later, replace the proxy with actual values.
@@ -491,7 +561,7 @@ class PositionManager:
                     logger.error(f"{pos.trade_id}: Failed emergency exit: {e}")
         else:
             # Proxy: use CPA EMA as a rough substitute for the M5 short EMAs
-            proxy_ema = self._get_trail_ema(pos.instrument, self._cpa_ema_key)
+            proxy_ema = self._get_trail_ema(pos.instrument, cpa_key)
             if proxy_ema is not None:
                 if pos.direction == "BUY":
                     proxy_broken = current_price < proxy_ema
@@ -506,7 +576,7 @@ class PositionManager:
                     )
 
         # Use CPA EMA 50 for aggressive trailing beyond TP1
-        aggressive_ema = self._get_trail_ema(pos.instrument, self._cpa_ema_key)
+        aggressive_ema = self._get_trail_ema(pos.instrument, cpa_key)
 
         if aggressive_ema is not None:
             # Tighter buffer in aggressive phase, but still give EMA some space
@@ -518,7 +588,7 @@ class PositionManager:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
                         f"{pos.trade_id}: AGGRESSIVE trail SL -> {new_sl:.5f} "
-                        f"(CPA {self._cpa_ema_key}={aggressive_ema:.5f})"
+                        f"(CPA {cpa_key}={aggressive_ema:.5f})"
                     )
             else:
                 new_sl = aggressive_ema + buffer
@@ -526,7 +596,7 @@ class PositionManager:
                     await self._update_sl(pos, new_sl)
                     logger.debug(
                         f"{pos.trade_id}: AGGRESSIVE trail SL -> {new_sl:.5f} "
-                        f"(CPA {self._cpa_ema_key}={aggressive_ema:.5f})"
+                        f"(CPA {cpa_key}={aggressive_ema:.5f})"
                     )
         else:
             # Fallback: tight percentage trail

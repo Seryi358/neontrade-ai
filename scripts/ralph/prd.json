@@ -266,7 +266,7 @@
         "CPA cripto implementado según la clase",
         "Diferencias entre gestión cripto y forex correctas"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-020",

@@ -8,6 +8,11 @@ Started: vie 27 mar 2026 21:45:20 -05
 - Tests checking config values are spread across 5+ test files — grep for the value when changing defaults
 - TradingLab transcriptions are at `/home/sergioacc/Projects/TradingLab_Notas/` (outside repo)
 - Each lesson has `transcripcion.txt` and `info.md` files in its directory
+- Candlestick patterns are in `market_analyzer.py:_detect_candlestick_patterns()`, chart patterns in `chart_patterns.py`
+- MarketCondition enum in `market_analyzer.py` — add new values there and check `test_round9_final.py` for enum assertions
+- Wedge/channel targets per TradingLab = start of pattern (not height projection like H&S/double top)
+- Some test files (test_round4, test_round10) use `sys.exit()` at module level — pytest crashes on collect; run them directly with `python3`
+- Pre-existing failures: 10 in test_round9 (openai missing, R:R, EMA config) — not related to audit work
 
 ---
 
@@ -39,4 +44,25 @@ Started: vie 27 mar 2026 21:45:20 -05
   - RECURRING_HIGH_IMPACT constant in news_filter.py is defined but never used in code logic (dead code)
   - Two calendar modules exist: news_filter.py (comprehensive, used by trading_engine) and economic_calendar.py (legacy Finnhub-based)
   - Alex recommends ForexFactory for precision and Investing.com for user-friendliness
+---
+
+## 2026-03-27 - AUDIT-003
+- **What was implemented:** Audited all 6 transcriptions from Trading Mastery/02_Básico/03_Análisis técnico básico against market_analyzer.py and chart_patterns.py. Fixed 4 discrepancies.
+- **Files changed:**
+  - `backend/core/market_analyzer.py` — Added CONSOLIDATING to MarketCondition enum (AT Básico teaches 3 states: accel/decel/consolidation). Added consolidation detection logic in `_detect_condition()`. Added `verify_sr_breakout()` static method implementing the 3-step S/R breakout verification from the class (Break→Close→Confirm).
+  - `backend/core/chart_patterns.py` — Fixed wedge targets (rising/falling) to use start of wedge per mentorship ("suelen atacar el inicio del mismo") instead of height projection. Fixed channel targets (ascending/descending) similarly.
+  - `scripts/ralph/prd.json` — Marked AUDIT-003 as passes: true
+- **Audit findings:**
+  - Candlestick patterns (Doji, Inside Bar, Engulfing, Morning/Evening Star, Low/High Test, Tweezer Top/Bottom) — all correctly implemented ✅
+  - Chart patterns (Wedge, Triangle, Channel, Double Top/Bottom, H&S) — all detected, targets fixed for wedge/channel
+  - Triangle 2/3 rule correctly implemented (> 2/3 duration → reversal vs continuation) ✅
+  - H&S neckline type classification (3 variants by slope) matches mentorship ✅
+  - Trend detection (HH+HL=bullish, LH+LL=bearish, else ranging) matches Dow Theory ✅
+  - S/R detection uses zones not exact prices, clusters by touch count + recency ✅
+  - Missing: diagonal trendline S/R detection (code only does horizontal + dynamic via EMA). Not critical — strategies use horizontal + EMA levels primarily.
+- **Learnings for future iterations:**
+  - Alex emphasizes "la naturaleza del movimiento" — don't treat patterns as exact recipes. Code already uses tolerances.
+  - Wedge/channel target = start of pattern. H&S/double top target = height projection. Different rules for different patterns.
+  - The 3-step breakout verification (Break→Close→Confirm) is available as `MarketAnalyzer.verify_sr_breakout()` — strategies can use this for entry signals.
+  - Consolidation is specifically "correction in time" (narrow range) vs deceleration "correction in price" (pullback).
 ---

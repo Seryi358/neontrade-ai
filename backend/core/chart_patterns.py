@@ -680,8 +680,8 @@ def _detect_rising_wedge(
             return None
 
     neckline = low_prices[-1]
-    pattern_height = high_prices[-1] - low_prices[0]
-    target = neckline - pattern_height
+    # TradingLab AT Básico: wedge target = start of the wedge (el inicio de la cuña)
+    target = low_prices[0]
 
     confidence = 60.0
     current_price = data["close"].iloc[-1]
@@ -697,7 +697,7 @@ def _detect_rising_wedge(
         neckline=neckline,
         target=target,
         description=f"Cuna Ascendente: Maximos y minimos subiendo con convergencia. "
-                    f"Patron bajista. Objetivo: {target:.5f}",
+                    f"Patron bajista. Objetivo (inicio de cuna): {target:.5f}",
     )
 
 
@@ -737,8 +737,8 @@ def _detect_falling_wedge(
             return None
 
     neckline = high_prices[-1]
-    pattern_height = high_prices[0] - low_prices[-1]
-    target = neckline + pattern_height
+    # TradingLab AT Básico: wedge target = start of the wedge (el inicio de la cuña)
+    target = high_prices[0]
 
     confidence = 60.0
     current_price = data["close"].iloc[-1]
@@ -754,7 +754,7 @@ def _detect_falling_wedge(
         neckline=neckline,
         target=target,
         description=f"Cuna Descendente: Maximos y minimos bajando con convergencia. "
-                    f"Patron alcista. Objetivo: {target:.5f}",
+                    f"Patron alcista. Objetivo (inicio de cuna): {target:.5f}",
     )
 
 
@@ -1033,9 +1033,9 @@ def _detect_ascending_channel(
     if slope_ratio < 0.4:  # Lines must be somewhat parallel
         return None
 
-    channel_width = high_prices[-1] - low_prices[-1]
     neckline = low_prices[-1]  # Lower trendline (support to break)
-    target = neckline - channel_width
+    # TradingLab AT Básico: channel target = start of the channel (el inicio del canal)
+    target = low_prices[0]
 
     confidence = 60.0
     if len(recent_highs) >= 4 and len(recent_lows) >= 4:
@@ -1052,7 +1052,7 @@ def _detect_ascending_channel(
         neckline=neckline,
         target=target,
         description=f"Canal Ascendente: Lineas paralelas ascendentes. "
-                    f"Soporte: {neckline:.5f}. Objetivo si rompe: {target:.5f}",
+                    f"Soporte: {neckline:.5f}. Objetivo (inicio canal): {target:.5f}",
     )
 
 
@@ -1095,9 +1095,9 @@ def _detect_descending_channel(
     if slope_ratio < 0.4:
         return None
 
-    channel_width = high_prices[-1] - low_prices[-1]
     neckline = high_prices[-1]  # Upper trendline (resistance to break)
-    target = neckline + channel_width
+    # TradingLab AT Básico: channel target = start of the channel (el inicio del canal)
+    target = high_prices[0]
 
     confidence = 60.0
     if len(recent_highs) >= 4 and len(recent_lows) >= 4:
@@ -1114,7 +1114,7 @@ def _detect_descending_channel(
         neckline=neckline,
         target=target,
         description=f"Canal Descendente: Lineas paralelas descendentes. "
-                    f"Resistencia: {neckline:.5f}. Objetivo si rompe: {target:.5f}",
+                    f"Resistencia: {neckline:.5f}. Objetivo (inicio canal): {target:.5f}",
     )
 
 

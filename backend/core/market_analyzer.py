@@ -50,6 +50,9 @@ class MarketCondition(Enum):
     NEUTRAL = "neutral"
     ACCELERATING = "accelerating"
     DECELERATING = "decelerating"
+    # TradingLab AT Básico: Consolidation = extended deceleration
+    # (correction in time, not price — price stays in a narrow range)
+    CONSOLIDATING = "consolidating"
 
 
 @dataclass
@@ -597,6 +600,16 @@ class MarketAnalyzer:
 
         # DECELERATING: candles getting smaller AND/OR approaching EMA 50
         if body_contracting and dist_contracting:
+            # Check for CONSOLIDATING (TradingLab AT Básico):
+            # Consolidation = extended deceleration where price stays in a
+            # narrow range relative to its recent movement (correction in time,
+            # not in price). If last 10 candles are range-bound, it's consolidation.
+            if len(df) >= 15:
+                recent_range = float(df["high"].iloc[-10:].max() - df["low"].iloc[-10:].min())
+                prior_range = float(df["high"].iloc[-20:-10].max() - df["low"].iloc[-20:-10].min()) if len(df) >= 20 else recent_range
+                # Narrow range + small bodies = consolidation (correction in time)
+                if prior_range > 0 and recent_range < prior_range * 0.5:
+                    return MarketCondition.CONSOLIDATING
             return MarketCondition.DECELERATING
         elif body_contracting or dist_contracting:
             if not body_expanding and not dist_expanding:
@@ -867,6 +880,55 @@ class MarketAnalyzer:
         levels["fvg_zones"] = fvg_zones[-20:]
 
         return levels
+
+    @staticmethod
+    def verify_sr_breakout(
+        df: pd.DataFrame,
+        level: float,
+        direction: str = "bullish",
+    ) -> Dict[str, bool]:
+        """
+        TradingLab AT Básico — 3-step S/R breakout verification:
+          1) BREAK:   price crosses the level
+          2) CLOSE:   candle closes beyond the level
+          3) CONFIRM: next candle continues in the breakout direction
+
+        A failed step-3 (false breakout) is itself a powerful reversal signal.
+
+        Args:
+            df: OHLC DataFrame (needs at least 2 recent candles).
+            level: the S/R price level.
+            direction: "bullish" (breaks above resistance) or "bearish" (breaks below support).
+
+        Returns:
+            Dict with keys: broke, closed, confirmed, false_breakout.
+        """
+        result = {"broke": False, "closed": False, "confirmed": False, "false_breakout": False}
+        if df.empty or len(df) < 2:
+            return result
+
+        prev = df.iloc[-2]
+        last = df.iloc[-1]
+
+        if direction == "bullish":
+            # Step 1: price crossed above
+            result["broke"] = float(prev["high"]) > level
+            # Step 2: candle closed above
+            result["closed"] = float(prev["close"]) > level
+            # Step 3: next candle continues bullish (higher close)
+            if result["closed"]:
+                result["confirmed"] = float(last["close"]) > float(prev["close"])
+                if not result["confirmed"] and float(last["close"]) < level:
+                    result["false_breakout"] = True
+        else:  # bearish
+            result["broke"] = float(prev["low"]) < level
+            result["closed"] = float(prev["close"]) < level
+            if result["closed"]:
+                result["confirmed"] = float(last["close"]) < float(prev["close"])
+                if not result["confirmed"] and float(last["close"]) > level:
+                    result["false_breakout"] = True
+
+        return result
 
     def _calculate_emas(self, candles: Dict[str, pd.DataFrame]) -> Dict[str, float]:
         """Calculate EMA values for multiple timeframes."""

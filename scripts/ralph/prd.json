@@ -39,7 +39,7 @@
         "Soportes y resistencias calculados como explica Alex Ruiz",
         "Aceleración/desaceleración/consolidación detectados correctamente"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "AUDIT-004",

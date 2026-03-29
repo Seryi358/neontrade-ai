@@ -529,6 +529,44 @@ export const cssTheme = `
   }
 `;
 
+// HUD-style divider component CSS (for web)
+export const hudDividerCss = `
+  .hud-divider-glow {
+    border: none;
+    border-top: 1px solid var(--cp2077-yellow-dim);
+    margin: 16px 0;
+    position: relative;
+  }
+  .hud-divider-glow::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 1px;
+    background: var(--cp2077-yellow);
+    box-shadow: 0 0 8px var(--cp2077-yellow-glow);
+  }
+
+  /* CP2077 Status indicator */
+  .status-online {
+    color: var(--neon-green);
+    text-shadow: 0 0 4px rgba(0, 255, 136, 0.6);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .status-offline {
+    color: var(--neon-red);
+    text-shadow: 0 0 4px rgba(218, 68, 83, 0.6);
+  }
+
+  /* Trading session indicator */
+  .session-active {
+    background: linear-gradient(90deg, transparent, rgba(252, 238, 9, 0.08), transparent);
+    padding: 4px 0;
+  }
+`;
+
 // Strategy badge color helper (TradingLab 6-color system)
 export const getStrategyColor = (strategy: string): string => {
   const map: Record<string, string> = {

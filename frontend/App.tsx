@@ -26,15 +26,17 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, backgroundColor: '#14101f', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Text style={{ color: '#fcee09', fontFamily: 'Rajdhani-Bold', fontSize: 24, letterSpacing: 6, marginBottom: 16, textTransform: 'uppercase' }}>SYSTEM ERROR</Text>
-          <ScrollView style={{ maxHeight: 200 }}>
-            <Text style={{ color: '#da4453', fontFamily: 'TerminessNerdFont', fontSize: 11, textAlign: 'center' }}>{this.state.error}</Text>
+        <View style={{ flex: 1, backgroundColor: '#0a0812', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ color: '#da4453', fontFamily: 'Rajdhani-Bold', fontSize: 48, marginBottom: 8 }}>⚠</Text>
+          <Text style={{ color: '#fcee09', fontFamily: 'Rajdhani-Bold', fontSize: 22, letterSpacing: 8, marginBottom: 4, textTransform: 'uppercase' }}>SYSTEM MALFUNCTION</Text>
+          <View style={{ width: '50%', height: 1, backgroundColor: '#da4453', marginBottom: 16 }} />
+          <ScrollView style={{ maxHeight: 180 }}>
+            <Text style={{ color: '#da4453', fontFamily: 'TerminessNerdFont', fontSize: 11, textAlign: 'center', letterSpacing: 1 }}>{this.state.error}</Text>
           </ScrollView>
           <Text
-            style={{ color: '#5df4fe', fontFamily: 'Rajdhani-SemiBold', fontSize: 14, marginTop: 24, letterSpacing: 3, textTransform: 'uppercase' }}
+            style={{ color: '#5df4fe', fontFamily: 'Rajdhani-Bold', fontSize: 14, marginTop: 28, letterSpacing: 4, textTransform: 'uppercase', borderWidth: 1, borderColor: '#5df4fe', paddingHorizontal: 24, paddingVertical: 8, borderRadius: 2 }}
             onPress={() => this.setState({ hasError: false, error: '' })}
-          >[ REINICIAR ]</Text>
+          >REBOOT SYSTEM</Text>
         </View>
       );
     }
@@ -86,8 +88,10 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
+        <Text style={styles.bootLogo}>⬡</Text>
         <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
         <Text style={styles.loadingText}>INITIALIZING NEONTRADE AI...</Text>
+        <Text style={styles.bootSubtext}>TRADINGLAB SYSTEM v2.2</Text>
       </View>
     );
   }
@@ -103,21 +107,21 @@ export default function App() {
             backgroundColor: theme.colors.backgroundDark,
             borderTopColor: theme.colors.cp2077YellowDim,
             borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 6,
-            paddingTop: 4,
-            elevation: 12,
+            height: 64,
+            paddingBottom: 8,
+            paddingTop: 6,
+            elevation: 16,
             shadowColor: theme.colors.cp2077Yellow,
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.15,
-            shadowRadius: 8,
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: 0.2,
+            shadowRadius: 12,
           },
           tabBarActiveTintColor: theme.colors.cp2077Yellow,
           tabBarInactiveTintColor: theme.colors.textMuted,
           tabBarLabelStyle: {
-            fontFamily: 'Rajdhani-SemiBold',
-            fontSize: 8,
-            letterSpacing: 1,
+            fontFamily: 'Rajdhani-Bold',
+            fontSize: 9,
+            letterSpacing: 2,
             textTransform: 'uppercase',
           },
         }}
@@ -126,9 +130,19 @@ export default function App() {
           name="Dashboard"
           component={DashboardScreen}
           options={{
-            tabBarLabel: 'DASH',
+            tabBarLabel: 'HQ',
             tabBarIcon: ({ focused }) => (
-              <TabIcon label="◈" focused={focused} />
+              <TabIcon label="⬡" focused={focused} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Analysis"
+          component={AnalysisScreen}
+          options={{
+            tabBarLabel: 'SCAN',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon label="◎" focused={focused} />
             ),
           }}
         />
@@ -138,27 +152,7 @@ export default function App() {
           options={{
             tabBarLabel: 'CHART',
             tabBarIcon: ({ focused }) => (
-              <TabIcon label="◫" focused={focused} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Analysis"
-          component={AnalysisScreen}
-          options={{
-            tabBarLabel: 'ANÁLISIS',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon label="◎" focused={focused} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Manual"
-          component={ManualModeScreen}
-          options={{
-            tabBarLabel: 'MANUAL',
-            tabBarIcon: ({ focused }) => (
-              <TabIcon label="◇" focused={focused} />
+              <TabIcon label="▥" focused={focused} />
             ),
           }}
         />
@@ -169,6 +163,16 @@ export default function App() {
             tabBarLabel: 'WATCH',
             tabBarIcon: ({ focused }) => (
               <TabIcon label="◉" focused={focused} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Manual"
+          component={ManualModeScreen}
+          options={{
+            tabBarLabel: 'OPS',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon label="⬢" focused={focused} />
             ),
           }}
         />
@@ -186,7 +190,7 @@ export default function App() {
           name="History"
           component={HistoryScreen}
           options={{
-            tabBarLabel: 'HIST',
+            tabBarLabel: 'LOG',
             tabBarIcon: ({ focused }) => (
               <TabIcon label="▤" focused={focused} />
             ),
@@ -196,7 +200,7 @@ export default function App() {
           name="Journal"
           component={JournalScreen}
           options={{
-            tabBarLabel: 'JOURNAL',
+            tabBarLabel: 'DIARIO',
             tabBarIcon: ({ focused }) => (
               <TabIcon label="◆" focused={focused} />
             ),
@@ -206,7 +210,7 @@ export default function App() {
           name="Settings"
           component={SettingsScreen}
           options={{
-            tabBarLabel: 'CONFIG',
+            tabBarLabel: 'SYS',
             tabBarIcon: ({ focused }) => (
               <TabIcon label="⚙" focused={focused} />
             ),
@@ -226,16 +230,33 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.backgroundDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bootLogo: {
+    fontSize: 48,
+    color: theme.colors.cp2077Yellow,
+    marginBottom: 20,
+    textShadowColor: theme.colors.cp2077YellowGlow,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 25,
+  },
   loadingText: {
     color: theme.colors.cp2077Yellow,
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 13,
-    letterSpacing: 4,
-    marginTop: 16,
+    fontFamily: 'Rajdhani-Bold',
+    fontSize: 14,
+    letterSpacing: 6,
+    marginTop: 20,
     textTransform: 'uppercase',
+  },
+  bootSubtext: {
+    color: theme.colors.neonCyan,
+    fontFamily: 'TerminessNerdFont',
+    fontSize: 10,
+    letterSpacing: 4,
+    marginTop: 8,
+    textTransform: 'uppercase',
+    opacity: 0.6,
   },
 });

@@ -151,15 +151,22 @@ export default function DashboardScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Header */}
+      {/* HUD Header */}
       <View style={styles.header}>
+        <View style={styles.headerTopLine} />
         <Text style={styles.title}>NEONTRADE</Text>
-        <Text style={styles.subtitle}>AI TRADING SYSTEM</Text>
-        <View style={[styles.statusBadge, status?.running ? styles.online : styles.offline]}>
-          <Text style={styles.statusText}>
-            {status?.running ? '● ONLINE' : '○ OFFLINE'}
+        <Text style={styles.subtitle}>AI TRADING SYSTEM v2.2</Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusBadge, status?.running ? styles.online : styles.offline]}>
+            <Text style={styles.statusText}>
+              {status?.running ? '● ONLINE' : '○ OFFLINE'}
+            </Text>
+          </View>
+          <Text style={styles.sessionText}>
+            {new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} UTC
           </Text>
         </View>
+        <View style={styles.headerBottomLine} />
       </View>
 
       {error && <Text style={{color: theme.colors.neonRed, fontFamily: theme.fonts.mono, fontSize: 11, textAlign: 'center', padding: 8, letterSpacing: 2}}>{error}</Text>}
@@ -409,6 +416,14 @@ export default function DashboardScreen() {
           {(status?.broker ?? 'capital').toUpperCase()}
         </Text>
       </View>
+
+      {/* TradingLab Philosophy */}
+      <View style={styles.quoteCard}>
+        <Text style={styles.quoteText}>
+          "El mercado siempre estará ahí — la conservación del capital es lo primero"
+        </Text>
+        <Text style={styles.quoteAuthor}>— Alex Ruiz, TradingLab</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -421,28 +436,52 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+  },
+  headerTopLine: {
+    width: '60%',
+    height: 1,
+    backgroundColor: theme.colors.cp2077YellowDim,
+    marginBottom: theme.spacing.sm,
+  },
+  headerBottomLine: {
+    width: '40%',
+    height: 1,
+    backgroundColor: theme.colors.cp2077YellowDim,
+    marginTop: theme.spacing.sm,
   },
   title: {
     fontFamily: theme.fonts.heading,
-    fontSize: 32,
+    fontSize: 34,
     color: theme.colors.cp2077Yellow,
-    letterSpacing: 8,
+    letterSpacing: 10,
     textTransform: 'uppercase',
     textShadowColor: theme.colors.cp2077YellowGlow,
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15,
+    textShadowRadius: 20,
   },
   subtitle: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 11,
+    fontFamily: theme.fonts.mono,
+    fontSize: 10,
     color: theme.colors.neonCyan,
     letterSpacing: 6,
     textTransform: 'uppercase',
-    marginTop: 2,
+    marginTop: 4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: theme.spacing.sm,
+  },
+  sessionText: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    letterSpacing: 2,
   },
   statusBadge: {
-    marginTop: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.round,
@@ -558,6 +597,33 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     paddingVertical: theme.spacing.lg,
+  },
+  quoteCard: {
+    backgroundColor: 'rgba(93, 244, 254, 0.05)',
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.neonCyanDim,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.neonCyan,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.xl,
+  },
+  quoteText: {
+    fontFamily: theme.fonts.light,
+    fontSize: 12,
+    color: theme.colors.neonCyan,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  quoteAuthor: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 9,
+    color: theme.colors.textMuted,
+    textAlign: 'right',
+    marginTop: 6,
+    letterSpacing: 2,
   },
 });
 

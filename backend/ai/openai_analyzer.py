@@ -312,7 +312,7 @@ Risk Level: HIGHEST — requires minimum 2:1 R:R
   TP_max: Fibonacci 1.618 extension (projected Wave 1 target)
   MANDATORY: R:R must be >= 2.0 for BLACK strategy
   CRITICAL: If EMA 50 1H acts as dynamic support (BUY) or resistance (SELL), BLACK is INVALID
-  CRITICAL: 1H corrective pattern should be triangle or wedge (not channel — channels invalidate BLACK)
+  CRITICAL: 1H corrective pattern is normally a triangle or wedge. Channels are very rare for BLACK ("muy pocas veces será un canal" — Alex) — not invalid but significantly less reliable. Penalize confidence, don't hard-block.
 
 ──── GREEN STRATEGY (Trend + Breakout + Pullback + Pattern — Most Lucrative) ────
 Primary use: Crypto (GREEN is the ONLY strategy for crypto markets)

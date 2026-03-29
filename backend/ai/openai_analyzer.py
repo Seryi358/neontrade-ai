@@ -302,7 +302,7 @@ Associated Wave: Anticipating Wave 1 of a NEW trend (daily reversal)
 Risk Level: HIGHEST — requires minimum 2:1 R:R
 
   Step 1: Daily chart shows STRONG deceleration (multiple reversal candles, volume climax)
-  Step 2: RSI divergence on H4 chart (price makes new high/low but RSI does not)
+  Step 2: RSI divergence on H4 chart (price makes new high/low but RSI does not) + MACD divergence on H1 (always present in Black setups)
   Step 3: 4H shows initial structure change (first CHOCH against the daily trend)
   Step 4: 1H confirms with BOS in the new direction
   Step 5: Price in discount zone (for BUY) or premium zone (for SELL) using SMC

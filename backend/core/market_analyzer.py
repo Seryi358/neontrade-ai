@@ -571,16 +571,25 @@ class MarketAnalyzer:
         gain = delta.where(delta > 0, 0).ewm(alpha=1/14, adjust=False).mean()
         loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
 
-        rs = gain / loss.replace(0, np.nan)
-        rsi = 100 - (100 / (1 + rs))
-        rsi = rsi.fillna(100.0)
-        current_rsi = float(rsi.iloc[-1])
+        # Bug fix R26: handle both gain and loss = 0 (no movement) → RSI=50 (neutral)
+        last_gain = float(gain.iloc[-1]) if not gain.empty else 0.0
+        last_loss = float(loss.iloc[-1]) if not loss.empty else 0.0
+        if last_gain == 0 and last_loss == 0:
+            current_rsi = 50.0  # No movement = neutral, not overbought
+        else:
+            rs = gain / loss.replace(0, np.nan)
+            rsi = 100 - (100 / (1 + rs))
+            rsi = rsi.fillna(100.0)
+            current_rsi = float(rsi.iloc[-1])
 
-        # Overbought/oversold take priority (extreme conditions)
+        # Bug fix R26: Don't return early on overbought/oversold — check deceleration
+        # too, since BLACK strategy needs both overbought AND deceleration.
+        # Store RSI state and continue to accel/decel detection.
+        rsi_condition = None
         if current_rsi > 70:
-            return MarketCondition.OVERBOUGHT
+            rsi_condition = MarketCondition.OVERBOUGHT
         elif current_rsi < 30:
-            return MarketCondition.OVERSOLD
+            rsi_condition = MarketCondition.OVERSOLD
 
         # ── Acceleration / Deceleration detection ──
         # Metric 1: Candle body size trend (last 5 vs previous 5)
@@ -628,6 +637,12 @@ class MarketAnalyzer:
         elif body_contracting or dist_contracting:
             if not body_expanding and not dist_expanding:
                 return MarketCondition.DECELERATING
+
+        # Bug fix R26: If RSI detected overbought/oversold but we also found
+        # deceleration above, that was returned. If we reach here (no accel/decel),
+        # return the RSI condition (overbought/oversold) or NEUTRAL.
+        if rsi_condition is not None:
+            return rsi_condition
 
         return MarketCondition.NEUTRAL
 

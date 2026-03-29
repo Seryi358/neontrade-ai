@@ -978,15 +978,15 @@ class TradingEngine:
                         })
 
                     # Persist close to database with PnL data
+                    # Bug fix R26: use the actual close_price from broker (line 932-947),
+                    # NOT highest/lowest_price which overstates PnL
                     if self._db:
                         try:
-                            close_price = getattr(pos, 'highest_price', pos.entry_price) if pos.direction == "BUY" else getattr(pos, 'lowest_price', pos.entry_price)
-                            pnl_val = (close_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - close_price)
                             await self._db.update_trade(tid, {
                                 "status": "closed_manual",
                                 "closed_at": datetime.now(timezone.utc).isoformat(),
                                 "exit_price": close_price,
-                                "pnl": pnl_val * abs(pos.units),
+                                "pnl": pnl_dollars,
                             })
                         except Exception:
                             pass

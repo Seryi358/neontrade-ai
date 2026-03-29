@@ -496,8 +496,20 @@ class CapitalClient(BaseBroker):
                 low=l,
                 close=c,
                 volume=vol,
-                complete=True,  # Capital.com doesn't flag incomplete candles
+                complete=True,  # Will mark last candle incomplete below
             ))
+
+        # Bug fix R26: Mark last candle as incomplete (currently forming).
+        # Capital.com API doesn't flag this, but the last candle in any
+        # resolution is the currently-forming candle. market_analyzer filters
+        # out incomplete candles to avoid oscillating indicator values.
+        if result:
+            last = result[-1]
+            result[-1] = CandleData(
+                time=last.time, open=last.open, high=last.high,
+                low=last.low, close=last.close, volume=last.volume,
+                complete=False,
+            )
 
         return result
 
@@ -688,6 +700,7 @@ class CapitalClient(BaseBroker):
         SELL stop: placed below current price (breakdown below support).
         units > 0 = BUY, units < 0 = SELL.
         """
+        await self._ensure_session()  # Bug fix R26: was missing, causing 401 after idle
         epic = await self._resolve_epic(instrument)
         direction = "BUY" if units > 0 else "SELL"
         size = abs(units)

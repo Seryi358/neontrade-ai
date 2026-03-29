@@ -601,12 +601,17 @@ class PositionManager:
                     partial_units = pos.units // 2  # Close half
                     if partial_units != 0:
                         try:
-                            await self.broker.close_trade(pos.trade_id, units=partial_units)
-                            pos.units -= partial_units
-                            logger.info(
-                                f"{pos.trade_id}: PARTIAL PROFIT at TP1 — closed {partial_units} units, "
-                                f"remaining {pos.units} units"
-                            )
+                            # Bug fix R26: use close_trade_partial (not close_trade with units=)
+                            # close_trade() signature is (trade_id) only — no units param
+                            ok = await self.broker.close_trade_partial(pos.trade_id, percent=50)
+                            if ok:
+                                pos.units -= partial_units
+                                logger.info(
+                                    f"{pos.trade_id}: PARTIAL PROFIT at TP1 — closed ~50%, "
+                                    f"remaining {pos.units} units"
+                                )
+                            else:
+                                logger.warning(f"{pos.trade_id}: Partial close returned False")
                         except Exception as e:
                             logger.error(f"{pos.trade_id}: Failed partial close at TP1: {e}")
 

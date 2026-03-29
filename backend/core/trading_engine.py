@@ -141,6 +141,8 @@ class TradingEngine:
             logger.warning("OpenAI analyzer not available — trading without AI validation")
         self.market_analyzer = MarketAnalyzer(self.broker)
         self.explanation_engine = ExplanationEngine()
+        # R30 fix: scan lock prevents overlapping scan cycles (duplicate trades)
+        self._scan_lock = asyncio.Lock()
         news_style = "scalping" if settings.scalping_enabled else "day_trading"
         self.news_filter = NewsFilter(
             trading_style=news_style,
@@ -1183,6 +1185,15 @@ class TradingEngine:
 
     async def _scan_for_setups(self):
         """Scan all watchlist pairs for trading setups."""
+        # R30 fix: prevent overlapping scan cycles that could cause duplicate trades
+        if self._scan_lock.locked():
+            logger.debug("Scan skipped — previous scan still running")
+            return
+        async with self._scan_lock:
+            await self._scan_for_setups_impl()
+
+    async def _scan_for_setups_impl(self):
+        """Internal scan implementation (protected by _scan_lock)."""
         self._daily_scan_count += 1
         # Reset circuit breaker at start of each scan cycle
         if broker_circuit_breaker.is_open:
@@ -1924,10 +1935,18 @@ class TradingEngine:
             return
 
         # Build a TradeRisk from the pending setup
+        # R30 fix: use configured trading style, not hardcoded DAY_TRADING
+        style_map = {
+            "day_trading": TradingStyle.DAY_TRADING,
+            "swing": TradingStyle.SWING,
+            "scalping": TradingStyle.SCALPING,
+        }
+        _style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
+        _risk = self.risk_manager.get_risk_for_style(_style)
         trade_risk = TradeRisk(
             instrument=setup.instrument,
-            style=TradingStyle.DAY_TRADING,
-            risk_percent=settings.risk_day_trading,
+            style=_style,
+            risk_percent=_risk,
             units=setup.units,
             stop_loss=setup.stop_loss,
             take_profit_1=setup.take_profit,

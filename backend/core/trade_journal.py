@@ -47,6 +47,9 @@ class TradeJournal:
         self._current_winning_streak = 0
         self._max_winning_streak = 0
         self._max_streak_pct = 0.0  # cumulative % of the max winning streak
+        self._current_losing_streak = 0
+        self._max_losing_streak = 0
+        self._max_losing_streak_pct = 0.0  # cumulative % of the max losing streak
         self._trade_counter = 0
         self._accumulator = 1.0  # Compound growth tracker (Excel column O)
         self._dd_by_year: Dict[str, float] = {}  # year -> max DD that year
@@ -103,9 +106,11 @@ class TradeJournal:
         # Classify result
         result = self._classify_result(pnl_pct)
 
-        # Winning streak tracking
+        # Winning and losing streak tracking
         if result == "TP":
             self._current_winning_streak += 1
+            self._current_losing_streak = 0
+            self._current_losing_streak_pct = 0.0
             # Track cumulative % for current streak
             if not hasattr(self, '_current_streak_pct'):
                 self._current_streak_pct = 0.0
@@ -113,9 +118,23 @@ class TradeJournal:
             if self._current_winning_streak > self._max_winning_streak:
                 self._max_winning_streak = self._current_winning_streak
                 self._max_streak_pct = self._current_streak_pct
-        else:
+        elif result == "SL":
+            self._current_losing_streak += 1
             self._current_winning_streak = 0
             self._current_streak_pct = 0.0
+            # Track cumulative loss % for current losing streak
+            if not hasattr(self, '_current_losing_streak_pct'):
+                self._current_losing_streak_pct = 0.0
+            self._current_losing_streak_pct += abs(pnl_pct)
+            if self._current_losing_streak > self._max_losing_streak:
+                self._max_losing_streak = self._current_losing_streak
+                self._max_losing_streak_pct = self._current_losing_streak_pct
+        else:
+            # BE: reset both streaks
+            self._current_winning_streak = 0
+            self._current_streak_pct = 0.0
+            self._current_losing_streak = 0
+            self._current_losing_streak_pct = 0.0
 
         # P&L accumulated from initial capital
         pnl_accumulated_pct = (
@@ -230,6 +249,9 @@ class TradeJournal:
                 "current_winning_streak": 0,
                 "max_winning_streak": 0,
                 "max_streak_pct": 0.0,
+                "current_losing_streak": 0,
+                "max_losing_streak": 0,
+                "max_losing_streak_pct": 0.0,
                 "avg_win_pct": 0.0,
                 "avg_loss_pct": 0.0,
                 "profit_factor": 0.0,
@@ -283,9 +305,10 @@ class TradeJournal:
             if self._peak_balance > 0 else 0.0
         )
 
-        # Monthly returns
+        # Monthly returns and trade count
         monthly_returns: Dict[str, float] = {}
         monthly_start_balance: Dict[str, float] = {}
+        monthly_trade_count: Dict[str, int] = {}
         for t in self._trades:
             month = t["month"]
             if month not in monthly_returns:
@@ -293,6 +316,7 @@ class TradeJournal:
                 # Find balance at start of month (balance before first trade of the month)
                 monthly_start_balance[month] = t["balance_after"] - t["pnl_dollars"]
             monthly_returns[month] += t["pnl_dollars"]
+            monthly_trade_count[month] = monthly_trade_count.get(month, 0) + 1
 
         # Convert monthly P&L dollars to percentage
         monthly_returns_pct: Dict[str, float] = {}
@@ -357,10 +381,14 @@ class TradeJournal:
             "current_winning_streak": self._current_winning_streak,
             "max_winning_streak": self._max_winning_streak,
             "max_streak_pct": round(self._max_streak_pct, 4),
+            "current_losing_streak": self._current_losing_streak,
+            "max_losing_streak": self._max_losing_streak,
+            "max_losing_streak_pct": round(self._max_losing_streak_pct, 4),
             "avg_win_pct": round(avg_win_pct, 4),
             "avg_loss_pct": round(avg_loss_pct, 4),
             "profit_factor": round(profit_factor, 2) if profit_factor != float('inf') else 999.99,
             "monthly_returns": monthly_returns_pct,
+            "monthly_trade_count": monthly_trade_count,
             "pnl_accumulated_pct": round(pnl_accumulated_pct, 4),
             "accumulator": round(self._accumulator, 6),  # Compound growth factor
             "dd_by_year": self._dd_by_year,
@@ -708,6 +736,9 @@ class TradeJournal:
                 "current_winning_streak": self._current_winning_streak,
                 "max_winning_streak": self._max_winning_streak,
                 "max_streak_pct": self._max_streak_pct,
+                "current_losing_streak": self._current_losing_streak,
+                "max_losing_streak": self._max_losing_streak,
+                "max_losing_streak_pct": self._max_losing_streak_pct,
                 "trade_counter": self._trade_counter,
                 "accumulator": self._accumulator,
                 "dd_by_year": self._dd_by_year,
@@ -757,10 +788,14 @@ class TradeJournal:
                 self._current_winning_streak = data.get("current_winning_streak", 0)
                 self._max_winning_streak = data.get("max_winning_streak", 0)
                 self._max_streak_pct = data.get("max_streak_pct", 0.0)
+                self._current_losing_streak = data.get("current_losing_streak", 0)
+                self._max_losing_streak = data.get("max_losing_streak", 0)
+                self._max_losing_streak_pct = data.get("max_losing_streak_pct", 0.0)
                 self._trade_counter = data.get("trade_counter", len(self._trades))
                 self._accumulator = data.get("accumulator", 1.0)
                 self._dd_by_year = data.get("dd_by_year", {})
                 self._current_streak_pct = 0.0
+                self._current_losing_streak_pct = 0.0
                 logger.info(
                     f"Trade journal loaded: {len(self._trades)} trades, "
                     f"balance=${self._current_balance:.2f}"

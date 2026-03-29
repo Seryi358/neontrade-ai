@@ -155,6 +155,7 @@ class ManagedPosition:
     style: str = "day_trading"     # Trading style: "day_trading", "swing", "scalping"
     strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED" — for strategy-specific logic
     trailing_tp_only: bool = False  # True for crypto GREEN: skip hard TP1 close, use EMA 50 trailing
+    htf_context: str = "pullback"  # "pullback" (quick exit via CP, target TP1) or "run" (extended target via LP, target TP_max)
     phase: PositionPhase = PositionPhase.INITIAL
     highest_price: float = 0.0    # For BUY: highest since entry
     lowest_price: float = float('inf')  # For SELL: lowest since entry
@@ -592,10 +593,18 @@ class PositionManager:
         can be closed at TP1. Otherwise trail full position.
         Give space to the EMA — buffer below/above, never exactly on it.
         """
-        # Check if TP1 has been reached -> switch to aggressive (CPA) trailing
+        # HTF context determines TP target and management style:
+        # "run" (daily reversal pattern like H&S, double top): use LP, target TP_max
+        # "pullback" (simple pullback): use CP (default), target TP1
+        if pos.htf_context == "run" and pos.take_profit_max:
+            tp_target = pos.take_profit_max
+        else:
+            tp_target = pos.take_profit_1
+
+        # Check if TP target has been reached -> switch to aggressive (CPA) trailing
         tp1_reached = (
-            (pos.direction == "BUY" and current_price >= pos.take_profit_1) or
-            (pos.direction == "SELL" and current_price <= pos.take_profit_1)
+            (pos.direction == "BUY" and current_price >= tp_target) or
+            (pos.direction == "SELL" and current_price <= tp_target)
         )
         if tp1_reached:
             # GREEN/crypto trailing_tp_only: Do NOT hard-close at TP1.
@@ -645,7 +654,16 @@ class PositionManager:
 
         # EMA-based styles (LP/CP): get the EMA 50 value
         # Use crypto-specific wider timeframes for crypto instruments
-        base_key = self._get_base_ema_key(pos.instrument)
+        # HTF context "run" overrides to LP EMA for wider trailing (more room)
+        if pos.htf_context == "run" and self.management_style != ManagementStyle.PRICE_ACTION:
+            is_crypto = self._is_crypto(pos.instrument)
+            grid = _EMA_TIMEFRAME_GRID_CRYPTO if is_crypto else _EMA_TIMEFRAME_GRID
+            base_key = grid.get(
+                (ManagementStyle.LP, self.trading_style),
+                self._get_base_ema_key(pos.instrument),
+            )
+        else:
+            base_key = self._get_base_ema_key(pos.instrument)
         trail_ema = self._get_trail_ema(pos.instrument, base_key)
 
         if trail_ema is not None:

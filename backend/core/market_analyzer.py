@@ -402,11 +402,29 @@ class MarketAnalyzer:
             for price_val in weekly_closes[1:]:
                 ema_21 = (price_val - ema_21) * multiplier + ema_21
             last_weekly_close = weekly_closes[-1]
+            # Check if last close is below both BMSB bands
+            last_below = last_weekly_close < sma_20 and last_weekly_close < ema_21
+            # 2-close confirmation: need at least 2 consecutive weekly closes
+            # below both SMA 20 and EMA 21 to confirm bearish (per mentorship).
+            bearish_confirmed = False
+            if last_below and len(weekly_closes) >= 2:
+                prev_weekly_close = weekly_closes[-2]
+                # Recalculate SMA 20 and EMA 21 as of the previous week
+                if len(weekly_closes) >= 21:
+                    prev_sma_20 = sum(weekly_closes[-21:-1]) / 20
+                    prev_ema_21 = weekly_closes[0]
+                    for price_val in weekly_closes[1:-1]:
+                        prev_ema_21 = (price_val - prev_ema_21) * multiplier + prev_ema_21
+                    bearish_confirmed = (
+                        prev_weekly_close < prev_sma_20
+                        and prev_weekly_close < prev_ema_21
+                    )
             bmsb = {
                 "sma_20": sma_20,
                 "ema_21": ema_21,
                 "bullish": last_weekly_close > sma_20 and last_weekly_close > ema_21,
-                "bearish": last_weekly_close < sma_20 and last_weekly_close < ema_21,
+                "bearish": bearish_confirmed,
+                "bearish_warning": last_below and not bearish_confirmed,
                 "last_close": last_weekly_close,
             }
 

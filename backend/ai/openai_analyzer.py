@@ -353,10 +353,7 @@ NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequenti
   Step 6 (RCC Entry): Execute using RCC — Ruptura (price breaks the diagonal), Cierre (candle closes beyond it), Confirmacion (next candle confirms the break direction)
   Step 7 (SL/TP): Set SL below/above the pattern low/high; TP at measured move or Fibonacci extension
 
-  Timeframes per trading style:
-  - Swing Trading: Weekly -> Daily -> 1H -> 15M (execution)
-  - Day Trading: 4H -> 1H -> 15M -> 2M (execution)
-  - Scalping: 15M -> 5M -> 1M -> 30s (execution)
+  NOTE: In the app implementation, GREEN uses a FIXED layout (Weekly->Daily->1H->15M) regardless of trading style, per the mentorship principle that Green does not differentiate day/swing.
 
   SL: Below/above the pattern structure (tight SL due to HTF alignment)
   TP1: Next structure level on the intermediate timeframe
@@ -578,10 +575,7 @@ GREEN is the ONLY valid strategy for crypto:
   5. Draw diagonal/trendline on the pattern
   6. RCC execution: Ruptura (break), Cierre (close beyond), Confirmacion (next candle confirms)
   7. Set SL below pattern low / TP at measured move or Fibonacci extension
-- Timeframes per style:
-  - Swing: Weekly -> Daily -> 1H -> 15M execution
-  - Day Trading: 4H -> 1H -> 15M -> 2M execution
-  - Scalping: 15M -> 5M -> 1M -> 30s execution
+- NOTE: In the app implementation, GREEN uses a FIXED layout (Weekly->Daily->1H->15M) regardless of trading style, per the mentorship principle that Green does not differentiate day/swing.
 
 BMSB - Bull Market Support Band (Crypto Module 8):
 - SMA 20 + EMA 21 on the WEEKLY chart
@@ -741,7 +735,7 @@ class OpenAIAnalyzer:
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.1,
-                max_tokens=700,
+                max_tokens=1000,
             )
 
             result = json.loads(response.choices[0].message.content)
@@ -991,6 +985,15 @@ Respond in JSON format:
             )
 
             result = json.loads(response.choices[0].message.content)
+
+            # Ensure required fields with defaults
+            result.setdefault("score", 50)
+            result.setdefault("strategy_detected", "UNKNOWN")
+            result.setdefault("direction", "NEUTRAL")
+            result.setdefault("confidence", "MEDIA")
+            result.setdefault("reasoning", "")
+            result.setdefault("adjustments", {})
+
             logger.info(
                 "OpenAI analysis for {}: Score={} Rec={} Strategy={} Wave={}",
                 instrument,

@@ -3439,17 +3439,22 @@ class BlackStrategy(BaseStrategy):
                 result["tp1"] = ema_4h_50
 
         if "tp1" not in result:
-            # Fallback: nivel S/R intermedio
-            supports = analysis.key_levels.get("supports", [])
-            resistances = analysis.key_levels.get("resistances", [])
-            if direction == "BUY":
-                above = [r for r in resistances if r > entry_price]
-                if above:
-                    result["tp1"] = min(above)
+            # BLACK TP is ALWAYS EMA 50 4H per mentorship.
+            # If EMA is on the wrong side or unavailable, use its value anyway
+            # as a projected target but apply a confidence warning.
+            if ema_4h_50 and ema_4h_50 > 0:
+                # EMA exists but is on the wrong side — still use it with warning
+                result["tp1"] = ema_4h_50
+                result["tp_warning"] = "EMA50_4H on wrong side of entry; confidence reduced"
             else:
-                below = [s for s in supports if s < entry_price]
-                if below:
-                    result["tp1"] = max(below)
+                # EMA truly unavailable — use a conservative 1:2 R:R projection
+                # This preserves the BLACK principle of targeting mean reversion
+                sl = analysis.key_levels.get("supports", []) if direction == "BUY" else analysis.key_levels.get("resistances", [])
+                if direction == "BUY":
+                    result["tp1"] = entry_price + abs(entry_price - entry_price * 0.985) * 2
+                else:
+                    result["tp1"] = entry_price - abs(entry_price * 1.015 - entry_price) * 2
+                result["tp_warning"] = "EMA50_4H unavailable; using 2R projection as fallback"
 
         return result
 

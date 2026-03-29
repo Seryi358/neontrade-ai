@@ -491,7 +491,7 @@ class TestE2EBlueStrategy:
     async def test_blue_full_cycle(self, mock_settings):
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -572,7 +572,7 @@ class TestE2ERedStrategy:
     async def test_red_full_cycle(self, mock_settings):
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -615,7 +615,7 @@ class TestE2EPinkStrategy:
     async def test_pink_full_cycle(self, mock_settings):
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -659,7 +659,7 @@ class TestE2EWhiteStrategy:
     async def test_white_full_cycle(self, mock_settings):
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -701,7 +701,7 @@ class TestE2EBlackStrategy:
     async def test_black_full_cycle(self, mock_settings):
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -749,7 +749,7 @@ class TestE2EGreenStrategy:
     async def test_green_full_cycle(self, mock_settings):
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -903,7 +903,7 @@ class TestAIValidationFlow:
         """AI recommends TAKE → trade should execute."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -942,7 +942,7 @@ class TestAIValidationFlow:
         """AI recommends SKIP → trade should NOT execute."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -982,7 +982,7 @@ class TestAIValidationFlow:
         """AI suggests adjusted SL/TP → signal should be modified."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -1046,7 +1046,7 @@ class TestCrossCuttingIntegration:
         """With all strategies enabled, get_best_setup returns highest confidence."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -1127,7 +1127,7 @@ class TestCrossCuttingIntegration:
         """After execution, position should be in INITIAL phase with correct SL."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -1162,7 +1162,7 @@ class TestCrossCuttingIntegration:
         """Multiple trades should accumulate in risk manager."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -1203,7 +1203,7 @@ class TestCrossCuttingIntegration:
         """After closing a trade, risk manager should unregister it."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5
@@ -1265,7 +1265,7 @@ class TestCrossCuttingIntegration:
         """If broker order fails, trade should NOT be tracked."""
         mock_settings.risk_day_trading = 0.01
         mock_settings.risk_scalping = 0.005
-        mock_settings.risk_swing = 0.03
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
         mock_settings.min_rr_ratio = 1.5

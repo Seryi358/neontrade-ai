@@ -97,7 +97,7 @@ class AnalysisResult:
     session: Optional[str] = None
     # Elliott Wave detail from daily candle analysis
     elliott_wave_detail: Dict[str, Any] = field(default_factory=dict)
-    # Pivot Points (P, S1, S2, R1, R2) from daily data
+    # Pivot Points (P, S1, R1) from daily data — mentorship only uses these three
     pivot_points: Dict[str, float] = field(default_factory=dict)
     # Premium/Discount zone: dict with zone, position, swing levels, sweet_spot, or None
     premium_discount_zone: Optional[Dict[str, Any]] = None
@@ -1966,9 +1966,8 @@ class MarketAnalyzer:
         P  = (H + L + C) / 3
         R1 = 2*P - L
         S1 = 2*P - H
-        R2 = P + (H - L)
-        S2 = P - (H - L)
 
+        Mentorship: Alex only uses P, S1, R1. S2/R2 are optional and not displayed.
         These act as intraday S/R levels used by institutional traders.
         """
         if df.empty or len(df) < 2:
@@ -1979,12 +1978,11 @@ class MarketAnalyzer:
         h, l, c = float(candle["high"]), float(candle["low"]), float(candle["close"])
         p = (h + l + c) / 3.0
 
+        # Mentorship: Alex only uses P, S1, R1 (S2/R2 optional, not displayed)
         return {
             "P": round(p, 5),
             "R1": round(2 * p - l, 5),
             "S1": round(2 * p - h, 5),
-            "R2": round(p + (h - l), 5),
-            "S2": round(p - (h - l), 5),
         }
 
     # ── Volume Divergence Detection (TradingLab Gap #6) ──────────────

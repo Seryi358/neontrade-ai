@@ -63,7 +63,7 @@ class BacktestConfig:
     spread_pips: float = 1.0
     enabled_strategies: Dict[str, bool] = field(default_factory=dict)
     # Optional: override minimum R:R filter
-    min_rr_ratio: float = 2.0
+    min_rr_ratio: float = 1.5
     # Maximum number of concurrent open positions
     max_concurrent_positions: int = 3
     # Cooldown bars after a trade closes before another can open

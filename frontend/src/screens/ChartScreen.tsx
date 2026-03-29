@@ -81,11 +81,7 @@ interface KeyLevels {
 interface PivotPoints {
   P?: number;
   S1?: number;
-  S2?: number;
-  S3?: number;
   R1?: number;
-  R2?: number;
-  R3?: number;
 }
 
 interface AnalysisSummary {
@@ -554,13 +550,10 @@ export default function ChartScreen() {
     if (analysisSummary?.pivot_points) {
       const pivots = analysisSummary.pivot_points;
       const pivotEntries: Array<{ key: string; value: number }> = [];
+      // Mentorship: Alex only uses P, S1, R1 — S2/R2 are optional and not displayed
       if (pivots.P) pivotEntries.push({ key: 'PP', value: pivots.P });
       if (pivots.S1) pivotEntries.push({ key: 'S1', value: pivots.S1 });
-      if (pivots.S2) pivotEntries.push({ key: 'S2', value: pivots.S2 });
-      if (pivots.S3) pivotEntries.push({ key: 'S3', value: pivots.S3 });
       if (pivots.R1) pivotEntries.push({ key: 'R1', value: pivots.R1 });
-      if (pivots.R2) pivotEntries.push({ key: 'R2', value: pivots.R2 });
-      if (pivots.R3) pivotEntries.push({ key: 'R3', value: pivots.R3 });
 
       for (const entry of pivotEntries) {
         const line = candleSeries.createPriceLine({

@@ -447,7 +447,7 @@ Confluence Rule: an entry level must have AT LEAST 2 of these:
 Risk Per Trade:
 - Day Trading: 1% of account per trade
 - Scalping: 0.5% of account per trade (NeonTrade AI default; workshop defers exact %)
-- Swing Trading: 3% of account per trade (Trading Plan PDF)
+- Swing Trading: 1% of account per trade (NON-NEGOTIABLE — same as day trading per mentorship)
 - Maximum total risk at any time: 7% of account
 
 Minimum R:R Ratios:

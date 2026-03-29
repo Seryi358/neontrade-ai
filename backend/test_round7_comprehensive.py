@@ -799,7 +799,7 @@ def block_5_risk_manager():
     check("B5-05 scalping risk = 0.5%", abs(risk_scalp - 0.005) < 1e-9)
 
     risk_swing = rm.get_risk_for_style(TradingStyle.SWING)
-    check("B5-06 swing risk = 3%", abs(risk_swing - 0.03) < 1e-9)
+    check("B5-06 swing risk = 1%", abs(risk_swing - 0.01) < 1e-9)
 
     # Drawdown tracking
     rm._peak_balance = 10000
@@ -995,7 +995,7 @@ def block_8_config():
     # Defaults valid
     check("B8-01 risk_day_trading = 0.01", abs(settings.risk_day_trading - 0.01) < 1e-9)
     check("B8-02 risk_scalping = 0.005", abs(settings.risk_scalping - 0.005) < 1e-9)
-    check("B8-03 risk_swing = 0.03", abs(settings.risk_swing - 0.03) < 1e-9)
+    check("B8-03 risk_swing = 0.01", abs(settings.risk_swing - 0.01) < 1e-9)
     check("B8-04 max_total_risk = 0.07", abs(settings.max_total_risk - 0.07) < 1e-9)
     check("B8-05 min_rr_ratio = 1.5", abs(settings.min_rr_ratio - 1.5) < 1e-9)
     check("B8-06 correlated_risk_pct = 0.0075", abs(settings.correlated_risk_pct - 0.0075) < 1e-9)

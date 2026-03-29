@@ -604,7 +604,7 @@ TRADING_PROFILES = {
             # Risk management — lower risk for beginners
             "risk_day_trading": 0.01,
             "risk_scalping": 0.005,
-            "risk_swing": 0.01,             # 1% instead of 3% for safety
+            "risk_swing": 0.01,             # 1% — NON-NEGOTIABLE per mentorship
             "max_total_risk": 0.05,          # 5% max (stricter)
             "correlated_risk_pct": 0.005,    # 0.5% per correlated pair
             "min_rr_ratio": 2.0,             # Higher minimum R:R for beginners

@@ -5,7 +5,7 @@ Implements all risk management rules from the TradingLab Trading Plan.
 Rules:
 - 1% risk per Day Trade
 - 0.5% risk per Scalping trade (NeonTrade AI default)
-- 3% risk per Swing Trade (Trading Plan PDF)
+- 1% risk per Swing Trade (NON-NEGOTIABLE — same as day trading per mentorship)
 - Max 7% total risk at any time
 - Correlated pairs: 0.75% each instead of full risk
 - No trading before major news

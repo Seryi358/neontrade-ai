@@ -67,7 +67,7 @@ def run(coro):
 # =====================================================================
 
 class TestBaseRiskPerStyle:
-    """Verify the 1% day / 0.5% scalping / 3% swing rule."""
+    """Verify the 1% day / 0.5% scalping / 1% swing rule (1% NON-NEGOTIABLE per mentorship)."""
 
     @patch("core.risk_manager.settings")
     def test_day_trading_risk_1pct(self, mock_settings, rm):
@@ -84,11 +84,11 @@ class TestBaseRiskPerStyle:
         assert rm.get_risk_for_style(TradingStyle.SCALPING) == 0.005
 
     @patch("core.risk_manager.settings")
-    def test_swing_risk_3pct(self, mock_settings, rm):
-        mock_settings.risk_swing = 0.03
+    def test_swing_risk_1pct(self, mock_settings, rm):
+        mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
-        assert rm.get_risk_for_style(TradingStyle.SWING) == 0.03
+        assert rm.get_risk_for_style(TradingStyle.SWING) == 0.01
 
 
 # =====================================================================

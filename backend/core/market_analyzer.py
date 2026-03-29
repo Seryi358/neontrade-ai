@@ -158,11 +158,17 @@ class MarketAnalyzer:
             # Throttle between timeframe fetches to avoid broker rate limits
             await asyncio.sleep(0.3)
 
-        # Step 2: HTF Analysis
+        # Step 2: HTF Analysis (Weekly direction, Daily confirmation)
         htf_trend = self._detect_trend(candles.get("W", pd.DataFrame()))
         htf_condition = self._detect_condition(candles.get("D", pd.DataFrame()))
 
-        # Step 3: LTF Analysis
+        # Step 2b: H4 Analysis (MTFA bridge: strategy selection + RSI overbought/oversold)
+        # TradingLab MTFA: H4 is the critical intermediate timeframe where you determine
+        # which strategy to apply and check RSI overbought/oversold conditions.
+        h4_trend = self._detect_trend(candles.get("H4", pd.DataFrame()))
+        h4_condition = self._detect_condition(candles.get("H4", pd.DataFrame()))
+
+        # Step 3: LTF Analysis (H1 structure + execution)
         ltf_trend = self._detect_trend(candles.get("H1", pd.DataFrame()))
 
         # Step 4: Key levels
@@ -944,8 +950,8 @@ class MarketAnalyzer:
         ema_configs = {
             "W": [8, 50],  # EMA 8 Weekly: mentorship Class 3 (trend/close signal)
             "D": [20, 50],
-            "H4": [50],
-            "H1": [50],
+            "H4": [20, 50],  # EMA 20 added per mentorship: "las tres medias en todos los gráficos"
+            "H1": [20, 50],  # EMA 20 for small pullback detection on H1
             "M15": [5, 20, 50],
             "M5": [2, 5, 20, 50],
             # M2: Capital.com supports MINUTE_2 — needed for CPA Day Trading

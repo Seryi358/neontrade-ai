@@ -195,7 +195,7 @@ class Settings(BaseSettings):
     avoid_news_minutes_after: int = 15   # Don't trade 15 min after major news
     # Swing trading: Alex says "podemos llegar a ejecutar incluso" during news
     # Relaxed buffers for swing style (mentorship: swing is less affected by news)
-    avoid_news_minutes_before_swing: int = 10  # Relaxed: 10 min before for swing
+    avoid_news_minutes_before_swing: int = 15  # Relaxed: 15 min before for swing (matches NewsFilter)
     avoid_news_minutes_after_swing: int = 5    # Relaxed: 5 min after for swing
     # News impact differentiation (mentorship: Interest Rates, Unemployment, CPI, GDP
     # are the key ones — "estas cuatro son las más importantes")

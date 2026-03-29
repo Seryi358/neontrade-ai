@@ -358,10 +358,13 @@ if os.path.isdir(_static_dir):
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """Serve the SPA index.html for any non-API route (catch-all)."""
-        # Check if the requested file exists in static dir
-        file_path = os.path.join(_static_dir, full_path)
-        if full_path and os.path.isfile(file_path):
-            return FileResponse(file_path)
+        # Security: prevent path traversal by resolving and validating the path
+        if full_path:
+            file_path = os.path.realpath(os.path.join(_static_dir, full_path))
+            static_real = os.path.realpath(_static_dir)
+            # Ensure resolved path is within the static directory
+            if file_path.startswith(static_real + os.sep) and os.path.isfile(file_path):
+                return FileResponse(file_path)
         # Otherwise serve index.html with injected API key
         return HTMLResponse(_get_index_html())
 

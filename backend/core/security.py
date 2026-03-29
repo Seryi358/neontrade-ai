@@ -192,7 +192,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             or path.startswith("/_expo")
             or path.startswith("/assets")
         )
-        is_websocket = request.headers.get("upgrade", "").lower() == "websocket"
+        # Only skip auth for actual WebSocket path, NOT just Upgrade header
+        # (prevents auth bypass via fake Upgrade header on API endpoints)
+        is_websocket = path == "/ws" and request.headers.get("upgrade", "").lower() == "websocket"
         # Serve frontend SPA for non-API paths (no auth needed for UI)
         is_frontend = not path.startswith("/api/") and not path.startswith("/ws") and not is_public
 

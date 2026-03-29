@@ -70,7 +70,7 @@ class ErrorBoundary extends React.Component<
 const errorStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050508',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
@@ -88,7 +88,7 @@ const errorStyles = StyleSheet.create({
   },
   icon: {
     fontSize: 52,
-    color: '#da4453',
+    color: '#ff4a57',
     fontFamily: 'Rajdhani-Bold',
     textShadowColor: 'rgba(218, 68, 83, 0.6)',
     textShadowOffset: { width: 0, height: 0 },
@@ -96,7 +96,7 @@ const errorStyles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    color: '#da4453',
+    color: '#ff4a57',
     fontFamily: 'Rajdhani-Bold',
     fontSize: 24,
     letterSpacing: 8,
@@ -108,9 +108,9 @@ const errorStyles = StyleSheet.create({
   divider: {
     width: '50%',
     height: 1,
-    backgroundColor: '#da4453',
+    backgroundColor: '#ff4a57',
     marginVertical: 16,
-    shadowColor: '#da4453',
+    shadowColor: '#ff4a57',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 8,
@@ -120,7 +120,7 @@ const errorStyles = StyleSheet.create({
     marginBottom: 12,
   },
   errorDetail: {
-    color: '#da4453',
+    color: '#ff4a57',
     fontFamily: 'TerminessNerdFont',
     fontSize: 11,
     textAlign: 'center',
@@ -135,13 +135,13 @@ const errorStyles = StyleSheet.create({
     marginBottom: 24,
   },
   rebootBtn: {
-    color: '#5df4fe',
+    color: '#0abdc6',
     fontFamily: 'Rajdhani-Bold',
     fontSize: 14,
     letterSpacing: 4,
     textTransform: 'uppercase',
     borderWidth: 1,
-    borderColor: '#5df4fe',
+    borderColor: '#0abdc6',
     paddingHorizontal: 28,
     paddingVertical: 10,
     borderRadius: 2,
@@ -205,11 +205,11 @@ function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
 
 const subTabStyles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#050508',
+    backgroundColor: '#050505',
   },
   bar: {
     flexDirection: 'row',
-    backgroundColor: '#050508',
+    backgroundColor: '#050505',
     borderBottomWidth: 1,
     borderBottomColor: '#2a2445',
     paddingHorizontal: 8,
@@ -228,8 +228,8 @@ const subTabStyles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    color: '#fcee09',
-    borderBottomColor: '#fcee09',
+    color: '#f3e600',
+    borderBottomColor: '#f3e600',
     textShadowColor: 'rgba(252, 238, 9, 0.4)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 6,
@@ -372,15 +372,15 @@ function BootScreen() {
 const bootStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050508',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bootLine: {
     height: 2,
-    backgroundColor: '#fcee09',
+    backgroundColor: '#f3e600',
     marginBottom: 24,
-    shadowColor: '#fcee09',
+    shadowColor: '#f3e600',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 12,
@@ -389,7 +389,7 @@ const bootStyles = StyleSheet.create({
   title: {
     fontFamily: 'Rajdhani-Bold',
     fontSize: 36,
-    color: '#fcee09',
+    color: '#f3e600',
     letterSpacing: 12,
     textTransform: 'uppercase',
     textShadowColor: 'rgba(252, 238, 9, 0.4)',
@@ -439,26 +439,26 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#050508' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#050505' }}>
         <NavigationContainer>
           <StatusBar style="light" />
           <Tab.Navigator
             screenOptions={{
               headerShown: false,
               tabBarStyle: {
-                backgroundColor: '#050508',
+                backgroundColor: '#050505',
                 borderTopWidth: 1,
-                borderTopColor: '#fcee09',
+                borderTopColor: '#f3e600',
                 height: 60,
                 paddingBottom: 6,
                 paddingTop: 6,
                 elevation: 16,
-                shadowColor: '#fcee09',
+                shadowColor: '#f3e600',
                 shadowOffset: { width: 0, height: -2 },
                 shadowOpacity: 0.15,
                 shadowRadius: 10,
               },
-              tabBarActiveTintColor: '#fcee09',
+              tabBarActiveTintColor: '#f3e600',
               tabBarInactiveTintColor: '#8a9bad',
               tabBarLabelStyle: {
                 fontFamily: 'Rajdhani-Bold',

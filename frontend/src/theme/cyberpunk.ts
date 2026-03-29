@@ -1,110 +1,110 @@
 /**
  * NeonTrade AI - Cyberpunk 2077 Theme
- * Inspired by Cyberpunk 2077 UI + user's Daemon-2.0 KDE theme.
+ * Colors matched EXACTLY to user's Bitpunk KDE Plasma theme.
  * Font: Rajdhani (user's system font) — geometric, futuristic sans-serif.
  *
  * Design principles:
- * - CP2077 yellow (#fcee09) as primary accent (iconic game color)
- * - Cyan (#5df4fe) for tech/AI elements (Daemon-2.0 palette)
- * - Magenta (#ed00d9) for critical alerts (Daemon-2.0 palette)
+ * - Bitpunk yellow (#f3e600) as primary accent (ForegroundNeutral)
+ * - Bitpunk cyan (#0abdc6) for tech/AI elements (DecorationFocus)
+ * - Bitpunk magenta (#ea00d9) for critical alerts (DecorationHover)
  * - Angular, clipped corners (CP2077 UI signature)
  * - Scan lines, grid overlays, glitch effects
  * - HUD-style data presentation (trading = combat readiness)
- * - Cold dark backgrounds with blue tint for eye comfort during long sessions
+ * - Bitpunk dark backgrounds (#0a0e14 window, #050505 view)
  */
 
 export const theme = {
   colors: {
-    // Primary backgrounds (cold dark palette — true blacks with blue tint)
-    background: '#0a0e14',      // True black with cold blue tint
-    backgroundDark: '#050508',  // Near-OLED black
-    backgroundLight: '#111824', // Cold dark navy
-    backgroundCard: '#0d1219',  // Cold card surface
-    backgroundHUD: '#080c12',   // Cold HUD overlay
+    // Primary backgrounds (EXACT Bitpunk KDE theme values)
+    background: '#0a0e14',      // Bitpunk: Colors:Window BackgroundNormal (10,14,20)
+    backgroundDark: '#050505',  // Bitpunk: Colors:View BackgroundNormal (5,5,5)
+    backgroundLight: '#1c2632', // Bitpunk: Colors:Button BackgroundNormal (28,38,50)
+    backgroundCard: '#131a24',  // Bitpunk: Colors:Tooltip BackgroundNormal (19,26,36)
+    backgroundHUD: '#080c12',   // Derived: between View and Window BG
 
-    // CP2077 Primary accent — iconic yellow
-    cp2077Yellow: '#fcee09',
-    cp2077YellowDim: '#b3a906',
-    cp2077YellowGlow: 'rgba(252, 238, 9, 0.3)',
+    // Bitpunk Primary accent — ForegroundNeutral yellow (243,230,0)
+    cp2077Yellow: '#f3e600',
+    cp2077YellowDim: '#a9a000',
+    cp2077YellowGlow: 'rgba(243, 230, 0, 0.3)',
 
-    // Daemon-2.0 Cyan — tech/AI/trust
-    neonCyan: '#5df4fe',
-    neonCyanDim: '#1e505a',
-    neonCyanGlow: 'rgba(93, 244, 254, 0.3)',
+    // Bitpunk Cyan — DecorationFocus (10,189,198)
+    neonCyan: '#0abdc6',
+    neonCyanDim: '#08919a',
+    neonCyanGlow: 'rgba(10, 189, 198, 0.3)',
 
-    // Daemon-2.0 Magenta — critical/brand
-    neonMagenta: '#ed00d9',
-    neonMagentaDim: '#8a0080',
-    neonMagentaGlow: 'rgba(237, 0, 217, 0.3)',
+    // Bitpunk Magenta — DecorationHover (234,0,217)
+    neonMagenta: '#ea00d9',
+    neonMagentaDim: '#bb00ae',
+    neonMagentaGlow: 'rgba(234, 0, 217, 0.3)',
 
-    // Daemon-2.0 Red — alerts/loss
-    neonRed: '#da4453',
-    neonRedDim: '#8a2030',
-    neonRedGlow: 'rgba(218, 68, 83, 0.3)',
+    // Bitpunk Red — ForegroundNegative (255,74,87)
+    neonRed: '#ff4a57',
+    neonRedDim: '#c83a44',
+    neonRedGlow: 'rgba(255, 74, 87, 0.3)',
 
-    // Status colors (trading universal)
-    neonGreen: '#00ff88',       // Profit — universal green
-    neonGreenDim: '#00994d',
-    neonGreenGlow: 'rgba(0, 255, 136, 0.3)',
-    neonOrange: '#ff6b35',      // Warning
-    neonYellow: '#ffb800',      // Caution/pending
+    // Bitpunk Green — Color2/ForegroundPositive (46,216,140)
+    neonGreen: '#2ed88c',
+    neonGreenDim: '#24aa6e',
+    neonGreenGlow: 'rgba(46, 216, 140, 0.3)',
+    neonOrange: '#ff6b35',      // Warning (no Bitpunk equivalent, kept)
+    neonYellow: '#ffef4a',      // Caution/pending — Bitpunk Color3Intense (255,239,74)
 
-    // New cold accent colors
-    neonBlue: '#0088ff',        // Cool blue accent
-    coldGray: '#2a3a4d',        // Cold gray for borders/dividers
-    iceWhite: '#e0e8f0',        // Cold white for secondary text
+    // Bitpunk accent colors
+    neonBlue: '#08919a',        // Bitpunk: Color4/ForegroundVisited (8,145,154)
+    coldGray: '#2a3a4d',        // Bitpunk: Color0Intense (42,58,77)
+    iceWhite: '#e0e8f0',        // Bitpunk: ForegroundNormal (224,232,240)
 
-    // Text (cold palette — iceWhite secondary, visible muted)
-    textPrimary: '#fcee09',     // CP2077 yellow for headers/titles
-    textSecondary: '#e0e8f0',   // iceWhite — colder secondary
-    textMuted: '#8a9bad',       // More visible in cold backgrounds
+    // Text (EXACT Bitpunk values)
+    textPrimary: '#f3e600',     // Bitpunk: ForegroundNeutral (243,230,0)
+    textSecondary: '#e0e8f0',   // Bitpunk: ForegroundNormal (224,232,240)
+    textMuted: '#8a9bad',       // Bitpunk: ForegroundInactive (138,155,173)
     textWhite: '#f0eef5',       // Pure content text
-    textCyan: '#5df4fe',        // Tech/AI text
+    textCyan: '#0abdc6',        // Tech/AI text
 
     // Status
-    profit: '#00ff88',
-    loss: '#da4453',
+    profit: '#2ed88c',
+    loss: '#ff4a57',
     neutral: '#8a9bad',
     warning: '#ffb800',
 
     // Confidence levels
-    confidenceHigh: '#5df4fe',
+    confidenceHigh: '#0abdc6',
     confidenceMedium: '#ffb800',
     confidenceLow: '#8a9bad',
 
     // Borders (angular CP2077 style — colder)
     border: '#1a2535',
-    borderActive: '#fcee09',    // CP2077 yellow active border
-    borderCyan: '#5df4fe',
-    borderMagenta: '#ed00d9',
+    borderActive: '#f3e600',    // CP2077 yellow active border
+    borderCyan: '#0abdc6',
+    borderMagenta: '#ea00d9',
 
     // Chart
-    chartBullish: '#00ff88',
-    chartBearish: '#da4453',
+    chartBullish: '#2ed88c',
+    chartBearish: '#ff4a57',
     chartGrid: '#111824',
-    chartBackground: '#050508',
+    chartBackground: '#050505',
     chartGridLines: '#111824',
-    chartCandleUp: '#00ff88',
-    chartCandleDown: '#da4453',
+    chartCandleUp: '#2ed88c',
+    chartCandleDown: '#ff4a57',
     chartVolumeUp: 'rgba(0, 255, 136, 0.3)',
     chartVolumeDown: 'rgba(218, 68, 83, 0.3)',
-    chartCrosshair: '#fcee09',
-    chartEma20: '#5df4fe',
-    chartEma50: '#ed00d9',
-    chartSupport: '#00ff88',
-    chartResistance: '#da4453',
+    chartCrosshair: '#f3e600',
+    chartEma20: '#0abdc6',
+    chartEma50: '#ea00d9',
+    chartSupport: '#2ed88c',
+    chartResistance: '#ff4a57',
     chartPivot: '#ffb800',
     chartTextColor: '#8a9bad',
-    chartCurrentPrice: '#fcee09',
+    chartCurrentPrice: '#f3e600',
 
-    // Strategy detection colors (TradingLab 6-color system)
-    strategyBlue: '#0088ff',
-    strategyRed: '#da4453',
-    strategyPink: '#ed00d9',
-    strategyWhite: '#e0e8f0',
-    strategyBlack: '#888888',
-    strategyGreen: '#00ff88',
-    strategyDetected: '#fcee09',
+    // Strategy detection colors (TradingLab 6-color system, Bitpunk-aligned)
+    strategyBlue: '#08919a',    // Bitpunk: Color4 (8,145,154)
+    strategyRed: '#ff4a57',     // Bitpunk: ForegroundNegative (255,74,87)
+    strategyPink: '#ea00d9',    // Bitpunk: DecorationHover (234,0,217)
+    strategyWhite: '#e0e8f0',   // Bitpunk: ForegroundNormal (224,232,240)
+    strategyBlack: '#8a9bad',   // Bitpunk: ForegroundInactive (138,155,173)
+    strategyGreen: '#2ed88c',   // Bitpunk: Color2 (46,216,140)
+    strategyDetected: '#f3e600', // Bitpunk: ForegroundNeutral (243,230,0)
   },
 
   fonts: {
@@ -159,21 +159,21 @@ export const theme = {
 
   shadows: {
     cp2077Yellow: {
-      shadowColor: '#fcee09',
+      shadowColor: '#f3e600',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.5,
       shadowRadius: 12,
       elevation: 12,
     },
     neonCyan: {
-      shadowColor: '#5df4fe',
+      shadowColor: '#0abdc6',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.4,
       shadowRadius: 10,
       elevation: 10,
     },
     neonMagenta: {
-      shadowColor: '#ed00d9',
+      shadowColor: '#ea00d9',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.4,
       shadowRadius: 8,
@@ -187,7 +187,7 @@ export const theme = {
       elevation: 6,
     },
     hudGlow: {
-      shadowColor: '#fcee09',
+      shadowColor: '#f3e600',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.15,
       shadowRadius: 20,

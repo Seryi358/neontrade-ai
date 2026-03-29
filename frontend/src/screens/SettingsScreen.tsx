@@ -79,11 +79,11 @@ const STRATEGIES = [
       { key: 'BLUE_C', label: 'Tipo C', description: 'Rechazo EMA 4H' },
     ],
   },
-  { key: 'RED', label: 'RED', description: 'Cambio de tendencia 4H', color: '#da4453', variants: [] },
+  { key: 'RED', label: 'RED', description: 'Cambio de tendencia 4H', color: '#ff4a57', variants: [] },
   { key: 'PINK', label: 'PINK', description: 'Patron correctivo (Onda 4->5)', color: '#ff69b4', variants: [] },
-  { key: 'WHITE', label: 'WHITE', description: 'Continuacion post-Pink', color: '#ffffff', variants: [] },
-  { key: 'BLACK', label: 'BLACK', description: 'Contratendencia (min 2:1 R:R)', color: '#888888', variants: [] },
-  { key: 'GREEN', label: 'GREEN', description: 'Semanal + Diario + 15M (hasta 10:1)', color: '#00ff41', variants: [] },
+  { key: 'WHITE', label: 'WHITE', description: 'Continuacion post-Pink', color: '#e0e8f0', variants: [] },
+  { key: 'BLACK', label: 'BLACK', description: 'Contratendencia (min 2:1 R:R)', color: '#8a9bad', variants: [] },
+  { key: 'GREEN', label: 'GREEN', description: 'Semanal + Diario + 15M (hasta 10:1)', color: '#2ed88c', variants: [] },
 ];
 
 const RISK_FIELDS = [

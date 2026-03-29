@@ -347,26 +347,26 @@ export const api = {
 // ── Shared Constants ─────────────────────────────────────────────
 
 export const STRATEGY_COLORS: Record<string, string> = {
-  BLUE: '#0088ff',
-  RED: '#da4453',
-  PINK: '#ed00d9',
-  WHITE: '#dcdce6',
-  BLACK: '#888888',
-  GREEN: '#00ff88',
-  DETECTED: '#fcee09',
+  BLUE: '#08919a',    // Bitpunk: Color4 (8,145,154)
+  RED: '#ff4a57',     // Bitpunk: ForegroundNegative (255,74,87)
+  PINK: '#ea00d9',    // Bitpunk: DecorationHover (234,0,217)
+  WHITE: '#e0e8f0',   // Bitpunk: ForegroundNormal (224,232,240)
+  BLACK: '#8a9bad',   // Bitpunk: ForegroundInactive (138,155,173)
+  GREEN: '#2ed88c',   // Bitpunk: Color2 (46,216,140)
+  DETECTED: '#f3e600', // Bitpunk: ForegroundNeutral (243,230,0)
 };
 
 export function getScoreColor(score: number): string {
-  if (score >= 80) return '#00ff88';
-  if (score >= 60) return '#fcee09';
-  if (score >= 40) return '#ff6b35';
-  return '#ff2e63';
+  if (score >= 80) return '#2ed88c';  // Bitpunk green
+  if (score >= 60) return '#f3e600';  // Bitpunk yellow
+  if (score >= 40) return '#ff6b35';  // Warning orange
+  return '#ff4a57';                   // Bitpunk red
 }
 
 export function getTrendColor(trend: string): string {
   const upper = trend?.toUpperCase() || '';
-  if (upper.includes('BULL')) return '#00ff41';
-  if (upper.includes('BEAR')) return '#ff0040';
+  if (upper.includes('BULL')) return '#2ed88c';  // Bitpunk green
+  if (upper.includes('BEAR')) return '#ff4a57';  // Bitpunk red
   return '#7a6b9a';
 }
 

@@ -454,7 +454,9 @@ class TestEdgeCases:
             journal = TradeJournal.__new__(TradeJournal)
             journal._initial_capital = 0.0
             journal._data_path = os.path.join(tmpdir, "journal.json")
+            journal._missed_trades_path = os.path.join(tmpdir, "missed.json")
             journal._trades = []
+            journal._missed_trades = []
             journal._current_balance = 0.0
             journal._peak_balance = 0.0
             journal._max_drawdown_pct = 0.0
@@ -462,6 +464,10 @@ class TestEdgeCases:
             journal._current_winning_streak = 0
             journal._max_winning_streak = 0
             journal._max_streak_pct = 0.0
+            journal._current_losing_streak = 0
+            journal._max_losing_streak = 0
+            journal._max_losing_streak_pct = 0.0
+            journal._current_losing_streak_pct = 0.0
             journal._trade_counter = 0
             journal._accumulator = 1.0
             journal._dd_by_year = {}
@@ -520,7 +526,9 @@ class TestConcurrencySafety:
             j1 = TradeJournal.__new__(TradeJournal)
             j1._initial_capital = 10000.0
             j1._data_path = path
+            j1._missed_trades_path = path.replace("journal", "missed")
             j1._trades = []
+            j1._missed_trades = []
             j1._current_balance = 10000.0
             j1._peak_balance = 10000.0
             j1._max_drawdown_pct = 0.0
@@ -528,6 +536,10 @@ class TestConcurrencySafety:
             j1._current_winning_streak = 0
             j1._max_winning_streak = 0
             j1._max_streak_pct = 0.0
+            j1._current_losing_streak = 0
+            j1._max_losing_streak = 0
+            j1._max_losing_streak_pct = 0.0
+            j1._current_losing_streak_pct = 0.0
             j1._trade_counter = 0
             j1._accumulator = 1.0
             j1._dd_by_year = {}
@@ -1063,7 +1075,9 @@ class TestAdditionalBugs:
             journal = TradeJournal.__new__(TradeJournal)
             journal._initial_capital = 10000.0
             journal._data_path = os.path.join(tmpdir, "journal.json")
+            journal._missed_trades_path = os.path.join(tmpdir, "missed.json")
             journal._trades = []
+            journal._missed_trades = []
             journal._current_balance = 10000.0
             journal._peak_balance = 10000.0
             journal._max_drawdown_pct = 0.0
@@ -1071,6 +1085,10 @@ class TestAdditionalBugs:
             journal._current_winning_streak = 0
             journal._max_winning_streak = 0
             journal._max_streak_pct = 0.0
+            journal._current_losing_streak = 0
+            journal._max_losing_streak = 0
+            journal._max_losing_streak_pct = 0.0
+            journal._current_losing_streak_pct = 0.0
             journal._trade_counter = 0
             journal._accumulator = 1.0
             journal._dd_by_year = {}

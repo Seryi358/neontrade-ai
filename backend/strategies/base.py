@@ -2008,15 +2008,14 @@ class RedStrategy(BaseStrategy):
         wave_count = str(ew.get("wave_count", "")).strip()
 
         # RED TP1: Fib 1.272 extension of the corrective wave (mentorship primary target)
-        # Fallback to nearest swing S/R if Fib extension not available
-        fib_1272 = analysis.fibonacci_levels.get("ext_1.272")
+        # Uses directional keys (ext_bull_1.272 / ext_bear_1.272) — NOT legacy ext_1.272
+        # which has bearish-only bias and is dead code for BUY trades.
         if direction == "BUY":
             fib_1272_bull = analysis.fibonacci_levels.get("ext_bull_1.272")
             if fib_1272_bull and fib_1272_bull > entry_price:
                 result["tp1"] = fib_1272_bull
-            elif fib_1272 and fib_1272 > entry_price:
-                result["tp1"] = fib_1272
             else:
+                # Fallback to nearest swing resistance
                 above = [r for r in resistances if r > entry_price]
                 if above:
                     result["tp1"] = min(above)
@@ -2024,9 +2023,8 @@ class RedStrategy(BaseStrategy):
             fib_1272_bear = analysis.fibonacci_levels.get("ext_bear_1.272")
             if fib_1272_bear and fib_1272_bear < entry_price:
                 result["tp1"] = fib_1272_bear
-            elif fib_1272 and fib_1272 < entry_price:
-                result["tp1"] = fib_1272
             else:
+                # Fallback to nearest swing support
                 below = [s for s in supports if s < entry_price]
                 if below:
                     result["tp1"] = max(below)

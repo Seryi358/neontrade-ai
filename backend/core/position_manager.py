@@ -95,10 +95,11 @@ _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
     (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
-    # CPA (Short-term Aggressive): Swing=M15, Day=M2 (M5 fallback), Scalp=M1
+    # CPA (Short-term Aggressive): Swing=M15, Day=M2, Scalp=M1
+    # Alex: "el corto plazo agresivo son 2 minutos" for day trading
     (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
-    # M2 not available from broker API; M5 is the best available approximation
-    (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M5_50",
+    # Capital.com supports M2 (MINUTE_2) — use it per mentorship
+    (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M2_50",
     (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M1_50",
 }
 

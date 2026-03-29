@@ -421,6 +421,12 @@ class MonthlyReviewGenerator:
         if isinstance(ts, datetime):
             return ts
         if isinstance(ts, str) and ts.strip():
+            # Try Python's built-in ISO parser first (handles +00:00, Z, etc.)
+            try:
+                return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                pass
+            # Fallback to manual format parsing
             formats = [
                 "%Y-%m-%dT%H:%M:%S.%f",
                 "%Y-%m-%dT%H:%M:%S",

@@ -165,7 +165,7 @@ class TTLCache:
 
 # ── Global instances ──────────────────────────────────────────────
 broker_circuit_breaker = CircuitBreaker(
-    failure_threshold=50,
+    failure_threshold=5,   # Open after 5 consecutive failures (was 50 — far too high)
     recovery_timeout=30.0,
     name="broker",
 )

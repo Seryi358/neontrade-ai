@@ -144,8 +144,8 @@ class MarketAnalyzer:
             "H1": 200,   # ~8 days of 1H
             "M15": 200,  # ~2 days of 15m
             "M5": 200,   # ~17 hours of 5m
+            "M2": 200,   # ~6.6 hours of 2m, needed for CPA Day Trading (Alex: "2 minutos")
             "M1": 200,   # ~3.3 hours, needed for scalping position management
-            # M2 not supported by Capital.com API — M5 used as fallback
         }
 
         for tf, count in timeframes.items():
@@ -948,7 +948,9 @@ class MarketAnalyzer:
             "H1": [50],
             "M15": [5, 20, 50],
             "M5": [2, 5, 20, 50],
-            # M2 removed: candles are never fetched (not supported by broker API)
+            # M2: Capital.com supports MINUTE_2 — needed for CPA Day Trading
+            # Alex: "el corto plazo agresivo son 2 minutos"
+            "M2": [5, 50],
             "M1": [50],  # EMA 50 for scalping CP/CPA management
         }
 

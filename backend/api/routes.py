@@ -53,21 +53,11 @@ class TradeResponse(BaseModel):
     strategy: Optional[str] = None
 
 
-class EngineStatusResponse(BaseModel):
-    running: bool
-    mode: str  # "AUTO" or "MANUAL"
-    broker: str
-    open_positions: int
-    pending_setups: int
-    total_risk: float
-    watchlist_count: int
-    startup_error: str = ""
-    scanned_instruments: int = 0
-
-
 # ── Engine Status ─────────────────────────────────────────────────
+# Removed Pydantic response_model to avoid stripping dynamic fields
+# like positions, daily_activity, etc. that the frontend needs.
 
-@router.get("/status", response_model=EngineStatusResponse)
+@router.get("/status")
 async def get_status():
     """Get current trading engine status."""
     from main import engine
@@ -78,17 +68,20 @@ async def get_status():
     broker_name = getattr(engine.broker, 'broker_type', None)
     broker_str = broker_name.value if broker_name else "oanda"
 
-    return EngineStatusResponse(
-        running=status["running"],
-        mode=mode_str,
-        broker=broker_str,
-        open_positions=status["open_positions"],
-        pending_setups=len(pending),
-        total_risk=status["total_risk"],
-        watchlist_count=status["watchlist_count"],
-        startup_error=status.get("startup_error", ""),
-        scanned_instruments=status.get("scanned_instruments", 0),
-    )
+    return {
+        "running": status["running"],
+        "mode": mode_str,
+        "broker": broker_str,
+        "open_positions": status["open_positions"],
+        "pending_setups": len(pending),
+        "total_risk": status["total_risk"],
+        "watchlist_count": status["watchlist_count"],
+        "startup_error": status.get("startup_error", ""),
+        "scanned_instruments": status.get("scanned_instruments", 0),
+        # Include dynamic fields that frontend needs
+        "positions": status.get("positions", []),
+        "daily_activity": status.get("daily_activity", {}),
+    }
 
 
 # ── Daily Activity (Proof of Life) ────────────────────────────────

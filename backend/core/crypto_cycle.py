@@ -283,7 +283,8 @@ class CryptoCycleAnalyzer:
         elif dom == "falling" and btc_trend == "down":
             altcoin_outlook = "rare_alts_may_fall"
         elif dom == "rising" and btc_trend == "stable":
-            altcoin_outlook = "down"
+            # Mentorship: BTC.D rising + BTC stable = consolidation, not fleeing
+            altcoin_outlook = "stable_to_slightly_down"
         # stable dominance cases
         elif dom == "stable":
             altcoin_outlook = "neutral"

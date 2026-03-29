@@ -1245,7 +1245,12 @@ async def run_backtest(request: BacktestRequest):
         )
 
         backtester = Backtester(engine.broker)
-        result = await backtester.run(config)
+        # Bug fix R27: run backtest with timeout to prevent blocking event loop
+        import asyncio
+        try:
+            result = await asyncio.wait_for(backtester.run(config), timeout=120.0)
+        except asyncio.TimeoutError:
+            raise HTTPException(408, "Backtest timed out after 120 seconds. Try a shorter period.")
         import math
         _safe = lambda v: 0.0 if (isinstance(v, float) and (math.isinf(v) or math.isnan(v))) else v
         return {

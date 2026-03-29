@@ -586,6 +586,10 @@ class Backtester:
                 trades.append(pos.trade)
                 open_positions.remove(pos)
 
+            # Bug fix R27: reset cooldown after trade closes (was never set)
+            if newly_closed:
+                cooldown_remaining = config.cooldown_bars
+
             if cooldown_remaining > 0:
                 cooldown_remaining -= 1
 

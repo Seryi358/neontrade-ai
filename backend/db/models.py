@@ -233,14 +233,14 @@ class TradeDatabase:
 
     async def get_trades_between(self, start_iso: str, end_iso: str) -> list:
         """Get trades between two ISO datetime strings."""
-        async with aiosqlite.connect(self.db_path) as db:
-            db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT * FROM trades WHERE opened_at >= ? AND opened_at <= ? ORDER BY opened_at",
-                (start_iso, end_iso),
-            )
-            rows = await cursor.fetchall()
-            return [dict(r) for r in rows]
+        # Bug fix R27: use self._db instead of opening separate connection
+        # (avoids WAL bypass and potential locking issues)
+        cursor = await self._db.execute(
+            "SELECT * FROM trades WHERE opened_at >= ? AND opened_at <= ? ORDER BY opened_at",
+            (start_iso, end_iso),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
 
     # ── Daily Stats ───────────────────────────────────────────────
 

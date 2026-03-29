@@ -296,10 +296,10 @@ export default function CryptoScreen() {
             {cycle?.bmsb_status?.toUpperCase() || 'N/A'}
           </Text>
         </View>
-        {cycle?.bmsb_consecutive_bearish_closes > 0 && (
+        {(cycle?.bmsb_consecutive_bearish_closes ?? 0) > 0 && (
           <Text style={styles.indicatorNote}>
-            {cycle.bmsb_consecutive_bearish_closes} cierre(s) semanal(es) bajo BMSB
-            {cycle.bmsb_consecutive_bearish_closes >= 2 ? ' — CONFIRMADO BEARISH' : ' — esperando confirmación'}
+            {cycle?.bmsb_consecutive_bearish_closes} cierre(s) semanal(es) bajo BMSB
+            {(cycle?.bmsb_consecutive_bearish_closes ?? 0) >= 2 ? ' — CONFIRMADO BEARISH' : ' — esperando confirmación'}
           </Text>
         )}
 

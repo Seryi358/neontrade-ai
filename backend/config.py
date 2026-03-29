@@ -3,12 +3,13 @@ NeonTrade AI - Configuration
 Multi-broker Trading System powered by TradingLab Strategies
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 import os
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
     # Active broker: "ibkr", "capital", or "oanda"
     active_broker: str = "capital"
 
@@ -494,9 +495,7 @@ class Settings(BaseSettings):
         ["JP225_USD", "AU200_AUD"],
     ]
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    # model_config defined at class level above (Pydantic v2 ConfigDict)
 
 
 settings = Settings()

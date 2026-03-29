@@ -1009,6 +1009,10 @@ async def get_risk_config():
         "close_before_friday_hour": settings.close_before_friday_hour,
         "avoid_news_minutes_before": settings.avoid_news_minutes_before,
         "avoid_news_minutes_after": settings.avoid_news_minutes_after,
+        "avoid_news_minutes_before_swing": settings.avoid_news_minutes_before_swing,
+        "avoid_news_minutes_after_swing": settings.avoid_news_minutes_after_swing,
+        "news_impact_filter": settings.news_impact_filter,
+        "crypto_position_mgmt_style": settings.crypto_position_mgmt_style,
         # Drawdown management (ch18.7)
         "drawdown_method": settings.drawdown_method,
         "drawdown_level_1": settings.drawdown_level_1,

@@ -576,7 +576,7 @@ export default function SettingsScreen() {
               <Text style={styles.configValue}>30s</Text>
             </View>
             <View style={{ marginTop: theme.spacing.sm }}>
-              <Text style={{ fontFamily: theme.fonts.mono, fontSize: 9, color: theme.colors.textMuted, letterSpacing: 1 }}>
+              <Text style={{ fontFamily: theme.fonts.primary, fontSize: 9, color: theme.colors.textMuted, letterSpacing: 1 }}>
                 MAPEO: D→H1 | H4→M15 | H1→M5 | M5→M1
               </Text>
             </View>
@@ -1049,7 +1049,7 @@ export default function SettingsScreen() {
               backgroundColor: !securityStatus.auth_enabled || securityStatus.api_keys_count === 0
                 ? theme.colors.neonGreen : apiKeyValue ? theme.colors.neonGreen : theme.colors.cp2077Yellow,
             }} />
-            <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.mono }}>
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.primary }}>
               {!securityStatus.auth_enabled
                 ? 'AUTH DESHABILITADA'
                 : securityStatus.api_keys_count === 0
@@ -1162,15 +1162,15 @@ export default function SettingsScreen() {
         </View>
         {engineStatus?.startup_error ? (
           <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(255,46,99,0.1)', borderRadius: 4, borderWidth: 1, borderColor: theme.colors.neonRed }}>
-            <Text style={{ color: theme.colors.neonRed, fontFamily: theme.fonts.mono, fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ERROR DE CONEXION</Text>
-            <Text style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 10 }} numberOfLines={3}>
+            <Text style={{ color: theme.colors.neonRed, fontFamily: theme.fonts.heading, fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ERROR DE CONEXION</Text>
+            <Text style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary, fontSize: 10 }} numberOfLines={3}>
               {engineStatus.startup_error}
             </Text>
             <TouchableOpacity
               style={{ marginTop: 6, alignSelf: 'flex-start' }}
               onPress={startEngine}
             >
-              <Text style={{ color: theme.colors.neonCyan, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 1 }}>REINTENTAR CONEXION</Text>
+              <Text style={{ color: theme.colors.neonCyan, fontFamily: theme.fonts.heading, fontSize: 11, letterSpacing: 1 }}>REINTENTAR CONEXION</Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -1179,7 +1179,7 @@ export default function SettingsScreen() {
       {/* Diagnostic Card */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>DIAGNOSTICO DEL BROKER</Text>
-        <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.mono, marginBottom: 8 }}>
+        <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.primary, marginBottom: 8 }}>
           Prueba paso a paso la conexion con el broker
         </Text>
         <TouchableOpacity
@@ -1207,7 +1207,7 @@ export default function SettingsScreen() {
           {actionLoading === 'diagnostic' ? (
             <ActivityIndicator size="small" color={theme.colors.background} />
           ) : (
-            <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontFamily: theme.fonts.mono, fontSize: 12 }}>EJECUTAR DIAGNOSTICO</Text>
+            <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontFamily: theme.fonts.heading, fontSize: 12 }}>EJECUTAR DIAGNOSTICO</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -1281,20 +1281,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   modeLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 22,
     color: theme.colors.textWhite,
     letterSpacing: 4,
   },
   modeDescription: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     lineHeight: 18,
   },
   // Strategy selection
   strategyHint: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     marginBottom: theme.spacing.sm,
@@ -1323,7 +1323,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   strategyLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 14,
     color: theme.colors.textWhite,
     letterSpacing: 2,
@@ -1332,7 +1332,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   strategyDesc: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
     marginTop: 1,
@@ -1354,13 +1354,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   variantLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textSecondary,
     letterSpacing: 1,
   },
   variantDesc: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
   },
@@ -1374,7 +1374,7 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.border,
   },
   strategyCountLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
   },
@@ -1409,7 +1409,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   brokerName: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 14,
     color: theme.colors.textWhite,
     letterSpacing: 1,
@@ -1431,7 +1431,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.textMuted,
   },
   brokerBadgeText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 8,
     letterSpacing: 1,
   },
@@ -1442,7 +1442,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   brokerDesc: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     lineHeight: 16,
@@ -1451,7 +1451,7 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.sm,
   },
   connectedText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.neonGreen,
     letterSpacing: 1,
@@ -1466,7 +1466,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   configLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textSecondary,
   },
@@ -1504,7 +1504,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   engineStatusLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textSecondary,
   },
@@ -1523,7 +1523,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 7, 58, 0.1)',
   },
   engineStatusText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textWhite,
     letterSpacing: 2,
@@ -1544,7 +1544,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neonGreen,
   },
   startBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 12,
     color: theme.colors.backgroundDark,
     letterSpacing: 2,
@@ -1556,7 +1556,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.textMuted,
   },
   stopBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 12,
     color: theme.colors.textWhite,
     letterSpacing: 2,
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emergencyBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
     color: theme.colors.neonRed,
     letterSpacing: 2,
@@ -1579,7 +1579,7 @@ const styles = StyleSheet.create({
   },
   // Loading / Error
   loadingText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: theme.spacing.md,
@@ -1591,7 +1591,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   errorText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 13,
     color: theme.colors.neonRed,
     textAlign: 'center',
@@ -1605,14 +1605,14 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
   },
   retryBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
     color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
   // Watchlist card
   cardSubtitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     marginBottom: theme.spacing.sm,
@@ -1647,13 +1647,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   profileBtnTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 13,
     letterSpacing: 2,
     marginBottom: 4,
   },
   profileBtnDesc: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     letterSpacing: 0.5,

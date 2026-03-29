@@ -612,6 +612,7 @@ class TradingEngine:
 
             # Check economic calendar for upcoming news
             has_news, news_desc = await self.news_filter.has_upcoming_news()
+            self._news_active = has_news  # Cache for CPA auto-trigger check
             if has_news:
                 # Funded account: block ALL trades during news, not just execution
                 if settings.funded_account_mode and settings.funded_no_news_trading:
@@ -1028,18 +1029,10 @@ class TradingEngine:
         is_friday = now.weekday() == 4
         friday_close_soon = is_friday and now.hour >= settings.no_new_trades_friday_hour
 
-        # Check upcoming news
-        news_active = False
-        if self.news_filter:
-            try:
-                news_active, _ = asyncio.get_event_loop().run_until_complete(
-                    self.news_filter.has_upcoming_news()
-                ) if not asyncio.get_event_loop().is_running() else (False, "")
-            except Exception:
-                pass
-            # Simpler sync check for running loop
-            if hasattr(self, '_news_active'):
-                news_active = self._news_active
+        # Check upcoming news — use cached value from last scan cycle
+        # (the main scan loop already calls has_upcoming_news() asynchronously
+        # and stores the result; we just read the cached state here)
+        news_active = getattr(self, '_news_active', False)
 
         for pos in list(self.position_manager.positions.values()):
             # Only trigger CPA on positions past BE
@@ -1070,9 +1063,11 @@ class TradingEngine:
             if settings.cpa_auto_on_indecision:
                 analysis = self._last_scan_results.get(pos.instrument)
                 if analysis and "DOJI" in analysis.candlestick_patterns:
-                    price = prices.get(pos.instrument)
-                    if price and pos.take_profit_1:
-                        tp_dist = abs(pos.take_profit_1 - price)
+                    raw_price = prices.get(pos.instrument)
+                    # Extract numeric price from broker price object
+                    if raw_price is not None and pos.take_profit_1:
+                        price_val = raw_price.bid if hasattr(raw_price, 'bid') else float(raw_price)
+                        tp_dist = abs(pos.take_profit_1 - price_val)
                         entry_dist = abs(pos.take_profit_1 - pos.entry_price)
                         if entry_dist > 0 and tp_dist / entry_dist < 0.3:
                             self.position_manager.set_cpa_trigger(pos.trade_id, "indecision_near_tp")

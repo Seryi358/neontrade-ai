@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   countBadgeText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 14,
     color: theme.colors.textWhite,
     fontWeight: 'bold',
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.neonCyan,
   },
   modeIndicatorText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.neonCyan,
     letterSpacing: 2,
@@ -504,12 +504,12 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   strategyName: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     letterSpacing: 2,
   },
   setupInstrument: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 22,
     color: theme.colors.textWhite,
     letterSpacing: 2,
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   confidenceText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 9,
     letterSpacing: 2,
     fontWeight: 'bold',
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   directionText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 16,
     letterSpacing: 2,
     fontWeight: 'bold',
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   priceLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   expandToggleText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.cp2077Yellow,
     letterSpacing: 1,
@@ -598,21 +598,21 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   reasoningTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
     marginBottom: 6,
   },
   reasoningText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textSecondary,
     lineHeight: 18,
     marginBottom: theme.spacing.sm,
   },
   checklistTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     color: theme.colors.neonGreen,
   },
   checklistText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textSecondary,
     flex: 1,
@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   approveBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 12,
     color: theme.colors.backgroundDark,
     letterSpacing: 2,
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.neonRed,
   },
   rejectBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 12,
     color: theme.colors.neonRed,
     letterSpacing: 2,
@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   bulkApproveText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
     color: theme.colors.backgroundDark,
     letterSpacing: 2,
@@ -714,7 +714,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.neonRed,
   },
   bulkRejectText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
     color: theme.colors.neonRed,
     letterSpacing: 2,
@@ -733,13 +733,13 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   emptyText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 14,
     color: theme.colors.textMuted,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     textAlign: 'center',
@@ -753,14 +753,14 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.lg,
   },
   emptyPulseText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
   // Loading / Error
   loadingText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: theme.spacing.md,
@@ -772,7 +772,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   errorText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 13,
     color: theme.colors.neonRed,
     textAlign: 'center',
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
   },
   retryBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.cp2077Yellow,
     letterSpacing: 2,

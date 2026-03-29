@@ -429,7 +429,7 @@ class CryptoCycleAnalyzer:
             # Golden Cross / Death Cross detection (Esp. Criptomonedas Section 8)
             # Golden Cross = SMA 50 crosses ABOVE SMA 200 (strong bullish)
             # Death Cross = SMA 50 crosses BELOW SMA 200 (strong bearish)
-            if len(closes) >= 200:
+            if len(closes) >= 201:
                 sma_50 = sum(closes[-50:]) / 50
                 sma_50_prev = sum(closes[-51:-1]) / 50
                 sma_200_prev = sum(closes[-201:-1]) / 200

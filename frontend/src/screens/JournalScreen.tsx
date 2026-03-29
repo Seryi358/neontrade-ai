@@ -739,7 +739,7 @@ export default function JournalScreen() {
           disabled={loadingReport}
         >
           {loadingReport ? (
-            <ActivityIndicator size="small" color="#00f0ff" />
+            <ActivityIndicator size="small" color="#5df4fe" />
           ) : (
             <Text style={styles.actionButtonText}>GENERATE {currentMonth}</Text>
           )}

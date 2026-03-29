@@ -623,7 +623,7 @@ class ScalpingAnalyzer:
                 closes = m15_df["close"].values
                 # Calculate EMA 50 for recent M15 candles to find crossover
                 if len(closes) >= 52:
-                    ema_values = pd.Series(closes).ewm(span=50, adjust=False).values
+                    ema_values = pd.Series(closes).ewm(span=50, adjust=False).mean().values
                     # Check last 8 candles for a crossover
                     recent_breakout = False
                     lookback = min(8, len(ema_values) - 1)

@@ -495,6 +495,10 @@ class PositionManager:
         # Intermediate step: at 50% of BE threshold, reduce risk by 50%
         # Mentorship transcription: "antes del break-even, al 50% de beneficio, muevo el SL
         # para eliminar el 50% del riesgo" — progressive risk reduction before full BE.
+        # NOTE: Mentorship says this should trigger when "price exits the structure"
+        # (structural event). Current implementation uses 50% of BE distance as a proxy.
+        # A structural trigger would require pattern boundary detection, which is complex.
+        # The profit-based proxy is a reasonable approximation for automated trading.
         half_be_profit = risk_distance * 0.5
         if current_profit >= half_be_profit and not getattr(pos, '_half_risk_applied', False):
             # Move SL to reduce 50% of remaining risk

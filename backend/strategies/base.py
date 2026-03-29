@@ -1669,7 +1669,7 @@ class BlueStrategy(BaseStrategy):
         # Validar R:R minimo (config: min_rr_ratio para Blue)
         min_rr = settings.min_rr_ratio
         if variant == "BLUE_C":
-            min_rr = 2.0  # App default: Blue C is most restrictive variant, higher R:R recommended
+            min_rr = settings.min_rr_blue_c  # Blue C requires min 2:1 R:R (mentorship: "minimo 2 a 1, incluso 3 a 1")
 
         risk = abs(entry_price - sl)
         reward = abs(tp1 - entry_price)

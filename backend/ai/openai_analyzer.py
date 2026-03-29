@@ -283,16 +283,16 @@ IMPORTANT SL PROTECTION RULE: Fibonacci 0.618 is an ORIENTATION for SL placement
 ──── RED STRATEGY (4H Trend Change — Elliott Wave 2-3) ────
 Associated Wave: Wave 2 end on 4H → riding Wave 3
 
-  Step 1: Daily trend is clear (not ranging)
-  Step 2: 4H shows deceleration against daily trend (potential end of 4H corrective move)
-  Step 3: 1H shows BOS/CHOCH aligned with daily trend direction
-  Step 4: Price is in Fibonacci 0.382-0.618 zone of the 4H corrective move
-  Step 5: Confluence with daily S/R, FVG, or OB
-  Step 6: Entry on 5m/2m with reversal pattern
-  SL: Beyond the 4H corrective wave extreme
+  Step 1: Daily S/R level identified
+  Step 2: Price attacks level + deceleration on Daily
+  Step 3: Drop to 4H — trend change confirmed: break EMA 50 4H + higher highs/higher lows (or lower)
+  Step 4: Drop to 1H — pullback to EMA 50 1H + EMA 50 4H zone + Fibonacci. Small 1H EMA break without continuation = permissive. Big break = NOT a Red.
+  Step 5: Deceleration on 1H at that zone (attack, support, deceleration, turn)
+  Step 6: Drop to 5min — RCC on strongest level (EMA 50 5min > diagonal > 2min)
+  SL: Below/above the EMA 50 of 4H. Must also cover the previous swing low/high — if EMA 50 4H is closer to entry than the previous swing extreme, use the previous swing extreme as SL instead.
   TP1: previous high/low (safest)
   TP_max: Fibonacci 1.618 extension (Wave 3 target). Extended TP: 1.618 extension ONLY for Wave 3 with strong daily move.
-  1H EMA BREAK NUANCE: If small 1H MA break without continuation: permissive (still a Red). If break descontrols (strong momentum through EMA): NOT a Red — the setup is invalidated.
+  Step 7: SL below EMA 50 4H (must cover previous swing). TP: previous high/low (safest). Extended: 1.618 only for Wave 3 with strong daily.
 
 ──── PINK STRATEGY (Corrective Pattern Continuation — Elliott Wave 4→5) ────
 Associated Wave: Wave 4 correction end → entry for Wave 5
@@ -335,7 +335,7 @@ Risk Level: HIGHEST — requires minimum 2:1 R:R
   TP1: EMA 50 4H level (ALWAYS — not 'first significant S/R')
   TP_max: Fibonacci 1.618 extension (projected Wave 1 target)
   MANDATORY: R:R must be >= 2.0 for BLACK strategy
-  CRITICAL: If EMA 50 1H acts as dynamic support (BUY) or resistance (SELL), BLACK is INVALID
+  CRITICAL: If EMA 50 1H has rejected price 3 or more consecutive times, BLACK is INVALID — the EMA has become established dynamic S/R against trade direction. A single touch/rejection is acceptable; 3+ consecutive rejections means the level is respected and BLACK will likely fail.
   CRITICAL: 1H corrective pattern is normally a triangle or wedge. Channels are very rare for BLACK ("muy pocas veces será un canal" — Alex) — not invalid but significantly less reliable. Penalize confidence, don't hard-block.
 
 ──── GREEN STRATEGY (Trend + Breakout + Pullback + Pattern — Most Lucrative) ────
@@ -355,7 +355,7 @@ NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequenti
 
   NOTE: In the app implementation, GREEN uses a FIXED layout (Weekly->Daily->1H->15M) regardless of trading style, per the mentorship principle that Green does not differentiate day/swing.
 
-  SL: Below/above the pattern structure (tight SL due to HTF alignment)
+  SL: Below/above the LAST 1H swing low/high immediately preceding the diagonal break (the tightest possible SL). NOT the full pattern structure — Alex: 'queremos cubrir lo mínimo posible, el mínimo anterior en gráfico horario, previo justo a la ruptura de esa diagonal'.
   TP1: Next structure level on the intermediate timeframe
   TP_max: Major S/R level or Fibonacci 1.618 extension
   NOTE: GREEN setups are rare but extremely profitable when all timeframes align

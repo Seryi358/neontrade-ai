@@ -102,6 +102,7 @@ class Settings(BaseSettings):
     min_rr_ratio: float = 1.5
     min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R (mentoría explícita)
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R (mentoría explícita)
+    min_rr_blue_c: float = 2.0  # Blue C requires min 2:1 R:R (mentorship: "minimo 2 a 1, incluso 3 a 1")
     min_confluence_points: int = 2  # Minimum positive confluence points required (mentorship doesn't specify 3)
 
     # Reference benchmarks from ch18.3 Regla del 1%:

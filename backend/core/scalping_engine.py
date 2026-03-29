@@ -676,40 +676,85 @@ class ScalpingAnalyzer:
 
         # Condition 3: M1 execution trigger — breakout + confirmation (Workshop Step 6)
         # Workshop: "Requires both: breakout + confirmation (not just the breakout candle)"
-        # The breakout can be of the EMA 50 OR a diagonal/trendline.
-        # TODO: Diagonal/trendline break detection on M1 is not yet implemented.
-        if scalp_data.close_m1 is not None and scalp_data.ema50_m1 is not None:
-            # (a) Price must be on correct side of M1 EMA 50
-            if direction == "BUY" and scalp_data.close_m1 < scalp_data.ema50_m1:
-                result["valid"] = False
-                return result
-            if direction == "SELL" and scalp_data.close_m1 > scalp_data.ema50_m1:
-                result["valid"] = False
-                return result
+        # Workshop: "Does it have to be the EMA? No. We look for a trend change —
+        #            sometimes EMA, sometimes diagonal."
+        # Two valid breakout types: EMA 50 OR diagonal/trendline break
+        m1_ema_breakout = False
+        m1_diagonal_breakout = False
 
-            # (b) Breakout + confirmation: verify that the previous candle also
-            # closed on the correct side (two consecutive candle closes = confirmation)
-            m1_df = scalp_data.candles.get("M1", pd.DataFrame())
-            if not m1_df.empty and len(m1_df) >= 3:
-                closes = m1_df["close"].values
-                if len(closes) >= 52:
-                    ema_vals = pd.Series(closes).ewm(span=50, adjust=False).values
-                    # Check: current candle (confirmation) AND previous candle (breakout)
-                    # both closed on the correct side of EMA 50
-                    prev_close = closes[-2]
-                    prev_ema = ema_vals[-2]
-                    if direction == "BUY" and prev_close < prev_ema:
-                        # Previous candle was still below EMA — no confirmed breakout yet
-                        # (current candle is the breakout, needs one more for confirmation)
-                        result["confidence_adj"] -= 15
-                        result["reasons"].append(
-                            "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
-                        )
-                    elif direction == "SELL" and prev_close > prev_ema:
-                        result["confidence_adj"] -= 15
-                        result["reasons"].append(
-                            "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
-                        )
+        if scalp_data.close_m1 is not None and scalp_data.ema50_m1 is not None:
+            # (a) Check EMA 50 breakout on M1
+            if direction == "BUY" and scalp_data.close_m1 > scalp_data.ema50_m1:
+                m1_ema_breakout = True
+            elif direction == "SELL" and scalp_data.close_m1 < scalp_data.ema50_m1:
+                m1_ema_breakout = True
+
+        # (b) Check diagonal/trendline breakout on M1
+        # Workshop: "buscamos un cambio de tendencia — a veces EMA, a veces diagonal"
+        m1_df = scalp_data.candles.get("M1", pd.DataFrame())
+        if not m1_df.empty and len(m1_df) >= 10:
+            highs = m1_df["high"].values
+            lows = m1_df["low"].values
+            closes = m1_df["close"].values
+
+            # Detect diagonal/trendline break: 3+ descending highs then break above
+            # (bullish) or 3+ ascending lows then break below (bearish)
+            if direction == "BUY" and len(highs) >= 5:
+                # Look for descending trendline on recent M1 highs (last 10-20 candles)
+                lookback = min(20, len(highs) - 1)
+                recent_highs = highs[-lookback:-1]  # Exclude current candle
+                if len(recent_highs) >= 3:
+                    # Simple linear regression on highs to detect descending trendline
+                    x = np.arange(len(recent_highs))
+                    slope = np.polyfit(x, recent_highs, 1)[0] if len(x) > 1 else 0
+                    if slope < 0:  # Descending trendline exists
+                        # Project trendline to current candle
+                        projected = recent_highs[-1] + slope
+                        if closes[-1] > projected:  # Current close breaks above trendline
+                            m1_diagonal_breakout = True
+                            result["reasons"].append(
+                                "M1 diagonal/trendline breakout detected (descending trendline broken)"
+                            )
+            elif direction == "SELL" and len(lows) >= 5:
+                lookback = min(20, len(lows) - 1)
+                recent_lows = lows[-lookback:-1]
+                if len(recent_lows) >= 3:
+                    x = np.arange(len(recent_lows))
+                    slope = np.polyfit(x, recent_lows, 1)[0] if len(x) > 1 else 0
+                    if slope > 0:  # Ascending trendline exists
+                        projected = recent_lows[-1] + slope
+                        if closes[-1] < projected:  # Current close breaks below trendline
+                            m1_diagonal_breakout = True
+                            result["reasons"].append(
+                                "M1 diagonal/trendline breakout detected (ascending trendline broken)"
+                            )
+
+        # Must have at least ONE breakout type (EMA or diagonal)
+        if not m1_ema_breakout and not m1_diagonal_breakout:
+            result["valid"] = False
+            return result
+
+        if m1_ema_breakout and m1_diagonal_breakout:
+            result["confidence_adj"] += 10
+            result["reasons"].append("M1 double breakout: EMA 50 + diagonal (strong confirmation)")
+
+        # (c) Breakout confirmation: verify consecutive candle closes for EMA breakout
+        if m1_ema_breakout and not m1_df.empty and len(m1_df) >= 3:
+            closes = m1_df["close"].values
+            if len(closes) >= 52:
+                ema_vals = pd.Series(closes).ewm(span=50, adjust=False).mean().values
+                prev_close = closes[-2]
+                prev_ema = ema_vals[-2]
+                if direction == "BUY" and prev_close < prev_ema:
+                    result["confidence_adj"] -= 15
+                    result["reasons"].append(
+                        "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
+                    )
+                elif direction == "SELL" and prev_close > prev_ema:
+                    result["confidence_adj"] -= 15
+                    result["reasons"].append(
+                        "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
+                    )
 
         # Condition 4: Volume on M5 — Workshop says volume is "important" on M5
         # but does NOT make it a hard entry requirement. Treat as confluence

@@ -519,7 +519,7 @@ export default function AnalysisScreen() {
       >
         {loading && !analysis ? (
           <View style={styles.centerMessage}>
-            <ActivityIndicator size="large" color={theme.colors.neonPink} />
+            <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
             <Text style={styles.loadingText}>Analizando {selectedInstrument.replace('_', '/')}...</Text>
           </View>
         ) : error ? (
@@ -575,11 +575,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
   },
   title: {
-    fontFamily: theme.fonts.primary,
+    fontFamily: theme.fonts.heading,
     fontSize: 24,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 6,
-    textShadowColor: theme.colors.neonPinkGlow,
+    textShadowColor: theme.colors.cp2077YellowGlow,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
   },
@@ -609,13 +609,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.backgroundCard,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm + 2,
   },
   pickerButtonText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 16,
     color: theme.colors.textWhite,
     letterSpacing: 2,
@@ -623,12 +623,12 @@ const styles = StyleSheet.create({
   pickerChevron: {
     fontFamily: theme.fonts.mono,
     fontSize: 14,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
   },
   pickerDropdown: {
     backgroundColor: theme.colors.backgroundDark,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderTopWidth: 0,
     borderBottomLeftRadius: theme.borderRadius.md,
     borderBottomRightRadius: theme.borderRadius.md,
@@ -650,13 +650,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundLight,
   },
   pickerOptionText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 14,
     color: theme.colors.textSecondary,
     letterSpacing: 1,
   },
   pickerOptionTextActive: {
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
   },
   pickerOptionScore: {
     fontFamily: theme.fonts.mono,
@@ -674,9 +674,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   cardTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,
   },
@@ -731,7 +731,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   trendLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   trendValue: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -807,14 +807,14 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
   },
   tfSectionTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 9,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
     marginBottom: 4,
   },
   tfBullet: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textSecondary,
     lineHeight: 18,
@@ -836,16 +836,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: theme.colors.neonPinkDim,
+    borderColor: theme.colors.cp2077YellowDim,
   },
   patternText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 1,
   },
   tfConclusion: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textWhite,
     lineHeight: 18,
@@ -865,7 +865,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   strategyName: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 2,
@@ -888,7 +888,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textSecondary,
     flex: 1,
@@ -904,14 +904,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   entryLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     color: theme.colors.neonCyan,
     letterSpacing: 2,
     marginBottom: 2,
   },
   entryValue: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textSecondary,
     lineHeight: 16,
@@ -924,14 +924,14 @@ const styles = StyleSheet.create({
     padding: theme.spacing.sm,
   },
   riskLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 9,
     color: theme.colors.neonOrange,
     letterSpacing: 2,
     marginBottom: 4,
   },
   riskText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textSecondary,
     lineHeight: 16,
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
 
   // ── Recommendation ──────────────────────────────────
   recommendationCard: {
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderWidth: 1,
   },
   recommendationHeader: {
@@ -955,13 +955,13 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   confidenceText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     fontWeight: 'bold',
     letterSpacing: 2,
   },
   recommendationText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 13,
     color: theme.colors.textWhite,
     lineHeight: 20,
@@ -974,14 +974,14 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xxl * 2,
   },
   loadingText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textMuted,
     letterSpacing: 2,
     marginTop: theme.spacing.md,
   },
   errorIcon: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 36,
     color: theme.colors.neonRed,
     fontWeight: 'bold',
@@ -995,7 +995,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   errorText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.neonRed,
     letterSpacing: 1,
@@ -1004,19 +1004,19 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
   },
   retryButtonText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
   emptyText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textMuted,
     textAlign: 'center',

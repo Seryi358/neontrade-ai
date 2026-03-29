@@ -94,9 +94,9 @@ const styles = StyleSheet.create({
   },
   dot: {},
   label: {
-    fontFamily: theme.fonts.mono,
-    letterSpacing: 1,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   confidenceBadge: {
     borderWidth: 1,
@@ -105,14 +105,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   confidenceText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontFamily: theme.fonts.semibold,
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   direction: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 12,
-    letterSpacing: 1,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
 });

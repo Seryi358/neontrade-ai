@@ -224,7 +224,7 @@ export default function HistoryScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.neonPink} />
+        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
         <Text style={styles.loadingText}>Cargando historial...</Text>
       </View>
     );
@@ -247,7 +247,7 @@ export default function HistoryScreen() {
       <Text style={styles.header}>HISTORIAL</Text>
       <Text style={styles.subheader}>Operaciones cerradas</Text>
 
-      {error && <Text style={{color: theme.colors.neonRed, fontFamily: theme.fonts.mono, fontSize: 11, textAlign: 'center', padding: 8, letterSpacing: 2}}>{error}</Text>}
+      {error && <Text style={{color: theme.colors.neonRed, fontFamily: theme.fonts.primary, fontSize: 11, textAlign: 'center', padding: 8, letterSpacing: 2}}>{error}</Text>}
 
       {renderStatsCard()}
       {renderFilterBar()}
@@ -289,14 +289,14 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   header: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 20,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 4,
     marginTop: theme.spacing.lg,
   },
   subheader: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -312,9 +312,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   cardTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,
   },
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -375,8 +375,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   filterTabActive: {
-    borderColor: theme.colors.neonPink,
-    backgroundColor: 'rgba(235, 78, 202, 0.15)',
+    borderColor: theme.colors.cp2077Yellow,
+    backgroundColor: 'rgba(252, 238, 9, 0.15)',
   },
   filterDot: {
     width: 8,
@@ -384,13 +384,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   filterLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
     letterSpacing: 1,
   },
   filterLabelActive: {
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
   },
   // Trade list
   list: {
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   tradeInstrument: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 15,
     color: theme.colors.textWhite,
     letterSpacing: 1,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tradeDirection: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.textMuted,
   },
   modeBadgeText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 8,
     color: theme.colors.textMuted,
     letterSpacing: 1,
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   tradeDate: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
     marginTop: 4,
@@ -490,13 +490,13 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   emptyText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 14,
     color: theme.colors.textMuted,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     textAlign: 'center',
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   },
   // Loading / Error
   loadingText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: theme.spacing.md,
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   errorText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 13,
     color: theme.colors.neonRed,
     textAlign: 'center',
@@ -527,13 +527,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
   },
   retryBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
 });

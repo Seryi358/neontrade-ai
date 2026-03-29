@@ -1,85 +1,118 @@
 /**
- * NeonTrade AI - Cyberpunk Theme
- * Colors, fonts, and styling optimized for trading psychology.
+ * NeonTrade AI - Cyberpunk 2077 Theme
+ * Inspired by Cyberpunk 2077 UI + user's Daemon-2.0 KDE theme.
+ * Font: Rajdhani (user's system font) — geometric, futuristic sans-serif.
  *
- * Neuromarketing principles applied:
- * - Dark backgrounds reduce cognitive fatigue during long sessions
- * - Cyan triggers trust (reads as "blue" to the brain's trust circuits)
- * - Neon green/red preserve universal profit/loss associations
- * - High contrast text ensures readability for financial data
- * - Glow effects used sparingly (<15% of screen) to maintain focus
+ * Design principles:
+ * - CP2077 yellow (#fcee09) as primary accent (iconic game color)
+ * - Cyan (#5df4fe) for tech/AI elements (Daemon-2.0 palette)
+ * - Magenta (#ed00d9) for critical alerts (Daemon-2.0 palette)
+ * - Angular, clipped corners (CP2077 UI signature)
+ * - Scan lines, grid overlays, glitch effects
+ * - HUD-style data presentation (trading = combat readiness)
+ * - Dark navy/purple backgrounds for eye comfort during long sessions
  */
 
 export const theme = {
   colors: {
-    // Primary backgrounds (deep navy/near-black - reduces eye strain)
-    background: '#0f0a1a',
-    backgroundDark: '#0a0713',
-    backgroundLight: '#1a1530',
-    backgroundCard: '#161225',
+    // Primary backgrounds (Daemon-2.0: deep navy-purple gradient)
+    background: '#14101f',      // BG_DARK from Daemon-2.0
+    backgroundDark: '#0a0812',  // Deeper for modals/overlays
+    backgroundLight: '#1c1630', // Elevated cards
+    backgroundCard: '#18122a',  // Card surfaces
+    backgroundHUD: '#110e1d',   // HUD overlay background
 
-    // Accent (neon pink - brand identity + urgency)
-    neonPink: '#eb4eca',
-    neonPinkDim: '#b33d9b',
-    neonPinkGlow: 'rgba(235, 78, 202, 0.3)',
+    // CP2077 Primary accent — iconic yellow
+    cp2077Yellow: '#fcee09',
+    cp2077YellowDim: '#b3a906',
+    cp2077YellowGlow: 'rgba(252, 238, 9, 0.3)',
 
-    // Secondary accents (trust + status)
-    neonCyan: '#00f0ff',       // Trust, AI, technology
-    neonCyanGlow: 'rgba(0, 240, 255, 0.3)',
-    neonGreen: '#00ff88',      // Profit (softer green - less anxiety)
-    neonRed: '#ff2e63',        // Loss (softer red - less panic-inducing)
-    neonYellow: '#ffb800',     // Warning, caution, pending
-    neonOrange: '#ff6b35',     // Alerts
+    // Daemon-2.0 Cyan — tech/AI/trust
+    neonCyan: '#5df4fe',
+    neonCyanDim: '#1e505a',
+    neonCyanGlow: 'rgba(93, 244, 254, 0.3)',
 
-    // Text (high readability hierarchy)
-    textPrimary: '#eb4eca',
-    textSecondary: '#e2e8f0',  // Brighter for better readability
-    textMuted: '#8892a0',      // Blue-gray muted
-    textWhite: '#f0e6ff',
+    // Daemon-2.0 Magenta — critical/brand
+    neonMagenta: '#ed00d9',
+    neonMagentaDim: '#8a0080',
+    neonMagentaGlow: 'rgba(237, 0, 217, 0.3)',
 
-    // Status (profit/loss - universal associations)
+    // Daemon-2.0 Red — alerts/loss
+    neonRed: '#da4453',
+    neonRedDim: '#8a2030',
+    neonRedGlow: 'rgba(218, 68, 83, 0.3)',
+
+    // Status colors (trading universal)
+    neonGreen: '#00ff88',       // Profit — universal green
+    neonGreenDim: '#00994d',
+    neonGreenGlow: 'rgba(0, 255, 136, 0.3)',
+    neonOrange: '#ff6b35',      // Warning
+    neonYellow: '#ffb800',      // Caution/pending
+
+    // Text (Daemon-2.0: off-white with slight warmth)
+    textPrimary: '#fcee09',     // CP2077 yellow for headers/titles
+    textSecondary: '#dcdce6',   // Daemon-2.0 WHITE
+    textMuted: '#6b7080',       // Subdued labels
+    textWhite: '#f0eef5',       // Pure content text
+    textCyan: '#5df4fe',        // Tech/AI text
+
+    // Status
     profit: '#00ff88',
-    loss: '#ff2e63',
-    neutral: '#8892a0',
+    loss: '#da4453',
+    neutral: '#6b7080',
     warning: '#ffb800',
 
-    // Confidence levels (for AI signals)
-    confidenceHigh: '#00f0ff',
+    // Confidence levels
+    confidenceHigh: '#5df4fe',
     confidenceMedium: '#ffb800',
-    confidenceLow: '#8892a0',
+    confidenceLow: '#6b7080',
 
-    // Borders
+    // Borders (angular CP2077 style)
     border: '#2a2445',
-    borderActive: '#eb4eca',
+    borderActive: '#fcee09',    // CP2077 yellow active border
+    borderCyan: '#5df4fe',
+    borderMagenta: '#ed00d9',
 
-    // Chart - core
+    // Chart
     chartBullish: '#00ff88',
-    chartBearish: '#ff2e63',
-    chartGrid: '#1a1530',
-
-    // Chart - TradingView professional palette
-    chartBackground: '#0a0713',
+    chartBearish: '#da4453',
+    chartGrid: '#1a1535',
+    chartBackground: '#0a0812',
     chartGridLines: '#1a1535',
     chartCandleUp: '#00ff88',
-    chartCandleDown: '#ff2e63',
+    chartCandleDown: '#da4453',
     chartVolumeUp: 'rgba(0, 255, 136, 0.3)',
-    chartVolumeDown: 'rgba(255, 46, 99, 0.3)',
-    chartCrosshair: '#eb4eca',
-    chartEma20: '#00f0ff',
-    chartEma50: '#eb4eca',
+    chartVolumeDown: 'rgba(218, 68, 83, 0.3)',
+    chartCrosshair: '#fcee09',
+    chartEma20: '#5df4fe',
+    chartEma50: '#ed00d9',
     chartSupport: '#00ff88',
-    chartResistance: '#ff2e63',
+    chartResistance: '#da4453',
     chartPivot: '#ffb800',
-    chartTextColor: '#8892a0',
-    chartCurrentPrice: '#00f0ff',
+    chartTextColor: '#6b7080',
+    chartCurrentPrice: '#fcee09',
+
+    // Strategy detection colors (TradingLab 6-color system)
+    strategyBlue: '#0088ff',
+    strategyRed: '#da4453',
+    strategyPink: '#ed00d9',
+    strategyWhite: '#dcdce6',
+    strategyBlack: '#888888',
+    strategyGreen: '#00ff88',
+    strategyDetected: '#fcee09',
   },
 
   fonts: {
-    primary: 'TerminessNerdFont',
-    mono: 'TerminessNerdFont',
-    bold: 'TerminessNerdFont-Bold',
-    italic: 'TerminessNerdFont-Italic',
-    fallback: 'monospace',
+    // Rajdhani — geometric, futuristic, perfect for CP2077 HUD aesthetic
+    primary: 'Rajdhani',
+    heading: 'Rajdhani-Bold',
+    medium: 'Rajdhani-Medium',
+    semibold: 'Rajdhani-SemiBold',
+    light: 'Rajdhani-Light',
+    mono: 'TerminessNerdFont',  // Keep monospace for code/data
+    bold: 'Rajdhani-Bold',
+    fallback: "'Rajdhani', 'Segoe UI', sans-serif",
+    monoFallback: "'TerminessNerdFont', 'Fira Code', monospace",
   },
 
   spacing: {
@@ -92,23 +125,30 @@ export const theme = {
   },
 
   borderRadius: {
-    sm: 4,
-    md: 8,
-    lg: 12,
-    xl: 16,
+    sm: 2,    // Sharper — CP2077 angular style
+    md: 4,
+    lg: 8,
+    xl: 12,
     round: 999,
   },
 
   shadows: {
-    neonPink: {
-      shadowColor: '#eb4eca',
+    cp2077Yellow: {
+      shadowColor: '#fcee09',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.5,
+      shadowRadius: 12,
+      elevation: 12,
+    },
+    neonCyan: {
+      shadowColor: '#5df4fe',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.4,
       shadowRadius: 10,
       elevation: 10,
     },
-    neonCyan: {
-      shadowColor: '#00f0ff',
+    neonMagenta: {
+      shadowColor: '#ed00d9',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.4,
       shadowRadius: 8,
@@ -117,8 +157,15 @@ export const theme = {
     card: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
+      shadowOpacity: 0.4,
+      shadowRadius: 6,
+      elevation: 6,
+    },
+    hudGlow: {
+      shadowColor: '#fcee09',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.15,
+      shadowRadius: 20,
       elevation: 4,
     },
   },
@@ -128,24 +175,31 @@ export type Theme = typeof theme;
 
 // CSS variables version for web/electron
 export const cssTheme = `
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
   :root {
     --bg-primary: ${theme.colors.background};
     --bg-dark: ${theme.colors.backgroundDark};
     --bg-light: ${theme.colors.backgroundLight};
     --bg-card: ${theme.colors.backgroundCard};
+    --bg-hud: ${theme.colors.backgroundHUD};
 
-    --neon-pink: ${theme.colors.neonPink};
-    --neon-pink-dim: ${theme.colors.neonPinkDim};
-    --neon-pink-glow: ${theme.colors.neonPinkGlow};
+    --cp2077-yellow: ${theme.colors.cp2077Yellow};
+    --cp2077-yellow-dim: ${theme.colors.cp2077YellowDim};
+    --cp2077-yellow-glow: ${theme.colors.cp2077YellowGlow};
     --neon-cyan: ${theme.colors.neonCyan};
+    --neon-cyan-dim: ${theme.colors.neonCyanDim};
     --neon-cyan-glow: ${theme.colors.neonCyanGlow};
-    --neon-green: ${theme.colors.neonGreen};
+    --neon-magenta: ${theme.colors.neonMagenta};
+    --neon-magenta-glow: ${theme.colors.neonMagentaGlow};
     --neon-red: ${theme.colors.neonRed};
+    --neon-green: ${theme.colors.neonGreen};
 
     --text-primary: ${theme.colors.textPrimary};
     --text-secondary: ${theme.colors.textSecondary};
     --text-muted: ${theme.colors.textMuted};
     --text-white: ${theme.colors.textWhite};
+    --text-cyan: ${theme.colors.textCyan};
 
     --profit: ${theme.colors.profit};
     --loss: ${theme.colors.loss};
@@ -153,8 +207,9 @@ export const cssTheme = `
     --border: ${theme.colors.border};
     --border-active: ${theme.colors.borderActive};
 
-    --font-primary: 'TerminessNerdFont', 'Terminess Nerd Font', monospace;
-    --font-mono: 'TerminessNerdFont', 'Terminess Nerd Font', monospace;
+    --font-primary: 'Rajdhani', 'Segoe UI', sans-serif;
+    --font-heading: 'Rajdhani', sans-serif;
+    --font-mono: 'TerminessNerdFont', 'Fira Code', monospace;
 
     --radius-sm: ${theme.borderRadius.sm}px;
     --radius-md: ${theme.borderRadius.md}px;
@@ -172,66 +227,229 @@ export const cssTheme = `
     padding: 0;
   }
 
-  /* Tabular numerals for financial data (prevents layout jitter) */
+  /* ── CP2077 HUD Typography ─────────────────────────────── */
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--cp2077-yellow);
+  }
+
+  /* Tabular numerals for financial data */
   .financial-num {
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
 
-  /* Neon glow effects */
+  /* ── CP2077 Neon Text Effects ──────────────────────────── */
+
   .neon-text {
-    color: var(--neon-pink);
-    text-shadow: 0 0 7px var(--neon-pink-glow),
-                 0 0 10px var(--neon-pink-glow),
-                 0 0 21px var(--neon-pink-glow);
+    color: var(--cp2077-yellow);
+    text-shadow: 0 0 7px var(--cp2077-yellow-glow),
+                 0 0 14px var(--cp2077-yellow-glow),
+                 0 0 28px var(--cp2077-yellow-glow);
   }
 
   .neon-text-cyan {
     color: var(--neon-cyan);
     text-shadow: 0 0 7px var(--neon-cyan-glow),
-                 0 0 10px var(--neon-cyan-glow);
+                 0 0 14px var(--neon-cyan-glow);
   }
+
+  .neon-text-magenta {
+    color: var(--neon-magenta);
+    text-shadow: 0 0 7px var(--neon-magenta-glow),
+                 0 0 14px var(--neon-magenta-glow);
+  }
+
+  /* ── CP2077 Card & Border Styles ───────────────────────── */
 
   .neon-border {
-    border: 1px solid var(--neon-pink);
-    box-shadow: 0 0 5px var(--neon-pink-glow),
-                inset 0 0 5px var(--neon-pink-glow);
+    border: 1px solid var(--cp2077-yellow);
+    box-shadow: 0 0 5px var(--cp2077-yellow-glow),
+                inset 0 0 5px var(--cp2077-yellow-glow);
   }
 
-  .neon-card {
+  .neon-border-cyan {
+    border: 1px solid var(--neon-cyan);
+    box-shadow: 0 0 5px var(--neon-cyan-glow),
+                inset 0 0 5px var(--neon-cyan-glow);
+  }
+
+  .cp2077-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-left: 3px solid var(--cp2077-yellow);
+    border-radius: var(--radius-sm);
     padding: 16px;
+    position: relative;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
   }
 
-  .neon-card:hover {
-    border-color: var(--neon-pink);
-    box-shadow: 0 0 10px var(--neon-pink-glow);
+  .cp2077-card:hover {
+    border-color: var(--cp2077-yellow);
+    box-shadow: 0 0 15px var(--cp2077-yellow-glow),
+                inset 0 0 5px rgba(252, 238, 9, 0.05);
   }
+
+  /* CP2077 clipped corner effect */
+  .cp2077-clip {
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+
+  .cp2077-clip-sm {
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+
+  /* ── CP2077 HUD Elements ───────────────────────────────── */
+
+  .hud-header {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: var(--cp2077-yellow);
+    border-bottom: 1px solid var(--cp2077-yellow);
+    padding-bottom: 4px;
+    margin-bottom: 12px;
+  }
+
+  .hud-label {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+  }
+
+  .hud-value {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-white);
+    text-shadow: 0 0 4px rgba(240, 238, 245, 0.2);
+  }
+
+  .hud-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px 0;
+    position: relative;
+  }
+
+  .hud-divider::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    width: 40px;
+    height: 1px;
+    background: var(--cp2077-yellow);
+  }
+
+  /* ── Scan Lines (CP2077 CRT effect) ────────────────────── */
+
+  .scan-lines {
+    position: relative;
+  }
+
+  .scan-lines::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.06) 2px,
+      rgba(0, 0, 0, 0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* ── CP2077 Grid Background ────────────────────────────── */
+
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(93, 244, 254, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(93, 244, 254, 0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Price Animations ──────────────────────────────────── */
 
   .profit { color: var(--profit); }
   .loss { color: var(--loss); }
 
-  /* Price tick flash animation */
   @keyframes tick-up {
-    0% { background-color: rgba(0, 255, 136, 0.2); }
+    0% { background-color: rgba(0, 255, 136, 0.25); }
     100% { background-color: transparent; }
   }
   @keyframes tick-down {
-    0% { background-color: rgba(255, 46, 99, 0.2); }
+    0% { background-color: rgba(218, 68, 83, 0.25); }
     100% { background-color: transparent; }
   }
   .tick-up { animation: tick-up 0.4s ease-out; }
   .tick-down { animation: tick-down 0.4s ease-out; }
 
-  /* Confidence gauge gradient */
+  /* CP2077 glitch effect (use sparingly on alerts) */
+  @keyframes glitch {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+  }
+  .glitch { animation: glitch 0.3s ease-in-out; }
+
+  /* Pulsing dot for live status */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--neon-green); }
+    50% { opacity: 0.5; box-shadow: 0 0 8px var(--neon-green); }
+  }
+  .pulse-live {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--neon-green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* HUD corner decorations */
+  @keyframes corner-scan {
+    0% { width: 0; }
+    100% { width: 20px; }
+  }
+
+  .hud-corner::before,
+  .hud-corner::after {
+    content: '';
+    position: absolute;
+    background: var(--cp2077-yellow);
+    height: 1px;
+    animation: corner-scan 0.5s ease-out forwards;
+  }
+  .hud-corner::before { top: 0; left: 0; }
+  .hud-corner::after { bottom: 0; right: 0; }
+
+  /* ── Confidence Levels ─────────────────────────────────── */
+
   .confidence-high { color: ${theme.colors.confidenceHigh}; }
   .confidence-medium { color: ${theme.colors.confidenceMedium}; }
   .confidence-low { color: ${theme.colors.confidenceLow}; }
 
-  /* ── Chart-specific styles ─────────────────────────────────── */
+  /* ── Chart Styles ──────────────────────────────────────── */
+
   --chart-bg: ${theme.colors.chartBackground};
   --chart-grid: ${theme.colors.chartGridLines};
   --chart-candle-up: ${theme.colors.chartCandleUp};
@@ -245,49 +463,92 @@ export const cssTheme = `
   --chart-resistance: ${theme.colors.chartResistance};
   --chart-pivot: ${theme.colors.chartPivot};
 
-  /* TradingView chart container glow on hover */
   .tv-lightweight-charts {
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     transition: box-shadow 0.3s ease;
   }
   .tv-lightweight-charts:hover {
-    box-shadow: 0 0 12px rgba(235, 78, 202, 0.15),
-                0 0 4px rgba(0, 240, 255, 0.1);
+    box-shadow: 0 0 15px rgba(252, 238, 9, 0.1),
+                0 0 4px rgba(93, 244, 254, 0.08);
   }
 
-  /* Neon glow utility classes */
+  /* ── Glow Utilities ────────────────────────────────────── */
+
+  .glow-yellow {
+    box-shadow: 0 0 8px rgba(252, 238, 9, 0.4),
+                0 0 16px rgba(252, 238, 9, 0.15);
+  }
   .glow-green {
     box-shadow: 0 0 6px rgba(0, 255, 136, 0.4),
                 0 0 12px rgba(0, 255, 136, 0.15);
   }
   .glow-red {
-    box-shadow: 0 0 6px rgba(255, 46, 99, 0.4),
-                0 0 12px rgba(255, 46, 99, 0.15);
+    box-shadow: 0 0 6px rgba(218, 68, 83, 0.4),
+                0 0 12px rgba(218, 68, 83, 0.15);
   }
   .glow-cyan {
-    box-shadow: 0 0 6px rgba(0, 240, 255, 0.4),
-                0 0 12px rgba(0, 240, 255, 0.15);
+    box-shadow: 0 0 6px rgba(93, 244, 254, 0.4),
+                0 0 12px rgba(93, 244, 254, 0.15);
   }
-  .glow-pink {
-    box-shadow: 0 0 6px rgba(235, 78, 202, 0.4),
-                0 0 12px rgba(235, 78, 202, 0.15);
-  }
-  .glow-yellow {
-    box-shadow: 0 0 6px rgba(255, 184, 0, 0.4),
-                0 0 12px rgba(255, 184, 0, 0.15);
+  .glow-magenta {
+    box-shadow: 0 0 6px rgba(237, 0, 217, 0.4),
+                0 0 12px rgba(237, 0, 217, 0.15);
   }
 
-  /* Text glow utilities */
+  .text-glow-yellow {
+    text-shadow: 0 0 6px rgba(252, 238, 9, 0.5);
+  }
   .text-glow-green {
     text-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
   }
   .text-glow-red {
-    text-shadow: 0 0 6px rgba(255, 46, 99, 0.5);
+    text-shadow: 0 0 6px rgba(218, 68, 83, 0.5);
   }
   .text-glow-cyan {
-    text-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+    text-shadow: 0 0 6px rgba(93, 244, 254, 0.5);
   }
-  .text-glow-pink {
-    text-shadow: 0 0 6px rgba(235, 78, 202, 0.5);
+  .text-glow-magenta {
+    text-shadow: 0 0 6px rgba(237, 0, 217, 0.5);
+  }
+
+  /* ── Scrollbar (CP2077 thin style) ─────────────────────── */
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--cp2077-yellow-dim);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--cp2077-yellow);
   }
 `;
+
+// Strategy badge color helper (TradingLab 6-color system)
+export const getStrategyColor = (strategy: string): string => {
+  const map: Record<string, string> = {
+    BLUE: theme.colors.strategyBlue,
+    BLUE_A: theme.colors.strategyBlue,
+    BLUE_B: theme.colors.strategyBlue,
+    BLUE_C: theme.colors.strategyBlue,
+    RED: theme.colors.strategyRed,
+    PINK: theme.colors.strategyPink,
+    WHITE: theme.colors.strategyWhite,
+    BLACK: theme.colors.strategyBlack,
+    GREEN: theme.colors.strategyGreen,
+  };
+  return map[strategy.toUpperCase()] || theme.colors.cp2077Yellow;
+};
+
+// Score color helper (confidence/quality tiers)
+export const getScoreColor = (score: number): string => {
+  if (score >= 80) return theme.colors.neonGreen;
+  if (score >= 60) return theme.colors.cp2077Yellow;
+  if (score >= 40) return theme.colors.neonOrange;
+  return theme.colors.neonRed;
+};

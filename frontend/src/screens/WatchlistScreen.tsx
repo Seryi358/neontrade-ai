@@ -131,7 +131,7 @@ export default function WatchlistScreen() {
         {activeCount > 0 ? ` · ${activeCount} con señal` : ''}
       </Text>
 
-      {error && <Text style={{color: theme.colors.neonRed, fontFamily: theme.fonts.mono, fontSize: 11, textAlign: 'center', padding: 8, letterSpacing: 2}}>{error}</Text>}
+      {error && <Text style={{color: theme.colors.neonRed, fontFamily: theme.fonts.primary, fontSize: 11, textAlign: 'center', padding: 8, letterSpacing: 2}}>{error}</Text>}
 
       <FlatList
         data={watchlist}
@@ -150,14 +150,14 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   header: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 20,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 4,
     marginTop: theme.spacing.lg,
   },
   subheader: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pair: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 16,
     color: theme.colors.textWhite,
     letterSpacing: 1,
@@ -193,12 +193,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   trend: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     letterSpacing: 1,
   },
   convergenceTag: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.neonCyan,
     borderWidth: 1,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   conditionTag: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 8,
     borderWidth: 1,
     borderRadius: 3,
@@ -229,13 +229,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   strategyText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1,
   },
   confidenceTag: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 8,
     borderWidth: 1,
     borderRadius: 3,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   scoreLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 8,
     color: theme.colors.textMuted,
     letterSpacing: 2,

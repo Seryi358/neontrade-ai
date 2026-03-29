@@ -144,19 +144,31 @@ class EconomicCalendar:
             within_minutes: Check within this many minutes (default from config)
         """
         if within_minutes is None:
-            within_minutes = settings.avoid_news_minutes_before
+            # Swing trading uses relaxed news buffers (mentorship: "podemos ejecutar")
+            if settings.trading_style == "swing":
+                within_minutes = settings.avoid_news_minutes_before_swing
+            else:
+                within_minutes = settings.avoid_news_minutes_before
+
+        # News impact filter (mentorship: Interest Rates, NFP, CPI, GDP are key)
+        impact_filter = getattr(settings, 'news_impact_filter', 'high')
 
         now = datetime.now(timezone.utc)
         check_until = now + timedelta(minutes=within_minutes)
 
         for event in self._events:
-            if event.impact != "high":
+            # Filter by impact level
+            if impact_filter == "high" and event.impact != "high":
                 continue
+            elif impact_filter == "medium" and event.impact not in ("high", "medium"):
+                continue
+            # "all" = no filter
             if event.currency not in currencies:
                 continue
             if now <= event.datetime_utc <= check_until:
                 logger.warning(
-                    f"High impact event in {within_minutes}min: "
+                    f"{'High' if event.impact == 'high' else event.impact.title()} "
+                    f"impact event in {within_minutes}min: "
                     f"{event.title} ({event.currency})"
                 )
                 return True
@@ -169,7 +181,11 @@ class EconomicCalendar:
     ) -> bool:
         """Check if a high-impact event just occurred."""
         if within_minutes is None:
-            within_minutes = settings.avoid_news_minutes_after
+            # Swing trading uses relaxed news buffers
+            if settings.trading_style == "swing":
+                within_minutes = settings.avoid_news_minutes_after_swing
+            else:
+                within_minutes = settings.avoid_news_minutes_after
 
         now = datetime.now(timezone.utc)
         check_from = now - timedelta(minutes=within_minutes)

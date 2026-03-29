@@ -310,7 +310,7 @@ export default function ManualModeScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.neonPink} />
+        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
         <Text style={styles.loadingText}>Cargando setups...</Text>
       </View>
     );
@@ -427,19 +427,19 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.lg,
   },
   header: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 20,
     color: theme.colors.neonCyan,
     letterSpacing: 4,
   },
   subheader: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     letterSpacing: 2,
   },
   countBadge: {
-    backgroundColor: theme.colors.neonPink,
+    backgroundColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.round,
     width: 32,
     height: 32,
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
   expandToggleText: {
     fontFamily: theme.fonts.mono,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 1,
   },
   expandedContent: {
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   reasoningTitle: {
     fontFamily: theme.fonts.mono,
     fontSize: 10,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
     marginBottom: 6,
   },
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   checklistTitle: {
     fontFamily: theme.fonts.mono,
     fontSize: 10,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
     marginBottom: 6,
     borderTopWidth: 1,
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   emptyPulseText: {
     fontFamily: theme.fonts.mono,
     fontSize: 10,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
   // Loading / Error
@@ -782,13 +782,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
   },
   retryBtnText: {
     fontFamily: theme.fonts.mono,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
 });

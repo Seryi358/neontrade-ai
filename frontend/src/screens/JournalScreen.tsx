@@ -625,7 +625,7 @@ export default function JournalScreen() {
             {/* Screenshots */}
             {item._screenshots && item._screenshots.length > 0 && (
               <TouchableOpacity onPress={() => openScreenshots(item.trade_id)}>
-                <Text style={[styles.statLabel, { color: '#00f0ff', marginBottom: 8 }]}>
+                <Text style={[styles.statLabel, { color: '#5df4fe', marginBottom: 8 }]}>
                   📸 {item._screenshots.length} screenshot(s)
                 </Text>
               </TouchableOpacity>
@@ -707,7 +707,7 @@ export default function JournalScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.neonPink} />
+        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
         <Text style={styles.loadingText}>Cargando journal...</Text>
       </View>
     );
@@ -771,7 +771,7 @@ export default function JournalScreen() {
             {monthlyReport.worst_strategy && (
               <View style={styles.statRow}>
                 <Text style={styles.statLabel}>Worst Strategy</Text>
-                <Text style={[styles.statValue, { color: '#ff2e63' }]}>
+                <Text style={[styles.statValue, { color: '#da4453' }]}>
                   {monthlyReport.worst_strategy}
                 </Text>
               </View>
@@ -862,14 +862,14 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   header: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 20,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 4,
     marginTop: theme.spacing.lg,
   },
   subheader: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -879,9 +879,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,
     marginTop: theme.spacing.xs,
@@ -896,9 +896,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   cardTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,
   },
@@ -921,7 +921,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -953,7 +953,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   configLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textSecondary,
   },
@@ -979,7 +979,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   monthlyLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
     letterSpacing: 1,
@@ -1073,12 +1073,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tradeDirection: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     letterSpacing: 1,
   },
   tradeStrategy: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
     letterSpacing: 1,
@@ -1089,7 +1089,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.textMuted,
   },
   tradeDate: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
   },
@@ -1126,19 +1126,19 @@ const styles = StyleSheet.create({
   },
   notesDivider: {
     height: 1,
-    backgroundColor: theme.colors.neonPinkDim,
+    backgroundColor: theme.colors.cp2077YellowDim,
     marginBottom: theme.spacing.sm,
     opacity: 0.5,
   },
   notesTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,
   },
   noteLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -1146,7 +1146,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
   noteInput: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textSecondary,
     backgroundColor: theme.colors.backgroundLight,
@@ -1160,20 +1160,20 @@ const styles = StyleSheet.create({
   saveNotesBtn: {
     marginTop: theme.spacing.sm,
     alignSelf: 'flex-end',
-    backgroundColor: theme.colors.neonPink,
+    backgroundColor: theme.colors.cp2077Yellow,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.xs + 2,
     borderRadius: theme.borderRadius.sm,
   },
   saveNotesBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     color: theme.colors.backgroundDark,
     letterSpacing: 2,
     fontWeight: 'bold',
   },
   expandIndicator: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
     textAlign: 'center',
@@ -1196,7 +1196,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 184, 0, 0.15)',
   },
   discretionaryBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: '#8892a0',
   },
@@ -1204,7 +1204,7 @@ const styles = StyleSheet.create({
   actionButton: {
     backgroundColor: 'rgba(0, 240, 255, 0.15)',
     borderWidth: 1,
-    borderColor: '#00f0ff',
+    borderColor: '#5df4fe',
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -1212,9 +1212,9 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   actionButtonText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 14,
-    color: '#00f0ff',
+    color: '#5df4fe',
     fontWeight: 'bold',
   },
   // Strategy row in monthly review
@@ -1229,7 +1229,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   recommendationText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: '#ffb800',
     marginTop: 4,
@@ -1247,13 +1247,13 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   emptyText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 14,
     color: theme.colors.textMuted,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     textAlign: 'center',
@@ -1262,7 +1262,7 @@ const styles = StyleSheet.create({
   },
   // Loading / Error
   loadingText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: theme.spacing.md,
@@ -1274,7 +1274,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   errorText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 13,
     color: theme.colors.neonRed,
     textAlign: 'center',
@@ -1284,13 +1284,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
   },
   retryBtnText: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
 });

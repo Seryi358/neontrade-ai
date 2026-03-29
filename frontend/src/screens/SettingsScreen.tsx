@@ -58,7 +58,7 @@ const STRATEGIES = [
       { key: 'BLUE_C', label: 'Tipo C', description: 'Rechazo EMA 4H' },
     ],
   },
-  { key: 'RED', label: 'RED', description: 'Cambio de tendencia 4H', color: '#ff2e63', variants: [] },
+  { key: 'RED', label: 'RED', description: 'Cambio de tendencia 4H', color: '#da4453', variants: [] },
   { key: 'PINK', label: 'PINK', description: 'Patron correctivo (Onda 4→5)', color: '#ff69b4', variants: [] },
   { key: 'WHITE', label: 'WHITE', description: 'Continuacion post-Pink', color: '#ffffff', variants: [] },
   { key: 'BLACK', label: 'BLACK', description: 'Contratendencia (min 2:1 R:R)', color: '#888888', variants: [] },
@@ -426,7 +426,7 @@ export default function SettingsScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.neonPink} />
+        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
         <Text style={styles.loadingText}>Cargando configuracion...</Text>
       </View>
     );
@@ -795,7 +795,7 @@ export default function SettingsScreen() {
           return (
             <View key={cat.key} style={styles.watchlistRow}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.strategyLabel, isActive && { color: '#00f0ff' }]}>
+                <Text style={[styles.strategyLabel, isActive && { color: '#5df4fe' }]}>
                   {cat.icon} {cat.label}
                 </Text>
                 <Text style={styles.watchlistCount}>
@@ -806,7 +806,7 @@ export default function SettingsScreen() {
                 value={isActive}
                 onValueChange={() => toggleWatchlistCategory(cat.key)}
                 trackColor={{ false: '#2a2445', true: 'rgba(0, 240, 255, 0.3)' }}
-                thumbColor={isActive ? '#00f0ff' : '#555'}
+                thumbColor={isActive ? '#5df4fe' : '#555'}
               />
             </View>
           );
@@ -1026,7 +1026,7 @@ export default function SettingsScreen() {
               Alert.alert('Backend', 'Restaurado a localhost. Reinicia la app.');
             }}
           >
-            <Text style={{ color: theme.colors.neonPink, fontSize: 12 }}>Restaurar a localhost</Text>
+            <Text style={{ color: theme.colors.cp2077Yellow, fontSize: 12 }}>Restaurar a localhost</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -1047,7 +1047,7 @@ export default function SettingsScreen() {
             <View style={{
               width: 8, height: 8, borderRadius: 4, marginRight: 6,
               backgroundColor: !securityStatus.auth_enabled || securityStatus.api_keys_count === 0
-                ? theme.colors.neonGreen : apiKeyValue ? theme.colors.neonGreen : theme.colors.neonPink,
+                ? theme.colors.neonGreen : apiKeyValue ? theme.colors.neonGreen : theme.colors.cp2077Yellow,
             }} />
             <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.mono }}>
               {!securityStatus.auth_enabled
@@ -1097,7 +1097,7 @@ export default function SettingsScreen() {
                   ? theme.colors.neonGreen
                   : (securityStatus && (securityStatus.api_keys_count === 0 || !securityStatus.auth_enabled))
                     ? theme.colors.neonCyan
-                    : theme.colors.neonPink,
+                    : theme.colors.cp2077Yellow,
               }]}>
                 {apiKeyValue
                   ? apiKeyValue.slice(0, 8) + '...' + apiKeyValue.slice(-4)
@@ -1120,7 +1120,7 @@ export default function SettingsScreen() {
               Alert.alert('API Key', 'Key eliminada.');
             }}
           >
-            <Text style={{ color: theme.colors.neonPink, fontSize: 12 }}>Eliminar Key</Text>
+            <Text style={{ color: theme.colors.cp2077Yellow, fontSize: 12 }}>Eliminar Key</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -1231,14 +1231,14 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   header: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 20,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 4,
     marginTop: theme.spacing.lg,
   },
   subheader: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -1254,15 +1254,15 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   cardTitle: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,
   },
   // Mode card
   modeCard: {
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
   },
   modeRow: {
     flexDirection: 'row',
@@ -1601,13 +1601,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
   },
   retryBtnText: {
     fontFamily: theme.fonts.mono,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
   // Watchlist card

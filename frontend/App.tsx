@@ -26,13 +26,13 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, backgroundColor: '#0f0a1a', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Text style={{ color: '#eb4eca', fontFamily: 'monospace', fontSize: 20, letterSpacing: 4, marginBottom: 16 }}>SYSTEM ERROR</Text>
+        <View style={{ flex: 1, backgroundColor: '#14101f', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ color: '#fcee09', fontFamily: 'Rajdhani-Bold', fontSize: 24, letterSpacing: 6, marginBottom: 16, textTransform: 'uppercase' }}>SYSTEM ERROR</Text>
           <ScrollView style={{ maxHeight: 200 }}>
-            <Text style={{ color: '#ff073a', fontFamily: 'monospace', fontSize: 11, textAlign: 'center' }}>{this.state.error}</Text>
+            <Text style={{ color: '#da4453', fontFamily: 'TerminessNerdFont', fontSize: 11, textAlign: 'center' }}>{this.state.error}</Text>
           </ScrollView>
           <Text
-            style={{ color: '#00f0ff', fontFamily: 'monospace', fontSize: 12, marginTop: 24, letterSpacing: 2 }}
+            style={{ color: '#5df4fe', fontFamily: 'Rajdhani-SemiBold', fontSize: 14, marginTop: 24, letterSpacing: 3, textTransform: 'uppercase' }}
             onPress={() => this.setState({ hasError: false, error: '' })}
           >[ REINICIAR ]</Text>
         </View>
@@ -59,7 +59,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   return (
     <Text style={[
       styles.tabIcon,
-      { color: focused ? theme.colors.neonPink : theme.colors.textMuted }
+      { color: focused ? theme.colors.cp2077Yellow : theme.colors.textMuted }
     ]}>
       {label}
     </Text>
@@ -68,6 +68,13 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
+    // Rajdhani — primary UI font (CP2077 geometric style)
+    'Rajdhani': require('./src/assets/fonts/Rajdhani-Regular.ttf'),
+    'Rajdhani-Light': require('./src/assets/fonts/Rajdhani-Light.ttf'),
+    'Rajdhani-Medium': require('./src/assets/fonts/Rajdhani-Medium.ttf'),
+    'Rajdhani-SemiBold': require('./src/assets/fonts/Rajdhani-SemiBold.ttf'),
+    'Rajdhani-Bold': require('./src/assets/fonts/Rajdhani-Bold.ttf'),
+    // Terminess — monospace for financial data/code
     'TerminessNerdFont': require('./src/assets/fonts/TerminessNerdFont-Regular.ttf'),
     'TerminessNerdFont-Bold': require('./src/assets/fonts/TerminessNerdFont-Bold.ttf'),
     'TerminessNerdFont-Italic': require('./src/assets/fonts/TerminessNerdFont-Italic.ttf'),
@@ -78,8 +85,8 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.neonPink} />
-        <Text style={styles.loadingText}>CARGANDO FUENTES...</Text>
+        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
+        <Text style={styles.loadingText}>INITIALIZING NEONTRADE AI...</Text>
       </View>
     );
   }
@@ -99,12 +106,13 @@ export default function App() {
             paddingBottom: 8,
             paddingTop: 4,
           },
-          tabBarActiveTintColor: theme.colors.neonPink,
+          tabBarActiveTintColor: theme.colors.cp2077Yellow,
           tabBarInactiveTintColor: theme.colors.textMuted,
           tabBarLabelStyle: {
-            fontFamily: 'TerminessNerdFont',
-            fontSize: 8,
-            letterSpacing: 1.5,
+            fontFamily: 'Rajdhani-SemiBold',
+            fontSize: 9,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
           },
         }}
       >
@@ -196,9 +204,9 @@ export default function App() {
 
 const styles = StyleSheet.create({
   tabIcon: {
-    fontSize: 18,
+    fontSize: 20,
     marginTop: 2,
-    fontFamily: 'TerminessNerdFont',
+    fontFamily: 'Rajdhani-Bold',
   },
   loadingContainer: {
     flex: 1,
@@ -207,10 +215,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    color: theme.colors.neonPink,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    letterSpacing: 3,
+    color: theme.colors.cp2077Yellow,
+    fontFamily: 'Rajdhani-SemiBold',
+    fontSize: 13,
+    letterSpacing: 4,
     marginTop: 16,
+    textTransform: 'uppercase',
   },
 });

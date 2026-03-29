@@ -154,9 +154,13 @@ class Settings(BaseSettings):
     #          "fixed_levels" (step-down at DD thresholds, most conservative)
     drawdown_method: str = "fixed_1pct"
     # Fixed levels: reduce risk at these drawdown thresholds
-    drawdown_level_1: float = 0.05    # -5% DD -> 0.75% risk
-    drawdown_level_2: float = 0.075   # -7.5% DD -> 0.50% risk
-    drawdown_level_3: float = 0.10    # -10% DD -> 0.25% risk (funded account max)
+    # Values from TradingPlan_2024.pdf "Cálculo fijo" screenshot:
+    # Level 1: -4.12% DD (4 trades * 1.03% avg loss)
+    # Level 2: -6.18% DD (6 trades * 1.03% avg loss)
+    # Level 3: -8.23% DD (8 trades * 1.03% avg loss)
+    drawdown_level_1: float = 0.0412  # -4.12% DD -> 0.75% risk
+    drawdown_level_2: float = 0.0618  # -6.18% DD -> 0.50% risk
+    drawdown_level_3: float = 0.0823  # -8.23% DD -> 0.25% risk (funded account max)
     drawdown_risk_1: float = 0.0075   # 0.75% at level 1
     drawdown_risk_2: float = 0.005    # 0.50% at level 2
     drawdown_risk_3: float = 0.0025   # 0.25% at level 3
@@ -180,6 +184,16 @@ class Settings(BaseSettings):
     no_new_trades_friday_hour: int = 18  # No NEW trades after Friday 18:00 UTC (Trading Plan)
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
     avoid_news_minutes_after: int = 15   # Don't trade 15 min after major news
+    # Swing trading: Alex says "podemos llegar a ejecutar incluso" during news
+    # Relaxed buffers for swing style (mentorship: swing is less affected by news)
+    avoid_news_minutes_before_swing: int = 10  # Relaxed: 10 min before for swing
+    avoid_news_minutes_after_swing: int = 5    # Relaxed: 5 min after for swing
+    # News impact differentiation (mentorship: Interest Rates, Unemployment, CPI, GDP
+    # are the key ones — "estas cuatro son las más importantes")
+    # high = Interest Rates, NFP/Unemployment, CPI, GDP
+    # medium = PMI, Retail Sales, Trade Balance, Consumer Confidence
+    # low = everything else
+    news_impact_filter: str = "high"  # "high" = only avoid high-impact, "all" = avoid all
 
     # Timeframes — Day Trading layout (Alex's preferred style)
     # Roles: Directional=D (1D), Analysis=H4, Entry/Management=H1, Execution=M5
@@ -364,6 +378,37 @@ class Settings(BaseSettings):
     # These are included in watchlist for capital rotation monitoring only.
     memecoins_monitor_only: bool = True
     memecoin_symbols: List[str] = ["DOGE_USD", "SHIB_USD", "PEPE_USD", "WIF_USD", "BONK_USD"]
+
+    # Dominance & Market Cap tracking symbols (Esp. Criptomonedas Section 7)
+    # Alex tracks these in his watchlist for macro cycle analysis:
+    # "BTC.D, ETH.D, Others.D, USDT.D, TOTAL, TOTAL2, TOTAL3"
+    # These are NOT for strategy trading — they feed crypto_cycle.py analysis
+    crypto_dominance_symbols: List[str] = [
+        "BTC.D",     # Bitcoin Dominance
+        "ETH.D",     # Ethereum Dominance
+        "OTHERS.D",  # Altcoin Dominance (excl. BTC+ETH)
+        "USDT.D",    # Tether Dominance (risk-off indicator)
+        "TOTAL",     # Total crypto market cap
+        "TOTAL2",    # Total market cap excl. BTC
+        "TOTAL3",    # Total market cap excl. BTC+ETH
+    ]
+
+    # Crypto vs BTC pairs (Esp. Criptomonedas Section 7)
+    # Alex: "criptos contra bitcoin" — tracks relative performance
+    # When ETH/BTC rises, capital is rotating from BTC to alts
+    crypto_btc_pairs: List[str] = [
+        "ETH_BTC", "SOL_BTC", "BNB_BTC", "XRP_BTC", "ADA_BTC",
+        "AVAX_BTC", "DOT_BTC", "LINK_BTC", "NEAR_BTC", "UNI_BTC",
+    ]
+
+    # Crypto position management style (Esp. Criptomonedas position management)
+    # Three modes taught in the specialization:
+    #   "long_term" = weekly EMA 50 trailing (default, safest)
+    #   "short_term" = H1 EMA 50 trailing (faster exits, ~7-10% moves)
+    #   "aggressive" = M15 EMA 50 trailing / reference TP + M15 validation
+    # Alex recommends beginners start with "long_term"
+    crypto_position_mgmt_style: str = "long_term"
+
     # Mentoría: up to ~150 cryptos. Organized by capitalization tiers.
     # Below ~1B market cap = extreme volatility, manipulation, less pattern reliability.
     crypto_watchlist: List[str] = [
@@ -380,10 +425,22 @@ class Settings(BaseSettings):
         "ICP_USD", "EOS_USD", "THETA_USD", "XTZ_USD", "EGLD_USD",
         "MANA_USD", "SAND_USD", "GALA_USD", "AXS_USD", "CHZ_USD",
         "CAKE_USD", "IOTA_USD",
-        # === Top 50-150 (high volatility, smaller allocations) ===
+        # === Top 50-100 (high volatility, smaller allocations) ===
         "CRV_USD", "SNX_USD", "COMP_USD", "LDO_USD", "RPL_USD",
         "ENS_USD", "PENDLE_USD", "GMX_USD", "DYDX_USD", "JUP_USD",
         "TIA_USD", "PYTH_USD", "WLD_USD", "ONDO_USD", "JTO_USD",
+        # === Top 100-150 (expanded per mentorship recommendation) ===
+        "FLOW_USD", "KAVA_USD", "ZIL_USD", "ONE_USD", "CELO_USD",
+        "ROSE_USD", "KDA_USD", "OCEAN_USD", "BAL_USD", "SUSHI_USD",
+        "YFI_USD", "ZRX_USD", "ANKR_USD", "SKL_USD", "STORJ_USD",
+        "ICX_USD", "ONT_USD", "ZEC_USD", "DASH_USD", "KSM_USD",
+        "WAVES_USD", "1INCH_USD", "MASK_USD", "BAND_USD", "REN_USD",
+        "AUDIO_USD", "CELR_USD", "MTL_USD", "CTSI_USD", "RAD_USD",
+        "BAT_USD", "LOOM_USD", "NKN_USD", "OGN_USD", "PERP_USD",
+        "QNT_USD", "RLC_USD", "SPELL_USD", "SSV_USD", "WAXP_USD",
+        "API3_USD", "BAKE_USD", "BNT_USD", "COTI_USD", "HIFI_USD",
+        "JASMY_USD", "LPT_USD", "OMG_USD", "POLS_USD", "REEF_USD",
+        "SLP_USD", "SUPER_USD", "TOMO_USD", "TRB_USD", "UMA_USD",
     ]
 
     # Market View — macro dashboard symbols (from MARKET_VIEW.txt)

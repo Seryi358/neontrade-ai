@@ -640,6 +640,26 @@ class RiskManager:
             current_profit_pct = (self._current_balance - initial_balance) / initial_balance if initial_balance > 0 else 0
             profit_progress = (current_profit_pct / profit_target * 100) if profit_target > 0 else 0
 
+        # Auto-transition: check if profit target is met (Workshop de Cuentas Fondeadas)
+        # Phase 1 target met -> advance to Phase 2
+        # Phase 2 target met -> advance to real account (Phase 3)
+        phase_advanced = False
+        if profit_target > 0 and profit_progress >= 100.0:
+            if settings.funded_current_phase == 1:
+                settings.funded_current_phase = 2
+                phase_advanced = True
+                logger.info(
+                    f"FUNDED ACCOUNT: Phase 1 profit target ({profit_target:.0%}) MET! "
+                    f"Auto-advancing to Phase 2."
+                )
+            elif settings.funded_current_phase == 2:
+                settings.funded_current_phase = 3  # Real account
+                phase_advanced = True
+                logger.info(
+                    f"FUNDED ACCOUNT: Phase 2 profit target ({profit_target:.0%}) MET! "
+                    f"Advancing to REAL ACCOUNT (Phase 3). Congratulations!"
+                )
+
         can_trade, reason = self.check_funded_account_limits()
 
         return {
@@ -664,6 +684,7 @@ class RiskManager:
             "no_overnight": settings.funded_no_overnight,
             "no_news_trading": settings.funded_no_news_trading,
             "no_weekend": settings.funded_no_weekend,
+            "phase_advanced": phase_advanced,
         }
 
     @staticmethod

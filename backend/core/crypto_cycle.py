@@ -38,6 +38,9 @@ class CryptoMarketCycle:
     # USDT.D tracking — critical for distinguishing true altseason from risk-off.
     # Mentorship: "If USDT.D is rising while BTC.D falls, money going to stablecoins (NOT altcoins)"
     usdt_dominance_rising: Optional[bool] = None  # True = risk-off, False = capital flowing to alts
+    # Golden Cross / Death Cross (Esp. Criptomonedas Section 8 - SMA 200 Daily)
+    golden_cross: bool = False  # SMA 50 crossed above SMA 200 (strong bullish signal)
+    death_cross: bool = False   # SMA 50 crossed below SMA 200 (strong bearish signal)
     last_updated: Optional[str] = None
 
 
@@ -423,6 +426,25 @@ class CryptoCycleAnalyzer:
                 cycle.sma_d200_position = "above"
             else:
                 cycle.sma_d200_position = "below"
+            # Golden Cross / Death Cross detection (Esp. Criptomonedas Section 8)
+            # Golden Cross = SMA 50 crosses ABOVE SMA 200 (strong bullish)
+            # Death Cross = SMA 50 crosses BELOW SMA 200 (strong bearish)
+            if len(closes) >= 200:
+                sma_50 = sum(closes[-50:]) / 50
+                sma_50_prev = sum(closes[-51:-1]) / 50
+                sma_200_prev = sum(closes[-201:-1]) / 200
+                if sma_50 > sma_200 and sma_50_prev <= sma_200_prev:
+                    cycle.golden_cross = True
+                    cycle.death_cross = False
+                    logger.info("GOLDEN CROSS detected: SMA 50 crossed above SMA 200 Daily")
+                elif sma_50 < sma_200 and sma_50_prev >= sma_200_prev:
+                    cycle.golden_cross = False
+                    cycle.death_cross = True
+                    logger.info("DEATH CROSS detected: SMA 50 crossed below SMA 200 Daily")
+                else:
+                    cycle.golden_cross = False
+                    cycle.death_cross = False
+
             logger.debug(
                 f"SMA 200 Daily: {sma_200:.2f} | BTC price: {current_price:.2f} "
                 f"| Position: {cycle.sma_d200_position}"
@@ -539,24 +561,45 @@ class CryptoCycleAnalyzer:
         else:
             cycle.market_phase = "distribution"
 
-    async def get_crypto_trailing_ema(self, symbol: str = "BTC_USD") -> Optional[float]:
+    async def get_crypto_trailing_ema(
+        self,
+        symbol: str = "BTC_USD",
+        style: str = "long_term",
+    ) -> Optional[float]:
         """Return the EMA 50 value for crypto trailing stop management.
 
-        The mentorship's CORE position management for crypto is EMA 50 trailing
-        on the weekly chart -- NOT fixed take-profit levels. EMA 50 weekly adapts
-        to the trend and keeps you in winning positions during bull runs while
-        protecting against trend reversals.
+        The mentorship teaches THREE crypto position management modes
+        (Esp. Criptomonedas position management section):
 
-        Usage: close position (or tighten stop) when weekly candle closes below
-        EMA 50. This replaces fixed TP1/TP2/TP3 targets for crypto swing trades.
+        1. "long_term" (default): Weekly EMA 50 trailing — safest, keeps you
+           in major bull runs. Close when weekly candle closes below EMA 50.
+        2. "short_term": H1 EMA 50 trailing — faster exits, captures ~7-10% moves.
+           Close when H1 candle closes below EMA 50.
+        3. "aggressive": M15 EMA 50 trailing / reference TP + M15 validation.
+           Set TP1 at key level, then trail with M15 EMA 50. When price reaches
+           TP zone, drop to M15 to check if reversing.
+
+        Args:
+            symbol: Crypto instrument to calculate EMA for.
+            style: Management style ("long_term", "short_term", "aggressive").
 
         Returns:
-            The current EMA 50 weekly value, or None if data unavailable.
+            The current EMA 50 value on the appropriate timeframe, or None.
         """
         if not self.broker:
             return None
+
+        # Map style to timeframe (from mentorship)
+        style_tf_map = {
+            "long_term": "W",     # Weekly EMA 50
+            "short_term": "H1",   # H1 EMA 50
+            "aggressive": "M15",  # M15 EMA 50
+        }
+        granularity = style_tf_map.get(style, "W")
+        count = 60 if granularity == "W" else 200
+
         try:
-            candles = await self.broker.get_candles(symbol, granularity="W", count=60)
+            candles = await self.broker.get_candles(symbol, granularity=granularity, count=count)
             if not candles or len(candles) < 50:
                 return None
             closes = [c.close for c in candles]
@@ -567,7 +610,7 @@ class CryptoCycleAnalyzer:
                 ema = (p - ema) * multiplier + ema
             return ema
         except Exception as e:
-            logger.debug(f"EMA 50 trailing calculation failed: {e}")
+            logger.debug(f"EMA 50 trailing ({style}/{granularity}) calculation failed: {e}")
             return None
 
     async def should_trade_crypto(

@@ -280,17 +280,17 @@ export const api = {
 
 export const STRATEGY_COLORS: Record<string, string> = {
   BLUE: '#0088ff',
-  RED: '#ff0040',
-  PINK: '#ff69b4',
-  WHITE: '#ffffff',
+  RED: '#da4453',
+  PINK: '#ed00d9',
+  WHITE: '#dcdce6',
   BLACK: '#888888',
-  GREEN: '#00ff41',
-  DETECTED: '#eb4eca',
+  GREEN: '#00ff88',
+  DETECTED: '#fcee09',
 };
 
 export function getScoreColor(score: number): string {
   if (score >= 80) return '#00ff88';
-  if (score >= 60) return '#ffd700';
+  if (score >= 60) return '#fcee09';
   if (score >= 40) return '#ff6b35';
   return '#ff2e63';
 }

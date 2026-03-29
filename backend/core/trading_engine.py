@@ -235,10 +235,14 @@ class TradingEngine:
         self._last_equity_snapshot: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
         # Reentry tracking: instrument -> {"tp1_time": datetime, "direction": str, "count": int}
-        # TradingLab rule: after TP1 hit, allow one reentry in same direction
-        # if pullback to EMA occurs within 30 minutes and new RCC forms
+        # TradingLab (Esp. Criptomonedas Section 9 + Avanzado position management):
+        # Reentries allowed up to 3 times with PROGRESSIVE risk reduction:
+        #   Reentry 1: 50% of normal risk (1% -> 0.5%)
+        #   Reentry 2: 25% of normal risk (1% -> 0.25%)
+        #   Reentry 3: 25% of normal risk (minimum floor)
+        # Alex: "necesitas 6 meses de experiencia antes de reentrar"
         self._reentry_candidates: Dict[str, Dict] = {}
-        self._max_reentries_per_setup: int = 1
+        self._max_reentries_per_setup: int = 3
 
         # Daily activity counters (reset each day) — proves the app was alive
         self._daily_scan_count: int = 0
@@ -1190,13 +1194,23 @@ class TradingEngine:
                 # Check for strategy setups
                 setup = await self._detect_setup(analysis)
                 if setup:
-                    # Check if this is a reentry opportunity (TradingLab: reentry at 75% normal risk)
+                    # Check if this is a reentry opportunity
+                    # TradingLab progressive risk reduction:
+                    #   Reentry 1: 50% risk (1% -> 0.5%)
+                    #   Reentry 2: 25% risk (1% -> 0.25%)
+                    #   Reentry 3: 25% risk (floor)
                     reentry = self._reentry_candidates.get(instrument)
                     if reentry and setup.direction == reentry.get("direction"):
-                        setup.risk_percent *= 0.75
-                        setup.units = int(setup.units * 0.75) or (1 if setup.units > 0 else -1)
+                        reentry_count = reentry.get("count", 0) + 1
+                        if reentry_count == 1:
+                            risk_multiplier = 0.50
+                        else:
+                            risk_multiplier = 0.25  # Reentry 2+ = minimum risk
+                        setup.risk_percent *= risk_multiplier
+                        setup.units = int(setup.units * risk_multiplier) or (1 if setup.units > 0 else -1)
                         logger.info(
-                            f"[{instrument}] Reentry opportunity — reduced risk to {setup.risk_percent:.2%}"
+                            f"[{instrument}] Reentry #{reentry_count} — "
+                            f"risk reduced to {setup.risk_percent:.2%} ({risk_multiplier:.0%} of normal)"
                         )
 
                     self._daily_setups_found += 1

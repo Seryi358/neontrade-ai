@@ -113,20 +113,20 @@ const CANDLE_COUNT = 120;
 // ─── Chart Color Theme ─────────────────────────────────────────────────────
 
 const CHART_COLORS = {
-  background: '#0a0713',
+  background: '#0a0812',
   gridLines: '#1a1535',
   candleUp: '#00ff88',
-  candleDown: '#ff2e63',
+  candleDown: '#da4453',
   volumeUp: 'rgba(0, 255, 136, 0.3)',
-  volumeDown: 'rgba(255, 46, 99, 0.3)',
-  crosshair: '#eb4eca',
-  ema20: '#00f0ff',
-  ema50: '#eb4eca',
+  volumeDown: 'rgba(218, 68, 83, 0.3)',
+  crosshair: '#fcee09',
+  ema20: '#5df4fe',
+  ema50: '#fcee09',
   support: '#00ff88',
-  resistance: '#ff2e63',
+  resistance: '#da4453',
   pivot: '#ffb800',
-  textColor: '#8892a0',
-  currentPrice: '#00f0ff',
+  textColor: '#6b7080',
+  currentPrice: '#fcee09',
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -684,7 +684,7 @@ export default function ChartScreen() {
                 <Text
                   style={[
                     styles.pickerOptionText,
-                    item.instrument === selectedInstrument && { color: theme.colors.neonPink },
+                    item.instrument === selectedInstrument && { color: theme.colors.cp2077Yellow },
                   ]}
                 >
                   {item.instrument.replace('_', '/')}
@@ -965,7 +965,7 @@ export default function ChartScreen() {
 
         {loading && !hasCandles ? (
           <View style={styles.centerMessage}>
-            <ActivityIndicator size="large" color={theme.colors.neonPink} />
+            <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
             <Text style={styles.loadingText}>Cargando velas...</Text>
           </View>
         ) : error && !hasCandles ? (
@@ -1026,9 +1026,9 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: theme.fonts.primary,
     fontSize: 24,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 6,
-    textShadowColor: theme.colors.neonPinkGlow,
+    textShadowColor: theme.colors.cp2077YellowGlow,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
   },
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.backgroundCard,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
@@ -1063,12 +1063,12 @@ const styles = StyleSheet.create({
   pickerChevron: {
     fontFamily: theme.fonts.mono,
     fontSize: 14,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
   },
   pickerDropdown: {
     backgroundColor: theme.colors.backgroundDark,
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderTopWidth: 0,
     borderBottomLeftRadius: theme.borderRadius.md,
     borderBottomRightRadius: theme.borderRadius.md,
@@ -1111,7 +1111,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundCard,
   },
   tfButtonActive: {
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     backgroundColor: theme.colors.backgroundLight,
   },
   tfButtonText: {
@@ -1121,7 +1121,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   tfButtonTextActive: {
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
   },
 
   // ── Price Overlay ───────────────────────────────────
@@ -1212,7 +1212,7 @@ const styles = StyleSheet.create({
   resistanceLevel: {
     borderTopWidth: 1,
     borderStyle: 'dashed' as any,
-    borderColor: 'rgba(255, 46, 99, 0.5)',
+    borderColor: 'rgba(218, 68, 83, 0.5)',
   },
   pivotLevel: {
     borderTopWidth: 1,
@@ -1384,7 +1384,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     borderWidth: 1,
-    borderColor: theme.colors.neonPink,
+    borderColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.md,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
@@ -1392,7 +1392,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontFamily: theme.fonts.mono,
     fontSize: 12,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 2,
   },
   emptyText: {

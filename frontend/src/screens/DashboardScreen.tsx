@@ -206,7 +206,7 @@ export default function DashboardScreen() {
                 ? theme.colors.neonOrange
                 : theme.colors.neonYellow,
             backgroundColor: riskStatus.dd_alert_level === 'critical'
-              ? 'rgba(255, 46, 99, 0.1)'
+              ? 'rgba(218, 68, 83, 0.1)'
               : riskStatus.dd_alert_level === 'high'
                 ? 'rgba(255, 107, 53, 0.1)'
                 : 'rgba(255, 184, 0, 0.08)',
@@ -426,9 +426,9 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: theme.fonts.primary,
     fontSize: 32,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 6,
-    textShadowColor: theme.colors.neonPinkGlow,
+    textShadowColor: theme.colors.cp2077YellowGlow,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
   },
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   },
   offline: {
     borderColor: theme.colors.neonRed,
-    backgroundColor: 'rgba(255, 7, 58, 0.1)',
+    backgroundColor: 'rgba(218, 68, 83, 0.1)',
   },
   statusText: {
     fontFamily: theme.fonts.mono,
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: theme.fonts.mono,
     fontSize: 11,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,
   },
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
   positionPhase: {
     fontFamily: theme.fonts.mono,
     fontSize: 10,
-    color: theme.colors.neonPink,
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 1,
   },
   emptyText: {

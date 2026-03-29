@@ -304,7 +304,7 @@ Associated Wave: Wave 4 correction end → entry for Wave 5
   Step 4: 1H EMA 50 breaks in CORRECTIVE PATTERN form — the 1H EMA break must form a wedge, triangle, or channel (NOT a clean break). This is the KEY differentiator of PINK. If 4H EMA also breaks = it's RED, not PINK
   Step 5: 5M entry at the FINAL portion of the pattern. The 5M EMA will NOT be respected throughout the pattern due to volatility — only look for it in the final phase when a mini-structure (double bottom, small diagonal) forms
   Step 6: SL below/above the previous swing low/high (NOT Fibonacci, NOT pattern edge). TP at previous swing high/low (conservative — trend may be ending at Wave 5)
-  IMPORTANT: Alex does NOT execute Pink on channel patterns (no convergence point) — wait for White instead
+  IMPORTANT: Alex PREFERS White over Pink for channel patterns (channels can be valid but less ideal for Pink — no convergence point makes timing harder)
 
 ──── WHITE STRATEGY (Blue After a Pink — Post-Pink Continuation) ────
 Associated Wave: After Pink completes, riding the continuation
@@ -345,7 +345,7 @@ NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequenti
 
   7 Sequential Steps:
   Step 1 (Trend): Weekly direction (always weekly, Green does NOT differentiate day/swing — weekly is ALWAYS the starting point)
-  Step 2 (Pattern): The weekly correction forms a recognizable pattern on the next lower timeframe (Daily for swing, 1H for day) — wedge, triangle, flag, channel
+  Step 2 (Pattern): The weekly correction forms a recognizable pattern on the DAILY chart (always daily — Green does NOT differentiate day/swing) — wedge, triangle, flag, channel
   Step 3 (Pullback): Wait for pullback on the intermediate timeframe
   Step 4 (Pattern): Identify continuation pattern (flag, pennant, triangle, wedge)
   Step 5 (Diagonal): Draw diagonal/trendline on the pullback pattern

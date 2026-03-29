@@ -1974,19 +1974,17 @@ class RedStrategy(BaseStrategy):
                         elif direction == "SELL" and candle.get("close", 0) < candle.get("open", 0):
                             aggressive_count += 1
             if aggressive_count >= 2:
-                # Uncontrolled break: 2-3 consecutive large-body candles moving away
-                confidence -= 15.0
+                # Uncontrolled break: 2+ aggressive candles = REJECT
+                # Alex says "fuera" (out) at uncontrolled break — not just a penalty
                 failed.append(
                     f"Rompimiento EMA 1H NO controlado ({aggressive_count} velas agresivas "
-                    f"consecutivas) - no es pullback, es momentum puro"
+                    f"consecutivas) - no es pullback, es momentum puro — RECHAZADO"
                 )
-                if aggressive_count >= 3:
-                    # 3 consecutive aggressive candles = reject outright
-                    logger.debug(
-                        f"[RED] Uncontrolled 1H EMA break on {analysis.instrument}: "
-                        f"{aggressive_count} aggressive candles - rejecting"
-                    )
-                    return None
+                logger.debug(
+                    f"[RED] Uncontrolled 1H EMA break on {analysis.instrument}: "
+                    f"{aggressive_count} aggressive candles - rejecting (Alex: 'fuera')"
+                )
+                return None
 
         # --- Paso 4: Pullback a EMA 50 1H + EMA 50 4H + Fibonacci ---
         pb_1h, pb_1h_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
@@ -2028,17 +2026,73 @@ class RedStrategy(BaseStrategy):
             met.append(f"Paso 5b: {rev_desc}")
 
         # --- Paso 6: Entrada en 5M (RCC) ---
-        # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
+        # TradingLab execution priority: "5min MA50 > diagonal > 2min MA/diagonal"
+        # 1. Check EMA M5 50 break (HIGHEST priority)
+        # 2. If not, check diagonal on 5min
+        # 3. If not, check EMA M2 50 (2min, approximated by M5 EMA 20)
+        # 4. If not, check diagonal on 2min
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
+        # M2 not available from broker API; use M5 EMA 20 as approximation
+        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
+        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+
+        entry_found = False
+
+        # Priority 1: EMA M5 50 break (highest priority per mentorship)
         if ema_5m_break:
             if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
-                confidence += 10.0
-                met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
+                confidence += 12.0
+                met.append(f"Paso 6: RCC confirmado en EMA 5M 50 (prioridad maxima) - {ema_5m_desc}")
             else:
                 failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
-        else:
-            failed.append(f"Paso 6: {ema_5m_desc}")
+            entry_found = True
+
+        # Priority 2: Diagonal breakout on 5min
+        if not entry_found and hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
+                ptype_lower = ptype.lower()
+                if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
+                    if ptf in ("M5", ""):
+                        confidence += 10.0
+                        met.append(f"Paso 6: Rompimiento de diagonal en 5M ({ptype})")
+                        entry_found = True
+                        break
+
+        # Priority 3: EMA M2 50 break (2min timeframe)
+        if not entry_found and ema_2m_break:
+            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+                confidence += 8.0
+                met.append(f"Paso 6: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
+            else:
+                failed.append(f"Paso 6: EMA 2M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                return None
+            entry_found = True
+
+        # Priority 4: Diagonal breakout on 2min
+        if not entry_found and hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
+                ptype_lower = ptype.lower()
+                if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
+                    if ptf == "M2":
+                        confidence += 6.0
+                        met.append(f"Paso 6: Rompimiento de diagonal en 2M ({ptype})")
+                        entry_found = True
+                        break
+
+        if not entry_found:
+            failed.append(f"Paso 6: Sin entrada valida (ni EMA 5M/2M ni diagonal) - {ema_5m_desc}")
+
+        # Additional confirmation: EMA 2M break adds confluence if not already the primary entry
+        if entry_found and ema_2m_break and ema_5m_break:
+            confidence += 5.0
+            met.append(f"Paso 6b: Confirmacion EMA 2M - {ema_2m_desc}")
 
         # TradingLab: RSI divergence bonus
         has_div, div_bonus = _check_rsi_divergence(analysis, direction)
@@ -3281,17 +3335,51 @@ class BlackStrategy(BaseStrategy):
                 return None  # No 1H candle pattern = no Black entry
 
         # --- Paso 6: Ejecutar en rompimiento 5M (RCC) ---
-        # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
+        # TradingLab execution priority for BLACK:
+        # "5min MA50 > diagonal 5min > 2min MA50"
+        # Diagonal is especially important for BLACK (triangle/wedge patterns)
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
+        # M2 approximation via M5 EMA 20
+        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+
+        entry_found = False
+
+        # Priority 1: EMA M5 50 break + RCC (highest priority)
         if ema_5m_break:
             if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
-                confidence += 10.0
-                met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
+                confidence += 12.0
+                met.append(f"Paso 6: RCC confirmado en EMA 5M 50 (prioridad maxima) - {ema_5m_desc}")
             else:
                 failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
-        else:
-            failed.append(f"Paso 6: Sin rompimiento 5M - {ema_5m_desc}")
+            entry_found = True
+
+        # Priority 2: Diagonal breakout on 5min (especially important for BLACK triangle patterns)
+        if not entry_found and hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
+                ptype_lower = ptype.lower()
+                if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break", "triangle_break")):
+                    if ptf in ("M5", ""):
+                        confidence += 10.0
+                        met.append(f"Paso 6: Rompimiento de diagonal/triangulo en 5M ({ptype}) - clave para BLACK")
+                        entry_found = True
+                        break
+
+        # Priority 3: EMA M2 50 break + RCC (2min timeframe)
+        if not entry_found and ema_2m_break:
+            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+                confidence += 8.0
+                met.append(f"Paso 6: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
+            else:
+                failed.append(f"Paso 6: EMA 2M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                return None
+            entry_found = True
+
+        if not entry_found:
+            failed.append(f"Paso 6: Sin rompimiento 5M ni diagonal - {ema_5m_desc}")
 
         # NOTE: RSI divergence already checked above (Paso 5c) with BLACK-specific
         # logic (+15/-10). Do NOT call _check_rsi_divergence() here to avoid double-counting.

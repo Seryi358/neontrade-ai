@@ -334,7 +334,7 @@ Risk Level: HIGHEST — requires minimum 2:1 R:R
   TP1: EMA 50 4H level (ALWAYS — not 'first significant S/R')
   TP_max: Fibonacci 1.618 extension (projected Wave 1 target)
   MANDATORY: R:R must be >= 2.0 for BLACK strategy
-  CRITICAL: If EMA 50 1H has rejected price 3 or more consecutive times, BLACK is INVALID — the EMA has become established dynamic S/R against trade direction. A single touch/rejection is acceptable; 3+ consecutive rejections means the level is respected and BLACK will likely fail.
+  CRITICAL: If EMA 50 1H has rejected price repeatedly (2+ times in recent candles), BLACK is INVALID — the EMA has become established dynamic S/R against trade direction. A single touch/rejection is acceptable; repeated rejections mean the level is respected and BLACK will likely fail.
   CRITICAL: 1H corrective pattern is normally a triangle or wedge. Channels are very rare for BLACK ("muy pocas veces será un canal" — Alex) — not invalid but significantly less reliable. Penalize confidence, don't hard-block.
 
 ──── GREEN STRATEGY (Trend + Breakout + Pullback + Pattern — Most Lucrative) ────

@@ -2007,18 +2007,31 @@ class RedStrategy(BaseStrategy):
         ew = getattr(analysis, 'elliott_wave_detail', {})
         wave_count = str(ew.get("wave_count", "")).strip()
 
-        # TP1: swing high/low reciente (same for all wave contexts)
+        # RED TP1: Fib 1.272 extension of the corrective wave (mentorship primary target)
+        # Fallback to nearest swing S/R if Fib extension not available
+        fib_1272 = analysis.fibonacci_levels.get("ext_1.272")
         if direction == "BUY":
-            above = [r for r in resistances if r > entry_price]
-            if above:
-                result["tp1"] = min(above)
+            fib_1272_bull = analysis.fibonacci_levels.get("ext_bull_1.272")
+            if fib_1272_bull and fib_1272_bull > entry_price:
+                result["tp1"] = fib_1272_bull
+            elif fib_1272 and fib_1272 > entry_price:
+                result["tp1"] = fib_1272
+            else:
+                above = [r for r in resistances if r > entry_price]
+                if above:
+                    result["tp1"] = min(above)
         else:
-            below = [s for s in supports if s < entry_price]
-            if below:
-                result["tp1"] = max(below)
+            fib_1272_bear = analysis.fibonacci_levels.get("ext_bear_1.272")
+            if fib_1272_bear and fib_1272_bear < entry_price:
+                result["tp1"] = fib_1272_bear
+            elif fib_1272 and fib_1272 < entry_price:
+                result["tp1"] = fib_1272
+            else:
+                below = [s for s in supports if s < entry_price]
+                if below:
+                    result["tp1"] = max(below)
 
         tp1 = result.get("tp1")
-        fib_1272 = analysis.fibonacci_levels.get("ext_1.272")
         fib_1618 = analysis.fibonacci_levels.get("ext_1.618")
         fib_100 = analysis.fibonacci_levels.get("ext_1.0")
 
@@ -2418,9 +2431,9 @@ class PinkStrategy(BaseStrategy):
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
         """
-        TP en el swing high/low anterior (maximos recientes / minimos anteriores).
-        TradingLab mentorship: "take profit en maximos recientes" / "minimos anteriores"
-        — specifically the previous swing high (BUY) or swing low (SELL).
+        PINK TP1: Fib 0.618 extension of Wave 3 projected from Wave 4 end.
+        Mentorship: TP at Fibonacci 0.618 extension (conservative, trend may be ending).
+        Fallback: previous swing high/low if Fib extension not available.
         """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
@@ -2428,19 +2441,25 @@ class PinkStrategy(BaseStrategy):
         swing_lows = getattr(analysis, 'swing_lows', [])
         result: Dict[str, float] = {}
 
+        # Primary: Fib 0.618 extension (mentorship PINK target)
+        fib_ext_618_bull = analysis.fibonacci_levels.get("ext_bull_0.618")
+        fib_ext_618_bear = analysis.fibonacci_levels.get("ext_bear_0.618")
+        fib_ext_618 = analysis.fibonacci_levels.get("ext_0.618")
+
         if direction == "BUY":
-            # Previous swing high above entry price
-            valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
-            if valid_swing_highs:
-                # Use the most recent (last) swing high, not the nearest S/R
-                result["tp1"] = valid_swing_highs[-1]
+            # Try Fib 0.618 extension first
+            fib_tp = fib_ext_618_bull or fib_ext_618
+            if fib_tp and fib_tp > entry_price:
+                result["tp1"] = fib_tp
             else:
-                # Fallback: highest resistance above entry (previous high area)
-                above = sorted([r for r in resistances if r > entry_price])
-                if len(above) >= 2:
-                    result["tp1"] = above[1]  # Second resistance = more likely a swing extreme
-                elif above:
-                    result["tp1"] = above[0]
+                # Fallback: previous swing high
+                valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
+                if valid_swing_highs:
+                    result["tp1"] = valid_swing_highs[-1]
+                else:
+                    above = sorted([r for r in resistances if r > entry_price])
+                    if above:
+                        result["tp1"] = above[0]
 
             # tp_max: next swing high beyond tp1
             tp1 = result.get("tp1")
@@ -2453,18 +2472,19 @@ class PinkStrategy(BaseStrategy):
                     if further_res:
                         result["tp_max"] = sorted(further_res)[0]
         else:
-            # Previous swing low below entry price
-            valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
-            if valid_swing_lows:
-                # Use the most recent (last) swing low, not the nearest S/R
-                result["tp1"] = valid_swing_lows[-1]
+            # Try Fib 0.618 extension first (SELL)
+            fib_tp = fib_ext_618_bear or fib_ext_618
+            if fib_tp and fib_tp < entry_price:
+                result["tp1"] = fib_tp
             else:
-                # Fallback: lowest support below entry (previous low area)
-                below = sorted([s for s in supports if s < entry_price], reverse=True)
-                if len(below) >= 2:
-                    result["tp1"] = below[1]  # Second support = more likely a swing extreme
-                elif below:
-                    result["tp1"] = below[0]
+                # Fallback: previous swing low
+                valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
+                if valid_swing_lows:
+                    result["tp1"] = valid_swing_lows[-1]
+                else:
+                    below = sorted([s for s in supports if s < entry_price], reverse=True)
+                    if below:
+                        result["tp1"] = below[0]
 
             # tp_max: next swing low beyond tp1
             tp1 = result.get("tp1")

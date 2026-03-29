@@ -558,9 +558,10 @@ Friday Close Rule:
 - No new trades after Friday 18:00 UTC
 - Weekend gaps are unacceptable risk
 
-News Avoidance:
-- Stop trading 30 minutes before HIGH-IMPACT news events (NFP, FOMC, CPI, ECB, Fed Chair speeches/press conferences, etc.)
-- Wait 15 minutes after the news release before trading
+News Avoidance (per trading style):
+- Day Trading: Stop 30 min before, wait 15 min after HIGH-IMPACT news (NFP, FOMC, CPI, ECB, Fed Chair speeches/press conferences)
+- Scalping: Stop 60 min before, wait 60 min after. "Do NOT trade during news. Period."
+- Swing Trading: Stop 15 min before, wait 5 min after (swing is less affected by news)
 - Check economic calendar BEFORE every trading session
 
 ═══════════════════════════════════════════════════════════════════

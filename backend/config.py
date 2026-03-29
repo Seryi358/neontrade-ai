@@ -133,6 +133,13 @@ class Settings(BaseSettings):
 
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
 
+    # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
+    # Mentorship: "sobreoperar después de una pérdida" is a top-5 failure mode.
+    # These limits protect against emotional trading during drawdowns.
+    max_trades_per_day: int = 5           # Max trades per day (0 = unlimited). Alex: conservative 3-5/day
+    cooldown_after_consecutive_losses: int = 2  # After N consecutive losses, enforce cooldown
+    cooldown_minutes: int = 60            # Minutes to wait after consecutive loss threshold
+
     # Re-entry risk reduction (configurable per trader's plan)
     # Mentorship: "Cada uno pone sus normas" — these are DEFAULTS, not hard rules.
     # Alex uses 0.5% and 0.25% as examples but says the trader defines their own plan.

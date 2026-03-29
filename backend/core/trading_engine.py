@@ -1229,6 +1229,30 @@ class TradingEngine:
         # Reset circuit breaker at start of each scan cycle
         if broker_circuit_breaker.is_open:
             broker_circuit_breaker.reset()
+
+        # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
+        # "sobreoperar después de una pérdida" — top-5 failure mode per mentorship
+        if settings.max_trades_per_day > 0:
+            today_trades = getattr(self, '_daily_executed_count', 0)
+            if today_trades >= settings.max_trades_per_day:
+                logger.info(f"Max daily trades reached ({settings.max_trades_per_day}). Skipping scan.")
+                return
+
+        # Post-loss cooldown: if N consecutive losses today, wait before next trade
+        consecutive_losses = getattr(self, '_consecutive_losses_today', 0)
+        if consecutive_losses >= settings.cooldown_after_consecutive_losses:
+            last_loss_time = getattr(self, '_last_loss_time', None)
+            if last_loss_time:
+                from datetime import timezone
+                now_utc = datetime.now(timezone.utc)
+                elapsed = (now_utc - last_loss_time).total_seconds() / 60
+                if elapsed < settings.cooldown_minutes:
+                    logger.info(
+                        f"Cooldown active: {consecutive_losses} consecutive losses, "
+                        f"waiting {settings.cooldown_minutes - elapsed:.0f}min more"
+                    )
+                    return
+
         for instrument in settings.forex_watchlist:
             try:
                 # Check if we can take more risk

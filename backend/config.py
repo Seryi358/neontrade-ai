@@ -288,12 +288,15 @@ class Settings(BaseSettings):
     ]
 
     # Correlation pairs map (TradingLab: enter with 0.75% each if correlated)
+    # Expanded to cover all watchlist pairs sharing a common currency
     correlation_groups: List[List[str]] = [
         ["AUD_USD", "NZD_USD"],
         ["AUD_JPY", "AUD_CAD", "AUD_NZD", "AUD_CHF"],
         ["EUR_USD", "GBP_USD"],
         ["USD_CHF", "USD_CAD"],
-        ["EUR_JPY", "GBP_JPY", "CAD_JPY"],
+        ["EUR_JPY", "GBP_JPY", "CAD_JPY", "CHF_JPY", "NZD_JPY"],
+        ["GBP_AUD", "GBP_NZD", "GBP_CHF"],
+        ["NZD_CHF", "NZD_CAD"],
         ["XAU_USD", "XAG_USD"],
     ]
 

@@ -2030,7 +2030,15 @@ class RedStrategy(BaseStrategy):
                     result["tp1"] = max(below)
 
         tp1 = result.get("tp1")
-        fib_1618 = analysis.fibonacci_levels.get("ext_1.618")
+        # Directional Fib extensions for tp_max
+        fib_1272_dir = (
+            analysis.fibonacci_levels.get("ext_bull_1.272") if direction == "BUY"
+            else analysis.fibonacci_levels.get("ext_bear_1.272")
+        )
+        fib_1618_dir = (
+            analysis.fibonacci_levels.get("ext_bull_1.618") if direction == "BUY"
+            else analysis.fibonacci_levels.get("ext_bear_1.618")
+        )
         fib_100 = analysis.fibonacci_levels.get("ext_1.0")
 
         # Wave 3 with strong daily setup: aggressive TP, target 1.618 extension
@@ -2040,17 +2048,15 @@ class RedStrategy(BaseStrategy):
                 analysis.htf_condition in (MarketCondition.OVERBOUGHT, MarketCondition.OVERSOLD)
                 or _has_deceleration(analysis)
             )
-            if daily_strong and fib_1618 and tp1:
-                if direction == "BUY" and fib_1618 > tp1:
-                    result["tp_max"] = fib_1618
-                elif direction == "SELL" and fib_1618 < tp1:
-                    result["tp_max"] = fib_1618
+            if daily_strong and fib_1618_dir and tp1:
+                valid = (fib_1618_dir > tp1) if direction == "BUY" else (fib_1618_dir < tp1)
+                if valid:
+                    result["tp_max"] = fib_1618_dir
             # Fallback to 1.272 for Wave 3 without strong daily
-            if "tp_max" not in result and fib_1272 and tp1:
-                if direction == "BUY" and fib_1272 > tp1:
-                    result["tp_max"] = fib_1272
-                elif direction == "SELL" and fib_1272 < tp1:
-                    result["tp_max"] = fib_1272
+            if "tp_max" not in result and fib_1272_dir and tp1:
+                valid = (fib_1272_dir > tp1) if direction == "BUY" else (fib_1272_dir < tp1)
+                if valid:
+                    result["tp_max"] = fib_1272_dir
 
         elif wave_count == "5":
             # Wave 5: conservative - stick to recent high/low only, no extensions
@@ -2066,12 +2072,11 @@ class RedStrategy(BaseStrategy):
                         result["tp_max"] = further[0]
 
         else:
-            # Default / daily pullback: use 1.272 extension (original logic)
-            if fib_1272 and tp1:
-                if direction == "BUY" and fib_1272 > tp1:
-                    result["tp_max"] = fib_1272
-                elif direction == "SELL" and fib_1272 < tp1:
-                    result["tp_max"] = fib_1272
+            # Default / daily pullback: use 1.272 extension
+            if fib_1272_dir and tp1:
+                valid = (fib_1272_dir > tp1) if direction == "BUY" else (fib_1272_dir < tp1)
+                if valid:
+                    result["tp_max"] = fib_1272_dir
 
         # Final fallback to ext_1.0 if no tp_max set
         if "tp_max" not in result and fib_100 and tp1:

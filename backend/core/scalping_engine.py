@@ -505,7 +505,9 @@ class ScalpingAnalyzer:
         if scalp_data.ema50_m5 is not None:
             ema_values["EMA_H1_50"] = scalp_data.ema50_m5   # M5 -> H1 slot
         if scalp_data.ema50_m1 is not None:
-            ema_values["EMA_M5_20"] = scalp_data.ema50_m1   # M1 -> M5 slot
+            ema_values["EMA_M5_50"] = scalp_data.ema50_m1   # M1 EMA 50 -> M5 EMA 50 slot (execution)
+            ema_values["EMA_M5_20"] = scalp_data.ema50_m1   # Also set M5_20 as fallback
+            ema_values["EMA_M5_5"] = scalp_data.ema50_m1    # Also set M5_5 for price proxy
 
         # Build MACD values remapped for scalping
         macd_values = dict(base_analysis.macd_values)

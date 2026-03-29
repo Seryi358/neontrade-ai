@@ -1796,7 +1796,7 @@ async def list_monthly_reviews():
     return {"reports": engine.monthly_review.list_reports()}
 
 
-# ── Weekly Review (ASR - Análisis Semanal de Resultados) ───────────
+# ── Weekly Review (ASR - Auto Self Review) ───────────
 
 @router.get("/weekly-review")
 async def get_weekly_review(
@@ -1806,7 +1806,7 @@ async def get_weekly_review(
     ),
 ):
     """
-    Generate a weekly analysis report (ASR - Análisis Semanal de Resultados).
+    Generate a weekly analysis report (ASR - Auto Self Review).
 
     The mentorship teaches ASR as a critical weekly practice to review
     performance, identify patterns, and make adjustments.

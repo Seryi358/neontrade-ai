@@ -1774,6 +1774,25 @@ class TradingEngine:
                 self._daily_setups_executed += 1
                 logger.info(f"Trade {trade_id} opened and tracked")
 
+                # Broadcast trade_executed via WebSocket for real-time dashboard updates
+                if self._ws_broadcast:
+                    try:
+                        await self._ws_broadcast("trade_executed", {
+                            "trade_id": trade_id,
+                            "instrument": setup.instrument,
+                            "direction": setup.direction,
+                            "entry_price": setup.entry_price,
+                            "stop_loss": setup.stop_loss,
+                            "take_profit": setup.take_profit_1,
+                            "units": setup.units,
+                            "risk_reward_ratio": setup.reward_risk_ratio,
+                            "risk_percent": setup.risk_percent,
+                            "strategy": getattr(setup, '_strategy_name', 'DETECTED'),
+                            "mode": self.mode.value,
+                        })
+                    except Exception as ws_err:
+                        logger.debug(f"WS broadcast trade_executed failed: {ws_err}")
+
                 # Screenshot on trade open (Trading Plan rule)
                 if self.screenshot_generator:
                     try:

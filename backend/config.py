@@ -416,6 +416,7 @@ class Settings(BaseSettings):
         "BTC_USD", "ETH_USD", "BNB_USD", "SOL_USD", "XRP_USD",
         "ADA_USD", "AVAX_USD", "DOT_USD", "TRX_USD", "LINK_USD",
         # === Top 10-50 (growth potential + risk) ===
+        "BCH_USD", "ETC_USD", "XMR_USD",  # Added R4: top-50 coins missing from watchlist
         "MATIC_USD", "UNI_USD", "ATOM_USD", "LTC_USD", "NEAR_USD",
         "APT_USD", "FIL_USD", "ARB_USD", "OP_USD", "INJ_USD",
         "RENDER_USD", "FET_USD", "GRT_USD", "STX_USD", "IMX_USD",

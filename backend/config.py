@@ -136,6 +136,7 @@ class Settings(BaseSettings):
     # Mentorship: "Cada uno pone sus normas" — these are DEFAULTS, not hard rules.
     # Alex uses 0.5% and 0.25% as examples but says the trader defines their own plan.
     max_reentries_per_setup: int = 3       # Max re-entries per setup (0 = disabled)
+    reentry_window_seconds: int = 1800     # 30 minutes (configurable per trader's plan)
     reentry_risk_1: float = 0.50           # Reentry 1: 50% of normal risk (e.g., 1% -> 0.5%)
     reentry_risk_2: float = 0.25           # Reentry 2: 25% of normal risk (e.g., 1% -> 0.25%)
     reentry_risk_3: float = 0.25           # Reentry 3+: 25% of normal risk (floor)

@@ -114,8 +114,7 @@ def _create_broker():
             account_id=settings.capital_account_id or None,
         )
     else:
-        from broker.oanda_client import OandaClient
-        return OandaClient()
+        raise ValueError(f"Unsupported broker: {settings.active_broker}. Supported: 'capital', 'ibkr'")
 
 
 class TradingEngine:
@@ -664,6 +663,7 @@ class TradingEngine:
                                         pnl=0.0,
                                         pips=0.0,
                                         reason=f"Closed before news: {reason}",
+                                        strategy=getattr(pos, 'strategy_variant', '') or '',
                                     )
                                 except Exception:
                                     pass
@@ -694,7 +694,7 @@ class TradingEngine:
 
         # Cleanup expired reentry candidates
         expired = [k for k, v in self._reentry_candidates.items()
-                   if (datetime.now(timezone.utc) - v["tp1_time"]).total_seconds() > 1800]
+                   if (datetime.now(timezone.utc) - v["tp1_time"]).total_seconds() > settings.reentry_window_seconds]
         for k in expired:
             del self._reentry_candidates[k]
 
@@ -1031,6 +1031,7 @@ class TradingEngine:
                                 pnl=pnl_dollars,
                                 pips=0.0,
                                 reason="Position closed externally (broker/SL/TP)",
+                                strategy=getattr(pos, 'strategy_variant', '') or '',
                             )
                         except Exception:
                             pass
@@ -1081,7 +1082,7 @@ class TradingEngine:
 
         for pos in list(self.position_manager.positions.values()):
             # Only trigger CPA on positions past BE
-            if pos.phase.value not in ("break_even", "trailing"):
+            if pos.phase not in (PositionPhase.BREAK_EVEN, PositionPhase.TRAILING_TO_TP1):
                 continue
 
             # Condition 1: Friday close approaching
@@ -1201,8 +1202,10 @@ class TradingEngine:
         for instrument in settings.forex_watchlist:
             try:
                 # Check if we can take more risk
+                style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
+                current_style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
                 if not self.risk_manager.can_take_trade(
-                    TradingStyle.DAY_TRADING, instrument
+                    current_style, instrument
                 ):
                     continue
 
@@ -1220,7 +1223,7 @@ class TradingEngine:
                     tp1_time = reentry_info.get("tp1_time")
                     now_utc = datetime.now(timezone.utc)
                     # Reentry window: 30 minutes after TP1
-                    if tp1_time and (now_utc - tp1_time).total_seconds() < 1800:
+                    if tp1_time and (now_utc - tp1_time).total_seconds() < settings.reentry_window_seconds:
                         # Still in reentry window - normal scan will handle it
                         # The setup detection will find a new entry if conditions hold
                         pass
@@ -1897,6 +1900,7 @@ class TradingEngine:
                             sl=setup.stop_loss,
                             tp=setup.take_profit_1,
                             rr=setup.reward_risk_ratio,
+                            strategy=getattr(setup, '_strategy_name', 'DETECTED'),
                         )
                     except Exception as ae:
                         logger.debug(f"Alert send failed (non-critical): {ae}")
@@ -2163,7 +2167,7 @@ class TradingEngine:
                 f"<b>Strategies Active:</b> {strategies_on}/9\n"
                 f"<b>Scan Interval:</b> {self._scan_interval}s\n\n"
                 f"{checklist}\n"
-                f"<i>Trading hours: 07:00-21:00 UTC. You'll get a summary at 21:00 UTC.</i>"
+                f"<i>Trading hours: 07:00-22:00 UTC. You'll get a summary at 22:00 UTC.</i>"
             )
 
             await self.alert_manager.send_alert(
@@ -2189,7 +2193,7 @@ class TradingEngine:
                 f"<b>Pre-Session Checklist - {session_label}</b>\n\n"
                 f"<b>Posiciones abiertas:</b> {open_positions}\n"
                 f"{checklist}\n"
-                f"<i>La sesión NY (13:00-21:00 UTC) es de alta volatilidad. Mantén disciplina.</i>"
+                f"<i>La sesión NY (13:00-22:00 UTC) es de alta volatilidad. Mantén disciplina.</i>"
             )
 
             await self.alert_manager.send_alert(

@@ -228,6 +228,7 @@ class AlertManager:
         sl: float,
         tp: float,
         rr: float,
+        strategy: str = "",
     ):
         if not self._config.notify_trade_executed:
             return
@@ -237,6 +238,7 @@ class AlertManager:
         body = (
             f"<b>Instrument:</b> {instrument}\n"
             f"<b>Direction:</b> {direction.upper()}\n"
+            f"<b>Strategy:</b> {strategy}\n"
             f"<b>Entry:</b> {entry}\n"
             f"<b>Stop Loss:</b> {sl}\n"
             f"<b>Take Profit:</b> {tp}\n"
@@ -245,6 +247,7 @@ class AlertManager:
         data = {
             "instrument": instrument,
             "direction": direction,
+            "strategy": strategy,
             "entry": entry,
             "sl": sl,
             "tp": tp,
@@ -283,6 +286,7 @@ class AlertManager:
         pnl: float,
         pips: float,
         reason: str,
+        strategy: str = "",
     ):
         if not self._config.notify_trade_closed:
             return
@@ -292,12 +296,14 @@ class AlertManager:
         sign = "+" if pnl >= 0 else ""
         body = (
             f"<b>Instrument:</b> {instrument}\n"
+            f"<b>Strategy:</b> {strategy}\n"
             f"<b>P&L:</b> {sign}{pnl:.2f}\n"
             f"<b>Pips:</b> {sign}{pips:.1f}\n"
             f"<b>Reason:</b> {reason}"
         )
         data = {
             "instrument": instrument,
+            "strategy": strategy,
             "pnl": pnl,
             "pips": pips,
             "reason": reason,

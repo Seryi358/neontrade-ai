@@ -317,7 +317,7 @@ async def health():
         "status": "online",
         "engine_running": engine._running,
         "mode": mode.value if mode else "AUTO",
-        "broker": broker_type.value if broker_type else "oanda",
+        "broker": broker_type.value if broker_type else "capital",
         "database": db is not None,
         "websocket_clients": len(ws_manager.active_connections),
         "version": "1.0.0",

@@ -683,11 +683,11 @@ async def get_current_broker():
             },
             {
                 "id": "oanda",
-                "name": "OANDA",
+                "name": "OANDA (deprecated, out of scope)",
                 "description": "Broker regulado, popular para Forex. API robusta.",
                 "safe_in_colombia": True,
                 "demo_available": True,
-                "implemented": True,
+                "implemented": False,
             },
             {
                 "id": "icmarkets",
@@ -1020,6 +1020,8 @@ async def get_risk_config():
         "delta_max_risk": settings.delta_max_risk,
         # Scale-in rule
         "scale_in_require_be": settings.scale_in_require_be,
+        # Friday trading cutoff
+        "no_new_trades_friday_hour": settings.no_new_trades_friday_hour,
     }
 
 

@@ -37,7 +37,9 @@ class TradeJournal:
     def __init__(self, initial_capital: float):
         self._initial_capital = initial_capital
         self._data_path = os.path.join("data", "trade_journal.json")
+        self._missed_trades_path = os.path.join("data", "missed_trades.json")
         self._trades: List[Dict] = []
+        self._missed_trades: List[Dict] = []
         self._current_balance = initial_capital
         self._peak_balance = initial_capital
         self._max_drawdown_pct = 0.0
@@ -526,6 +528,110 @@ class TradeJournal:
             ) if completed > 0 else 0.0,
         }
 
+    # ── Missed Trades (Trades Not Taken) ─────────────────────────
+    # Mentorship: reviewing missed opportunities is key for improvement.
+    # Alex emphasizes analyzing setups you SAW but did NOT take,
+    # and understanding why — fear, hesitation, filter too strict, etc.
+
+    def record_missed_trade(
+        self,
+        instrument: str,
+        strategy: str,
+        direction: str,
+        confidence: float,
+        reason_skipped: str,
+        timestamp: Optional[str] = None,
+    ):
+        """Record a setup that was detected but not executed.
+
+        The mentorship emphasizes reviewing missed opportunities to identify
+        patterns of hesitation, over-filtering, or fear. Each missed trade
+        should include why it was skipped so the trader can review whether
+        the skip was justified or a behavioral issue.
+
+        Args:
+            instrument: The trading pair (e.g. "EUR_USD", "BTC_USD").
+            strategy: Strategy that generated the signal (e.g. "BLUE_A", "GREEN").
+            direction: "BUY" or "SELL".
+            confidence: Signal confidence score (0.0 - 1.0).
+            reason_skipped: Why the trade was not taken (e.g. "news filter",
+                "low confidence", "max positions reached", "manual skip").
+            timestamp: ISO timestamp; defaults to current UTC time.
+        """
+        now = timestamp or datetime.now(timezone.utc).isoformat()
+        record = {
+            "timestamp": now,
+            "instrument": instrument,
+            "strategy": strategy,
+            "direction": direction,
+            "confidence": round(confidence, 4),
+            "reason_skipped": reason_skipped,
+        }
+        self._missed_trades.append(record)
+        self._save_missed_trades()
+
+        logger.info(
+            f"Missed trade recorded: {instrument} {direction} ({strategy}) "
+            f"confidence={confidence:.2f} — reason: {reason_skipped}"
+        )
+
+    def get_missed_trades(self, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """Retrieve missed trades, most recent first.
+
+        Args:
+            limit: Maximum number of records to return.
+            offset: Number of records to skip (for pagination).
+
+        Returns:
+            List of missed trade records.
+        """
+        sorted_missed = list(reversed(self._missed_trades))
+        return sorted_missed[offset:offset + limit]
+
+    def get_missed_trade_stats(self) -> Dict:
+        """Return statistics on missed trades for self-review.
+
+        Helps identify patterns: are you skipping too many trades?
+        Are the skipped trades winning? (requires manual follow-up marking)
+        """
+        total = len(self._missed_trades)
+        if total == 0:
+            return {"total_missed": 0, "by_reason": {}, "by_strategy": {}}
+
+        by_reason: Dict[str, int] = {}
+        by_strategy: Dict[str, int] = {}
+        for mt in self._missed_trades:
+            reason = mt.get("reason_skipped", "unknown")
+            by_reason[reason] = by_reason.get(reason, 0) + 1
+            strat = mt.get("strategy", "unknown")
+            by_strategy[strat] = by_strategy.get(strat, 0) + 1
+
+        return {
+            "total_missed": total,
+            "by_reason": by_reason,
+            "by_strategy": by_strategy,
+        }
+
+    def _save_missed_trades(self):
+        """Persist missed trades to a separate JSON file."""
+        try:
+            os.makedirs(os.path.dirname(self._missed_trades_path), exist_ok=True)
+            with open(self._missed_trades_path, "w") as f:
+                json.dump(self._missed_trades, f, indent=2)
+        except Exception as e:
+            logger.error(f"Missed trades save failed: {e}")
+
+    def _load_missed_trades(self):
+        """Load missed trades from JSON file if it exists."""
+        try:
+            if os.path.exists(self._missed_trades_path):
+                with open(self._missed_trades_path, "r") as f:
+                    self._missed_trades = json.load(f)
+                logger.info(f"Loaded {len(self._missed_trades)} missed trade records")
+        except Exception as e:
+            logger.warning(f"Missed trades load failed: {e}")
+            self._missed_trades = []
+
     # ── Classification ────────────────────────────────────────────
 
     def _classify_result(self, pnl_pct: float) -> str:
@@ -613,3 +719,6 @@ class TradeJournal:
         except Exception as e:
             logger.warning(f"Trade journal load failed (starting fresh): {e}")
             self._trades = []
+
+        # Load missed trades from separate file
+        self._load_missed_trades()

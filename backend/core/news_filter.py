@@ -77,6 +77,13 @@ CRITICAL_EVENT_KEYWORDS: List[str] = [
     "nonfarm payrolls",
     "non farm payrolls",
     "nfp",
+    # Fed / central bank speeches — mentorship: these move markets significantly
+    "fed chair",
+    "powell",
+    "fed speech",
+    "fomc press conference",
+    "ecb press conference",
+    "boe press conference",
 ]
 
 

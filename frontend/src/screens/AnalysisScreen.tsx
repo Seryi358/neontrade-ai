@@ -1,6 +1,7 @@
 /**
  * NeonTrade AI - Analysis Screen
  * Detailed analysis for a selected instrument with strategy explanations in Spanish.
+ * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -15,6 +16,16 @@ import {
   Dimensions,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+import {
+  HUDCard,
+  HUDHeader,
+  HUDSectionTitle,
+  HUDBadge,
+  HUDProgressBar,
+  HUDDivider,
+  LoadingState,
+  ErrorState,
+} from '../components/HUDComponents';
 import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -170,25 +181,21 @@ export default function AnalysisScreen() {
   // ── Score Gauge ───────────────────────────────────────────────────────────
 
   const renderScoreGauge = (score: number) => {
-    const gaugeWidth = SCREEN_WIDTH - theme.spacing.md * 4 - 2; // account for card padding & border
-    const fillWidth = (score / 100) * gaugeWidth;
     const color = getScoreColor(score);
 
     return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>SCORE DE ANALISIS</Text>
+      <HUDCard accentColor={color}>
+        <HUDSectionTitle title="SCORE DE ANALISIS" color={theme.colors.cp2077Yellow} />
         <View style={styles.gaugeContainer}>
           <Text style={[styles.gaugeScore, { color }]}>{score.toFixed(0)}</Text>
           <Text style={styles.gaugeMax}>/100</Text>
         </View>
-        <View style={styles.gaugeTrack}>
-          <View
-            style={[
-              styles.gaugeFill,
-              { width: fillWidth > 0 ? fillWidth : 0, backgroundColor: color },
-            ]}
-          />
-        </View>
+        <HUDProgressBar
+          label=""
+          value={score}
+          color={color}
+          showValue={false}
+        />
         <View style={styles.gaugeLabels}>
           <Text style={styles.gaugeLabelText}>0</Text>
           <Text style={styles.gaugeLabelText}>25</Text>
@@ -196,7 +203,7 @@ export default function AnalysisScreen() {
           <Text style={styles.gaugeLabelText}>75</Text>
           <Text style={styles.gaugeLabelText}>100</Text>
         </View>
-      </View>
+      </HUDCard>
     );
   };
 
@@ -207,8 +214,8 @@ export default function AnalysisScreen() {
     const { htf_trend, ltf_trend, convergence } = analysis;
 
     return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>TENDENCIA</Text>
+      <HUDCard>
+        <HUDSectionTitle title="TENDENCIA" />
         <View style={styles.trendRow}>
           <View style={styles.trendItem}>
             <Text style={styles.trendLabel}>HTF</Text>
@@ -238,7 +245,7 @@ export default function AnalysisScreen() {
                 { color: convergence ? theme.colors.neonGreen : theme.colors.neonRed },
               ]}
             >
-              {convergence ? '✓' : '✗'}
+              {convergence ? '\u2713' : '\u2717'}
             </Text>
             <Text
               style={[
@@ -250,7 +257,7 @@ export default function AnalysisScreen() {
             </Text>
           </View>
         </View>
-      </View>
+      </HUDCard>
     );
   };
 
@@ -261,8 +268,8 @@ export default function AnalysisScreen() {
     if (!timeframes || timeframes.length === 0) return null;
 
     return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>ANALISIS POR TEMPORALIDAD</Text>
+      <HUDCard>
+        <HUDSectionTitle title="ANALISIS POR TEMPORALIDAD" />
         {timeframes.map((tf, idx) => {
           const isExpanded = expandedTimeframes[tf.timeframe] ?? false;
           return (
@@ -273,12 +280,19 @@ export default function AnalysisScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.tfHeaderLeft}>
-                  <Text style={styles.tfBadge}>{tf.timeframe}</Text>
-                  <Text style={[styles.tfTrend, { color: getTrendColor(tf.trend) }]}>
-                    {getTrendIcon(tf.trend)} {tf.trend?.toUpperCase()}
-                  </Text>
+                  <View style={styles.tfBadgeContainer}>
+                    <Text style={styles.tfBadge}>{tf.timeframe}</Text>
+                  </View>
+                  <View style={styles.tfTrendRow}>
+                    <Text style={[styles.tfTrendIcon, { color: getTrendColor(tf.trend) }]}>
+                      {getTrendIcon(tf.trend)}
+                    </Text>
+                    <Text style={[styles.tfTrend, { color: getTrendColor(tf.trend) }]}>
+                      {tf.trend?.toUpperCase()}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.tfChevron}>{isExpanded ? '▾' : '▸'}</Text>
+                <Text style={styles.tfChevron}>{isExpanded ? '\u25BE' : '\u25B8'}</Text>
               </TouchableOpacity>
 
               {isExpanded && (
@@ -289,7 +303,7 @@ export default function AnalysisScreen() {
                       <Text style={styles.tfSectionTitle}>OBSERVACIONES</Text>
                       {tf.observations.map((obs, i) => (
                         <Text key={i} style={styles.tfBullet}>
-                          {'  '}· {obs}
+                          {'  '}{'\u00B7'} {obs}
                         </Text>
                       ))}
                     </View>
@@ -340,7 +354,7 @@ export default function AnalysisScreen() {
             </View>
           );
         })}
-      </View>
+      </HUDCard>
     );
   };
 
@@ -353,10 +367,10 @@ export default function AnalysisScreen() {
     const steps = strategy.steps || explanation?.strategy_steps || [];
 
     return (
-      <View style={[styles.card, { borderColor: stratColor, borderWidth: 1 }]}>
+      <HUDCard accentColor={stratColor} borderColor={stratColor}>
         <View style={styles.strategyHeader}>
           <View style={[styles.strategyColorDot, { backgroundColor: stratColor }]} />
-          <Text style={styles.cardTitle}>ESTRATEGIA DETECTADA</Text>
+          <HUDSectionTitle title="ESTRATEGIA DETECTADA" color={stratColor} />
         </View>
 
         <Text style={[styles.strategyName, { color: stratColor }]}>
@@ -375,7 +389,7 @@ export default function AnalysisScreen() {
                     { color: step.met ? theme.colors.neonGreen : theme.colors.neonRed },
                   ]}
                 >
-                  {step.met ? '✓' : '✗'}
+                  {step.met ? '\u2713' : '\u2717'}
                 </Text>
                 <Text
                   style={[
@@ -393,6 +407,7 @@ export default function AnalysisScreen() {
         {/* Entry / SL / TP */}
         {(strategy.entry_explanation || strategy.sl_explanation || strategy.tp_explanation) && (
           <View style={styles.entrySection}>
+            <HUDDivider />
             {strategy.entry_explanation && (
               <View style={styles.entryRow}>
                 <Text style={styles.entryLabel}>ENTRADA</Text>
@@ -421,7 +436,7 @@ export default function AnalysisScreen() {
             <Text style={styles.riskText}>{strategy.risk_assessment}</Text>
           </View>
         )}
-      </View>
+      </HUDCard>
     );
   };
 
@@ -432,19 +447,24 @@ export default function AnalysisScreen() {
     const confidenceColor = getConfidenceColor(analysis.confidence);
 
     return (
-      <View style={[styles.card, styles.recommendationCard]}>
+      <HUDCard accentColor={confidenceColor} borderColor={theme.colors.cp2077Yellow}>
         <View style={styles.recommendationHeader}>
-          <Text style={styles.cardTitle}>RECOMENDACION</Text>
-          <View style={[styles.confidenceBadge, { borderColor: confidenceColor }]}>
-            <Text style={[styles.confidenceText, { color: confidenceColor }]}>
-              {analysis.confidence || '---'}
-            </Text>
-          </View>
+          <HUDSectionTitle title="RECOMENDACION" />
+          <HUDBadge label={analysis.confidence || '---'} color={confidenceColor} />
         </View>
+        {analysis.htf_trend && (
+          <View style={styles.directionBadgeRow}>
+            <HUDBadge
+              label={analysis.htf_trend === 'bullish' ? '\u25B2 COMPRA' : analysis.htf_trend === 'bearish' ? '\u25BC VENTA' : '\u25CF NEUTRAL'}
+              color={getTrendColor(analysis.htf_trend)}
+              small
+            />
+          </View>
+        )}
         <Text style={styles.recommendationText}>
           {analysis.explanation.recommendation}
         </Text>
-      </View>
+      </HUDCard>
     );
   };
 
@@ -457,10 +477,11 @@ export default function AnalysisScreen() {
         onPress={() => setPickerOpen(!pickerOpen)}
         activeOpacity={0.7}
       >
+        <View style={styles.pickerAccent} />
         <Text style={styles.pickerButtonText}>
           {selectedInstrument ? selectedInstrument.replace('_', '/') : 'Seleccionar par...'}
         </Text>
-        <Text style={styles.pickerChevron}>{pickerOpen ? '▾' : '▸'}</Text>
+        <Text style={styles.pickerChevron}>{pickerOpen ? '\u25BE' : '\u25B8'}</Text>
       </TouchableOpacity>
 
       {pickerOpen && (
@@ -501,11 +522,8 @@ export default function AnalysisScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>ANALISIS</Text>
-        <Text style={styles.subtitle}>DETALLE DE INSTRUMENTO</Text>
-      </View>
+      {/* HUD Header */}
+      <HUDHeader title="MARKET ANALYSIS // SCAN" subtitle="TRADE INTELLIGENCE SYSTEM" />
 
       {/* Instrument Picker */}
       {renderPicker()}
@@ -518,28 +536,19 @@ export default function AnalysisScreen() {
         contentContainerStyle={styles.scrollContentInner}
       >
         {loading && !analysis ? (
-          <View style={styles.centerMessage}>
-            <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
-            <Text style={styles.loadingText}>Analizando {selectedInstrument.replace('_', '/')}...</Text>
-          </View>
+          <LoadingState message={`Analizando ${selectedInstrument.replace('_', '/')}...`} />
         ) : error ? (
           <View style={styles.centerMessage}>
             {error.includes('esperando') || error.includes('disponible') ? (
               <>
                 <ActivityIndicator size="large" color={theme.colors.neonCyan} />
-                <Text style={[styles.loadingText, { color: theme.colors.neonCyan, marginTop: 16 }]}>{error}</Text>
-                <Text style={[styles.loadingText, { marginTop: 8, fontSize: 10 }]}>
+                <Text style={[styles.waitingText, { marginTop: 16 }]}>{error}</Text>
+                <Text style={styles.waitingSubtext}>
                   El motor esta analizando los pares...
                 </Text>
               </>
             ) : (
-              <>
-                <Text style={styles.errorIcon}>!</Text>
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={fetchAnalysis}>
-                  <Text style={styles.retryButtonText}>REINTENTAR</Text>
-                </TouchableOpacity>
-              </>
+              <ErrorState message={error} onRetry={fetchAnalysis} />
             )}
           </View>
         ) : analysis ? (
@@ -568,28 +577,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  header: {
-    alignItems: 'center',
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-  },
-  title: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 24,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 6,
-    textShadowColor: theme.colors.cp2077YellowGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15,
-  },
-  subtitle: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    letterSpacing: 4,
-    marginTop: 2,
-  },
   scrollContent: {
     flex: 1,
   },
@@ -600,22 +587,29 @@ const styles = StyleSheet.create({
   // ── Picker ──────────────────────────────────────────
   pickerContainer: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
     zIndex: 100,
   },
   pickerButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: theme.colors.backgroundCard,
     borderWidth: 1,
     borderColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.sm,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm + 2,
   },
+  pickerAccent: {
+    width: 3,
+    height: 16,
+    backgroundColor: theme.colors.cp2077Yellow,
+    marginRight: theme.spacing.sm,
+    borderRadius: 1,
+  },
   pickerButtonText: {
-    fontFamily: theme.fonts.primary,
+    flex: 1,
+    fontFamily: theme.fonts.mono,
     fontSize: 16,
     color: theme.colors.textWhite,
     letterSpacing: 2,
@@ -650,7 +644,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundLight,
   },
   pickerOptionText: {
-    fontFamily: theme.fonts.primary,
+    fontFamily: theme.fonts.mono,
     fontSize: 14,
     color: theme.colors.textSecondary,
     letterSpacing: 1,
@@ -664,25 +658,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // ── Card ────────────────────────────────────────────
-  card: {
-    backgroundColor: theme.colors.backgroundCard,
-    borderRadius: theme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.cp2077Yellow,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
-  cardTitle: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 11,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 3,
-    marginBottom: theme.spacing.sm,
-  },
-
   // ── Score Gauge ─────────────────────────────────────
   gaugeContainer: {
     flexDirection: 'row',
@@ -692,8 +667,10 @@ const styles = StyleSheet.create({
   },
   gaugeScore: {
     fontFamily: theme.fonts.mono,
-    fontSize: 48,
+    fontSize: 52,
     fontWeight: 'bold',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
   gaugeMax: {
     fontFamily: theme.fonts.mono,
@@ -701,24 +678,14 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     marginLeft: 4,
   },
-  gaugeTrack: {
-    height: 8,
-    backgroundColor: theme.colors.backgroundDark,
-    borderRadius: theme.borderRadius.sm,
-    overflow: 'hidden',
-  },
-  gaugeFill: {
-    height: '100%',
-    borderRadius: theme.borderRadius.sm,
-  },
   gaugeLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 2,
   },
   gaugeLabelText: {
     fontFamily: theme.fonts.mono,
-    fontSize: 8,
+    fontSize: 7,
     color: theme.colors.textMuted,
   },
 
@@ -733,7 +700,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   trendLabel: {
-    fontFamily: theme.fonts.primary,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -745,7 +712,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   trendValue: {
-    fontFamily: theme.fonts.primary,
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -776,18 +743,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  tfBadgeContainer: {
+    borderWidth: 1,
+    borderColor: theme.colors.neonCyan,
+    borderRadius: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(93, 244, 254, 0.06)',
+  },
   tfBadge: {
     fontFamily: theme.fonts.mono,
     fontSize: 13,
     color: theme.colors.neonCyan,
     fontWeight: 'bold',
     letterSpacing: 1,
-    borderWidth: 1,
-    borderColor: theme.colors.neonCyan,
-    borderRadius: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    overflow: 'hidden',
+  },
+  tfTrendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tfTrendIcon: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 13,
   },
   tfTrend: {
     fontFamily: theme.fonts.mono,
@@ -833,7 +811,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   patternTag: {
-    backgroundColor: theme.colors.backgroundLight,
+    backgroundColor: 'rgba(252, 238, 9, 0.06)',
     borderRadius: 3,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -865,13 +843,19 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     marginBottom: theme.spacing.sm,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 4,
   },
   strategyName: {
     fontFamily: theme.fonts.heading,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    letterSpacing: 2,
+    letterSpacing: 3,
     marginBottom: theme.spacing.md,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   stepsContainer: {
     marginBottom: theme.spacing.md,
@@ -897,9 +881,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   entrySection: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    paddingTop: theme.spacing.sm,
+    paddingTop: theme.spacing.xs,
     marginBottom: theme.spacing.sm,
   },
   entryRow: {
@@ -913,7 +895,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   entryValue: {
-    fontFamily: theme.fonts.primary,
+    fontFamily: theme.fonts.mono,
     fontSize: 11,
     color: theme.colors.textSecondary,
     lineHeight: 16,
@@ -924,6 +906,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.neonOrange,
     padding: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
   },
   riskLabel: {
     fontFamily: theme.fonts.heading,
@@ -940,27 +923,13 @@ const styles = StyleSheet.create({
   },
 
   // ── Recommendation ──────────────────────────────────
-  recommendationCard: {
-    borderColor: theme.colors.cp2077Yellow,
-    borderWidth: 1,
-  },
   recommendationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  confidenceBadge: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.round,
-    paddingHorizontal: theme.spacing.sm + 2,
-    paddingVertical: 2,
+  directionBadgeRow: {
     marginBottom: theme.spacing.sm,
-  },
-  confidenceText: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 2,
   },
   recommendationText: {
     fontFamily: theme.fonts.primary,
@@ -975,47 +944,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: theme.spacing.xxl * 2,
   },
-  loadingText: {
+  waitingText: {
     fontFamily: theme.fonts.primary,
     fontSize: 12,
+    color: theme.colors.neonCyan,
+    letterSpacing: 2,
+    textAlign: 'center',
+  },
+  waitingSubtext: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 10,
     color: theme.colors.textMuted,
-    letterSpacing: 2,
-    marginTop: theme.spacing.md,
-  },
-  errorIcon: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 36,
-    color: theme.colors.neonRed,
-    fontWeight: 'bold',
-    borderWidth: 2,
-    borderColor: theme.colors.neonRed,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    textAlign: 'center',
-    lineHeight: 38,
-    marginBottom: theme.spacing.md,
-  },
-  errorText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 12,
-    color: theme.colors.neonRed,
     letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  retryButton: {
-    borderWidth: 1,
-    borderColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-  },
-  retryButtonText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 12,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
+    marginTop: 8,
   },
   emptyText: {
     fontFamily: theme.fonts.primary,

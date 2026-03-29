@@ -1,6 +1,7 @@
 /**
  * NeonTrade AI - Manual Mode Screen
  * Shows pending trade setups awaiting user approval.
+ * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -15,9 +16,20 @@ import {
   Alert,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+import {
+  HUDCard,
+  HUDHeader,
+  HUDSectionTitle,
+  HUDBadge,
+  HUDDivider,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+} from '../components/HUDComponents';
 import { API_URL, authFetch, STRATEGY_COLORS } from '../services/api';
 
-// Types
+// ─── Types ──────────────────────────────────────────────────────────────────
+
 interface PendingSetup {
   id: string;
   timestamp: string;
@@ -36,18 +48,25 @@ interface PendingSetup {
   expires_at: string;
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 const getStrategyDotColor = (color: string): string => {
   return STRATEGY_COLORS[color?.toUpperCase()] || theme.colors.textMuted;
 };
 
-const getConfidenceColor = (confidence: string) => {
-  switch (confidence) {
-    case 'ALTA': return theme.colors.neonGreen;
-    case 'MEDIA': return theme.colors.neonYellow;
-    case 'BAJA': return theme.colors.neonOrange;
-    default: return theme.colors.textMuted;
-  }
+const getConfidenceLabel = (confidence: number): string => {
+  if (confidence >= 75) return 'ALTA';
+  if (confidence >= 50) return 'MEDIA';
+  return 'BAJA';
 };
+
+const getConfidenceColor = (confidence: number): string => {
+  if (confidence >= 75) return theme.colors.neonGreen;
+  if (confidence >= 50) return theme.colors.neonYellow;
+  return theme.colors.neonOrange;
+};
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export default function ManualModeScreen() {
   const [setups, setSetups] = useState<PendingSetup[]>([]);
@@ -181,70 +200,76 @@ export default function ManualModeScreen() {
     return instrument.toUpperCase().includes('JPY') ? 100 : 10000;
   };
 
+  // ── Setup Card ──────────────────────────────────────────────────────────
+
   const renderSetupCard = ({ item }: { item: PendingSetup }) => {
     const isExpanded = expandedId === item.id;
     const isApproving = actionLoading === `approve-${item.id}`;
     const isRejecting = actionLoading === `reject-${item.id}`;
     const pipMultiplier = getPipMultiplier(item.instrument);
+    const stratColor = getStrategyDotColor(item.strategy);
+    const confColor = getConfidenceColor(item.confidence);
+    const confLabel = getConfidenceLabel(item.confidence);
+    const isBuy = item.direction === 'BUY';
+
+    const slPips = (Math.abs(item.entry_price - item.stop_loss) * pipMultiplier).toFixed(1);
+    const tpPips = (Math.abs(item.take_profit - item.entry_price) * pipMultiplier).toFixed(1);
 
     return (
-      <View style={styles.setupCard}>
-        {/* Strategy badge + instrument */}
+      <HUDCard accentColor={stratColor}>
+        {/* Header: Strategy badge + Direction + Confidence */}
         <View style={styles.setupHeader}>
           <View style={styles.setupHeaderLeft}>
+            {/* Strategy badge */}
             <View style={styles.strategyBadge}>
-              <View style={[styles.strategyDot, { backgroundColor: getStrategyDotColor(item.strategy) }]} />
-              <Text style={[styles.strategyName, { color: getStrategyDotColor(item.strategy) }]}>
+              <View style={[styles.strategyDot, { backgroundColor: stratColor, shadowColor: stratColor }]} />
+              <Text style={[styles.strategyName, { color: stratColor }]}>
                 {item.strategy}
               </Text>
             </View>
-            <Text style={styles.setupInstrument}>
-              {item.instrument.replace('_', '/')}
-            </Text>
+            {/* Direction badge */}
+            <HUDBadge
+              label={isBuy ? '\u25B2 COMPRAR' : '\u25BC VENDER'}
+              color={isBuy ? theme.colors.profit : theme.colors.loss}
+              small
+            />
           </View>
-          <View style={[
-            styles.confidenceBadge,
-            { borderColor: item.confidence >= 75 ? theme.colors.neonGreen : item.confidence >= 50 ? theme.colors.neonYellow : theme.colors.neonOrange },
-          ]}>
-            <Text style={[
-              styles.confidenceText,
-              { color: item.confidence >= 75 ? theme.colors.neonGreen : item.confidence >= 50 ? theme.colors.neonYellow : theme.colors.neonOrange },
-            ]}>
-              {item.confidence >= 75 ? 'ALTA' : item.confidence >= 50 ? 'MEDIA' : 'BAJA'} ({item.confidence}%)
-            </Text>
-          </View>
+          {/* Confidence badge */}
+          <HUDBadge label={`${confLabel} (${item.confidence}%)`} color={confColor} small />
         </View>
 
-        {/* Direction */}
-        <View style={styles.directionRow}>
-          <Text style={[
-            styles.directionText,
-            item.direction === 'BUY' ? styles.profit : styles.loss,
-          ]}>
-            {item.direction === 'BUY' ? '▲ COMPRAR' : '▼ VENDER'}
-          </Text>
-          <Text style={styles.rrText}>R:R {(item.risk_reward_ratio || 0).toFixed(1)}</Text>
+        {/* Instrument name */}
+        <Text style={styles.setupInstrument}>
+          {item.instrument.replace('_', '/')}
+        </Text>
+
+        {/* R:R ratio prominent */}
+        <View style={styles.rrContainer}>
+          <Text style={styles.rrLabel}>R:R</Text>
+          <Text style={styles.rrValue}>{(item.risk_reward_ratio || 0).toFixed(1)}</Text>
         </View>
 
-        {/* Prices */}
-        <View style={styles.pricesContainer}>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>ENTRADA</Text>
-            <Text style={styles.priceValue}>{(item.entry_price || 0).toFixed(5)}</Text>
+        <HUDDivider />
+
+        {/* Entry/SL/TP grid (3 columns, mono font, with pip distances) */}
+        <View style={styles.pricesGrid}>
+          <View style={styles.priceCol}>
+            <Text style={styles.priceColLabel}>ENTRADA</Text>
+            <Text style={styles.priceColValue}>{(item.entry_price || 0).toFixed(5)}</Text>
           </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>STOP LOSS</Text>
-            <Text style={[styles.priceValue, styles.loss]}>
+          <View style={styles.priceCol}>
+            <Text style={[styles.priceColLabel, { color: theme.colors.neonRed }]}>STOP LOSS</Text>
+            <Text style={[styles.priceColValue, { color: theme.colors.neonRed }]}>
               {(item.stop_loss || 0).toFixed(5)}
-              <Text style={styles.priceDistance}> ({(Math.abs(item.entry_price - item.stop_loss) * pipMultiplier).toFixed(1)} pips)</Text>
             </Text>
+            <Text style={styles.priceColPips}>{slPips} pips</Text>
           </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>TAKE PROFIT</Text>
-            <Text style={[styles.priceValue, styles.profit]}>
+          <View style={styles.priceCol}>
+            <Text style={[styles.priceColLabel, { color: theme.colors.neonGreen }]}>TAKE PROFIT</Text>
+            <Text style={[styles.priceColValue, { color: theme.colors.neonGreen }]}>
               {(item.take_profit || 0).toFixed(5)}
-              <Text style={styles.priceDistance}> ({(Math.abs(item.take_profit - item.entry_price) * pipMultiplier).toFixed(1)} pips)</Text>
             </Text>
+            <Text style={styles.priceColPips}>{tpPips} pips</Text>
           </View>
         </View>
 
@@ -252,23 +277,25 @@ export default function ManualModeScreen() {
         <TouchableOpacity
           style={styles.expandToggle}
           onPress={() => toggleExpand(item.id)}
+          activeOpacity={0.7}
         >
           <Text style={styles.expandToggleText}>
-            {isExpanded ? '▾ Ocultar analisis' : '▸ Ver analisis de la estrategia'}
+            {isExpanded ? '\u25BE Ocultar analisis' : '\u25B8 Ver analisis de la estrategia'}
           </Text>
         </TouchableOpacity>
 
         {isExpanded && (
           <View style={styles.expandedContent}>
-            <Text style={styles.reasoningTitle}>RAZONAMIENTO</Text>
+            <HUDSectionTitle title="RAZONAMIENTO" color={theme.colors.cp2077Yellow} />
             <Text style={styles.reasoningText}>{item.reasoning}</Text>
 
             {item.checklist && item.checklist.length > 0 && (
               <>
-                <Text style={styles.checklistTitle}>CHECKLIST</Text>
+                <HUDDivider />
+                <HUDSectionTitle title="CHECKLIST" color={theme.colors.cp2077Yellow} />
                 {item.checklist.map((step, index) => (
                   <View key={index} style={styles.checklistItem}>
-                    <Text style={styles.checklistCheck}>✓</Text>
+                    <Text style={styles.checklistCheck}>{'\u2713'}</Text>
                     <Text style={styles.checklistText}>{step}</Text>
                   </View>
                 ))}
@@ -277,12 +304,13 @@ export default function ManualModeScreen() {
           </View>
         )}
 
-        {/* Action buttons */}
+        {/* Action buttons: GREEN glow APPROVE + RED outline REJECT */}
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.rejectBtn]}
             onPress={() => rejectSetup(item.id)}
             disabled={isRejecting || isApproving}
+            activeOpacity={0.7}
           >
             {isRejecting ? (
               <ActivityIndicator size="small" color={theme.colors.neonRed} />
@@ -295,6 +323,7 @@ export default function ManualModeScreen() {
             style={[styles.actionBtn, styles.approveBtn]}
             onPress={() => approveSetup(item.id)}
             disabled={isApproving || isRejecting}
+            activeOpacity={0.7}
           >
             {isApproving ? (
               <ActivityIndicator size="small" color={theme.colors.backgroundDark} />
@@ -303,50 +332,50 @@ export default function ManualModeScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </HUDCard>
     );
   };
 
+  // ── Loading State ─────────────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
-        <Text style={styles.loadingText}>Cargando setups...</Text>
+      <View style={styles.fullScreen}>
+        <HUDHeader title="PENDING OPS // MANUAL" subtitle="TRADE APPROVAL SYSTEM" />
+        <LoadingState message="Cargando setups..." />
       </View>
     );
   }
+
+  // ── Error State ───────────────────────────────────────────────────────────
 
   if (error) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorIcon}>⚠</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchSetups}>
-          <Text style={styles.retryBtnText}>REINTENTAR</Text>
-        </TouchableOpacity>
+      <View style={styles.fullScreen}>
+        <HUDHeader title="PENDING OPS // MANUAL" subtitle="TRADE APPROVAL SYSTEM" />
+        <ErrorState message={error} onRetry={fetchSetups} />
       </View>
     );
   }
 
+  // ── Main Render ───────────────────────────────────────────────────────────
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.header}>MODO MANUAL</Text>
-          <Text style={styles.subheader}>Setups pendientes de aprobacion</Text>
+      {/* HUD Header */}
+      <HUDHeader title="PENDING OPS // MANUAL" subtitle="TRADE APPROVAL SYSTEM" />
+
+      {/* Mode indicator + count */}
+      <View style={styles.modeRow}>
+        <View style={styles.modeIndicator}>
+          <View style={styles.modeIndicatorDot} />
+          <Text style={styles.modeIndicatorText}>MANUAL ACTIVO</Text>
         </View>
         {setups.length > 0 && (
           <View style={styles.countBadge}>
             <Text style={styles.countBadgeText}>{setups.length}</Text>
           </View>
         )}
-      </View>
-
-      {/* Mode indicator */}
-      <View style={styles.modeIndicator}>
-        <View style={styles.modeIndicatorDot} />
-        <Text style={styles.modeIndicatorText}>MANUAL ACTIVO</Text>
       </View>
 
       {setups.length > 0 ? (
@@ -356,233 +385,223 @@ export default function ManualModeScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderSetupCard}
             style={styles.list}
+            contentContainerStyle={styles.listContent}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
           />
 
-          {/* Bulk actions */}
+          {/* Bulk actions footer (sticky bottom bar) */}
           <View style={styles.bulkActions}>
-            <TouchableOpacity
-              style={[styles.bulkBtn, styles.bulkRejectBtn]}
-              onPress={rejectAll}
-              disabled={actionLoading === 'reject-all'}
-            >
-              {actionLoading === 'reject-all' ? (
-                <ActivityIndicator size="small" color={theme.colors.neonRed} />
-              ) : (
-                <Text style={styles.bulkRejectText}>RECHAZAR TODAS</Text>
-              )}
-            </TouchableOpacity>
+            <View style={styles.bulkActionsInner}>
+              <TouchableOpacity
+                style={[styles.bulkBtn, styles.bulkRejectBtn]}
+                onPress={rejectAll}
+                disabled={actionLoading === 'reject-all'}
+                activeOpacity={0.7}
+              >
+                {actionLoading === 'reject-all' ? (
+                  <ActivityIndicator size="small" color={theme.colors.neonRed} />
+                ) : (
+                  <Text style={styles.bulkRejectText}>RECHAZAR TODAS</Text>
+                )}
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.bulkBtn, styles.bulkApproveBtn]}
-              onPress={approveAll}
-              disabled={actionLoading === 'approve-all'}
-            >
-              {actionLoading === 'approve-all' ? (
-                <ActivityIndicator size="small" color={theme.colors.backgroundDark} />
-              ) : (
-                <Text style={styles.bulkApproveText}>APROBAR TODAS</Text>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.bulkBtn, styles.bulkApproveBtn]}
+                onPress={approveAll}
+                disabled={actionLoading === 'approve-all'}
+                activeOpacity={0.7}
+              >
+                {actionLoading === 'approve-all' ? (
+                  <ActivityIndicator size="small" color={theme.colors.backgroundDark} />
+                ) : (
+                  <Text style={styles.bulkApproveText}>APROBAR TODAS</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </>
       ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>◇</Text>
-          <Text style={styles.emptyText}>
-            No hay operaciones pendientes
-          </Text>
-          <Text style={styles.emptySubtext}>
-            Cuando NeonTrade detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion.
-          </Text>
-          <Text style={[styles.emptySubtext, { marginTop: 8, color: theme.colors.neonCyan }]}>
-            Cambia al modo MANUAL en Configuracion para aprobar operaciones manualmente.
-          </Text>
-        </View>
+        <EmptyState
+          title="No hay operaciones pendientes"
+          subtitle="Cuando NeonTrade detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion."
+          hint="Cambia al modo MANUAL en Configuracion para aprobar operaciones manualmente."
+        />
       )}
     </View>
   );
 }
 
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    padding: theme.spacing.md,
   },
-  centered: {
+  fullScreen: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.md,
   },
-  // Header
-  headerRow: {
+
+  // ── Mode Row ───────────────────────────────────────
+  modeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: theme.spacing.lg,
-  },
-  header: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 20,
-    color: theme.colors.neonCyan,
-    letterSpacing: 4,
-  },
-  subheader: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-  },
-  countBadge: {
-    backgroundColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.round,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countBadgeText: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 14,
-    color: theme.colors.textWhite,
-    fontWeight: 'bold',
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   modeIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
   },
   modeIndicatorDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: theme.colors.neonCyan,
+    shadowColor: theme.colors.neonCyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+    elevation: 4,
   },
   modeIndicatorText: {
-    fontFamily: theme.fonts.primary,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     color: theme.colors.neonCyan,
     letterSpacing: 2,
   },
+  countBadge: {
+    backgroundColor: theme.colors.cp2077Yellow,
+    borderRadius: theme.borderRadius.round,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 13,
+    color: theme.colors.backgroundDark,
+    fontWeight: 'bold',
+  },
+
+  // ── List ───────────────────────────────────────────
   list: {
     flex: 1,
   },
-  // Setup card
-  setupCard: {
-    backgroundColor: theme.colors.backgroundCard,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.neonCyan,
-    borderRadius: theme.borderRadius.sm,
+  listContent: {
     padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
   },
+
+  // ── Setup Card ─────────────────────────────────────
   setupHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   setupHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
     flex: 1,
   },
   strategyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: 5,
   },
   strategyDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+    elevation: 3,
   },
   strategyName: {
-    fontFamily: theme.fonts.primary,
+    fontFamily: theme.fonts.heading,
     fontSize: 10,
     letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   setupInstrument: {
     fontFamily: theme.fonts.heading,
-    fontSize: 22,
+    fontSize: 24,
     color: theme.colors.textWhite,
-    letterSpacing: 2,
+    letterSpacing: 3,
+    marginBottom: theme.spacing.xs,
+    textShadowColor: 'rgba(240, 238, 245, 0.1)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
   },
-  confidenceBadge: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  confidenceText: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 9,
-    letterSpacing: 2,
-    fontWeight: 'bold',
-  },
-  // Direction
-  directionRow: {
+
+  // ── R:R ────────────────────────────────────────────
+  rrContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: theme.spacing.xs,
   },
-  directionText: {
+  rrLabel: {
     fontFamily: theme.fonts.heading,
-    fontSize: 16,
+    fontSize: 10,
+    color: theme.colors.textMuted,
     letterSpacing: 2,
-    fontWeight: 'bold',
   },
-  rrText: {
+  rrValue: {
     fontFamily: theme.fonts.mono,
-    fontSize: 14,
+    fontSize: 22,
     color: theme.colors.neonCyan,
-    letterSpacing: 1,
+    fontWeight: 'bold',
+    textShadowColor: theme.colors.neonCyanGlow,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
-  profit: {
-    color: theme.colors.profit,
-  },
-  loss: {
-    color: theme.colors.loss,
-  },
-  // Prices
-  pricesContainer: {
+
+  // ── Prices Grid ────────────────────────────────────
+  pricesGrid: {
+    flexDirection: 'row',
     backgroundColor: theme.colors.backgroundDark,
     borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     padding: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
   },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  priceCol: {
+    flex: 1,
     alignItems: 'center',
-    paddingVertical: 4,
   },
-  priceLabel: {
+  priceColLabel: {
     fontFamily: theme.fonts.heading,
-    fontSize: 10,
+    fontSize: 8,
     color: theme.colors.textMuted,
-    letterSpacing: 2,
+    letterSpacing: 1,
+    marginBottom: 3,
+    textTransform: 'uppercase',
   },
-  priceValue: {
+  priceColValue: {
     fontFamily: theme.fonts.mono,
-    fontSize: 13,
+    fontSize: 12,
     color: theme.colors.textWhite,
+    letterSpacing: 0.5,
   },
-  priceDistance: {
+  priceColPips: {
     fontFamily: theme.fonts.mono,
-    fontSize: 10,
+    fontSize: 9,
     color: theme.colors.textMuted,
+    marginTop: 2,
   },
-  // Expand toggle
+
+  // ── Expand Toggle ──────────────────────────────────
   expandToggle: {
     paddingVertical: theme.spacing.xs,
     marginBottom: theme.spacing.sm,
@@ -596,32 +615,16 @@ const styles = StyleSheet.create({
   expandedContent: {
     backgroundColor: theme.colors.backgroundDark,
     borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     padding: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
-  },
-  reasoningTitle: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 10,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
-    marginBottom: 6,
   },
   reasoningText: {
     fontFamily: theme.fonts.primary,
     fontSize: 11,
     color: theme.colors.textSecondary,
     lineHeight: 18,
-    marginBottom: theme.spacing.sm,
-  },
-  checklistTitle: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 10,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
-    marginBottom: 6,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    paddingTop: theme.spacing.sm,
   },
   checklistItem: {
     flexDirection: 'row',
@@ -641,7 +644,8 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 16,
   },
-  // Action buttons
+
+  // ── Action Buttons ─────────────────────────────────
   actionRow: {
     flexDirection: 'row',
     gap: 10,
@@ -649,7 +653,7 @@ const styles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     paddingVertical: theme.spacing.sm + 2,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -658,18 +662,18 @@ const styles = StyleSheet.create({
     shadowColor: theme.colors.neonGreen,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 10,
+    elevation: 10,
   },
   approveBtnText: {
     fontFamily: theme.fonts.heading,
     fontSize: 12,
     color: theme.colors.backgroundDark,
-    letterSpacing: 2,
+    letterSpacing: 3,
     fontWeight: 'bold',
   },
   rejectBtn: {
-    backgroundColor: 'rgba(255, 7, 58, 0.15)',
+    backgroundColor: 'rgba(218, 68, 83, 0.12)',
     borderWidth: 1,
     borderColor: theme.colors.neonRed,
   },
@@ -677,21 +681,26 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.heading,
     fontSize: 12,
     color: theme.colors.neonRed,
-    letterSpacing: 2,
+    letterSpacing: 3,
     fontWeight: 'bold',
   },
-  // Bulk actions
+
+  // ── Bulk Actions (sticky bottom) ───────────────────
   bulkActions: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: theme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.backgroundDark,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm + 2,
+  },
+  bulkActionsInner: {
+    flexDirection: 'row',
+    gap: 10,
   },
   bulkBtn: {
     flex: 1,
     paddingVertical: theme.spacing.sm + 2,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -700,18 +709,18 @@ const styles = StyleSheet.create({
     shadowColor: theme.colors.neonGreen,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowRadius: 8,
+    elevation: 8,
   },
   bulkApproveText: {
     fontFamily: theme.fonts.heading,
     fontSize: 11,
     color: theme.colors.backgroundDark,
-    letterSpacing: 2,
+    letterSpacing: 3,
     fontWeight: 'bold',
   },
   bulkRejectBtn: {
-    backgroundColor: 'rgba(255, 7, 58, 0.15)',
+    backgroundColor: 'rgba(218, 68, 83, 0.12)',
     borderWidth: 1,
     borderColor: theme.colors.neonRed,
   },
@@ -719,78 +728,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.heading,
     fontSize: 11,
     color: theme.colors.neonRed,
-    letterSpacing: 2,
+    letterSpacing: 3,
     fontWeight: 'bold',
-  },
-  // Empty state
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xxl,
-  },
-  emptyIcon: {
-    fontSize: 56,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.md,
-  },
-  emptyText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    marginTop: theme.spacing.sm,
-    opacity: 0.6,
-  },
-  emptyPulse: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: theme.spacing.lg,
-  },
-  emptyPulseText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 10,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
-  },
-  // Loading / Error
-  loadingText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.md,
-    letterSpacing: 2,
-  },
-  errorIcon: {
-    fontSize: 40,
-    color: theme.colors.neonRed,
-    marginBottom: theme.spacing.md,
-  },
-  errorText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 13,
-    color: theme.colors.neonRed,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.md,
-  },
-  retryBtnText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
   },
 });

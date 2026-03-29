@@ -1,6 +1,7 @@
 /**
  * NeonTrade AI - Watchlist Screen
  * Shows all watched pairs with analysis scores, strategy detections, and signals.
+ * CyberPunk 2077 HUD redesign with sub-navigation pills.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,10 +10,20 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+import {
+  HUDCard,
+  HUDHeader,
+  HUDStatRow,
+  HUDBadge,
+  HUDDivider,
+  SubNavPills,
+  LoadingState,
+  ErrorState,
+} from '../components/HUDComponents';
+import StrategyBadge, { ConfidenceBadge } from '../components/StrategyBadge';
 import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
 
 interface WatchlistItem {
@@ -25,6 +36,11 @@ interface WatchlistItem {
   strategy_detected?: string | null;
   confidence_level?: string;
 }
+
+const SUB_NAV_OPTIONS = [
+  { key: 'watchlist', label: 'WATCHLIST' },
+  { key: 'crypto', label: 'CRYPTO' },
+];
 
 export default function WatchlistScreen() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -54,90 +70,111 @@ export default function WatchlistScreen() {
     return theme.colors.neonRed;
   };
 
-  const showInstrumentInfo = (item: WatchlistItem) => {
-    const trend = item.trend === 'bullish' ? 'Alcista' : item.trend === 'bearish' ? 'Bajista' : 'Rango';
-    const details = [
-      `Tendencia: ${trend}`,
-      `Score: ${item.score.toFixed(0)}`,
-      item.convergence ? 'Convergencia: Si' : null,
-      item.condition && item.condition !== 'neutral' ? `Condicion: ${item.condition === 'overbought' ? 'Sobrecompra' : 'Sobreventa'}` : null,
-      item.strategy_detected ? `Estrategia: ${item.strategy_detected}` : null,
-      item.confidence_level ? `Confianza: ${item.confidence_level}` : null,
-    ].filter(Boolean).join('\n');
-    Alert.alert(item.instrument.replace('_', '/'), details);
+  const getConvergenceLabel = (item: WatchlistItem): string | null => {
+    if (!item.convergence) return null;
+    return 'HTF/LTF CONV';
   };
-
-  const renderItem = ({ item }: { item: WatchlistItem }) => (
-    <TouchableOpacity
-      style={[
-        styles.item,
-        item.strategy_detected ? { borderColor: STRATEGY_COLORS[item.strategy_detected] || theme.colors.border } : {},
-      ]}
-      onPress={() => showInstrumentInfo(item)}
-    >
-      <View style={styles.itemLeft}>
-        <Text style={styles.pair}>
-          {item.instrument.replace('_', '/')}
-        </Text>
-        <View style={styles.tagsRow}>
-          <Text style={[styles.trend, { color: getTrendColor(item.trend) }]}>
-            {getTrendIcon(item.trend)} {item.trend === 'bullish' ? 'ALCISTA' : item.trend === 'bearish' ? 'BAJISTA' : 'RANGO'}
-          </Text>
-          {item.convergence && (
-            <Text style={styles.convergenceTag}>CONV</Text>
-          )}
-          {item.condition && item.condition !== 'neutral' && (
-            <Text style={[styles.conditionTag, {
-              color: item.condition === 'overbought' ? theme.colors.neonRed : theme.colors.neonGreen,
-              borderColor: item.condition === 'overbought' ? theme.colors.neonRed : theme.colors.neonGreen,
-            }]}>
-              {item.condition === 'overbought' ? 'SOBRECOMPRA' : 'SOBREVENTA'}
-            </Text>
-          )}
-        </View>
-        {item.strategy_detected && (
-          <View style={styles.strategyRow}>
-            <View style={[styles.strategyDot, { backgroundColor: STRATEGY_COLORS[item.strategy_detected] || '#888' }]} />
-            <Text style={[styles.strategyText, { color: STRATEGY_COLORS[item.strategy_detected] || '#888' }]}>
-              {item.strategy_detected}
-            </Text>
-            {item.confidence_level && (
-              <Text style={[styles.confidenceTag, { color: getConfidenceColor(item.confidence_level), borderColor: getConfidenceColor(item.confidence_level) }]}>
-                {item.confidence_level}
-              </Text>
-            )}
-          </View>
-        )}
-      </View>
-
-      <View style={styles.itemRight}>
-        <View style={styles.scoreContainer}>
-          <Text style={[styles.score, { color: getScoreColor(item.score) }]}>
-            {item.score.toFixed(0)}
-          </Text>
-          <Text style={styles.scoreLabel}>SCORE</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
 
   const activeCount = watchlist.filter(i => i.strategy_detected).length;
 
+  const renderItem = ({ item }: { item: WatchlistItem }) => (
+    <TouchableOpacity activeOpacity={0.85}>
+      <HUDCard
+        accentColor={
+          item.strategy_detected
+            ? STRATEGY_COLORS[item.strategy_detected] || theme.colors.cp2077Yellow
+            : theme.colors.cp2077Yellow
+        }
+        borderColor={
+          item.strategy_detected
+            ? STRATEGY_COLORS[item.strategy_detected] || theme.colors.border
+            : undefined
+        }
+      >
+        {/* Top row: instrument name + score */}
+        <View style={styles.topRow}>
+          <Text style={styles.instrumentName}>
+            {item.instrument.replace('_', '/')}
+          </Text>
+          <View style={styles.scoreBox}>
+            <Text style={[styles.scoreNumber, { color: getScoreColor(item.score) }]}>
+              {item.score.toFixed(0)}
+            </Text>
+            <Text style={styles.scoreLabel}>SCORE</Text>
+          </View>
+        </View>
+
+        {/* Tags row: trend + convergence + OB/OS */}
+        <View style={styles.tagsRow}>
+          {/* Trend */}
+          <Text style={[styles.trendTag, { color: getTrendColor(item.trend) }]}>
+            {getTrendIcon(item.trend)}{' '}
+            {item.trend === 'bullish' ? 'ALCISTA' : item.trend === 'bearish' ? 'BAJISTA' : 'RANGO'}
+          </Text>
+
+          {/* Convergence */}
+          {item.convergence && (
+            <HUDBadge label="HTF/LTF CONV" color={theme.colors.neonCyan} small />
+          )}
+
+          {/* OB/OS condition */}
+          {item.condition && item.condition !== 'neutral' && (
+            <HUDBadge
+              label={item.condition === 'overbought' ? 'SOBRECOMPRA' : 'SOBREVENTA'}
+              color={item.condition === 'overbought' ? theme.colors.neonRed : theme.colors.neonGreen}
+              small
+            />
+          )}
+        </View>
+
+        {/* Strategy detection row */}
+        {item.strategy_detected && (
+          <View style={styles.strategyRow}>
+            <StrategyBadge strategy={item.strategy_detected} size="sm" />
+            {item.confidence_level && (
+              <ConfidenceBadge level={item.confidence_level} />
+            )}
+          </View>
+        )}
+      </HUDCard>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>WATCHLIST</Text>
-      <Text style={styles.subheader}>
-        {watchlist.length} pares monitoreados
-        {activeCount > 0 ? ` · ${activeCount} con señal` : ''}
-      </Text>
+      {/* Sub-navigation pills */}
+      <SubNavPills
+        options={SUB_NAV_OPTIONS}
+        activeKey="watchlist"
+        onSelect={() => {}}
+      />
 
-      {error && <Text style={{color: theme.colors.neonRed, fontFamily: theme.fonts.primary, fontSize: 11, textAlign: 'center', padding: 8, letterSpacing: 2}}>{error}</Text>}
+      {/* Header stats */}
+      <HUDCard accentColor={theme.colors.neonCyan}>
+        <View style={styles.headerStatsRow}>
+          <View style={styles.headerStat}>
+            <Text style={styles.headerStatValue}>{watchlist.length}</Text>
+            <Text style={styles.headerStatLabel}>PARES</Text>
+          </View>
+          <View style={styles.headerStatDivider} />
+          <View style={styles.headerStat}>
+            <Text style={[styles.headerStatValue, { color: activeCount > 0 ? theme.colors.neonGreen : theme.colors.textMuted }]}>
+              {activeCount}
+            </Text>
+            <Text style={styles.headerStatLabel}>SENALES</Text>
+          </View>
+        </View>
+      </HUDCard>
 
+      {error && <ErrorState message={error} />}
+
+      {/* Instrument list */}
       <FlatList
         data={watchlist}
         keyExtractor={(item) => item.instrument}
         renderItem={renderItem}
         style={styles.list}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -148,113 +185,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
     padding: theme.spacing.md,
-  },
-  header: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 20,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 4,
-    marginTop: theme.spacing.lg,
-  },
-  subheader: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-    marginBottom: theme.spacing.md,
+    paddingTop: theme.spacing.lg,
   },
   list: {
     flex: 1,
   },
-  item: {
+  // Top row
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: theme.colors.backgroundCard,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.sm,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
   },
-  itemLeft: {
-    flex: 1,
-  },
-  pair: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 16,
+  instrumentName: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 17,
     color: theme.colors.textWhite,
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
-  tagsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-    flexWrap: 'wrap',
-  },
-  trend: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  convergenceTag: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 9,
-    color: theme.colors.neonCyan,
-    borderWidth: 1,
-    borderColor: theme.colors.neonCyan,
-    borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    letterSpacing: 1,
-  },
-  conditionTag: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 8,
-    borderWidth: 1,
-    borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    letterSpacing: 1,
-  },
-  strategyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-  },
-  strategyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  strategyText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  confidenceTag: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 8,
-    borderWidth: 1,
-    borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    letterSpacing: 1,
-    marginLeft: 4,
-  },
-  itemRight: {
+  scoreBox: {
     alignItems: 'center',
   },
-  scoreContainer: {
-    alignItems: 'center',
-  },
-  score: {
+  scoreNumber: {
     fontFamily: theme.fonts.mono,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
   },
   scoreLabel: {
@@ -262,5 +215,55 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: theme.colors.textMuted,
     letterSpacing: 2,
+  },
+  // Tags row
+  tagsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  trendTag: {
+    fontFamily: theme.fonts.semibold,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  // Strategy row
+  strategyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  // Header stats
+  headerStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+  },
+  headerStat: {
+    alignItems: 'center',
+  },
+  headerStatValue: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 22,
+    color: theme.colors.cp2077Yellow,
+    fontWeight: 'bold',
+  },
+  headerStatLabel: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 9,
+    color: theme.colors.textMuted,
+    letterSpacing: 3,
+  },
+  headerStatDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: theme.colors.border,
   },
 });

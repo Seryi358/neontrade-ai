@@ -62,7 +62,7 @@ check("active_watchlist_categories default ['forex']",
 
 # --- Capital allocation ---
 print("\n[7.5] Capital allocation")
-check("allocation_trading_pct 70%", settings.allocation_trading_pct == 0.80)
+check("allocation_trading_pct 70%", settings.allocation_trading_pct == 0.70)
 check("allocation_crypto_pct 10%", settings.allocation_crypto_pct == 0.10)
 check("allocation_investment_pct 20%", settings.allocation_investment_pct == 0.20)
 

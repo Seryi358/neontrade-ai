@@ -1,6 +1,7 @@
 /**
  * NeonTrade AI - History Screen
  * Trade history with performance stats and filtering by strategy color.
+ * CyberPunk 2077 HUD redesign with sub-navigation pills.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -11,9 +12,19 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+import {
+  HUDCard,
+  HUDSectionTitle,
+  HUDStatRow,
+  HUDBadge,
+  HUDDivider,
+  SubNavPills,
+  LoadingState,
+  ErrorState,
+} from '../components/HUDComponents';
 import { API_URL, authFetch, STRATEGY_COLORS } from '../services/api';
 
 // Types
@@ -50,6 +61,11 @@ const STRATEGY_FILTERS = [
 const getStrategyDotColor = (color: string): string => {
   return STRATEGY_COLORS[color?.toUpperCase()] || theme.colors.textMuted;
 };
+
+const SUB_NAV_OPTIONS = [
+  { key: 'history', label: 'HISTORY' },
+  { key: 'journal', label: 'JOURNAL' },
+];
 
 export default function HistoryScreen() {
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -108,62 +124,56 @@ export default function HistoryScreen() {
     }
   };
 
-  const renderStatsCard = () => {
+  // ── Performance Summary ─────────────────────────────────────────
+  const renderPerformanceSummary = () => {
     if (!stats) return null;
 
+    const avgRR = stats.total_pnl !== 0 && stats.total_trades > 0
+      ? (stats.best_trade / Math.abs(stats.worst_trade)).toFixed(2)
+      : '---';
+
     return (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>RENDIMIENTO (30 DIAS)</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>TRADES</Text>
-            <Text style={styles.statValue}>{stats.total_trades}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>WIN RATE</Text>
-            <Text style={[
-              styles.statValue,
-              stats.win_rate >= 50 ? styles.profit : styles.loss,
-            ]}>
-              {stats.win_rate.toFixed(1)}%
-            </Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>P&L TOTAL</Text>
-            <Text style={[
-              styles.statValue,
-              stats.total_pnl >= 0 ? styles.profit : styles.loss,
-            ]}>
-              ${stats.total_pnl.toFixed(2)}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>MEJOR TRADE</Text>
-            <Text style={[styles.statValueSm, styles.profit]}>
-              +${stats.best_trade.toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>PEOR TRADE</Text>
-            <Text style={[styles.statValueSm, styles.loss]}>
-              ${stats.worst_trade.toFixed(2)}
-            </Text>
-          </View>
-        </View>
-      </View>
+      <HUDCard accentColor={theme.colors.neonCyan}>
+        <HUDSectionTitle title="RENDIMIENTO (30 DIAS)" color={theme.colors.neonCyan} />
+        <HUDStatRow
+          label="TRADES"
+          value={stats.total_trades}
+          valueColor={theme.colors.textWhite}
+        />
+        <HUDStatRow
+          label="WIN RATE"
+          value={`${stats.win_rate.toFixed(1)}%`}
+          valueColor={stats.win_rate >= 50 ? theme.colors.profit : theme.colors.loss}
+        />
+        <HUDStatRow
+          label="P&L TOTAL"
+          value={`$${stats.total_pnl.toFixed(2)}`}
+          valueColor={stats.total_pnl >= 0 ? theme.colors.profit : theme.colors.loss}
+          large
+        />
+        <HUDStatRow
+          label="AVG R:R"
+          value={avgRR}
+          valueColor={theme.colors.cp2077Yellow}
+        />
+      </HUDCard>
     );
   };
 
+  // ── Strategy Filter Bar ─────────────────────────────────────────
   const renderFilterBar = () => (
-    <View style={styles.filterBar}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.filterScroll}
+    >
       {STRATEGY_FILTERS.map((f) => (
         <TouchableOpacity
           key={f.key}
           style={[
-            styles.filterTab,
-            activeFilter === f.key && styles.filterTabActive,
+            styles.filterPill,
+            activeFilter === f.key && styles.filterPillActive,
+            activeFilter === f.key && f.key !== 'ALL' && { borderColor: f.color, backgroundColor: `${f.color}18` },
           ]}
           onPress={() => setActiveFilter(f.key)}
         >
@@ -173,17 +183,22 @@ export default function HistoryScreen() {
           <Text style={[
             styles.filterLabel,
             activeFilter === f.key && styles.filterLabelActive,
+            activeFilter === f.key && f.key !== 'ALL' && { color: f.color },
           ]}>
             {f.label}
           </Text>
         </TouchableOpacity>
       ))}
-    </View>
+    </ScrollView>
   );
 
+  // ── Trade Item ──────────────────────────────────────────────────
   const renderTradeItem = ({ item }: { item: Trade }) => (
-    <View style={styles.tradeItem}>
-      <View style={styles.tradeHeader}>
+    <HUDCard
+      accentColor={getStrategyDotColor(item.strategy_color)}
+    >
+      {/* Row 1: Strategy dot + instrument + date */}
+      <View style={styles.tradeTopRow}>
         <View style={styles.tradeLeft}>
           <View style={styles.tradeInstrumentRow}>
             <View style={[styles.strategyDot, { backgroundColor: getStrategyDotColor(item.strategy_color) }]} />
@@ -191,65 +206,63 @@ export default function HistoryScreen() {
               {item.instrument.replace('_', '/')}
             </Text>
           </View>
-          <View style={styles.tradeTagsRow}>
-            <Text style={[
-              styles.tradeDirection,
-              item.direction === 'BUY' ? styles.profit : styles.loss,
-            ]}>
-              {item.direction}
-            </Text>
-            <View style={styles.modeBadge}>
-              <Text style={styles.modeBadgeText}>{item.mode}</Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.tradeRight}>
-          <Text style={[
-            styles.tradePnl,
-            item.pnl >= 0 ? styles.profit : styles.loss,
-          ]}>
-            {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
-          </Text>
           <Text style={styles.tradeDate}>{formatDate(item.closed_at)}</Text>
         </View>
+
+        {/* P&L (large, colored) */}
+        <Text style={[styles.tradePnl, {
+          color: item.pnl >= 0 ? theme.colors.profit : theme.colors.loss,
+        }]}>
+          {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
+        </Text>
       </View>
-      <View style={styles.tradePrices}>
-        <Text style={styles.tradePriceText}>
+
+      {/* Row 2: Direction badge + Mode badge + prices */}
+      <View style={styles.tradeBottomRow}>
+        <View style={styles.tradeBadges}>
+          <HUDBadge
+            label={item.direction}
+            color={item.direction === 'BUY' ? theme.colors.profit : theme.colors.loss}
+            small
+          />
+          <HUDBadge
+            label={item.mode}
+            color={theme.colors.textMuted}
+            small
+          />
+        </View>
+        <Text style={styles.tradePrices}>
           {item.entry_price.toFixed(5)} → {item.exit_price.toFixed(5)}
         </Text>
       </View>
-    </View>
+    </HUDCard>
   );
 
+  // ── Loading State ───────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
-        <Text style={styles.loadingText}>Cargando historial...</Text>
+      <View style={styles.centeredContainer}>
+        <LoadingState message="Cargando historial..." />
       </View>
     );
   }
 
-  if (error) {
+  // ── Error State ─────────────────────────────────────────────────
+  if (error && trades.length === 0) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorIcon}>⚠</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
-          <Text style={styles.retryBtnText}>REINTENTAR</Text>
-        </TouchableOpacity>
+      <View style={styles.centeredContainer}>
+        <SubNavPills options={SUB_NAV_OPTIONS} activeKey="history" onSelect={() => {}} />
+        <ErrorState message={error} onRetry={fetchData} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>HISTORIAL</Text>
-      <Text style={styles.subheader}>Operaciones cerradas</Text>
+      {/* Sub-navigation pills */}
+      <SubNavPills options={SUB_NAV_OPTIONS} activeKey="history" onSelect={() => {}} />
 
-      {error && <Text style={{color: theme.colors.neonRed, fontFamily: theme.fonts.primary, fontSize: 11, textAlign: 'center', padding: 8, letterSpacing: 2}}>{error}</Text>}
-
-      {renderStatsCard()}
+      {renderPerformanceSummary()}
       {renderFilterBar()}
 
       {trades.length > 0 ? (
@@ -258,6 +271,7 @@ export default function HistoryScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderTradeItem}
           style={styles.list}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -280,105 +294,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
     padding: theme.spacing.md,
+    paddingTop: theme.spacing.lg,
   },
-  centered: {
+  centeredContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.md,
   },
-  header: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 20,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 4,
-    marginTop: theme.spacing.lg,
-  },
-  subheader: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-    marginBottom: theme.spacing.md,
-  },
-  // Stats card
-  card: {
-    backgroundColor: theme.colors.backgroundCard,
-    borderRadius: theme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.cp2077Yellow,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
-  cardTitle: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 11,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 3,
-    marginBottom: theme.spacing.sm,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.sm,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    paddingTop: theme.spacing.sm,
-  },
-  stat: {
-    alignItems: 'center',
+  list: {
     flex: 1,
   },
-  statLabel: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-  },
-  statValue: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    marginTop: 4,
-  },
-  statValueSm: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 13,
-    marginTop: 4,
-  },
-  profit: {
-    color: theme.colors.profit,
-  },
-  loss: {
-    color: theme.colors.loss,
-  },
+
   // Filter bar
-  filterBar: {
-    flexDirection: 'row',
-    marginBottom: theme.spacing.md,
-    flexWrap: 'wrap',
+  filterScroll: {
+    paddingBottom: theme.spacing.md,
     gap: 6,
   },
-  filterTab: {
+  filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: theme.borderRadius.round,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    gap: 4,
+    gap: 5,
   },
-  filterTabActive: {
+  filterPillActive: {
     borderColor: theme.colors.cp2077Yellow,
-    backgroundColor: 'rgba(252, 238, 9, 0.15)',
+    backgroundColor: 'rgba(252, 238, 9, 0.12)',
   },
   filterDot: {
     width: 8,
@@ -386,27 +332,17 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   filterLabel: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 9,
+    fontFamily: theme.fonts.heading,
+    fontSize: 10,
     color: theme.colors.textMuted,
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   filterLabelActive: {
     color: theme.colors.cp2077Yellow,
   },
-  // Trade list
-  list: {
-    flex: 1,
-  },
-  tradeItem: {
-    backgroundColor: theme.colors.backgroundCard,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  tradeHeader: {
+
+  // Trade items
+  tradeTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -423,62 +359,49 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 4,
   },
   tradeInstrument: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 15,
+    fontFamily: theme.fonts.heading,
+    fontSize: 16,
     color: theme.colors.textWhite,
     letterSpacing: 1,
-  },
-  tradeTagsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  tradeDirection: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    letterSpacing: 1,
-  },
-  modeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: theme.colors.textMuted,
-  },
-  modeBadgeText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 8,
-    color: theme.colors.textMuted,
-    letterSpacing: 1,
-  },
-  tradeRight: {
-    alignItems: 'flex-end',
-  },
-  tradePnl: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   tradeDate: {
     fontFamily: theme.fonts.primary,
     fontSize: 9,
     color: theme.colors.textMuted,
-    marginTop: 4,
+    marginTop: 2,
+    marginLeft: 18,
   },
-  tradePrices: {
-    marginTop: theme.spacing.sm,
+  tradePnl: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  tradeBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
-    paddingTop: theme.spacing.xs,
   },
-  tradePriceText: {
+  tradeBadges: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  tradePrices: {
     fontFamily: theme.fonts.mono,
-    fontSize: 11,
-    color: theme.colors.textSecondary,
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    letterSpacing: 1,
   },
+
   // Empty state
   emptyContainer: {
     flex: 1,
@@ -504,38 +427,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: theme.spacing.sm,
     opacity: 0.6,
-  },
-  // Loading / Error
-  loadingText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.md,
-    letterSpacing: 2,
-  },
-  errorIcon: {
-    fontSize: 40,
-    color: theme.colors.neonRed,
-    marginBottom: theme.spacing.md,
-  },
-  errorText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 13,
-    color: theme.colors.neonRed,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.md,
-  },
-  retryBtnText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
   },
 });

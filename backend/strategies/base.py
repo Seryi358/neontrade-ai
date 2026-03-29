@@ -1124,12 +1124,59 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
             )):
                 return "BLUE_A"
 
-    # Variante C: precio esta cerca de EMA 4H (rechazo de EMA 4H)
+    # Variante C: price REJECTED from 4H EMA50 (bounced off, not just proximity)
+    # TradingLab: Blue C means price approached 4H EMA, showed reversal candle, then pulled back.
+    # This is a REJECTION check, not a proximity check.
     price = _get_current_price_proxy(analysis)
     if price and ema_4h_50:
-        dist = abs(price - ema_4h_50) / ema_4h_50 * 100
-        if dist < 0.2:
-            return "BLUE_C"
+        # Check for rejection: price approached EMA 4H and bounced away
+        m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
+        if len(m5_candles) >= 3:
+            # Look for a candle that wicked through EMA 4H but closed on the other side (rejection)
+            ema_tolerance = ema_4h_50 * 0.002  # 0.2% tolerance zone
+            rejection_detected = False
+
+            for candle in m5_candles[-5:]:
+                c_high = candle.get("high", 0)
+                c_low = candle.get("low", 0)
+                c_open = candle.get("open", 0)
+                c_close = candle.get("close", 0)
+
+                if direction == "BUY":
+                    # For BUY Blue C: price came DOWN to EMA 4H from above, wicked below, closed above
+                    # (rejection of EMA as support from above → now pulling back up)
+                    touched_ema = c_low <= ema_4h_50 + ema_tolerance
+                    closed_above = c_close > ema_4h_50
+                    is_reversal = c_close > c_open  # Bullish candle
+                    if touched_ema and closed_above and is_reversal:
+                        rejection_detected = True
+                        break
+                else:
+                    # For SELL Blue C: price came UP to EMA 4H from below, wicked above, closed below
+                    touched_ema = c_high >= ema_4h_50 - ema_tolerance
+                    closed_below = c_close < ema_4h_50
+                    is_reversal = c_close < c_open  # Bearish candle
+                    if touched_ema and closed_below and is_reversal:
+                        rejection_detected = True
+                        break
+
+            if rejection_detected:
+                return "BLUE_C"
+
+        # Also check if recent candles show price pulled away from EMA 4H after touching it
+        # (price is now moving away from EMA = already rejected)
+        if price and ema_4h_50:
+            dist_pct = abs(price - ema_4h_50) / ema_4h_50 * 100
+            # Price is within 0.5% of EMA but moving away (rejection in progress)
+            if dist_pct < 0.5:
+                # Check if price is moving away from EMA in the last 2 candles
+                if len(m5_candles) >= 2:
+                    prev_close = m5_candles[-2].get("close", 0)
+                    curr_close = m5_candles[-1].get("close", 0)
+                    if direction == "BUY" and curr_close > prev_close and curr_close > ema_4h_50:
+                        return "BLUE_C"
+                    elif direction == "SELL" and curr_close < prev_close and curr_close < ema_4h_50:
+                        return "BLUE_C"
 
     # Variante B: default
     return "BLUE_B"
@@ -1502,47 +1549,74 @@ class BlueStrategy(BaseStrategy):
             failed.append(f"Paso 5: {rev_desc}")
 
         # --- Paso 6: Entrada en 5M (RCC: Ruptura + Cierre + Confirmación) ---
-        # TradingLab mentorship: the ideal 5M entry is on a DIAGONAL breakout,
-        # not just EMA crosses. Automated diagonal detection is not fully reliable,
-        # so we use EMA breaks as a fallback. When only EMA is used, we log it
-        # so the trader knows this is a simplification of the mentorship method.
-        diagonal_entry_used = False
-        if hasattr(analysis, 'chart_patterns'):
+        # TradingLab execution priority: "5min MA50 > diagonal > 2min MA/diagonal"
+        # 1. Check EMA M5 50 break (HIGHEST priority)
+        # 2. If not, check diagonal on 5min
+        # 3. If not, check EMA M2 50 (2min, approximated by M5 EMA 20)
+        # 4. If not, check diagonal on 2min
+        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
+        # M2 not available from broker API; use M5 EMA 20 as approximation
+        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
+        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+
+        entry_found = False
+
+        # Priority 1: EMA M5 50 break (highest priority per mentorship)
+        if ema_5m_break:
+            # TradingLab RCC: verify previous candle confirmed the breakout
+            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
+                confidence += 12.0
+                met.append(f"Paso 6: RCC confirmado en EMA 5M 50 (prioridad maxima) - {ema_5m_desc}")
+            else:
+                # RCC failure = REJECT entry (mentorship: "NEVER enter on break alone")
+                failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada")
+                return None
+            entry_found = True
+
+        # Priority 2: Diagonal breakout on 5min
+        if not entry_found and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf in ("M5", "M2", ""):
-                        diagonal_entry_used = True
-                        confidence += 12.0
-                        met.append(f"Paso 6: Rompimiento de diagonal en 5M ({ptype}) - entrada ideal del curso")
+                    if ptf in ("M5", ""):
+                        confidence += 10.0
+                        met.append(f"Paso 6: Rompimiento de diagonal en 5M ({ptype})")
+                        entry_found = True
                         break
 
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
-        # M2 not available from broker API; use M5 EMA 20 as approximation
-        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
-
-        if not diagonal_entry_used:
-            # Fallback: EMA-based entry (simplification - mentorship prefers diagonals)
-            if ema_5m_break:
-                # TradingLab RCC: verify previous candle confirmed the breakout
-                if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
-                    confidence += 10.0
-                    met.append(f"Paso 6: RCC confirmado en EMA 5M - {ema_5m_desc}")
-                else:
-                    confidence += 3.0  # Breakout without confirmation = weaker
-                    met.append(f"Paso 6: Rompimiento EMA 5M sin confirmacion RCC")
-                logger.info(
-                    f"[BLUE] Entrada por EMA (no diagonal) en {analysis.instrument} - "
-                    f"el curso prioriza diagonales sobre EMAs para 5M entry"
-                )
+        # Priority 3: EMA M2 50 break (2min timeframe)
+        if not entry_found and ema_2m_break:
+            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+                confidence += 8.0
+                met.append(f"Paso 6: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
             else:
-                failed.append(f"Paso 6: {ema_5m_desc}")
+                # RCC failure = REJECT entry
+                failed.append(f"Paso 6: EMA 2M rota pero sin confirmacion RCC - entrada rechazada")
+                return None
+            entry_found = True
 
-        if ema_2m_break:
+        # Priority 4: Diagonal breakout on 2min
+        if not entry_found and hasattr(analysis, 'chart_patterns'):
+            chart_patterns = analysis.chart_patterns or []
+            for p in chart_patterns:
+                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
+                ptype_lower = ptype.lower()
+                if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
+                    if ptf == "M2":
+                        confidence += 6.0
+                        met.append(f"Paso 6: Rompimiento de diagonal en 2M ({ptype})")
+                        entry_found = True
+                        break
+
+        if not entry_found:
+            failed.append(f"Paso 6: Sin entrada valida (ni EMA 5M/2M ni diagonal) - {ema_5m_desc}")
+
+        # Additional confirmation: EMA 2M break adds confluence if not already the primary entry
+        if entry_found and ema_2m_break and ema_5m_break:
             confidence += 5.0
             met.append(f"Paso 6b: Confirmacion EMA 2M - {ema_2m_desc}")
 
@@ -1577,7 +1651,7 @@ class BlueStrategy(BaseStrategy):
 
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
-        tp_levels = self.get_tp_levels(analysis, direction, entry_price)
+        tp_levels = self.get_tp_levels(analysis, direction, entry_price, variant=variant)
         tp1 = tp_levels.get("tp1", 0.0)
 
         if sl == 0.0 or tp1 == 0.0:
@@ -1671,8 +1745,12 @@ class BlueStrategy(BaseStrategy):
                 return entry_price * 1.01
             return max(candidates)
 
-    def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
-        """TP1 en EMA 50 4H. TP_max en siguiente resistencia/soporte mas alla de TP1."""
+    def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float, variant: str = "BLUE_B") -> Dict[str, float]:
+        """
+        BLUE TP levels — variant-specific per TradingLab mentorship:
+        - BLUE_A: TP1 = 4H EMA50, TP_max = Fib 1.272 or 1.618 extension
+        - BLUE_B/C: TP1 = 4H EMA50 only (no Fib extensions)
+        """
         ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
         resistances = analysis.key_levels.get("resistances", [])
         supports = analysis.key_levels.get("supports", [])
@@ -1696,9 +1774,40 @@ class BlueStrategy(BaseStrategy):
                 if below:
                     result["tp1"] = max(below)
 
-        # BLUE TP_max = EMA 4H (Trading Plan rule: "BLUE: TP maximo = EMA 4H")
+        # BLUE_A variant: TP_max targets Fib 1.272 or 1.618 extension (more aggressive)
+        # BLUE_B/C variants: TP_max = EMA 4H only (conservative)
         tp1 = result.get("tp1")
-        if tp1:
+        if tp1 and variant == "BLUE_A":
+            # TradingLab: Blue A (doble suelo/techo) can target Fib extensions
+            fib_1272 = (
+                analysis.fibonacci_levels.get("ext_bull_1.272") if direction == "BUY"
+                else analysis.fibonacci_levels.get("ext_bear_1.272")
+            )
+            fib_1618 = (
+                analysis.fibonacci_levels.get("ext_bull_1.618") if direction == "BUY"
+                else analysis.fibonacci_levels.get("ext_bear_1.618")
+            )
+            # Try 1.618 first (most aggressive), then 1.272
+            if fib_1618:
+                valid = (fib_1618 > tp1) if direction == "BUY" else (fib_1618 < tp1)
+                if valid:
+                    result["tp_max"] = fib_1618
+            if "tp_max" not in result and fib_1272:
+                valid = (fib_1272 > tp1) if direction == "BUY" else (fib_1272 < tp1)
+                if valid:
+                    result["tp_max"] = fib_1272
+            # Fallback to next S/R if no Fib extensions available
+            if "tp_max" not in result:
+                if direction == "BUY":
+                    above_tp1 = sorted([r for r in resistances if r > tp1])
+                    if above_tp1:
+                        result["tp_max"] = above_tp1[0]
+                else:
+                    below_tp1 = sorted([s for s in supports if s < tp1], reverse=True)
+                    if below_tp1:
+                        result["tp_max"] = below_tp1[0]
+        elif tp1:
+            # BLUE_B/C: TP_max = EMA 4H (Trading Plan rule: "BLUE B/C: TP maximo = EMA 4H")
             ema_h4 = _ema_val(analysis, "EMA_H4_50")
             if ema_h4 and direction == "BUY" and ema_h4 > tp1:
                 result["tp_max"] = ema_h4
@@ -1919,14 +2028,15 @@ class RedStrategy(BaseStrategy):
             met.append(f"Paso 5b: {rev_desc}")
 
         # --- Paso 6: Entrada en 5M (RCC) ---
+        # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
             if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 10.0
                 met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
             else:
-                confidence += 3.0
-                met.append(f"Paso 6: Rompimiento sin RCC")
+                failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                return None
         else:
             failed.append(f"Paso 6: {ema_5m_desc}")
 
@@ -2047,24 +2157,24 @@ class RedStrategy(BaseStrategy):
         ew = getattr(analysis, 'elliott_wave_detail', {})
         wave_count = str(ew.get("wave_count", "")).strip()
 
-        # RED TP1: Fib 1.272 extension of the corrective wave (mentorship primary target)
-        # Uses directional keys (ext_bull_1.272 / ext_bear_1.272) — NOT legacy ext_1.272
-        # which has bearish-only bias and is dead code for BUY trades.
+        # RED TP1: Previous high/low (safest per mentorship)
+        # TradingLab: TP1 is the SAFEST target = previous swing high (BUY) or swing low (SELL)
+        # Fib extensions are used for tp_max, NOT for TP1.
+        swing_highs = getattr(analysis, 'swing_highs', [])
+        swing_lows = getattr(analysis, 'swing_lows', [])
         if direction == "BUY":
-            fib_1272_bull = analysis.fibonacci_levels.get("ext_bull_1.272")
-            if fib_1272_bull and fib_1272_bull > entry_price:
-                result["tp1"] = fib_1272_bull
+            valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
+            if valid_swing_highs:
+                result["tp1"] = min(valid_swing_highs)  # Nearest previous high = safest
             else:
-                # Fallback to nearest swing resistance
                 above = [r for r in resistances if r > entry_price]
                 if above:
                     result["tp1"] = min(above)
         else:
-            fib_1272_bear = analysis.fibonacci_levels.get("ext_bear_1.272")
-            if fib_1272_bear and fib_1272_bear < entry_price:
-                result["tp1"] = fib_1272_bear
+            valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
+            if valid_swing_lows:
+                result["tp1"] = max(valid_swing_lows)  # Nearest previous low = safest
             else:
-                # Fallback to nearest swing support
                 below = [s for s in supports if s < entry_price]
                 if below:
                     result["tp1"] = max(below)
@@ -2368,14 +2478,15 @@ class PinkStrategy(BaseStrategy):
                 )
 
         # --- Paso 5: Ejecutar al final del patron en 5M (RCC) ---
+        # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
             if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 15.0
                 met.append(f"Paso 5: RCC confirmado en 5M - {ema_5m_desc}")
             else:
-                confidence += 5.0
-                met.append(f"Paso 5: Rompimiento 5M sin RCC")
+                failed.append(f"Paso 5: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                return None
         else:
             failed.append(f"Paso 5: Sin rompimiento 5M - {ema_5m_desc}")
 
@@ -2474,9 +2585,9 @@ class PinkStrategy(BaseStrategy):
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
         """
-        PINK TP1: Fib 0.618 extension of Wave 3 projected from Wave 4 end.
-        Mentorship: TP at Fibonacci 0.618 extension (conservative, trend may be ending).
-        Fallback: previous swing high/low if Fib extension not available.
+        PINK TP1: Previous high/low (safest per mentorship).
+        TradingLab: PINK targets previous swing high (BUY) or swing low (SELL) as TP1.
+        Trend may be ending (Wave 5), so conservative TP is correct.
         """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
@@ -2484,57 +2595,42 @@ class PinkStrategy(BaseStrategy):
         swing_lows = getattr(analysis, 'swing_lows', [])
         result: Dict[str, float] = {}
 
-        # Primary: Fib 0.618 extension (mentorship PINK target)
-        fib_ext_618_bull = analysis.fibonacci_levels.get("ext_bull_0.618")
-        fib_ext_618_bear = analysis.fibonacci_levels.get("ext_bear_0.618")
-        fib_ext_618 = analysis.fibonacci_levels.get("ext_0.618")
-
         if direction == "BUY":
-            # Try Fib 0.618 extension first
-            fib_tp = fib_ext_618_bull or fib_ext_618
-            if fib_tp and fib_tp > entry_price:
-                result["tp1"] = fib_tp
+            # Primary: previous swing high (safest TP per mentorship)
+            valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
+            if valid_swing_highs:
+                result["tp1"] = min(valid_swing_highs)  # Nearest previous high = safest
             else:
-                # Fallback: previous swing high
-                valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
-                if valid_swing_highs:
-                    result["tp1"] = valid_swing_highs[-1]
-                else:
-                    above = sorted([r for r in resistances if r > entry_price])
-                    if above:
-                        result["tp1"] = above[0]
+                above = sorted([r for r in resistances if r > entry_price])
+                if above:
+                    result["tp1"] = above[0]
 
             # tp_max: next swing high beyond tp1
             tp1 = result.get("tp1")
             if tp1:
                 further_highs = [sh for sh in swing_highs if sh > tp1]
                 if further_highs:
-                    result["tp_max"] = further_highs[-1]
+                    result["tp_max"] = min(further_highs)
                 else:
                     further_res = [r for r in resistances if r > tp1]
                     if further_res:
                         result["tp_max"] = sorted(further_res)[0]
         else:
-            # Try Fib 0.618 extension first (SELL)
-            fib_tp = fib_ext_618_bear or fib_ext_618
-            if fib_tp and fib_tp < entry_price:
-                result["tp1"] = fib_tp
+            # Primary: previous swing low (safest TP per mentorship)
+            valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
+            if valid_swing_lows:
+                result["tp1"] = max(valid_swing_lows)  # Nearest previous low = safest
             else:
-                # Fallback: previous swing low
-                valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
-                if valid_swing_lows:
-                    result["tp1"] = valid_swing_lows[-1]
-                else:
-                    below = sorted([s for s in supports if s < entry_price], reverse=True)
-                    if below:
-                        result["tp1"] = below[0]
+                below = sorted([s for s in supports if s < entry_price], reverse=True)
+                if below:
+                    result["tp1"] = below[0]
 
             # tp_max: next swing low beyond tp1
             tp1 = result.get("tp1")
             if tp1:
                 further_lows = [sl for sl in swing_lows if sl < tp1]
                 if further_lows:
-                    result["tp_max"] = further_lows[-1]
+                    result["tp_max"] = max(further_lows)
                 else:
                     further_sup = [s for s in supports if s < tp1]
                     if further_sup:
@@ -2729,14 +2825,15 @@ class WhiteStrategy(BaseStrategy):
             failed.append(f"Paso 4: {rev_desc}")
 
         # --- Paso 5: Entrada en 5M (RCC) ---
+        # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
             if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 10.0
                 met.append(f"Paso 5: RCC confirmado - {ema_5m_desc}")
             else:
-                confidence += 3.0
-                met.append(f"Paso 5: Rompimiento sin RCC")
+                failed.append(f"Paso 5: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                return None
         else:
             failed.append(f"Paso 5: {ema_5m_desc}")
 
@@ -3122,19 +3219,28 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append("Paso 5c: Sin divergencia RSI en 4H (añadido deseable, no obligatorio)")
 
-        # MACD Divergence on H1 — bonus, NOT hard block
-        # TradingLab: "La divergencia MACD en 1H siempre estará presente" para BLACK,
-        # pero no bloqueamos si no hay datos suficientes.
+        # MACD Divergence on H1 — MANDATORY for BLACK
+        # TradingLab: "La divergencia MACD en 1H siempre estará presente" para BLACK setups.
+        # This is a hard requirement, not a bonus.
         macd_div = getattr(analysis, 'macd_divergence', None)
         if macd_div:
             expected_macd_div = "bullish" if direction == "BUY" else "bearish"
             if macd_div == expected_macd_div:
                 confidence += 10.0
-                met.append(f"Paso 5c2: MACD divergencia {macd_div} en H1 alineada con {direction}")
+                met.append(f"Paso 5c2 [OBLIGATORIO]: MACD divergencia {macd_div} en H1 alineada con {direction}")
             else:
-                confidence -= 5.0
-                failed.append(f"Paso 5c2: MACD divergencia {macd_div} en H1 contraria a {direction} (penalizacion)")
-        # If None: no change, don't block — data may be insufficient
+                failed.append(
+                    f"Paso 5c2 [OBLIGATORIO]: MACD divergencia {macd_div} en H1 contraria a {direction} "
+                    f"— BLACK RECHAZADO (divergencia MACD en H1 siempre debe estar presente)"
+                )
+                return None
+        else:
+            # No MACD divergence data = cannot confirm mandatory condition = reject
+            failed.append(
+                "Paso 5c2 [OBLIGATORIO]: Sin divergencia MACD en H1 — BLACK RECHAZADO "
+                "(la mentoria dice: 'la divergencia MACD en 1H siempre estará presente')"
+            )
+            return None
 
         # Consolidacion (patron correctivo formandose)
         if "DOJI" in analysis.candlestick_patterns:
@@ -3175,14 +3281,15 @@ class BlackStrategy(BaseStrategy):
                 return None  # No 1H candle pattern = no Black entry
 
         # --- Paso 6: Ejecutar en rompimiento 5M (RCC) ---
+        # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
         ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
         if ema_5m_break:
             if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
                 confidence += 10.0
                 met.append(f"Paso 6: RCC confirmado - {ema_5m_desc}")
             else:
-                confidence += 3.0
-                met.append(f"Paso 6: Rompimiento sin RCC")
+                failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                return None
         else:
             failed.append(f"Paso 6: Sin rompimiento 5M - {ema_5m_desc}")
 
@@ -3357,10 +3464,8 @@ class GreenStrategy(BaseStrategy):
     La mas lucrativa (hasta 10:1 R:R)
     TradingLab: GREEN is the ONLY strategy valid for crypto trading.
 
-    Timeframes por estilo de trading:
-    - Swing:       Weekly (trend) -> Daily (pattern) -> 1H (diagonal) -> 15M (execution)
-    - Day Trading: 4H (trend) -> 1H (pattern) -> 15M (diagonal) -> 2M (execution)
-    - Scalping:    15M (trend) -> 5M (pattern) -> 1M (diagonal) -> 30s (execution)
+    FIXED layout (NO style differentiation): Daily + 1H + 15min
+    Timeframes: Weekly (trend) -> Daily (pattern) -> 1H (diagonal) -> 15M (execution)
 
     7 Pasos:
     1. Direccion de tendencia semanal (alcista/bajista)
@@ -3632,33 +3737,13 @@ class GreenStrategy(BaseStrategy):
                         break
 
         # Fallback: EMA breaks if no diagonal detected.
-        # GREEN execution timeframe per mentorship:
-        #   Swing: 15M execution → try M15 EMAs first
-        #   Day Trading: 2M execution (M5 proxy) → try M5 EMAs first
-        #   Scalping: 30s execution (M1 proxy) → try M1 EMAs
+        # TradingLab: GREEN uses FIXED layout: Daily + 1H + 15min (NO style differentiation)
+        # Execution always on 15M, with M5 as fallback proxy.
         if not diagonal_breakout_detected:
-            # Determine primary execution EMA based on trading style
-            trading_style = getattr(settings, 'trading_style', 'day_trading') if 'settings' in dir() else 'day_trading'
-            try:
-                from config import settings as _s
-                trading_style = _s.trading_style
-            except Exception:
-                pass
-
-            if trading_style == "swing":
-                # Swing: 15M is the execution timeframe (mentorship)
-                primary_ema = "EMA_M15_50"
-                primary_ema2 = "EMA_M15_20"
-                fallback_ema = "EMA_M5_50"
-                fallback_ema2 = "EMA_M5_20"
-                style_label = "Swing"
-            else:
-                # Day Trading: M5 is proxy for M2 (broker API limitation)
-                primary_ema = "EMA_M5_50"
-                primary_ema2 = "EMA_M5_20"
-                fallback_ema = "EMA_M15_50"
-                fallback_ema2 = "EMA_M15_20"
-                style_label = "Day Trading"
+            primary_ema = "EMA_M15_50"
+            primary_ema2 = "EMA_M15_20"
+            fallback_ema = "EMA_M5_50"
+            fallback_ema2 = "EMA_M5_20"
 
             ema_m5_break, ema_m5_desc = _check_ema_break(analysis, primary_ema, direction)
             ema_m5_20_break, ema_m5_20_desc = _check_ema_break(analysis, primary_ema2, direction)
@@ -3666,30 +3751,31 @@ class GreenStrategy(BaseStrategy):
             if ema_m5_break and ema_m5_20_break:
                 if _check_rcc_confirmation(analysis, primary_ema, direction):
                     confidence += 12.0
-                    met.append(f"Paso 5: {style_label} - RCC confirmado ({primary_ema} + {primary_ema2})")
+                    met.append(f"Paso 5: RCC confirmado en 15M ({primary_ema} + {primary_ema2})")
                 else:
-                    confidence += 7.0
-                    met.append(f"Paso 5: {style_label} - Rompimiento doble sin RCC")
+                    # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
+                    failed.append(f"Paso 5: EMA 15M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                    return None
             elif ema_m5_break:
                 confidence += 4.0
-                met.append(f"Paso 5: {style_label} - Rompimiento parcial - {ema_m5_desc}")
+                met.append(f"Paso 5: Rompimiento parcial 15M - {ema_m5_desc}")
             else:
-                # Fall back to secondary timeframe EMAs
+                # Fall back to M5 EMAs as proxy
                 ema_15m_break, ema_15m_desc = _check_ema_break(analysis, fallback_ema, direction)
                 ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, fallback_ema2, direction)
 
                 if ema_15m_break and ema_15m_20_break:
                     if _check_rcc_confirmation(analysis, fallback_ema, direction):
                         confidence += 10.0
-                        met.append(f"Paso 5: Fallback - RCC confirmado ({fallback_ema} + {fallback_ema2})")
+                        met.append(f"Paso 5: Fallback M5 - RCC confirmado ({fallback_ema} + {fallback_ema2})")
                     else:
-                        confidence += 5.0
-                        met.append(f"Paso 5: Fallback - Rompimiento doble sin RCC")
+                        failed.append(f"Paso 5: Fallback M5 - EMA rota pero sin confirmacion RCC - entrada rechazada")
+                        return None
                 elif ema_15m_break:
                     confidence += 3.0
-                    met.append(f"Paso 5: Fallback - Rompimiento parcial - {ema_15m_desc}")
+                    met.append(f"Paso 5: Fallback M5 - Rompimiento parcial - {ema_15m_desc}")
                 else:
-                    failed.append(f"Paso 5: Sin rompimiento de diagonal ni EMA en M5/M15 - {ema_15m_desc}")
+                    failed.append(f"Paso 5: Sin rompimiento de diagonal ni EMA en M15/M5 - {ema_15m_desc}")
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
@@ -3798,24 +3884,40 @@ class GreenStrategy(BaseStrategy):
         """
         SL debajo del minimo anterior de 1H (ajustado para lograr alto R:R).
         Green usa SL muy ajustado, por eso logra R:R tan altos.
+        TradingLab: Use 1H swing lows/highs (NOT daily S/R levels).
         Previous 1H swing low/high only, NO Fibonacci.
         """
-        supports = analysis.key_levels.get("supports", [])
-        resistances = analysis.key_levels.get("resistances", [])
+        # Use swing_lows/swing_highs which come from 1H analysis (not daily S/R)
+        swing_lows = getattr(analysis, 'swing_lows', [])
+        swing_highs = getattr(analysis, 'swing_highs', [])
         ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
 
+        # Fallback: use key_levels supports/resistances if no swing data
+        supports = analysis.key_levels.get("supports", []) if analysis.key_levels else []
+        resistances = analysis.key_levels.get("resistances", []) if analysis.key_levels else []
+
         if direction == "BUY":
-            below = [s for s in supports if s < entry_price]
+            # 1H swing lows below entry = SL placement
+            below = [sl for sl in swing_lows if sl < entry_price]
             if below:
-                return max(below)  # Tightest SL for high R:R
+                return max(below)  # Tightest SL from 1H swing lows for high R:R
+            # Fallback to key_levels supports
+            support_below = [s for s in supports if s < entry_price]
+            if support_below:
+                return max(support_below)
             # Fallback: ligeramente debajo de EMA 1H si disponible
             if ema_1h_50 and ema_1h_50 < entry_price:
                 return ema_1h_50 * 0.999
             return entry_price * 0.995  # 0.5% tight SL
         else:
-            above = [r for r in resistances if r > entry_price]
+            # 1H swing highs above entry = SL placement
+            above = [sh for sh in swing_highs if sh > entry_price]
             if above:
-                return min(above)
+                return min(above)  # Tightest SL from 1H swing highs for high R:R
+            # Fallback to key_levels resistances
+            resistance_above = [r for r in resistances if r > entry_price]
+            if resistance_above:
+                return min(resistance_above)
             if ema_1h_50 and ema_1h_50 > entry_price:
                 return ema_1h_50 * 1.001
             return entry_price * 1.005

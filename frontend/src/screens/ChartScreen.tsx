@@ -1,6 +1,7 @@
 /**
  * NeonTrade AI - Chart Screen
  * Professional TradingView lightweight-charts integration with cyberpunk theme.
+ * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
  *
  * Web: Uses lightweight-charts directly in a DOM div.
  * Native: Falls back to the custom React Native candlestick renderer.
@@ -19,6 +20,13 @@ import {
   Platform,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+import {
+  HUDHeader,
+  HUDCard,
+  HUDBadge,
+  LoadingState,
+  ErrorState,
+} from '../components/HUDComponents';
 import { API_URL, authFetch, getScoreColor, getTrendColor, getTrendIcon, STRATEGY_COLORS } from '../services/api';
 
 // ─── TradingView lightweight-charts (web only) ─────────────────────────────
@@ -110,23 +118,23 @@ const GRANULARITY_MAP: Record<Timeframe, string> = {
 
 const CANDLE_COUNT = 120;
 
-// ─── Chart Color Theme ─────────────────────────────────────────────────────
+// ─── Chart Color Theme (referencing theme) ────────────────────────────────
 
 const CHART_COLORS = {
-  background: '#0a0812',
-  gridLines: '#1a1535',
-  candleUp: '#00ff88',
-  candleDown: '#da4453',
-  volumeUp: 'rgba(0, 255, 136, 0.3)',
-  volumeDown: 'rgba(218, 68, 83, 0.3)',
-  crosshair: '#fcee09',
-  ema20: '#5df4fe',
-  ema50: '#fcee09',
-  support: '#00ff88',
-  resistance: '#da4453',
-  pivot: '#ffb800',
-  textColor: '#6b7080',
-  currentPrice: '#fcee09',
+  background: theme.colors.chartBackground,
+  gridLines: theme.colors.chartGridLines,
+  candleUp: theme.colors.chartCandleUp,
+  candleDown: theme.colors.chartCandleDown,
+  volumeUp: theme.colors.chartVolumeUp,
+  volumeDown: theme.colors.chartVolumeDown,
+  crosshair: theme.colors.chartCrosshair,
+  ema20: theme.colors.chartEma20,
+  ema50: theme.colors.chartEma50,
+  support: theme.colors.chartSupport,
+  resistance: theme.colors.chartResistance,
+  pivot: theme.colors.chartPivot,
+  textColor: theme.colors.chartTextColor,
+  currentPrice: theme.colors.chartCurrentPrice,
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -303,10 +311,8 @@ export default function ChartScreen() {
 
   // ── TradingView Chart (Web) ─────────────────────────────────────────────
 
-  // Initialize chart via callback ref — fires when the div actually mounts in the DOM.
-  // This fixes the timing issue where useEffect([]) ran before the div existed.
+  // Initialize chart via callback ref
   const initChartRef = useCallback((el: HTMLDivElement | null) => {
-    // Cleanup previous instance
     if (chartCleanupRef.current) {
       chartCleanupRef.current();
       chartCleanupRef.current = null;
@@ -381,13 +387,12 @@ export default function ChartScreen() {
       wickDownColor: CHART_COLORS.candleDown,
     });
 
-    // Volume series (histogram in separate pane area via priceScaleId)
+    // Volume series
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     });
 
-    // Configure volume scale
     chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
       drawTicks: false,
@@ -397,7 +402,7 @@ export default function ChartScreen() {
     const ema20Series = chart.addLineSeries({
       color: CHART_COLORS.ema20,
       lineWidth: 1,
-      lineStyle: 0, // solid
+      lineStyle: 0,
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
@@ -419,7 +424,6 @@ export default function ChartScreen() {
     ema20SeriesRef.current = ema20Series;
     ema50SeriesRef.current = ema50Series;
 
-    // Handle resize
     const handleResize = () => {
       if (chartRef.current && el) {
         chartRef.current.applyOptions({
@@ -429,7 +433,6 @@ export default function ChartScreen() {
     };
     window.addEventListener('resize', handleResize);
 
-    // Store cleanup for later
     chartCleanupRef.current = () => {
       window.removeEventListener('resize', handleResize);
       if (chartRef.current) {
@@ -464,7 +467,6 @@ export default function ChartScreen() {
 
     if (candles.length === 0) return;
 
-    // Sort candles by time and remove duplicates
     const sorted = [...candles]
       .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
@@ -476,7 +478,6 @@ export default function ChartScreen() {
       return true;
     });
 
-    // Candlestick data
     const candleData = uniqueCandles.map(c => ({
       time: parseCandleTime(c.time) as any,
       open: c.open,
@@ -485,7 +486,6 @@ export default function ChartScreen() {
       close: c.close,
     }));
 
-    // Volume data
     const volumeData = uniqueCandles.map(c => ({
       time: parseCandleTime(c.time) as any,
       value: c.volume,
@@ -495,7 +495,6 @@ export default function ChartScreen() {
     candleSeries.setData(candleData);
     volumeSeries.setData(volumeData);
 
-    // Calculate and set EMAs from candle close prices
     const closes = uniqueCandles.map(c => c.close);
     const ema20Values = calculateEMA(closes, 20);
     const ema50Values = calculateEMA(closes, 50);
@@ -503,7 +502,7 @@ export default function ChartScreen() {
     const ema20Data = uniqueCandles.map((c, i) => ({
       time: parseCandleTime(c.time) as any,
       value: ema20Values[i],
-    })).filter((_, i) => i >= 19); // EMA needs warmup
+    })).filter((_, i) => i >= 19);
 
     const ema50Data = uniqueCandles.map((c, i) => ({
       time: parseCandleTime(c.time) as any,
@@ -589,7 +588,6 @@ export default function ChartScreen() {
       priceLinesRef.current.push(line);
     }
 
-    // Scroll to latest
     chart.timeScale().scrollToRealTime();
   }, [candles, analysisSummary, price]);
 
@@ -651,87 +649,101 @@ export default function ChartScreen() {
     return lines;
   }, [priceMin, priceRange]);
 
-  // ── Render: Instrument Picker ────────────────────────────────────────────
+  // ── Render: Instrument + TF selector (horizontal pills) ─────────────────
 
-  const renderPicker = () => (
-    <View style={styles.pickerContainer}>
+  const renderInstrumentTFSelector = () => (
+    <View style={styles.selectorRow}>
+      {/* Instrument picker */}
       <TouchableOpacity
-        style={styles.pickerButton}
+        style={styles.instrumentPill}
         onPress={() => setPickerOpen(!pickerOpen)}
         activeOpacity={0.7}
       >
-        <Text style={styles.pickerText}>
-          {selectedInstrument ? selectedInstrument.replace('_', '/') : 'Seleccionar...'}
+        <View style={styles.instrumentPillAccent} />
+        <Text style={styles.instrumentPillText}>
+          {selectedInstrument ? selectedInstrument.replace('_', '/') : 'PAR...'}
         </Text>
-        <Text style={styles.pickerChevron}>{pickerOpen ? '\u25BE' : '\u25B8'}</Text>
+        <Text style={styles.instrumentPillChevron}>{pickerOpen ? '\u25BE' : '\u25B8'}</Text>
       </TouchableOpacity>
 
-      {pickerOpen && (
-        <View style={styles.pickerDropdown}>
-          <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
-            {watchlist.map((item) => (
-              <TouchableOpacity
-                key={item.instrument}
+      {/* Timeframe pills - horizontal scroll */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tfScroll} contentContainerStyle={styles.tfScrollContent}>
+        {TIMEFRAMES.map((tf) => (
+          <TouchableOpacity
+            key={tf}
+            style={[styles.tfPill, tf === timeframe && styles.tfPillActive]}
+            onPress={() => setTimeframe(tf)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tfPillText, tf === timeframe && styles.tfPillTextActive]}>
+              {tf}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  // ── Render: Picker Dropdown ─────────────────────────────────────────────
+
+  const renderPickerDropdown = () => {
+    if (!pickerOpen) return null;
+    return (
+      <View style={styles.pickerDropdown}>
+        <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
+          {watchlist.map((item) => (
+            <TouchableOpacity
+              key={item.instrument}
+              style={[
+                styles.pickerOption,
+                item.instrument === selectedInstrument && styles.pickerOptionActive,
+              ]}
+              onPress={() => {
+                setSelectedInstrument(item.instrument);
+                setPickerOpen(false);
+              }}
+            >
+              <Text
                 style={[
-                  styles.pickerOption,
-                  item.instrument === selectedInstrument && styles.pickerOptionActive,
+                  styles.pickerOptionText,
+                  item.instrument === selectedInstrument && { color: theme.colors.cp2077Yellow },
                 ]}
-                onPress={() => {
-                  setSelectedInstrument(item.instrument);
-                  setPickerOpen(false);
-                }}
               >
-                <Text
-                  style={[
-                    styles.pickerOptionText,
-                    item.instrument === selectedInstrument && { color: theme.colors.cp2077Yellow },
-                  ]}
-                >
-                  {item.instrument.replace('_', '/')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-    </View>
-  );
+                {item.instrument.replace('_', '/')}
+              </Text>
+              <Text style={[styles.pickerOptionScore, { color: getScoreColor(item.score) }]}>
+                {item.score.toFixed(0)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
 
-  // ── Render: Timeframe Buttons ────────────────────────────────────────────
-
-  const renderTimeframeButtons = () => (
-    <View style={styles.tfButtonRow}>
-      {TIMEFRAMES.map((tf) => (
-        <TouchableOpacity
-          key={tf}
-          style={[styles.tfButton, tf === timeframe && styles.tfButtonActive]}
-          onPress={() => setTimeframe(tf)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.tfButtonText, tf === timeframe && styles.tfButtonTextActive]}>
-            {tf}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  // ── Render: Price Overlay ────────────────────────────────────────────────
+  // ── Render: Price Overlay (floating HUD element) ────────────────────────
 
   const renderPriceOverlay = () => {
     if (!price) return null;
     const spread = price.spread ?? (price.ask - price.bid);
     return (
       <View style={styles.priceOverlay}>
-        <Text style={styles.priceBid}>
-          BID {formatPrice(price.bid, selectedInstrument)}
-        </Text>
-        <Text style={styles.priceSpread}>
-          SPR {typeof spread === 'number' ? spread.toFixed(1) : '---'}
-        </Text>
-        <Text style={styles.priceAsk}>
-          ASK {formatPrice(price.ask, selectedInstrument)}
-        </Text>
+        <View style={styles.priceOverlayInner}>
+          <View style={styles.priceItem}>
+            <Text style={styles.priceItemLabel}>BID</Text>
+            <Text style={styles.priceBid}>{formatPrice(price.bid, selectedInstrument)}</Text>
+          </View>
+          <View style={styles.priceSeparator} />
+          <View style={styles.priceItem}>
+            <Text style={styles.priceItemLabel}>SPR</Text>
+            <Text style={styles.priceSpread}>{typeof spread === 'number' ? spread.toFixed(1) : '---'}</Text>
+          </View>
+          <View style={styles.priceSeparator} />
+          <View style={styles.priceItem}>
+            <Text style={styles.priceItemLabel}>ASK</Text>
+            <Text style={styles.priceAsk}>{formatPrice(price.ask, selectedInstrument)}</Text>
+          </View>
+        </View>
       </View>
     );
   };
@@ -747,7 +759,7 @@ export default function ChartScreen() {
           style={{
             width: '100%',
             height: chartHeightPx,
-            borderRadius: 8,
+            borderRadius: 4,
             overflow: 'hidden',
             border: `1px solid ${theme.colors.border}`,
           }}
@@ -891,48 +903,40 @@ export default function ChartScreen() {
 
   const renderBottomBar = () => {
     if (!analysisSummary) return null;
-    const stratColorMap: Record<string, string> = {
-      BLUE: STRATEGY_COLORS.BLUE,
-      RED: STRATEGY_COLORS.RED,
-      PINK: STRATEGY_COLORS.PINK,
-      WHITE: STRATEGY_COLORS.WHITE,
-      BLACK: STRATEGY_COLORS.BLACK,
-      GREEN: STRATEGY_COLORS.GREEN,
-    };
-    const stratColor = analysisSummary.strategy_color
-      ? stratColorMap[analysisSummary.strategy_color.toUpperCase()] || theme.colors.textMuted
-      : theme.colors.textMuted;
+    const stratColor = analysisSummary.strategy_color || theme.colors.textMuted;
 
     return (
-      <View style={styles.bottomBar}>
-        <View style={styles.bottomItem}>
-          <Text style={styles.bottomLabel}>TREND</Text>
-          <Text style={[styles.bottomValue, { color: getTrendColor(analysisSummary.trend) }]}>
-            {getTrendIcon(analysisSummary.trend)} {analysisSummary.trend?.toUpperCase() || '---'}
-          </Text>
+      <HUDCard style={styles.bottomBar}>
+        <View style={styles.bottomRow}>
+          <View style={styles.bottomItem}>
+            <Text style={styles.bottomLabel}>TREND</Text>
+            <Text style={[styles.bottomValue, { color: getTrendColor(analysisSummary.trend) }]}>
+              {getTrendIcon(analysisSummary.trend)} {analysisSummary.trend?.toUpperCase() || '---'}
+            </Text>
+          </View>
+          <View style={styles.bottomDivider} />
+          <View style={styles.bottomItem}>
+            <Text style={styles.bottomLabel}>SCORE</Text>
+            <Text style={[styles.bottomValue, { color: getScoreColor(analysisSummary.score) }]}>
+              {analysisSummary.score.toFixed(0)}
+            </Text>
+          </View>
+          <View style={styles.bottomDivider} />
+          <View style={styles.bottomItem}>
+            <Text style={styles.bottomLabel}>ESTRATEGIA</Text>
+            {analysisSummary.strategy_name ? (
+              <View style={styles.bottomStratRow}>
+                <View style={[styles.stratDot, { backgroundColor: stratColor, shadowColor: stratColor }]} />
+                <Text style={[styles.bottomValue, { color: stratColor, fontSize: 10 }]} numberOfLines={1}>
+                  {analysisSummary.strategy_name}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.bottomValue, { color: theme.colors.textMuted }]}>---</Text>
+            )}
+          </View>
         </View>
-        <View style={styles.bottomDivider} />
-        <View style={styles.bottomItem}>
-          <Text style={styles.bottomLabel}>SCORE</Text>
-          <Text style={[styles.bottomValue, { color: getScoreColor(analysisSummary.score) }]}>
-            {analysisSummary.score.toFixed(0)}
-          </Text>
-        </View>
-        <View style={styles.bottomDivider} />
-        <View style={styles.bottomItem}>
-          <Text style={styles.bottomLabel}>ESTRATEGIA</Text>
-          {analysisSummary.strategy_name ? (
-            <View style={styles.bottomStratRow}>
-              <View style={[styles.stratDot, { backgroundColor: stratColor }]} />
-              <Text style={[styles.bottomValue, { color: stratColor, fontSize: 10 }]} numberOfLines={1}>
-                {analysisSummary.strategy_name}
-              </Text>
-            </View>
-          ) : (
-            <Text style={[styles.bottomValue, { color: theme.colors.textMuted }]}>---</Text>
-          )}
-        </View>
-      </View>
+      </HUDCard>
     );
   };
 
@@ -943,13 +947,12 @@ export default function ChartScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>CHART</Text>
-      </View>
+      {/* HUD Header */}
+      <HUDHeader title="CHART // LIVE" subtitle="MARKET VISUALIZATION" />
 
-      {/* Instrument Picker */}
-      {renderPicker()}
+      {/* Instrument + TF selector */}
+      {renderInstrumentTFSelector()}
+      {renderPickerDropdown()}
 
       <ScrollView
         style={styles.scrollContent}
@@ -957,25 +960,13 @@ export default function ChartScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Timeframe Buttons */}
-        {renderTimeframeButtons()}
-
         {/* Price Overlay */}
         {renderPriceOverlay()}
 
         {loading && !hasCandles ? (
-          <View style={styles.centerMessage}>
-            <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
-            <Text style={styles.loadingText}>Cargando velas...</Text>
-          </View>
+          <LoadingState message="Cargando velas..." />
         ) : error && !hasCandles ? (
-          <View style={styles.centerMessage}>
-            <Text style={styles.errorIcon}>!</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchChartData}>
-              <Text style={styles.retryButtonText}>REINTENTAR</Text>
-            </TouchableOpacity>
-          </View>
+          <ErrorState message={error} onRetry={fetchChartData} />
         ) : hasCandles ? (
           <>
             {isWeb && createChart ? (
@@ -1017,57 +1008,81 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  header: {
-    alignItems: 'center',
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-  },
-  title: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 24,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 6,
-    textShadowColor: theme.colors.cp2077YellowGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15,
-  },
   scrollContent: {
     flex: 1,
     paddingHorizontal: theme.spacing.md,
   },
 
-  // ── Picker ──────────────────────────────────────────
-  pickerContainer: {
+  // ── Instrument + TF Selector ───────────────────────
+  selectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
+    gap: 8,
     zIndex: 100,
   },
-  pickerButton: {
+  instrumentPill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: theme.colors.backgroundCard,
     borderWidth: 1,
     borderColor: theme.colors.cp2077Yellow,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.cp2077Yellow,
     borderRadius: theme.borderRadius.sm,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm + 2,
+    paddingVertical: theme.spacing.sm - 1,
   },
-  pickerText: {
+  instrumentPillAccent: {
+    width: 3,
+    height: 14,
+    backgroundColor: theme.colors.cp2077Yellow,
+    marginRight: 6,
+    borderRadius: 1,
+  },
+  instrumentPillText: {
     fontFamily: theme.fonts.mono,
-    fontSize: 16,
+    fontSize: 13,
     color: theme.colors.textWhite,
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
-  pickerChevron: {
+  instrumentPillChevron: {
     fontFamily: theme.fonts.mono,
-    fontSize: 14,
+    fontSize: 12,
+    color: theme.colors.cp2077Yellow,
+    marginLeft: 4,
+  },
+  tfScroll: {
+    flex: 1,
+  },
+  tfScrollContent: {
+    gap: 4,
+    alignItems: 'center',
+  },
+  tfPill: {
+    paddingHorizontal: theme.spacing.sm + 4,
+    paddingVertical: theme.spacing.sm - 2,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.backgroundCard,
+  },
+  tfPillActive: {
+    borderColor: theme.colors.cp2077Yellow,
+    backgroundColor: 'rgba(252, 238, 9, 0.08)',
+  },
+  tfPillText: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    letterSpacing: 1,
+  },
+  tfPillTextActive: {
     color: theme.colors.cp2077Yellow,
   },
+
+  // ── Picker Dropdown ────────────────────────────────
   pickerDropdown: {
+    marginHorizontal: theme.spacing.md,
     backgroundColor: theme.colors.backgroundDark,
     borderWidth: 1,
     borderColor: theme.colors.cp2077Yellow,
@@ -1075,11 +1090,14 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: theme.borderRadius.md,
     borderBottomRightRadius: theme.borderRadius.md,
     maxHeight: 200,
+    zIndex: 200,
   },
   pickerScroll: {
     maxHeight: 200,
   },
   pickerOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     borderBottomWidth: 1,
@@ -1094,63 +1112,60 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     letterSpacing: 1,
   },
-
-  // ── Timeframe Buttons ───────────────────────────────
-  tfButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
-    gap: 4,
+  pickerOptionScore: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 13,
+    fontWeight: 'bold',
   },
-  tfButton: {
-    flex: 1,
+
+  // ── Price Overlay (floating HUD) ───────────────────
+  priceOverlay: {
+    alignItems: 'flex-end',
+    marginBottom: theme.spacing.sm,
+  },
+  priceOverlayInner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm - 2,
-    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'rgba(17, 14, 29, 0.85)',
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.backgroundCard,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: theme.spacing.sm + 2,
+    paddingVertical: theme.spacing.xs + 1,
+    gap: 8,
   },
-  tfButtonActive: {
-    borderColor: theme.colors.cp2077Yellow,
-    backgroundColor: theme.colors.backgroundLight,
-  },
-  tfButtonText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    letterSpacing: 1,
-  },
-  tfButtonTextActive: {
-    color: theme.colors.cp2077Yellow,
-  },
-
-  // ── Price Overlay ───────────────────────────────────
-  priceOverlay: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+  priceItem: {
     alignItems: 'center',
-    gap: 10,
-    marginBottom: theme.spacing.xs,
+  },
+  priceItemLabel: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 7,
+    color: theme.colors.textMuted,
+    letterSpacing: 2,
+    marginBottom: 1,
   },
   priceBid: {
     fontFamily: theme.fonts.mono,
-    fontSize: 11,
+    fontSize: 12,
     color: theme.colors.neonGreen,
     letterSpacing: 1,
   },
   priceSpread: {
     fontFamily: theme.fonts.mono,
-    fontSize: 9,
+    fontSize: 10,
     color: theme.colors.textMuted,
     letterSpacing: 1,
   },
   priceAsk: {
     fontFamily: theme.fonts.mono,
-    fontSize: 11,
+    fontSize: 12,
     color: theme.colors.neonRed,
     letterSpacing: 1,
+  },
+  priceSeparator: {
+    width: 1,
+    height: 20,
+    backgroundColor: theme.colors.border,
   },
 
   // ── TradingView Chart Wrapper (web) ─────────────────
@@ -1161,7 +1176,7 @@ const styles = StyleSheet.create({
   // ── Native Chart ────────────────────────────────────
   chartContainer: {
     backgroundColor: theme.colors.backgroundDark,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
     overflow: 'hidden',
@@ -1244,7 +1259,7 @@ const styles = StyleSheet.create({
   pivotLevelText: {
     fontFamily: theme.fonts.mono,
     fontSize: 7,
-    color: '#ffb800',
+    color: theme.colors.chartPivot,
     backgroundColor: theme.colors.backgroundDark,
     paddingHorizontal: 2,
     position: 'absolute',
@@ -1307,13 +1322,11 @@ const styles = StyleSheet.create({
 
   // ── Bottom Bar ──────────────────────────────────────
   bottomBar: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.backgroundCard,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.sm + 2,
     marginTop: theme.spacing.sm,
+    padding: theme.spacing.sm + 2,
+  },
+  bottomRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   bottomItem: {
@@ -1321,7 +1334,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bottomLabel: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.heading,
     fontSize: 8,
     color: theme.colors.textMuted,
     letterSpacing: 2,
@@ -1347,6 +1360,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+    elevation: 3,
   },
 
   // ── States ──────────────────────────────────────────
@@ -1354,48 +1371,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: theme.spacing.xxl * 2,
-  },
-  loadingText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-    marginTop: theme.spacing.md,
-  },
-  errorIcon: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 36,
-    color: theme.colors.neonRed,
-    fontWeight: 'bold',
-    borderWidth: 2,
-    borderColor: theme.colors.neonRed,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    textAlign: 'center',
-    lineHeight: 38,
-    marginBottom: theme.spacing.md,
-  },
-  errorText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 12,
-    color: theme.colors.neonRed,
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  retryButton: {
-    borderWidth: 1,
-    borderColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-  },
-  retryButtonText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 12,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
   },
   emptyText: {
     fontFamily: theme.fonts.mono,

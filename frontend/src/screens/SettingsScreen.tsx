@@ -1,9 +1,10 @@
 /**
  * NeonTrade AI - Settings Screen
- * Configuration: trading mode, broker, risk, engine control.
+ * Cyberpunk 2077 HUD-style system configuration.
+ * Decomposed into 12 HUDCard sections with collapsible panels.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,11 +16,25 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Animated,
+  Platform,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+import {
+  HUDCard,
+  HUDHeader,
+  HUDSectionTitle,
+  HUDStatRow,
+  HUDDivider,
+  HUDBadge,
+  HUDProgressBar,
+  LoadingState,
+  ErrorState,
+} from '../components/HUDComponents';
 import { api, API_URL, authFetch, setBackendUrl, resetBackendUrl, setApiKey, clearApiKey } from '../services/api';
 
-// Types
+// ── Types ──────────────────────────────────────────────
+
 interface ModeData {
   mode: 'AUTO' | 'MANUAL';
 }
@@ -28,6 +43,12 @@ interface BrokerData {
   broker: string;
   connected: boolean;
 }
+
+interface StrategyConfig {
+  [key: string]: boolean;
+}
+
+// ── Constants ──────────────────────────────────────────
 
 const BROKERS = [
   {
@@ -59,23 +80,144 @@ const STRATEGIES = [
     ],
   },
   { key: 'RED', label: 'RED', description: 'Cambio de tendencia 4H', color: '#da4453', variants: [] },
-  { key: 'PINK', label: 'PINK', description: 'Patron correctivo (Onda 4→5)', color: '#ff69b4', variants: [] },
+  { key: 'PINK', label: 'PINK', description: 'Patron correctivo (Onda 4->5)', color: '#ff69b4', variants: [] },
   { key: 'WHITE', label: 'WHITE', description: 'Continuacion post-Pink', color: '#ffffff', variants: [] },
   { key: 'BLACK', label: 'BLACK', description: 'Contratendencia (min 2:1 R:R)', color: '#888888', variants: [] },
   { key: 'GREEN', label: 'GREEN', description: 'Semanal + Diario + 15M (hasta 10:1)', color: '#00ff41', variants: [] },
 ];
 
-interface StrategyConfig {
-  [key: string]: boolean;
-}
-
-// Trading hours shown from dynamic config
-const _formatHours = (config: Record<string, number>) => [
-  { session: 'London + NY', hours: `${String(config.trading_start_hour ?? 7).padStart(2, '0')}:00 - ${String(config.trading_end_hour ?? 21).padStart(2, '0')}:00 UTC` },
-  { session: 'Cierre Viernes', hours: `${String(config.close_before_friday_hour ?? 20).padStart(2, '0')}:00 UTC` },
+const RISK_FIELDS = [
+  { key: 'risk_day_trading', label: 'Day Trading', fmt: (v: number) => `${(v * 100).toFixed(1)}%`, isPercent: true },
+  { key: 'risk_scalping', label: 'Scalping', fmt: (v: number) => `${(v * 100).toFixed(1)}%`, isPercent: true },
+  { key: 'risk_swing', label: 'Swing', fmt: (v: number) => `${(v * 100).toFixed(1)}%`, isPercent: true },
+  { key: 'max_total_risk', label: 'Max Total Risk', fmt: (v: number) => `${(v * 100).toFixed(1)}%`, isPercent: true },
+  { key: 'correlated_risk_pct', label: 'Riesgo Correlacion', fmt: (v: number) => `${(v * 100).toFixed(2)}%`, isPercent: true },
+  { key: 'min_rr_ratio', label: 'Min R:R', fmt: (v: number) => `1:${v.toFixed(2)}`, isPercent: false },
+  { key: 'move_sl_to_be_pct_to_tp1', label: 'BE a % de TP1', fmt: (v: number) => `${(v * 100).toFixed(0)}%`, isPercent: true },
 ];
 
+const WATCHLIST_CATEGORIES = [
+  { key: 'forex', label: 'FOREX' },
+  { key: 'forex_exotic', label: 'EXOTIC' },
+  { key: 'commodities', label: 'COMMODITIES' },
+  { key: 'indices', label: 'INDICES' },
+  { key: 'crypto', label: 'CRYPTO' },
+];
+
+const _formatHours = (config: Record<string, number>) => [
+  { label: 'London + NY', value: `${String(config.trading_start_hour ?? 7).padStart(2, '0')}:00 - ${String(config.trading_end_hour ?? 21).padStart(2, '0')}:00 UTC` },
+  { label: 'Cierre Viernes', value: `${String(config.close_before_friday_hour ?? 20).padStart(2, '0')}:00 UTC` },
+  { label: 'Sin Nuevas (Vie)', value: `${String(config.no_new_trades_friday_hour ?? 18).padStart(2, '0')}:00 UTC` },
+  { label: 'Evitar Noticias', value: `${config.news_avoidance_minutes ?? 30} min` },
+];
+
+// ── Safe localStorage helper (fixes crash on native) ───
+
+function safeGetLocalStorage(key: string): string | null {
+  if (Platform.OS === 'web') {
+    try {
+      return window.localStorage?.getItem(key) ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// ── Collapsible Section Component ──────────────────────
+
+interface CollapsibleProps {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  accentColor?: string;
+}
+
+function CollapsibleSection({ title, children, defaultOpen = false, accentColor = theme.colors.cp2077Yellow }: CollapsibleProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const animHeight = useRef(new Animated.Value(defaultOpen ? 1 : 0)).current;
+
+  const toggle = () => {
+    Animated.timing(animHeight, {
+      toValue: isOpen ? 0 : 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+    setIsOpen(!isOpen);
+  };
+
+  return (
+    <HUDCard accentColor={accentColor}>
+      <TouchableOpacity onPress={toggle} style={styles.collapsibleHeader} activeOpacity={0.7}>
+        <HUDSectionTitle title={title} color={accentColor} />
+        <Text style={[styles.collapseArrow, { color: accentColor }]}>
+          {isOpen ? '\u25B2' : '\u25BC'}
+        </Text>
+      </TouchableOpacity>
+      {isOpen && <View style={styles.collapsibleContent}>{children}</View>}
+    </HUDCard>
+  );
+}
+
+// ── CP2077 Toggle Switch ───────────────────────────────
+
+interface CP2077SwitchProps {
+  value: boolean;
+  onValueChange: (val: boolean) => void;
+  disabled?: boolean;
+  activeColor?: string;
+}
+
+function CP2077Switch({ value, onValueChange, disabled = false, activeColor = theme.colors.cp2077Yellow }: CP2077SwitchProps) {
+  return (
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      trackColor={{ false: theme.colors.backgroundLight, true: `${activeColor}40` }}
+      thumbColor={value ? activeColor : theme.colors.textMuted}
+      disabled={disabled}
+    />
+  );
+}
+
+// ── Emergency Button with Pulsing Glow ─────────────────
+
+function EmergencyButton({ onPress, loading }: { onPress: () => void; loading: boolean }) {
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: false }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: false }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View style={[styles.emergencyGlowWrap, { shadowOpacity: pulseAnim }]}>
+      <TouchableOpacity
+        style={styles.emergencyBtn}
+        onPress={onPress}
+        disabled={loading}
+        activeOpacity={0.7}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={theme.colors.textWhite} />
+        ) : (
+          <Text style={styles.emergencyBtnText}>EMERGENCY // CLOSE ALL POSITIONS</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────
+
 export default function SettingsScreen() {
+  // ── State ──────────────────────────────────────────
   const [mode, setMode] = useState<'AUTO' | 'MANUAL'>('AUTO');
   const [broker, setBroker] = useState<BrokerData | null>(null);
   const [engineRunning, setEngineRunning] = useState(false);
@@ -100,20 +242,23 @@ export default function SettingsScreen() {
   const [editingBackendUrl, setEditingBackendUrl] = useState(false);
   const [backendUrlDraft, setBackendUrlDraft] = useState(API_URL);
   const [apiKeyValue, setApiKeyValue] = useState(() => {
-    try {
-      // Check localStorage first, then injected key from backend (same-origin deploy)
-      const stored = window.localStorage.getItem('neontrade_api_key');
-      if (stored) return stored;
-      const injected = (window as any).__NEONTRADE_API_KEY__;
-      if (injected) return injected;
-      return '';
-    } catch { return ''; }
+    const stored = safeGetLocalStorage('neontrade_api_key');
+    if (stored) return stored;
+    if (Platform.OS === 'web') {
+      try {
+        const injected = (window as any).__NEONTRADE_API_KEY__;
+        if (injected) return injected;
+      } catch {}
+    }
+    return '';
   });
   const [editingApiKey, setEditingApiKey] = useState(false);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [securityStatus, setSecurityStatus] = useState<any>(null);
   const [watchlistCategories, setWatchlistCategories] = useState<string[]>(['forex']);
   const [watchlistInfo, setWatchlistInfo] = useState<any>(null);
+
+  // ── Data Fetching ──────────────────────────────────
 
   const fetchData = useCallback(async () => {
     try {
@@ -189,6 +334,8 @@ export default function SettingsScreen() {
     setRefreshing(false);
   };
 
+  // ── Actions ────────────────────────────────────────
+
   const toggleMode = async () => {
     const newMode = mode === 'AUTO' ? 'MANUAL' : 'AUTO';
     try {
@@ -211,7 +358,7 @@ export default function SettingsScreen() {
   const applyProfile = (profileId: string, profileName: string) => {
     Alert.alert(
       'APLICAR PERFIL',
-      `Se aplicará el perfil "${profileName}". Esto cambiará múltiples ajustes (riesgo, estilo, watchlists, gestión de posición). ¿Continuar?`,
+      `Se aplicara el perfil "${profileName}". Esto cambiara multiples ajustes (riesgo, estilo, watchlists, gestion de posicion). Continuar?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -225,7 +372,6 @@ export default function SettingsScreen() {
                 body: JSON.stringify({ profile_id: profileId }),
               });
               if (res.ok) {
-                // Refresh all data to reflect the new profile settings
                 await fetchData();
                 Alert.alert('Perfil Aplicado', `"${profileName}" configurado correctamente`);
               } else {
@@ -342,7 +488,6 @@ export default function SettingsScreen() {
   const saveRiskField = async (field: string, rawValue: string) => {
     const numValue = parseFloat(rawValue);
     if (isNaN(numValue)) return;
-    // Convert display percentage to decimal for percentage fields
     const isPercentField = ['risk_day_trading', 'risk_scalping', 'risk_swing', 'max_total_risk', 'move_sl_to_be_pct_to_tp1', 'correlated_risk_pct'].includes(field);
     const apiValue = isPercentField ? numValue / 100 : numValue;
     try {
@@ -364,7 +509,6 @@ export default function SettingsScreen() {
     const prevConfig = { ...strategyConfig };
     const newConfig = { ...strategyConfig, [key]: value };
 
-    // If toggling a main strategy OFF, also disable its variants
     if (!value) {
       const strat = STRATEGIES.find((s) => s.key === key);
       if (strat?.variants?.length) {
@@ -374,7 +518,6 @@ export default function SettingsScreen() {
       }
     }
 
-    // If toggling a main strategy ON, enable all its variants by default
     if (value) {
       const strat = STRATEGIES.find((s) => s.key === key);
       if (strat?.variants?.length) {
@@ -384,7 +527,6 @@ export default function SettingsScreen() {
       }
     }
 
-    // If enabling a variant, ensure the parent strategy is also enabled
     if (value) {
       const parent = STRATEGIES.find((s) =>
         s.variants?.some((v) => v.key === key)
@@ -414,20 +556,40 @@ export default function SettingsScreen() {
       const updated = watchlistCategories.includes(category)
         ? watchlistCategories.filter((c: string) => c !== category)
         : [...watchlistCategories, category];
-      // Don't allow empty
       if (updated.length === 0) return;
       await api.updateWatchlistCategories(updated);
       setWatchlistCategories(updated);
-    } catch (e: any) {
-      // handle error
+    } catch (_e: any) {
+      // handle error silently
     }
   };
+
+  const runDiagnostic = async () => {
+    setActionLoading('diagnostic');
+    try {
+      const res = await authFetch(`${API_URL}/api/v1/diagnostic`);
+      if (res.ok) {
+        const data = await res.json();
+        const stepLines = (data.steps || []).map((s: any) =>
+          `${s.ok ? '\u2713' : '\u2717'} ${s.step}: ${s.detail}${s.sample ? '\n  ' + JSON.stringify(s.sample).slice(0, 200) : ''}`
+        ).join('\n');
+        Alert.alert('Diagnostico', stepLines || 'Sin resultados');
+      } else {
+        Alert.alert('Error', `HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Fallo la conexion');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ── Loading / Error States ─────────────────────────
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.cp2077Yellow} />
-        <Text style={styles.loadingText}>Cargando configuracion...</Text>
+        <LoadingState message="CARGANDO CONFIGURACION..." />
       </View>
     );
   }
@@ -435,42 +597,52 @@ export default function SettingsScreen() {
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorIcon}>⚠</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
-          <Text style={styles.retryBtnText}>REINTENTAR</Text>
-        </TouchableOpacity>
+        <ErrorState message={error} onRetry={fetchData} />
       </View>
     );
   }
+
+  // ── Render ─────────────────────────────────────────
 
   return (
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={theme.colors.cp2077Yellow}
+        />
       }
     >
-      <Text style={styles.header}>CONFIGURACION</Text>
-      <Text style={styles.subheader}>Ajustes del sistema</Text>
+      {/* ═══ 1. HUD Header ═══════════════════════════════ */}
+      <HUDHeader
+        title="SYSTEM CONFIGURATION"
+        subtitle="// SYS"
+      />
 
-      {/* Trading Mode Card */}
-      <View style={[styles.card, styles.modeCard]}>
-        <Text style={styles.cardTitle}>MODO DE OPERACION</Text>
+      {/* ═══ 2. Mode Control Card ════════════════════════ */}
+      <HUDCard accentColor={theme.colors.cp2077Yellow}>
+        <HUDSectionTitle title="MODE CONTROL" color={theme.colors.cp2077Yellow} />
+
         <View style={styles.modeRow}>
           <View style={styles.modeInfo}>
             <View style={[
               styles.modeIndicator,
-              { backgroundColor: mode === 'AUTO' ? theme.colors.neonGreen : theme.colors.neonCyan },
+              { backgroundColor: mode === 'AUTO' ? theme.colors.cp2077Yellow : theme.colors.textMuted },
             ]} />
-            <Text style={styles.modeLabel}>{mode}</Text>
+            <Text style={[
+              styles.modeLabel,
+              { color: mode === 'AUTO' ? theme.colors.cp2077Yellow : theme.colors.textMuted },
+            ]}>
+              {mode}
+            </Text>
           </View>
-          <Switch
+          <CP2077Switch
             value={mode === 'AUTO'}
             onValueChange={toggleMode}
-            trackColor={{ false: theme.colors.backgroundLight, true: 'rgba(57, 255, 20, 0.3)' }}
-            thumbColor={mode === 'AUTO' ? theme.colors.neonGreen : theme.colors.neonCyan}
             disabled={actionLoading === 'mode'}
+            activeColor={theme.colors.cp2077Yellow}
           />
         </View>
         <Text style={styles.modeDescription}>
@@ -479,19 +651,19 @@ export default function SettingsScreen() {
             : 'NeonTrade te sugiere operaciones y tu decides si ejecutar o no'
           }
         </Text>
-      </View>
 
-      {/* Trading Profiles Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>PERFILES DE TRADING</Text>
-        <Text style={styles.strategyHint}>
-          Presets de configuración con valores recomendados por TradingLab
+        <HUDDivider />
+
+        {/* Trading Profile Selector */}
+        <Text style={styles.hintText}>
+          Presets de configuracion con valores recomendados por TradingLab
         </Text>
 
         <TouchableOpacity
           style={[styles.profileBtn, { borderColor: theme.colors.neonCyan }]}
           onPress={() => applyProfile('tradinglab_recommended', 'TradingLab Recommended')}
           disabled={actionLoading === 'profile'}
+          activeOpacity={0.7}
         >
           {actionLoading === 'profile' ? (
             <ActivityIndicator size="small" color={theme.colors.neonCyan} />
@@ -501,19 +673,17 @@ export default function SettingsScreen() {
                 TRADINGLAB RECOMMENDED
               </Text>
               <Text style={styles.profileBtnDesc}>
-                Day Trading · 1% riesgo · R:R 1.5:1 · Salida rápida · Sin parciales · BE al 1%
-              </Text>
-              <Text style={styles.profileBtnDesc}>
-                Watchlists completas · London + NY · LP por defecto, CP y CPA disponibles
+                Day Trading - 1% riesgo - R:R 1.5:1 - Salida rapida - Sin parciales - BE al 1%
               </Text>
             </>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.profileBtn, { borderColor: theme.colors.neonGreen, marginTop: theme.spacing.sm }]}
+          style={[styles.profileBtn, styles.profileBtnSpacing, { borderColor: theme.colors.neonGreen }]}
           onPress={() => applyProfile('conservative', 'Conservative')}
           disabled={actionLoading === 'profile'}
+          activeOpacity={0.7}
         >
           {actionLoading === 'profile' ? (
             <ActivityIndicator size="small" color={theme.colors.neonGreen} />
@@ -523,163 +693,28 @@ export default function SettingsScreen() {
                 CONSERVATIVE
               </Text>
               <Text style={styles.profileBtnDesc}>
-                Swing Trading · 1% riesgo · R:R 2.0:1 · Trailing amplio (LP)
-              </Text>
-              <Text style={styles.profileBtnDesc}>
-                Solo Forex principales · Ideal para principiantes
+                Swing Trading - 1% riesgo - R:R 2.0:1 - Trailing amplio (LP)
               </Text>
             </>
           )}
         </TouchableOpacity>
-      </View>
 
-      {/* Scalping Module Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>MODULO SCALPING</Text>
-        <Text style={styles.strategyHint}>
-          Workshop de Scalping — Temporalidades comprimidas H1→M15→M5→M1
-        </Text>
-        <View style={styles.modeRow}>
-          <View style={styles.modeInfo}>
-            <View style={[
-              styles.modeIndicator,
-              { backgroundColor: scalpingEnabled ? theme.colors.neonYellow : theme.colors.textMuted },
-            ]} />
-            <Text style={[styles.modeLabel, { fontSize: 16 }]}>
-              {scalpingEnabled ? 'ACTIVO' : 'INACTIVO'}
-            </Text>
-          </View>
-          <Switch
-            value={scalpingEnabled}
-            onValueChange={toggleScalping}
-            trackColor={{ false: theme.colors.backgroundLight, true: 'rgba(255, 184, 0, 0.3)' }}
-            thumbColor={scalpingEnabled ? theme.colors.neonYellow : theme.colors.textMuted}
-            disabled={actionLoading === 'scalping'}
-          />
-        </View>
-        {scalpingEnabled && scalpingStatus && (
-          <View style={{ marginTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }}>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>Riesgo/Trade</Text>
-              <Text style={styles.configValue}>0.5%</Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Diario Max</Text>
-              <Text style={[styles.configValue, { color: theme.colors.neonYellow }]}>5%</Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Total Max</Text>
-              <Text style={[styles.configValue, { color: theme.colors.neonYellow }]}>10%</Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>Intervalo Scan</Text>
-              <Text style={styles.configValue}>30s</Text>
-            </View>
-            <View style={{ marginTop: theme.spacing.sm }}>
-              <Text style={{ fontFamily: theme.fonts.primary, fontSize: 9, color: theme.colors.textMuted, letterSpacing: 1 }}>
-                MAPEO: D→H1 | H4→M15 | H1→M5 | M5→M1
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
+        <TouchableOpacity
+          style={styles.applyBtn}
+          onPress={onRefresh}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.applyBtnText}>REFRESH CONFIG</Text>
+        </TouchableOpacity>
+      </HUDCard>
 
-      {/* Funded Account Mode Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>CUENTA FONDEADA</Text>
-        <Text style={styles.strategyHint}>
-          Workshop Cuentas Fondeadas — Limites estrictos de drawdown
+      {/* ═══ 3. Strategy Module Card ═════════════════════ */}
+      <HUDCard accentColor={theme.colors.neonCyan}>
+        <HUDSectionTitle title="STRATEGY MODULE" color={theme.colors.neonCyan} />
+        <Text style={styles.hintText}>
+          TradingLab recommends starting with BLUE + RED only
         </Text>
-        <View style={styles.modeRow}>
-          <View style={styles.modeInfo}>
-            <View style={[
-              styles.modeIndicator,
-              { backgroundColor: fundedEnabled ? theme.colors.neonOrange : theme.colors.textMuted },
-            ]} />
-            <Text style={[styles.modeLabel, { fontSize: 16 }]}>
-              {fundedEnabled ? 'ACTIVO' : 'INACTIVO'}
-            </Text>
-          </View>
-          <Switch
-            value={fundedEnabled}
-            onValueChange={toggleFunded}
-            trackColor={{ false: theme.colors.backgroundLight, true: 'rgba(255, 107, 53, 0.3)' }}
-            thumbColor={fundedEnabled ? theme.colors.neonOrange : theme.colors.textMuted}
-            disabled={actionLoading === 'funded'}
-          />
-        </View>
-        {fundedEnabled && fundedStatus && (
-          <View style={{ marginTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }}>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>Tipo Cuenta</Text>
-              <Text style={[styles.configValue, { color: theme.colors.neonCyan }]}>
-                {(fundedStatus.account_type || 'swing').toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>Evaluacion</Text>
-              <Text style={[styles.configValue, { color: theme.colors.neonCyan }]}>
-                {(fundedStatus.evaluation_type || '2phase').toUpperCase()} — Fase {fundedStatus.current_phase || 1}
-              </Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Diario Max</Text>
-              <Text style={[styles.configValue, { color: theme.colors.neonOrange }]}>
-                {(fundedStatus.daily_dd_limit || 5).toFixed(0)}%
-              </Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Diario Usado</Text>
-              <Text style={[styles.configValue,
-                (fundedStatus.daily_dd_used_pct || 0) > 60 ? styles.loss : styles.profit
-              ]}>
-                {(fundedStatus.daily_dd_used_pct || 0).toFixed(1)}%
-              </Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Total Max</Text>
-              <Text style={[styles.configValue, { color: theme.colors.neonOrange }]}>
-                {(fundedStatus.total_dd_limit || 10).toFixed(0)}%
-              </Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>DD Total Actual</Text>
-              <Text style={[styles.configValue,
-                (fundedStatus.total_dd_pct || 0) > 5 ? styles.loss : styles.profit
-              ]}>
-                {(fundedStatus.total_dd_pct || 0).toFixed(2)}%
-              </Text>
-            </View>
-            {(fundedStatus.profit_target_pct || 0) > 0 && (
-              <View style={styles.configRow}>
-                <Text style={styles.configLabel}>Objetivo Profit</Text>
-                <Text style={[styles.configValue, { color: theme.colors.neonGreen }]}>
-                  {(fundedStatus.profit_progress_pct || 0).toFixed(1)}% / {(fundedStatus.profit_target_pct || 0).toFixed(0)}%
-                </Text>
-              </View>
-            )}
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>No Overnight</Text>
-              <Text style={styles.configValue}>{fundedStatus.no_overnight ? 'Si' : 'No'}</Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>No News Trading</Text>
-              <Text style={styles.configValue}>{fundedStatus.no_news_trading ? 'Si' : 'No'}</Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>No Weekend</Text>
-              <Text style={styles.configValue}>{fundedStatus.no_weekend ? 'Si' : 'No'}</Text>
-            </View>
-          </View>
-        )}
-      </View>
 
-      {/* Strategy Selection Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>ESTRATEGIAS ACTIVAS</Text>
-        <Text style={styles.strategyHint}>
-          Selecciona las estrategias que la IA debe utilizar
-        </Text>
         {STRATEGIES.map((strat) => (
           <View key={strat.key}>
             <View style={styles.strategyRow}>
@@ -695,14 +730,12 @@ export default function SettingsScreen() {
                   <Text style={styles.strategyDesc}>{strat.description}</Text>
                 </View>
               </View>
-              <Switch
+              <CP2077Switch
                 value={strategyConfig[strat.key] ?? true}
                 onValueChange={(val) => toggleStrategy(strat.key, val)}
-                trackColor={{ false: theme.colors.backgroundLight, true: `${strat.color}40` }}
-                thumbColor={strategyConfig[strat.key] ? strat.color : theme.colors.textMuted}
+                activeColor={strat.color}
               />
             </View>
-            {/* BLUE variants */}
             {strat.variants?.length > 0 && strategyConfig[strat.key] && (
               <View style={styles.variantContainer}>
                 {strat.variants.map((variant) => (
@@ -716,11 +749,10 @@ export default function SettingsScreen() {
                       </Text>
                       <Text style={styles.variantDesc}>{variant.description}</Text>
                     </View>
-                    <Switch
+                    <CP2077Switch
                       value={strategyConfig[variant.key] ?? true}
                       onValueChange={(val) => toggleStrategy(variant.key, val)}
-                      trackColor={{ false: theme.colors.backgroundLight, true: `${strat.color}40` }}
-                      thumbColor={strategyConfig[variant.key] ? strat.color : theme.colors.textMuted}
+                      activeColor={strat.color}
                     />
                   </View>
                 ))}
@@ -728,111 +760,22 @@ export default function SettingsScreen() {
             )}
           </View>
         ))}
+
+        <HUDDivider />
         <View style={styles.strategyCountRow}>
           <Text style={styles.strategyCountLabel}>Estrategias activas:</Text>
           <Text style={styles.strategyCountValue}>
             {STRATEGIES.filter((s) => strategyConfig[s.key]).length} / {STRATEGIES.length}
           </Text>
         </View>
-      </View>
+      </HUDCard>
 
-      {/* Broker Selection Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>BROKER</Text>
-        {BROKERS.map((b) => (
-          <View
-            key={b.id}
-            style={[
-              styles.brokerItem,
-              broker?.broker === b.id && styles.brokerItemActive,
-            ]}
-          >
-            <View style={styles.brokerInfo}>
-              <View style={styles.brokerNameRow}>
-                <Text style={[
-                  styles.brokerName,
-                  !b.active && styles.brokerNameDisabled,
-                ]}>
-                  {b.name}
-                </Text>
-                <View style={[
-                  styles.brokerBadge,
-                  b.active ? styles.brokerBadgeActive : styles.brokerBadgeInactive,
-                ]}>
-                  <Text style={[
-                    styles.brokerBadgeText,
-                    b.active ? styles.brokerBadgeTextActive : styles.brokerBadgeTextInactive,
-                  ]}>
-                    {b.badge}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.brokerDesc}>{b.description}</Text>
-            </View>
-            {broker?.broker === b.id && broker?.connected && (
-              <View style={styles.connectedBadge}>
-                <Text style={styles.connectedText}>● CONECTADO</Text>
-              </View>
-            )}
-          </View>
-        ))}
-      </View>
+      {/* ═══ 4. Risk Parameters Card ═════════════════════ */}
+      <HUDCard accentColor={theme.colors.neonOrange}>
+        <HUDSectionTitle title="RISK PARAMETERS" color={theme.colors.neonOrange} />
+        <Text style={styles.hintText}>Toca un valor para editarlo</Text>
 
-      {/* ── WATCHLISTS (TradingLab) ───────────────────────── */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>WATCHLISTS</Text>
-        <Text style={styles.cardSubtitle}>Categorías de instrumentos del curso TradingLab</Text>
-
-        {[
-          { key: 'forex', label: 'FOREX (Principales)', icon: '💱' },
-          { key: 'forex_exotic', label: 'FOREX (Exóticos)', icon: '🌍' },
-          { key: 'commodities', label: 'COMMODITIES', icon: '🛢️' },
-          { key: 'indices', label: 'ÍNDICES', icon: '📊' },
-          { key: 'crypto', label: 'CRYPTO', icon: '₿' },
-        ].map(cat => {
-          const info = watchlistInfo?.[cat.key];
-          const isActive = watchlistCategories.includes(cat.key);
-          return (
-            <View key={cat.key} style={styles.watchlistRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.strategyLabel, isActive && { color: '#5df4fe' }]}>
-                  {cat.icon} {cat.label}
-                </Text>
-                <Text style={styles.watchlistCount}>
-                  {info?.count || 0} instrumentos
-                </Text>
-              </View>
-              <Switch
-                value={isActive}
-                onValueChange={() => toggleWatchlistCategory(cat.key)}
-                trackColor={{ false: '#2a2445', true: 'rgba(0, 240, 255, 0.3)' }}
-                thumbColor={isActive ? '#5df4fe' : '#555'}
-              />
-            </View>
-          );
-        })}
-
-        <View style={styles.totalInstruments}>
-          <Text style={styles.configValue}>
-            Total activo: {watchlistCategories.reduce((sum: number, cat: string) =>
-              sum + (watchlistInfo?.[cat]?.count || 0), 0)} instrumentos
-          </Text>
-        </View>
-      </View>
-
-      {/* Risk Management Card (Editable) */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>GESTION DE RIESGO</Text>
-        <Text style={styles.strategyHint}>Toca un valor para editarlo</Text>
-        {[
-          { key: 'risk_day_trading', label: 'Day Trading', fmt: (v: number) => `${(v * 100).toFixed(1)}%` },
-          { key: 'risk_scalping', label: 'Scalping', fmt: (v: number) => `${(v * 100).toFixed(1)}%` },
-          { key: 'risk_swing', label: 'Swing', fmt: (v: number) => `${(v * 100).toFixed(1)}%` },
-          { key: 'max_total_risk', label: 'Max Total Risk', fmt: (v: number) => `${(v * 100).toFixed(1)}%` },
-          { key: 'correlated_risk_pct', label: 'Riesgo Correlacion', fmt: (v: number) => `${(v * 100).toFixed(2)}%` },
-          { key: 'min_rr_ratio', label: 'Min R:R', fmt: (v: number) => `1:${v.toFixed(2)}` },
-          { key: 'move_sl_to_be_pct_to_tp1', label: 'BE a % de TP1', fmt: (v: number) => `${(v * 100).toFixed(0)}%` },
-        ].map((item) => (
+        {RISK_FIELDS.map((item) => (
           <View key={item.key} style={styles.configRow}>
             <Text style={styles.configLabel}>{item.label}</Text>
             {editingRisk === item.key ? (
@@ -849,8 +792,7 @@ export default function SettingsScreen() {
             ) : (
               <TouchableOpacity onPress={() => {
                 const val = riskConfig[item.key];
-                const isPercent = ['risk_day_trading', 'risk_scalping', 'risk_swing', 'max_total_risk', 'move_sl_to_be_pct_to_tp1', 'correlated_risk_pct'].includes(item.key);
-                setEditValue(isPercent ? (val * 100).toFixed(1) : val?.toFixed(2) || '0');
+                setEditValue(item.isPercent ? (val * 100).toFixed(1) : val?.toFixed(2) || '0');
                 setEditingRisk(item.key);
               }}>
                 <Text style={[styles.configValue, { color: theme.colors.neonCyan }]}>
@@ -860,40 +802,324 @@ export default function SettingsScreen() {
             )}
           </View>
         ))}
-      </View>
+      </HUDCard>
 
-      {/* Trading Hours Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>HORARIO DE OPERACION</Text>
+      {/* ═══ 5. Trading Hours Card ═══════════════════════ */}
+      <HUDCard>
+        <HUDSectionTitle title="TRADING HOURS" />
         {_formatHours(riskConfig).map((item, index) => (
-          <View key={index} style={styles.configRow}>
-            <Text style={styles.configLabel}>{item.session}</Text>
-            <Text style={styles.configValue}>{item.hours}</Text>
+          <HUDStatRow
+            key={index}
+            label={item.label}
+            value={item.value}
+            valueColor={theme.colors.textWhite}
+          />
+        ))}
+      </HUDCard>
+
+      {/* ═══ 6. Scalping Module Card (collapsible) ═══════ */}
+      <CollapsibleSection title="SCALPING MODULE" accentColor={theme.colors.neonYellow}>
+        <View style={styles.modeRow}>
+          <View style={styles.modeInfo}>
+            <View style={[
+              styles.modeIndicator,
+              { backgroundColor: scalpingEnabled ? theme.colors.neonYellow : theme.colors.textMuted },
+            ]} />
+            <Text style={[styles.subModeLabel, { color: scalpingEnabled ? theme.colors.neonYellow : theme.colors.textMuted }]}>
+              {scalpingEnabled ? 'ACTIVO' : 'INACTIVO'}
+            </Text>
+          </View>
+          <CP2077Switch
+            value={scalpingEnabled}
+            onValueChange={toggleScalping}
+            disabled={actionLoading === 'scalping'}
+            activeColor={theme.colors.neonYellow}
+          />
+        </View>
+
+        <Text style={styles.hintText}>
+          {'Workshop de Scalping -- Temporalidades comprimidas H1->M15->M5->M1'}
+        </Text>
+
+        {scalpingEnabled && scalpingStatus && (
+          <View style={styles.collapsibleDetails}>
+            <HUDStatRow label="Riesgo/Trade" value="0.5%" valueColor={theme.colors.textWhite} />
+            <HUDStatRow label="DD Diario Max" value="5%" valueColor={theme.colors.neonYellow} />
+            <HUDStatRow label="DD Total Max" value="10%" valueColor={theme.colors.neonYellow} />
+            <HUDStatRow label="Intervalo Scan" value="30s" valueColor={theme.colors.textWhite} />
+            <HUDDivider />
+            <Text style={styles.mappingText}>
+              {'MAPEO: D->H1 | H4->M15 | H1->M5 | M5->M1'}
+            </Text>
+          </View>
+        )}
+      </CollapsibleSection>
+
+      {/* ═══ 7. Funded Account Card (collapsible) ════════ */}
+      <CollapsibleSection title="FUNDED ACCOUNT" accentColor={theme.colors.neonOrange}>
+        <View style={styles.modeRow}>
+          <View style={styles.modeInfo}>
+            <View style={[
+              styles.modeIndicator,
+              { backgroundColor: fundedEnabled ? theme.colors.neonOrange : theme.colors.textMuted },
+            ]} />
+            <Text style={[styles.subModeLabel, { color: fundedEnabled ? theme.colors.neonOrange : theme.colors.textMuted }]}>
+              {fundedEnabled ? 'ACTIVO' : 'INACTIVO'}
+            </Text>
+          </View>
+          <CP2077Switch
+            value={fundedEnabled}
+            onValueChange={toggleFunded}
+            disabled={actionLoading === 'funded'}
+            activeColor={theme.colors.neonOrange}
+          />
+        </View>
+
+        <Text style={styles.hintText}>
+          Workshop Cuentas Fondeadas -- Limites estrictos de drawdown
+        </Text>
+
+        {fundedEnabled && fundedStatus && (
+          <View style={styles.collapsibleDetails}>
+            <HUDStatRow
+              label="Tipo Cuenta"
+              value={(fundedStatus.account_type || 'swing').toUpperCase()}
+              valueColor={theme.colors.neonCyan}
+            />
+            <HUDStatRow
+              label="Evaluacion"
+              value={`${(fundedStatus.evaluation_type || '2phase').toUpperCase()} -- Fase ${fundedStatus.current_phase || 1}`}
+              valueColor={theme.colors.neonCyan}
+            />
+            <HUDStatRow
+              label="DD Diario Max"
+              value={`${(fundedStatus.daily_dd_limit || 5).toFixed(0)}%`}
+              valueColor={theme.colors.neonOrange}
+            />
+            <HUDStatRow
+              label="DD Diario Usado"
+              value={`${(fundedStatus.daily_dd_used_pct || 0).toFixed(1)}%`}
+              valueColor={(fundedStatus.daily_dd_used_pct || 0) > 60 ? theme.colors.loss : theme.colors.profit}
+            />
+            <HUDStatRow
+              label="DD Total Max"
+              value={`${(fundedStatus.total_dd_limit || 10).toFixed(0)}%`}
+              valueColor={theme.colors.neonOrange}
+            />
+            <HUDStatRow
+              label="DD Total Actual"
+              value={`${(fundedStatus.total_dd_pct || 0).toFixed(2)}%`}
+              valueColor={(fundedStatus.total_dd_pct || 0) > 5 ? theme.colors.loss : theme.colors.profit}
+            />
+            {(fundedStatus.profit_target_pct || 0) > 0 && (
+              <HUDProgressBar
+                label="Objetivo Profit"
+                value={(fundedStatus.profit_progress_pct || 0)}
+                maxLabel={`${(fundedStatus.profit_target_pct || 0).toFixed(0)}%`}
+                color={theme.colors.neonGreen}
+              />
+            )}
+            <HUDDivider />
+            <HUDStatRow label="No Overnight" value={fundedStatus.no_overnight ? 'Si' : 'No'} />
+            <HUDStatRow label="No News Trading" value={fundedStatus.no_news_trading ? 'Si' : 'No'} />
+            <HUDStatRow label="No Weekend" value={fundedStatus.no_weekend ? 'Si' : 'No'} />
+          </View>
+        )}
+      </CollapsibleSection>
+
+      {/* ═══ 8. Broker Selection Card ════════════════════ */}
+      <HUDCard accentColor={theme.colors.neonGreen}>
+        <HUDSectionTitle title="BROKER SELECTION" color={theme.colors.neonGreen} />
+
+        {BROKERS.map((b) => (
+          <View
+            key={b.id}
+            style={[
+              styles.brokerItem,
+              broker?.broker === b.id && styles.brokerItemActive,
+            ]}
+          >
+            <View style={styles.brokerInfo}>
+              <View style={styles.brokerNameRow}>
+                <Text style={[
+                  styles.brokerName,
+                  !b.active && styles.brokerNameDisabled,
+                ]}>
+                  {b.name}
+                </Text>
+                <HUDBadge
+                  label={b.badge}
+                  color={b.active ? theme.colors.neonGreen : theme.colors.textMuted}
+                  small
+                />
+              </View>
+              <Text style={styles.brokerDesc}>{b.description}</Text>
+            </View>
+            {broker?.broker === b.id && broker?.connected && (
+              <Text style={styles.connectedText}>CONECTADO</Text>
+            )}
           </View>
         ))}
-      </View>
 
-      {/* Engine Control Card */}
-      <View style={[styles.card, styles.engineCard]}>
-        <Text style={styles.cardTitle}>CONTROL DEL ENGINE</Text>
+        <HUDDivider />
+        <TouchableOpacity
+          style={styles.diagnosticBtn}
+          onPress={runDiagnostic}
+          disabled={actionLoading === 'diagnostic'}
+          activeOpacity={0.7}
+        >
+          {actionLoading === 'diagnostic' ? (
+            <ActivityIndicator size="small" color={theme.colors.backgroundDark} />
+          ) : (
+            <Text style={styles.diagnosticBtnText}>EJECUTAR DIAGNOSTICO</Text>
+          )}
+        </TouchableOpacity>
+      </HUDCard>
+
+      {/* ═══ 9. Watchlist Categories Card ════════════════ */}
+      <HUDCard>
+        <HUDSectionTitle title="WATCHLIST CATEGORIES" />
+        <Text style={styles.hintText}>Categorias de instrumentos del curso TradingLab</Text>
+
+        <View style={styles.chipContainer}>
+          {WATCHLIST_CATEGORIES.map((cat) => {
+            const isActive = watchlistCategories.includes(cat.key);
+            const info = watchlistInfo?.[cat.key];
+            return (
+              <TouchableOpacity
+                key={cat.key}
+                style={[
+                  styles.chip,
+                  isActive && styles.chipActive,
+                ]}
+                onPress={() => toggleWatchlistCategory(cat.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.chipText,
+                  isActive && styles.chipTextActive,
+                ]}>
+                  {cat.label}
+                </Text>
+                <Text style={[
+                  styles.chipCount,
+                  isActive && styles.chipCountActive,
+                ]}>
+                  {info?.count || 0}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <HUDDivider />
+        <HUDStatRow
+          label="Total activo"
+          value={`${watchlistCategories.reduce((sum: number, cat: string) =>
+            sum + (watchlistInfo?.[cat]?.count || 0), 0)} instrumentos`}
+          valueColor={theme.colors.neonCyan}
+        />
+      </HUDCard>
+
+      {/* ═══ 10. Notifications Card (collapsible) ════════ */}
+      <CollapsibleSection title="NOTIFICATIONS" accentColor={theme.colors.neonMagenta}>
+        <Text style={styles.hintText}>
+          Se activan automaticamente cuando las credenciales estan en las variables de entorno
+        </Text>
+
+        {[
+          { key: 'telegram_enabled', label: 'Telegram' },
+          { key: 'discord_enabled', label: 'Discord' },
+          { key: 'email_enabled', label: 'Email SMTP' },
+          { key: 'gmail_enabled', label: 'Gmail OAuth2' },
+        ].map((ch) => (
+          <View key={ch.key} style={styles.configRow}>
+            <Text style={styles.configLabel}>{ch.label}</Text>
+            <Text style={[
+              styles.configValue,
+              { color: alertConfig[ch.key] ? theme.colors.profit : theme.colors.loss },
+            ]}>
+              {alertConfig[ch.key] ? 'ACTIVO' : 'INACTIVO'}
+            </Text>
+          </View>
+        ))}
+
+        {(alertConfig.telegram_enabled || alertConfig.discord_enabled || alertConfig.email_enabled || alertConfig.gmail_enabled) && (
+          <>
+            <HUDDivider />
+            <HUDStatRow
+              label="Trades ejecutados"
+              value={alertConfig.notify_trade_executed ? 'Si' : 'No'}
+              valueColor={theme.colors.textSecondary}
+            />
+            <HUDStatRow
+              label="Setups pendientes"
+              value={alertConfig.notify_setup_pending ? 'Si' : 'No'}
+              valueColor={theme.colors.textSecondary}
+            />
+            <HUDStatRow
+              label="Trades cerrados"
+              value={alertConfig.notify_trade_closed ? 'Si' : 'No'}
+              valueColor={theme.colors.textSecondary}
+            />
+          </>
+        )}
+      </CollapsibleSection>
+
+      {/* ═══ 11. Engine Control Card ═════════════════════ */}
+      <HUDCard accentColor={engineRunning ? theme.colors.neonGreen : theme.colors.neonRed} borderColor={engineRunning ? theme.colors.neonGreen : theme.colors.neonRed}>
+        <HUDSectionTitle title="ENGINE CONTROL" color={theme.colors.neonCyan} />
 
         <View style={styles.engineStatusRow}>
           <Text style={styles.engineStatusLabel}>Estado:</Text>
-          <View style={[
-            styles.engineStatusBadge,
-            engineRunning ? styles.engineOnline : styles.engineOffline,
-          ]}>
-            <Text style={styles.engineStatusText}>
-              {engineRunning ? '● ACTIVO' : '○ DETENIDO'}
-            </Text>
-          </View>
+          <HUDBadge
+            label={engineRunning ? 'ACTIVO' : 'DETENIDO'}
+            color={engineRunning ? theme.colors.neonGreen : theme.colors.neonRed}
+          />
         </View>
+
+        {/* Connection status inline */}
+        <View style={styles.connectionBlock}>
+          <HUDStatRow
+            label="Motor"
+            value={engineRunning ? 'Ejecutando' : 'Detenido'}
+            valueColor={engineRunning ? theme.colors.profit : theme.colors.loss}
+          />
+          <HUDStatRow
+            label="Broker"
+            value={broker?.connected ? 'Conectado' : 'Desconectado'}
+            valueColor={broker?.connected ? theme.colors.profit : theme.colors.loss}
+          />
+          {engineStatus?.scanned_instruments != null && (
+            <HUDStatRow
+              label="Escaneados"
+              value={`${engineStatus.scanned_instruments}/${engineStatus.watchlist_count || 0}`}
+              valueColor={theme.colors.textWhite}
+            />
+          )}
+          <HUDStatRow label="API" value="Activa" valueColor={theme.colors.profit} />
+        </View>
+
+        {engineStatus?.startup_error && (
+          <View style={styles.errorBlock}>
+            <Text style={styles.errorBlockTitle}>ERROR DE CONEXION</Text>
+            <Text style={styles.errorBlockMsg} numberOfLines={3}>
+              {engineStatus.startup_error}
+            </Text>
+            <TouchableOpacity onPress={startEngine} activeOpacity={0.7}>
+              <Text style={styles.errorRetryLink}>REINTENTAR CONEXION</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <HUDDivider />
 
         <View style={styles.engineButtons}>
           <TouchableOpacity
-            style={[styles.engineBtn, styles.startBtn]}
+            style={[styles.engineBtn, styles.startBtn, engineRunning && styles.btnDisabled]}
             onPress={startEngine}
             disabled={engineRunning || actionLoading === 'start'}
+            activeOpacity={0.7}
           >
             {actionLoading === 'start' ? (
               <ActivityIndicator size="small" color={theme.colors.backgroundDark} />
@@ -903,9 +1129,10 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.engineBtn, styles.stopBtn]}
+            style={[styles.engineBtn, styles.stopBtn, !engineRunning && styles.btnDisabled]}
             onPress={stopEngine}
             disabled={!engineRunning || actionLoading === 'stop'}
+            activeOpacity={0.7}
           >
             {actionLoading === 'stop' ? (
               <ActivityIndicator size="small" color={theme.colors.textWhite} />
@@ -915,85 +1142,32 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.emergencyBtn}
+        <EmergencyButton
           onPress={emergencyCloseAll}
-          disabled={actionLoading === 'emergency'}
-        >
-          {actionLoading === 'emergency' ? (
-            <ActivityIndicator size="small" color={theme.colors.textWhite} />
-          ) : (
-            <Text style={styles.emergencyBtnText}>⚠ CERRAR TODAS LAS POSICIONES</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          loading={actionLoading === 'emergency'}
+        />
+      </HUDCard>
 
-      {/* Alert Channels Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>CANALES DE ALERTAS</Text>
-        <Text style={styles.strategyHint}>
-          Se activan automaticamente cuando las credenciales estan en las variables de entorno
-        </Text>
-        <View style={styles.configRow}>
-          <Text style={styles.configLabel}>Gmail OAuth2</Text>
-          <Text style={[styles.configValue, alertConfig.gmail_enabled ? styles.profit : styles.loss]}>
-            {alertConfig.gmail_enabled ? '● Activo' : '○ Inactivo'}
-          </Text>
-        </View>
-        <View style={styles.configRow}>
-          <Text style={styles.configLabel}>Telegram</Text>
-          <Text style={[styles.configValue, alertConfig.telegram_enabled ? styles.profit : styles.loss]}>
-            {alertConfig.telegram_enabled ? '● Activo' : '○ Inactivo'}
-          </Text>
-        </View>
-        <View style={styles.configRow}>
-          <Text style={styles.configLabel}>Discord</Text>
-          <Text style={[styles.configValue, alertConfig.discord_enabled ? styles.profit : styles.loss]}>
-            {alertConfig.discord_enabled ? '● Activo' : '○ Inactivo'}
-          </Text>
-        </View>
-        <View style={styles.configRow}>
-          <Text style={styles.configLabel}>Email SMTP</Text>
-          <Text style={[styles.configValue, alertConfig.email_enabled ? styles.profit : styles.loss]}>
-            {alertConfig.email_enabled ? '● Activo' : '○ Inactivo'}
-          </Text>
-        </View>
-        {(alertConfig.telegram_enabled || alertConfig.discord_enabled || alertConfig.email_enabled || alertConfig.gmail_enabled) && (
-          <>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>Trades ejecutados</Text>
-              <Text style={styles.configValue}>{alertConfig.notify_trade_executed ? 'Si' : 'No'}</Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>Setups pendientes</Text>
-              <Text style={styles.configValue}>{alertConfig.notify_setup_pending ? 'Si' : 'No'}</Text>
-            </View>
-            <View style={styles.configRow}>
-              <Text style={styles.configLabel}>Trades cerrados</Text>
-              <Text style={styles.configValue}>{alertConfig.notify_trade_closed ? 'Si' : 'No'}</Text>
-            </View>
-          </>
-        )}
-      </View>
+      {/* ═══ 12. System Info Card ════════════════════════ */}
+      <HUDCard accentColor={theme.colors.textMuted}>
+        <HUDSectionTitle title="SYSTEM INFO" color={theme.colors.textMuted} />
 
-      {/* Backend URL Card (for remote VPS deployment) */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>SERVIDOR BACKEND</Text>
+        {/* Backend URL */}
         <View style={styles.configRow}>
-          <Text style={styles.configLabel}>URL</Text>
+          <Text style={styles.configLabel}>Backend URL</Text>
           {editingBackendUrl ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+            <View style={styles.inlineEditRow}>
               <TextInput
-                style={[styles.configValue, { borderBottomWidth: 1, borderColor: theme.colors.neonCyan, minWidth: 180, textAlign: 'right' }]}
+                style={styles.inlineEditInput}
                 value={backendUrlDraft}
                 onChangeText={setBackendUrlDraft}
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="https://neontrade.tu-vps.com"
-                placeholderTextColor={theme.colors.textSecondary}
+                placeholderTextColor={theme.colors.textMuted}
               />
               <TouchableOpacity
-                style={{ marginLeft: 8, backgroundColor: theme.colors.neonCyan, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
+                style={styles.inlineEditOk}
                 onPress={() => {
                   if (backendUrlDraft && backendUrlDraft.startsWith('http')) {
                     setBackendUrl(backendUrlDraft);
@@ -1005,7 +1179,7 @@ export default function SettingsScreen() {
                   }
                 }}
               >
-                <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontSize: 12 }}>OK</Text>
+                <Text style={styles.inlineEditOkText}>OK</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1016,9 +1190,10 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
         {backendUrl !== 'http://localhost:8000' && (
           <TouchableOpacity
-            style={{ marginTop: 8, alignSelf: 'flex-end' }}
+            style={styles.resetLink}
             onPress={() => {
               resetBackendUrl();
               setBackendUrlState('http://localhost:8000');
@@ -1026,30 +1201,32 @@ export default function SettingsScreen() {
               Alert.alert('Backend', 'Restaurado a localhost. Reinicia la app.');
             }}
           >
-            <Text style={{ color: theme.colors.cp2077Yellow, fontSize: 12 }}>Restaurar a localhost</Text>
+            <Text style={styles.resetLinkText}>Restaurar a localhost</Text>
           </TouchableOpacity>
         )}
-      </View>
 
-      {/* API Key Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>API KEY</Text>
-        <Text style={{ color: theme.colors.textSecondary, fontSize: 11, marginBottom: 8 }}>
+        <HUDDivider />
+
+        {/* API Key */}
+        <Text style={styles.sysInfoLabel}>API KEY</Text>
+        <Text style={styles.sysInfoHint}>
           {securityStatus && !securityStatus.auth_enabled
             ? 'Autenticacion deshabilitada en el servidor'
             : securityStatus && securityStatus.api_keys_count === 0
-              ? 'Acceso abierto (sin keys configuradas) — primera ejecucion'
+              ? 'Acceso abierto (sin keys configuradas) -- primera ejecucion'
               : 'Requerida para conectar al servidor remoto'}
         </Text>
-        {/* Auth status badge */}
+
         {securityStatus && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <View style={{
-              width: 8, height: 8, borderRadius: 4, marginRight: 6,
-              backgroundColor: !securityStatus.auth_enabled || securityStatus.api_keys_count === 0
-                ? theme.colors.neonGreen : apiKeyValue ? theme.colors.neonGreen : theme.colors.cp2077Yellow,
-            }} />
-            <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.primary }}>
+          <View style={styles.authStatusRow}>
+            <View style={[
+              styles.authDot,
+              {
+                backgroundColor: !securityStatus.auth_enabled || securityStatus.api_keys_count === 0
+                  ? theme.colors.neonGreen : apiKeyValue ? theme.colors.neonGreen : theme.colors.cp2077Yellow,
+              },
+            ]} />
+            <Text style={styles.authStatusText}>
               {!securityStatus.auth_enabled
                 ? 'AUTH DESHABILITADA'
                 : securityStatus.api_keys_count === 0
@@ -1060,22 +1237,23 @@ export default function SettingsScreen() {
             </Text>
           </View>
         )}
+
         <View style={styles.configRow}>
           <Text style={styles.configLabel}>Key</Text>
           {editingApiKey ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+            <View style={styles.inlineEditRow}>
               <TextInput
-                style={[styles.configValue, { borderBottomWidth: 1, borderColor: theme.colors.neonCyan, minWidth: 200, textAlign: 'right', fontSize: 11 }]}
+                style={[styles.inlineEditInput, styles.inlineEditInputSmall]}
                 value={apiKeyDraft}
                 onChangeText={setApiKeyDraft}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry={false}
                 placeholder="nt_..."
-                placeholderTextColor={theme.colors.textSecondary}
+                placeholderTextColor={theme.colors.textMuted}
               />
               <TouchableOpacity
-                style={{ marginLeft: 8, backgroundColor: theme.colors.neonCyan, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
+                style={styles.inlineEditOk}
                 onPress={() => {
                   if (apiKeyDraft && apiKeyDraft.startsWith('nt_')) {
                     setApiKey(apiKeyDraft);
@@ -1087,7 +1265,7 @@ export default function SettingsScreen() {
                   }
                 }}
               >
-                <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontSize: 12 }}>OK</Text>
+                <Text style={styles.inlineEditOkText}>OK</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1110,9 +1288,10 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
         {apiKeyValue ? (
           <TouchableOpacity
-            style={{ marginTop: 8, alignSelf: 'flex-end' }}
+            style={styles.resetLink}
             onPress={() => {
               clearApiKey();
               setApiKeyValue('');
@@ -1120,102 +1299,23 @@ export default function SettingsScreen() {
               Alert.alert('API Key', 'Key eliminada.');
             }}
           >
-            <Text style={{ color: theme.colors.cp2077Yellow, fontSize: 12 }}>Eliminar Key</Text>
+            <Text style={styles.resetLinkText}>Eliminar Key</Text>
           </TouchableOpacity>
         ) : null}
-      </View>
 
-      {/* Connection Status Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>ESTADO DE CONEXION</Text>
-        <View style={styles.configRow}>
-          <Text style={styles.configLabel}>Motor</Text>
-          <Text style={[
-            styles.configValue,
-            engineRunning ? styles.profit : styles.loss,
-          ]}>
-            {engineRunning ? '● Ejecutando' : '○ Detenido'}
-          </Text>
-        </View>
-        <View style={styles.configRow}>
-          <Text style={styles.configLabel}>Broker</Text>
-          <Text style={[
-            styles.configValue,
-            broker?.connected ? styles.profit : styles.loss,
-          ]}>
-            {broker?.connected ? '● Conectado' : '○ Desconectado'}
-          </Text>
-        </View>
-        {engineStatus?.scanned_instruments != null && (
-          <View style={styles.configRow}>
-            <Text style={styles.configLabel}>Escaneados</Text>
-            <Text style={styles.configValue}>
-              {engineStatus.scanned_instruments}/{engineStatus.watchlist_count || 0}
-            </Text>
-          </View>
-        )}
-        <View style={styles.configRow}>
-          <Text style={styles.configLabel}>API</Text>
-          <Text style={[styles.configValue, styles.profit]}>
-            ● Activa
-          </Text>
-        </View>
-        {engineStatus?.startup_error ? (
-          <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(255,46,99,0.1)', borderRadius: 4, borderWidth: 1, borderColor: theme.colors.neonRed }}>
-            <Text style={{ color: theme.colors.neonRed, fontFamily: theme.fonts.heading, fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ERROR DE CONEXION</Text>
-            <Text style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary, fontSize: 10 }} numberOfLines={3}>
-              {engineStatus.startup_error}
-            </Text>
-            <TouchableOpacity
-              style={{ marginTop: 6, alignSelf: 'flex-start' }}
-              onPress={startEngine}
-            >
-              <Text style={{ color: theme.colors.neonCyan, fontFamily: theme.fonts.heading, fontSize: 11, letterSpacing: 1 }}>REINTENTAR CONEXION</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-      </View>
+        <HUDDivider />
 
-      {/* Diagnostic Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>DIAGNOSTICO DEL BROKER</Text>
-        <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontFamily: theme.fonts.primary, marginBottom: 8 }}>
-          Prueba paso a paso la conexion con el broker
-        </Text>
-        <TouchableOpacity
-          style={{ backgroundColor: theme.colors.neonCyan, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4, alignSelf: 'flex-start' }}
-          onPress={async () => {
-            setActionLoading('diagnostic');
-            try {
-              const res = await authFetch(`${API_URL}/api/v1/diagnostic`);
-              if (res.ok) {
-                const data = await res.json();
-                const stepLines = (data.steps || []).map((s: any) =>
-                  `${s.ok ? '✓' : '✗'} ${s.step}: ${s.detail}${s.sample ? '\n  ' + JSON.stringify(s.sample).slice(0, 200) : ''}`
-                ).join('\n');
-                Alert.alert('Diagnostico', stepLines || 'Sin resultados');
-              } else {
-                Alert.alert('Error', `HTTP ${res.status}`);
-              }
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Fallo la conexion');
-            } finally {
-              setActionLoading(null);
-            }
-          }}
-        >
-          {actionLoading === 'diagnostic' ? (
-            <ActivityIndicator size="small" color={theme.colors.background} />
-          ) : (
-            <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontFamily: theme.fonts.heading, fontSize: 12 }}>EJECUTAR DIAGNOSTICO</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+        {/* Version */}
+        <HUDStatRow label="Version" value="NeonTrade AI v1.0" valueColor={theme.colors.textMuted} />
+        <HUDStatRow label="Theme" value="CP2077 HUD" valueColor={theme.colors.cp2077YellowDim} />
+      </HUDCard>
 
-      <View style={{ height: theme.spacing.xl }} />
+      <View style={styles.bottomSpacer} />
     </ScrollView>
   );
 }
+
+// ── Styles ──────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -1230,42 +1330,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.md,
   },
-  header: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 20,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 4,
-    marginTop: theme.spacing.lg,
+  bottomSpacer: {
+    height: theme.spacing.xl,
   },
-  subheader: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-    marginBottom: theme.spacing.md,
+
+  // ── Collapsible ────────────────────────────────────
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  // Cards
-  card: {
-    backgroundColor: theme.colors.backgroundCard,
-    borderRadius: theme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.cp2077Yellow,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
-  cardTitle: {
+  collapseArrow: {
     fontFamily: theme.fonts.heading,
     fontSize: 12,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 3,
-    marginBottom: theme.spacing.sm,
+    marginTop: -8,
   },
-  // Mode card
-  modeCard: {
-    borderColor: theme.colors.cp2077Yellow,
+  collapsibleContent: {
+    marginTop: theme.spacing.sm,
   },
+  collapsibleDetails: {
+    marginTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: theme.spacing.sm,
+  },
+
+  // ── Mode Control ───────────────────────────────────
   modeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1285,8 +1375,12 @@ const styles = StyleSheet.create({
   modeLabel: {
     fontFamily: theme.fonts.heading,
     fontSize: 22,
-    color: theme.colors.textWhite,
     letterSpacing: 4,
+  },
+  subModeLabel: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 16,
+    letterSpacing: 3,
   },
   modeDescription: {
     fontFamily: theme.fonts.primary,
@@ -1294,14 +1388,53 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     lineHeight: 18,
   },
-  // Strategy selection
-  strategyHint: {
+  hintText: {
     fontFamily: theme.fonts.primary,
     fontSize: 10,
     color: theme.colors.textMuted,
     marginBottom: theme.spacing.sm,
     letterSpacing: 1,
   },
+
+  // ── Profile Buttons ────────────────────────────────
+  profileBtn: {
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  profileBtnSpacing: {
+    marginTop: theme.spacing.sm,
+  },
+  profileBtnTitle: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 13,
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
+  profileBtnDesc: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  applyBtn: {
+    backgroundColor: theme.colors.cp2077Yellow,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+  },
+  applyBtnText: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 12,
+    color: theme.colors.backgroundDark,
+    letterSpacing: 2,
+    fontWeight: 'bold',
+  },
+
+  // ── Strategy ───────────────────────────────────────
   strategyRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1370,10 +1503,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: theme.spacing.sm,
-    paddingTop: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
   },
   strategyCountLabel: {
     fontFamily: theme.fonts.primary,
@@ -1386,79 +1515,8 @@ const styles = StyleSheet.create({
     color: theme.colors.neonCyan,
     letterSpacing: 1,
   },
-  // Broker
-  brokerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.sm,
-    padding: theme.spacing.sm,
-    marginBottom: theme.spacing.xs,
-  },
-  brokerItemActive: {
-    borderColor: theme.colors.neonGreen,
-    backgroundColor: 'rgba(57, 255, 20, 0.05)',
-  },
-  brokerInfo: {
-    flex: 1,
-  },
-  brokerNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  brokerName: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 14,
-    color: theme.colors.textWhite,
-    letterSpacing: 1,
-  },
-  brokerNameDisabled: {
-    color: theme.colors.textMuted,
-  },
-  brokerBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-    borderWidth: 1,
-  },
-  brokerBadgeActive: {
-    borderColor: theme.colors.neonGreen,
-    backgroundColor: 'rgba(57, 255, 20, 0.1)',
-  },
-  brokerBadgeInactive: {
-    borderColor: theme.colors.textMuted,
-  },
-  brokerBadgeText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 8,
-    letterSpacing: 1,
-  },
-  brokerBadgeTextActive: {
-    color: theme.colors.neonGreen,
-  },
-  brokerBadgeTextInactive: {
-    color: theme.colors.textMuted,
-  },
-  brokerDesc: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    lineHeight: 16,
-  },
-  connectedBadge: {
-    marginLeft: theme.spacing.sm,
-  },
-  connectedText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 9,
-    color: theme.colors.neonGreen,
-    letterSpacing: 1,
-  },
-  // Config rows (risk, hours)
+
+  // ── Config Rows (risk, etc.) ───────────────────────
   configRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1489,16 +1547,117 @@ const styles = StyleSheet.create({
     minWidth: 60,
     textAlign: 'right',
   },
-  profit: {
-    color: theme.colors.profit,
+
+  // ── Mapping text ───────────────────────────────────
+  mappingText: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 9,
+    color: theme.colors.textMuted,
+    letterSpacing: 1,
   },
-  loss: {
-    color: theme.colors.loss,
+
+  // ── Broker ─────────────────────────────────────────
+  brokerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
-  // Engine card
-  engineCard: {
+  brokerItemActive: {
+    borderColor: theme.colors.neonGreen,
+    backgroundColor: 'rgba(0, 255, 136, 0.05)',
+  },
+  brokerInfo: {
+    flex: 1,
+  },
+  brokerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  brokerName: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 14,
+    color: theme.colors.textWhite,
+    letterSpacing: 1,
+  },
+  brokerNameDisabled: {
+    color: theme.colors.textMuted,
+  },
+  brokerDesc: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    lineHeight: 16,
+  },
+  connectedText: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 9,
+    color: theme.colors.neonGreen,
+    letterSpacing: 2,
+    marginLeft: theme.spacing.sm,
+  },
+  diagnosticBtn: {
+    backgroundColor: theme.colors.neonCyan,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: theme.borderRadius.md,
+    alignSelf: 'flex-start',
+  },
+  diagnosticBtnText: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 12,
+    color: theme.colors.backgroundDark,
+    letterSpacing: 2,
+    fontWeight: 'bold',
+  },
+
+  // ── Watchlist Chips ────────────────────────────────
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginVertical: theme.spacing.sm,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: theme.colors.backgroundHUD,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipActive: {
     borderColor: theme.colors.neonCyan,
+    backgroundColor: 'rgba(93, 244, 254, 0.1)',
   },
+  chipText: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    letterSpacing: 2,
+  },
+  chipTextActive: {
+    color: theme.colors.neonCyan,
+  },
+  chipCount: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 9,
+    color: theme.colors.textMuted,
+  },
+  chipCountActive: {
+    color: theme.colors.neonCyan,
+  },
+
+  // ── Engine ─────────────────────────────────────────
   engineStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1510,25 +1669,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.textSecondary,
   },
-  engineStatusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.round,
+  connectionBlock: {
+    marginBottom: theme.spacing.sm,
+  },
+  errorBlock: {
+    marginTop: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    backgroundColor: 'rgba(218, 68, 83, 0.1)',
+    borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
-  },
-  engineOnline: {
-    borderColor: theme.colors.neonGreen,
-    backgroundColor: 'rgba(57, 255, 20, 0.1)',
-  },
-  engineOffline: {
     borderColor: theme.colors.neonRed,
-    backgroundColor: 'rgba(255, 7, 58, 0.1)',
   },
-  engineStatusText: {
+  errorBlockTitle: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 10,
+    color: theme.colors.neonRed,
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
+  errorBlockMsg: {
     fontFamily: theme.fonts.primary,
     fontSize: 10,
-    color: theme.colors.textWhite,
-    letterSpacing: 2,
+    color: theme.colors.textSecondary,
+  },
+  errorRetryLink: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 11,
+    color: theme.colors.neonCyan,
+    letterSpacing: 1,
+    marginTop: 6,
   },
   engineButtons: {
     flexDirection: 'row',
@@ -1563,102 +1732,107 @@ const styles = StyleSheet.create({
     color: theme.colors.textWhite,
     letterSpacing: 2,
   },
+  btnDisabled: {
+    opacity: 0.4,
+  },
+
+  // ── Emergency Button ───────────────────────────────
+  emergencyGlowWrap: {
+    shadowColor: theme.colors.neonRed,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 16,
+    elevation: 12,
+    borderRadius: theme.borderRadius.md,
+  },
   emergencyBtn: {
-    backgroundColor: 'rgba(255, 7, 58, 0.15)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(218, 68, 83, 0.2)',
+    borderWidth: 2,
     borderColor: theme.colors.neonRed,
     borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.sm + 4,
+    paddingVertical: theme.spacing.sm + 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emergencyBtnText: {
     fontFamily: theme.fonts.heading,
-    fontSize: 11,
+    fontSize: 12,
     color: theme.colors.neonRed,
-    letterSpacing: 2,
+    letterSpacing: 3,
     fontWeight: 'bold',
   },
-  // Loading / Error
-  loadingText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.md,
-    letterSpacing: 2,
-  },
-  errorIcon: {
-    fontSize: 40,
-    color: theme.colors.neonRed,
-    marginBottom: theme.spacing.md,
-  },
-  errorText: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 13,
-    color: theme.colors.neonRed,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.cp2077Yellow,
-    borderRadius: theme.borderRadius.md,
-  },
-  retryBtnText: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 11,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
-  },
-  // Watchlist card
-  cardSubtitle: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.sm,
-    letterSpacing: 1,
-  },
-  watchlistRow: {
+
+  // ── System Info ────────────────────────────────────
+  inlineEditRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1530',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  watchlistCount: {
+  inlineEditInput: {
     fontFamily: theme.fonts.mono,
     fontSize: 11,
-    color: '#8892a0',
-    marginTop: 2,
+    color: theme.colors.neonCyan,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neonCyan,
+    minWidth: 180,
+    textAlign: 'right',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
   },
-  totalInstruments: {
-    marginTop: 12,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2445',
-    alignItems: 'center',
+  inlineEditInputSmall: {
+    minWidth: 200,
+    fontSize: 10,
   },
-  // Profile buttons
-  profileBtn: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  inlineEditOk: {
+    marginLeft: 8,
+    backgroundColor: theme.colors.neonCyan,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.sm,
   },
-  profileBtnTitle: {
+  inlineEditOkText: {
     fontFamily: theme.fonts.heading,
-    fontSize: 13,
+    fontSize: 12,
+    color: theme.colors.backgroundDark,
+    fontWeight: 'bold',
+  },
+  resetLink: {
+    marginTop: 8,
+    alignSelf: 'flex-end',
+  },
+  resetLinkText: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 12,
+    color: theme.colors.cp2077Yellow,
+  },
+  sysInfoLabel: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 11,
+    color: theme.colors.cp2077YellowDim,
     letterSpacing: 2,
     marginBottom: 4,
   },
-  profileBtnDesc: {
+  sysInfoHint: {
     fontFamily: theme.fonts.primary,
-    fontSize: 10,
+    fontSize: 11,
     color: theme.colors.textMuted,
-    letterSpacing: 0.5,
-    marginTop: 2,
+    marginBottom: 8,
+  },
+  authStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  authDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  authStatusText: {
+    fontFamily: theme.fonts.heading,
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    letterSpacing: 1,
   },
 });

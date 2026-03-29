@@ -21,6 +21,10 @@ CRYPTO (Esp. Criptomonedas module — wider due to volatility):
     - Day Trading: trail with H4 EMA 50
     - Scalping: trail with M15 EMA 50
 
+  Style DAILY (Mid-term) — Daily EMA 50:
+    - All styles: trail with Daily EMA 50
+    - Sits between LP (Weekly) and CP (H1) for crypto
+
   Style CP (Short-term) — PRIMARY timeframes:
     - Swing: trail with H1 EMA 50
     - Day Trading: trail with M15 EMA 50
@@ -64,6 +68,7 @@ class PositionPhase(Enum):
 class ManagementStyle(Enum):
     """TradingLab position management styles."""
     LP = "lp"              # Long-term: wider EMA timeframes, gives trades more room
+    DAILY = "daily"        # Daily: crypto-specific mid-term — Daily EMA 50 trailing
     CP = "cp"              # Short-term: tighter EMA timeframes, locks profit sooner
     CPA = "cpa"            # Short-term Aggressive: tightest EMAs, only at key levels
     PRICE_ACTION = "price_action"  # Trail SL using previous swing highs/lows (alternative to EMA)
@@ -91,6 +96,11 @@ _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
     (ManagementStyle.LP, TradingStyle.SWING): "EMA_D_50",
     (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H1_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
+    # DAILY (mid-term): uses Daily EMA 50 across all trading styles
+    # For forex this mirrors LP swing; exists for symmetry with crypto DAILY mode.
+    (ManagementStyle.DAILY, TradingStyle.SWING): "EMA_D_50",
+    (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_D_50",
+    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_D_50",
     # CP (Short-term): Swing=H1, Day=M5, Scalp=M1
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
@@ -113,6 +123,11 @@ _EMA_TIMEFRAME_GRID_CRYPTO: Dict[tuple, str] = {
     (ManagementStyle.LP, TradingStyle.SWING): "EMA_W_50",
     (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H4_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
+    # DAILY (mid-term crypto): Daily EMA 50 — between LP (Weekly) and CP (H1)
+    # Mentorship: crypto position management has LP=Weekly, now DAILY=Daily, CP=H1, CPA=M15
+    (ManagementStyle.DAILY, TradingStyle.SWING): "EMA_D_50",
+    (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_D_50",
+    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_D_50",
     # CP (Short-term): Swing=H1, Day=M15, Scalp=M1
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",

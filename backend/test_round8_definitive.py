@@ -1000,7 +1000,7 @@ def test_position_risk():
     # Risk for styles
     check("T182: Day trading risk is 1%", rm.get_risk_for_style(RMStyle.DAY_TRADING) == 0.01)
     check("T183: Scalping risk is 0.5%", rm.get_risk_for_style(RMStyle.SCALPING) == 0.005)
-    check("T184: Swing risk is 3%", rm.get_risk_for_style(RMStyle.SWING) == 0.03)
+    check("T184: Swing risk is 1%", rm.get_risk_for_style(RMStyle.SWING) == 0.01)
 
     # Register/unregister trades
     rm.register_trade("T001", "EUR_USD", 0.01)
@@ -1149,7 +1149,7 @@ def test_crypto_config_journal():
 
     check("T221: risk_day_trading default 1%", settings.risk_day_trading == 0.01)
     check("T222: risk_scalping default 0.5%", settings.risk_scalping == 0.005)
-    check("T223: risk_swing default 1%", settings.risk_swing == 0.03)
+    check("T223: risk_swing default 1%", settings.risk_swing == 0.01)
     check("T224: max_total_risk default 7%", settings.max_total_risk == 0.07)
     check("T225: min_rr_ratio default 2.0", settings.min_rr_ratio == 1.5)
     check("T226: trading_style default day_trading", settings.trading_style == "day_trading")
@@ -1493,7 +1493,7 @@ def test_api_frontend():
     check("T346: Correlation groups is list of lists", isinstance(settings.correlation_groups[0], list))
     check("T347: Settings has active_watchlist_categories", hasattr(settings, 'active_watchlist_categories'))
     check("T348: active_watchlist_categories default", settings.active_watchlist_categories == ["forex"])
-    check("T349: Settings has allocation_trading_pct", settings.allocation_trading_pct == 0.80)
+    check("T349: Settings has allocation_trading_pct", settings.allocation_trading_pct == 0.70)
     check("T350: Settings has allocation_crypto_pct", settings.allocation_crypto_pct == 0.10)
 
 

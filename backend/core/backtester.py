@@ -130,6 +130,8 @@ class BacktestResult:
     avg_bars_held: float = 0.0
     best_trade_pnl: float = 0.0
     worst_trade_pnl: float = 0.0
+    # Mentorship: "minimum 100 trades before evaluating the system"
+    warnings: List[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1032,6 +1034,25 @@ class Backtester:
         except Exception:
             duration = 0
 
+        # ── Warnings (mentorship validation) ────────────────────────────
+        # Mentorship: "minimum 100 trades before evaluating the system"
+        warnings: List[str] = []
+        if total < 100:
+            warnings.append(
+                f"Insufficient sample size: {total} trades. "
+                f"The mentorship requires a minimum of 100 trades per strategy "
+                f"before evaluating system performance. Results may not be "
+                f"statistically significant."
+            )
+        # Also check per-strategy trade counts
+        for strat_name, strat_stats in by_strategy.items():
+            strat_total = strat_stats.get("total_trades", 0)
+            if 0 < strat_total < 100:
+                warnings.append(
+                    f"Strategy '{strat_name}' has only {strat_total} trades. "
+                    f"Minimum 100 trades recommended before evaluating."
+                )
+
         return BacktestResult(
             config=config,
             trades=trades,
@@ -1055,6 +1076,7 @@ class Backtester:
             avg_bars_held=round(avg_bars, 1),
             best_trade_pnl=round(best_pnl, 2),
             worst_trade_pnl=round(worst_pnl, 2),
+            warnings=warnings,
         )
 
     # ------------------------------------------------------------------

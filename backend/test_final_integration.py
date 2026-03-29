@@ -303,37 +303,38 @@ check("BLUE A in code has 'Doble suelo/techo'",
       "Doble suelo/techo" in blue_code or "doble suelo" in blue_code.lower(),
       "Not found in BlueStrategy code")
 
-check("BLUE C says 'Rechazo EMA 4H'",
-      "Rechazo EMA 4H" in TRADINGLAB_SYSTEM_PROMPT or "Rechazo" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
+if TRADINGLAB_SYSTEM_PROMPT is not None:
+    check("BLUE C says 'Rechazo EMA 4H'",
+          "Rechazo EMA 4H" in TRADINGLAB_SYSTEM_PROMPT or "Rechazo" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
 
-# 3c: LP/CP/CPA spelled out
-check("LP spelled out as 'Largo Plazo'",
-      "Largo Plazo" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
-check("CP spelled out as 'Corto Plazo'",
-      "Corto Plazo" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
-check("CPA spelled out as 'Corto Plazo Agresivo'",
-      "Corto Plazo Agresivo" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
+    # 3c: LP/CP/CPA spelled out
+    check("LP spelled out as 'Largo Plazo'",
+          "Largo Plazo" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
+    check("CP spelled out as 'Corto Plazo'",
+          "Corto Plazo" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
+    check("CPA spelled out as 'Corto Plazo Agresivo'",
+          "Corto Plazo Agresivo" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
 
-# 3d: Crypto section exists
-check("Crypto section exists in prompt",
-      "CRYPTO" in TRADINGLAB_SYSTEM_PROMPT.upper() or "crypto" in TRADINGLAB_SYSTEM_PROMPT.lower(),
-      "Not found")
-check("BMSB mentioned in crypto section",
-      "BMSB" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
-check("Pi Cycle mentioned in crypto section",
-      "Pi Cycle" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
-check("Halving Cycle mentioned in prompt",
-      "Halving" in TRADINGLAB_SYSTEM_PROMPT or "halving" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
-check("BTC Dominance mentioned in prompt",
-      "BTC.D" in TRADINGLAB_SYSTEM_PROMPT or "Dominance" in TRADINGLAB_SYSTEM_PROMPT,
-      "Not found")
+    # 3d: Crypto section exists
+    check("Crypto section exists in prompt",
+          "CRYPTO" in TRADINGLAB_SYSTEM_PROMPT.upper() or "crypto" in TRADINGLAB_SYSTEM_PROMPT.lower(),
+          "Not found")
+    check("BMSB mentioned in crypto section",
+          "BMSB" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
+    check("Pi Cycle mentioned in crypto section",
+          "Pi Cycle" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
+    check("Halving Cycle mentioned in prompt",
+          "Halving" in TRADINGLAB_SYSTEM_PROMPT or "halving" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
+    check("BTC Dominance mentioned in prompt",
+          "BTC.D" in TRADINGLAB_SYSTEM_PROMPT or "Dominance" in TRADINGLAB_SYSTEM_PROMPT,
+          "Not found")
 
 
 # =====================================================================

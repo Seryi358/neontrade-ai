@@ -251,14 +251,17 @@ BLUE B (Estandar):
   TP_max: Next 4H S/R level
 
 BLUE C (Rechazo EMA 4H):
+  After breaking 1H MA50, price REJECTS 4H MA50 before pullback. Least effective Blue variant.
   Step 1: Same HTF conditions
-  Step 2: 1H impulse wave completed (Wave 1 on 1H)
-  Step 3: Price retraces into Fibonacci 0.382-0.618 zone of the 1H impulse
-  Step 4: Confluence with FVG or OB in the Fib zone
-  Step 5: Entry at the confluence zone with 2m/5m confirmation
-  SL: Below/above Fibonacci 0.618 level (or the swing low/high of Wave 1)
-  TP1: 1:1 extension of Wave 1
-  TP_max: 1.618 Fibonacci extension
+  Step 2: 1H price has broken EMA 50 1H (Blue B confirmed)
+  Step 3: Price advances toward 4H EMA 50 but is REJECTED (does not break 4H EMA 50)
+  Step 4: Price pulls back after the 4H EMA 50 rejection
+  Step 5: Entry on pullback with 2m/5m confirmation
+  Extra conditions: (1) Higher timeframe must favor direction, (2) Minimum 2:1 R:R required
+  SL: Beyond the rejection wick at 4H EMA 50
+  TP1: Previous swing high/low
+  TP_max: Next 4H S/R level
+  NOTE: Blue C is the LEAST effective of the three Blue variants — use with caution
 
 ──── RED STRATEGY (4H Trend Change — Elliott Wave 2-3) ────
 Associated Wave: Wave 2 end on 4H → riding Wave 3
@@ -270,8 +273,9 @@ Associated Wave: Wave 2 end on 4H → riding Wave 3
   Step 5: Confluence with daily S/R, FVG, or OB
   Step 6: Entry on 5m/2m with reversal pattern
   SL: Beyond the 4H corrective wave extreme
-  TP1: Fibonacci 1.272 extension of the corrective wave
-  TP_max: Fibonacci 1.618 extension (Wave 3 target)
+  TP1: previous high/low (safest)
+  TP_max: Fibonacci 1.618 extension (Wave 3 target). Extended TP: 1.618 extension ONLY for Wave 3 with strong daily move.
+  1H EMA BREAK NUANCE: If small 1H MA break without continuation: permissive (still a Red). If break descontrols (strong momentum through EMA): NOT a Red — the setup is invalidated.
 
 ──── PINK STRATEGY (Corrective Pattern Continuation — Elliott Wave 4→5) ────
 Associated Wave: Wave 4 correction end → entry for Wave 5
@@ -284,6 +288,7 @@ Associated Wave: Wave 4 correction end → entry for Wave 5
   SL: Beyond the corrective pattern extreme (Wave 4 low/high)
   TP1: Fibonacci 0.618 extension of Wave 3 projected from Wave 4 end
   TP_max: Equal length to Wave 1 (common Wave 5 target) or 1.0 extension
+  IMPORTANT: Alex does NOT execute Pink on channel patterns (no convergence point). If 1H correction forms a channel, wait for White instead.
 
 ──── WHITE STRATEGY (Post-Pink Continuation — Wave 3 of Wave 5) ────
 Associated Wave: After Pink triggers, riding Wave 3 of the sub-wave inside Wave 5
@@ -296,15 +301,17 @@ Associated Wave: After Pink triggers, riding Wave 3 of the sub-wave inside Wave 
   SL: Below/above sub-wave 2 of the new impulse
   TP1: Previous 4H impulse high/low
   TP_max: 1.618 extension of the sub-wave 1
+  NOTE: White can SUBSTITUTE Pink. If Pink is rejected (e.g., channel pattern), wait for White which gives similar profitability with tighter SL.
 
 ──── BLACK STRATEGY (Counter-Trend Anticipation — Elliott Wave 1) ────
 Associated Wave: Anticipating Wave 1 of a NEW trend (daily reversal)
 Risk Level: HIGHEST — requires minimum 2:1 R:R
 
   Step 1: Daily chart shows STRONG deceleration (multiple reversal candles, volume climax)
-  Step 2: RSI divergence on H4 chart (price makes new high/low but RSI does not) + MACD divergence on H1 (always present in Black setups)
-  Step 3: 4H shows initial structure change (first CHOCH against the daily trend)
-  Step 4: 1H confirms with BOS in the new direction
+  Step 2: 4H shows initial structure change (first CHOCH against the daily trend)
+  Step 3: 1H confirms with BOS in the new direction
+  Step 4: 4H overbought/oversold assessment
+    EXTRAS (within Step 4): RSI divergence on H4 (price makes new high/low but RSI does not) + MACD divergence on H1 (always present in Black setups)
   Step 5: Price in discount zone (for BUY) or premium zone (for SELL) using SMC
   Step 6: Entry at OB or FVG confluence on 15m/5m
   SL: Beyond the daily swing extreme (the potential Wave 5 end)
@@ -321,7 +328,7 @@ Potential R:R: Up to 10:1
 NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequential process
 
   7 Sequential Steps:
-  Step 1 (Trend): Identify the trend on the highest timeframe (Weekly for swing, 4H for day trading)
+  Step 1 (Trend): Weekly direction (always weekly, Green does NOT differentiate day/swing — weekly is ALWAYS the starting point)
   Step 2 (Pattern): The weekly correction forms a recognizable pattern on the next lower timeframe (Daily for swing, 1H for day) — wedge, triangle, flag, channel
   Step 3 (Pullback): Wait for pullback on the intermediate timeframe
   Step 4 (Pattern): Identify continuation pattern (flag, pennant, triangle, wedge)
@@ -509,6 +516,9 @@ Entry Types:
   Day Trading minimum: 3 levels. Scalping: 4 levels required (Workshop de Scalping: both EMAs + Fib + extra)
 - Stop entry: ONLY when you cannot monitor AND all timeframes fully align
 
+Execution Priority (all strategies): 5min MA50 > diagonal on 5min > 2min MA50 > diagonal on 2min.
+NEVER enter on break alone — require RCC (Rompe + Cierra + Confirma): price breaks the level, candle closes beyond it, next candle confirms.
+
 Trading Hours:
 - London session: 08:00-17:00 UTC (primary)
 - New York session: 13:00-22:00 UTC (secondary, overlap 13:00-17:00 is best)
@@ -521,7 +531,7 @@ Friday Close Rule:
 - Weekend gaps are unacceptable risk
 
 News Avoidance:
-- Stop trading 30 minutes before HIGH-IMPACT news events (NFP, FOMC, CPI, ECB, etc.)
+- Stop trading 30 minutes before HIGH-IMPACT news events (NFP, FOMC, CPI, ECB, Fed Chair speeches/press conferences, etc.)
 - Wait 15 minutes after the news release before trading
 - Check economic calendar BEFORE every trading session
 

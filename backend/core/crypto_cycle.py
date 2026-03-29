@@ -26,7 +26,8 @@ class CryptoMarketCycle:
     halving_phase: str = "unknown"  # pre_halving, post_halving, expansion, distribution
     halving_phase_description: str = ""  # Human-readable phase description
     halving_sentiment: str = "neutral"  # very_bullish, bullish, bearish, neutral
-    btc_rsi_14: Optional[float] = None  # RSI 14 on BTC weekly (approx 2-week chart)
+    btc_rsi_14_daily: Optional[float] = None  # RSI 14 on BTC daily (primary — mentorship: "RSI 14 días")
+    btc_rsi_14: Optional[float] = None  # RSI 14 on BTC weekly (secondary — cycle-level supplementary check)
     ema8_weekly_broken: bool = False  # True if BTC weekly close < EMA 8
     bmsb_status: Optional[str] = None  # "bullish", "bearish", or None
     bmsb_consecutive_bearish_closes: int = 0  # Weekly closes below BMSB (need 2+ for confirmed bearish)
@@ -337,14 +338,14 @@ class CryptoCycleAnalyzer:
                 cycle.halving_sentiment = "bullish"
 
     async def _analyze_rsi(self, cycle: CryptoMarketCycle):
-        """RSI 14 on BTC weekly for cycle top/bottom detection.
+        """RSI 14 on BTC for cycle top/bottom detection.
 
         From the mentorship (Alex): "lo que me gusta mas es para 14 semanas,
-        perdon 14 semanas no, dos semanas o 14 dias". We use weekly candles
-        with RSI period 14 to approximate the 2-week chart timeframe, which
-        gives a cleaner cycle signal than daily RSI.
+        perdon 14 semanas no, dos semanas o 14 dias". The mentorship says
+        "RSI 14 días" — RSI 14 on the DAILY chart is the primary signal.
+        Weekly RSI 14 is kept as a secondary/supplementary cycle-level check.
 
-        Diagonal analysis note: RSI on this timeframe can also be used to
+        Diagonal analysis note: RSI on the weekly timeframe can also be used to
         draw diagonal trendlines on the RSI itself. A break of a rising RSI
         diagonal while price is at highs can signal cycle exhaustion before
         RSI reaches the extreme 80+ level.
@@ -352,30 +353,26 @@ class CryptoCycleAnalyzer:
         if not self.broker:
             return
         try:
-            # Use weekly candles (approximates 2-week chart for cycle analysis)
+            # PRIMARY: Daily RSI 14 (mentorship: "RSI 14 días")
+            daily_candles = await self.broker.get_candles("BTC_USD", granularity="D", count=30)
+            if daily_candles and len(daily_candles) >= 15:
+                daily_closes = [c.close for c in daily_candles]
+                daily_rsi = self._compute_rsi_14(daily_closes)
+                if daily_rsi is not None:
+                    cycle.btc_rsi_14_daily = daily_rsi
+                    logger.info(f"BTC Daily RSI 14 (primary): {daily_rsi:.1f}")
+
+            # SECONDARY: Weekly RSI 14 (supplementary cycle-level check)
             candles = await self.broker.get_candles("BTC_USD", granularity="W", count=30)
             if not candles or len(candles) < 15:
                 return
             closes = [c.close for c in candles]
-            # Calculate RSI 14 on weekly closes
-            gains, losses = [], []
-            for i in range(1, len(closes)):
-                diff = closes[i] - closes[i - 1]
-                gains.append(max(diff, 0))
-                losses.append(max(-diff, 0))
-            if len(gains) < 14:
-                return
-            avg_gain = sum(gains[:14]) / 14
-            avg_loss = sum(losses[:14]) / 14
-            for i in range(14, len(gains)):
-                avg_gain = (avg_gain * 13 + gains[i]) / 14
-                avg_loss = (avg_loss * 13 + losses[i]) / 14
-            if avg_loss == 0:
-                rsi = 100.0
-            else:
-                rs = avg_gain / avg_loss
-                rsi = 100 - (100 / (1 + rs))
-            cycle.btc_rsi_14 = rsi
+            weekly_rsi = self._compute_rsi_14(closes)
+            if weekly_rsi is not None:
+                cycle.btc_rsi_14 = weekly_rsi
+
+            # Use daily RSI as primary for market phase decisions, fall back to weekly
+            rsi = cycle.btc_rsi_14_daily if cycle.btc_rsi_14_daily is not None else cycle.btc_rsi_14
 
             # RSI Diagonal Trendline Analysis (Esp. Criptomonedas Section 8)
             # Alex: "ha sido capaz de enlazar de forma muy clara diferentes
@@ -616,6 +613,32 @@ class CryptoCycleAnalyzer:
             cycle.market_phase = "accumulation"
         else:
             cycle.market_phase = "distribution"
+
+    @staticmethod
+    def _compute_rsi_14(closes: list) -> Optional[float]:
+        """Compute a single RSI 14 value from a list of close prices.
+
+        Returns the most recent RSI 14, or None if insufficient data.
+        Used for both daily (primary) and weekly (secondary) RSI calculations.
+        """
+        if len(closes) < 15:
+            return None
+        gains, losses = [], []
+        for i in range(1, len(closes)):
+            diff = closes[i] - closes[i - 1]
+            gains.append(max(diff, 0))
+            losses.append(max(-diff, 0))
+        if len(gains) < 14:
+            return None
+        avg_gain = sum(gains[:14]) / 14
+        avg_loss = sum(losses[:14]) / 14
+        for i in range(14, len(gains)):
+            avg_gain = (avg_gain * 13 + gains[i]) / 14
+            avg_loss = (avg_loss * 13 + losses[i]) / 14
+        if avg_loss == 0:
+            return 100.0
+        rs = avg_gain / avg_loss
+        return 100 - (100 / (1 + rs))
 
     @staticmethod
     def _calculate_rsi_series(closes: list, period: int = 14) -> list:

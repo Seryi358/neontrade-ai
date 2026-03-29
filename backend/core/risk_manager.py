@@ -406,25 +406,18 @@ class RiskManager:
         risk_percent = self._adjust_for_correlation(instrument, risk_percent)
 
         risk_amount = balance * risk_percent
-        pip_value = await self.broker.get_pip_value(instrument)
         sl_distance = abs(entry_price - stop_loss)
 
         if sl_distance == 0:
             logger.error(f"SL distance is 0 for {instrument}")
             return 0
 
-        if pip_value <= 0:
-            logger.error(f"Invalid pip value ({pip_value}) for {instrument}")
-            return 0
-
-        # Mentoría TradingLab: Position Size = Risk$ / (SL_distance * pip_value)
-        # pip_value converts price movement into account currency (e.g., USD)
-        # For forex: 1 standard lot = 100,000 units, pip = 0.0001 (or 0.01 for JPY)
-        # units = risk_amount / (sl_distance_in_price * pip_value_per_unit)
-        # Since pip_value is typically "value of 1 pip per 1 unit", we use:
-        # units = risk_amount / (sl_distance * pip_value)
-        # This correctly accounts for different instrument pip sizes and values
-        units = int(risk_amount / (sl_distance * pip_value))
+        # For Capital.com CFDs (no pip_value needed): 1 unit = 1 unit of base currency
+        # P&L = units * price_change, so units = risk_amount / sl_distance_in_price
+        # The pip_value from broker is pip SIZE (e.g., 0.0001), NOT dollar-per-pip,
+        # so we must NOT multiply by it. Direct division gives correct CFD units.
+        # Example: $100 risk, 0.0050 SL distance = 20,000 units
+        units = int(risk_amount / sl_distance)
 
         # Cap maximum position size to prevent broker rejections
         MAX_UNITS = 10_000_000

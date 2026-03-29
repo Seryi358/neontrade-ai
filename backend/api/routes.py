@@ -2144,8 +2144,8 @@ async def get_crypto_allocation():
         "forex_pct": settings.allocation_forex_pct,
         "crypto_pct": settings.allocation_crypto_pct,
         "investment_pct": settings.allocation_investment_pct,
-        "investment_stocks_pct": settings.allocation_investment_stocks,
-        "investment_crypto_pct": settings.allocation_investment_crypto,
+        "investment_stocks_pct": settings.allocation_investment_pct * 0.70,  # 70% of investment in VT/S&P500
+        "investment_crypto_pct": settings.allocation_crypto_longterm_pct,
         "crypto_default_strategy": settings.crypto_default_strategy,
         "crypto_position_mgmt_style": settings.crypto_position_mgmt_style,
         "memecoins_monitor_only": settings.memecoins_monitor_only,

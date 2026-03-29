@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # 0.5% (NeonTrade AI default; workshop defers exact %)
-    risk_swing: float = 0.03             # Trading Plan PDF: 3% en Swing trading
+    risk_swing: float = 0.01             # 1% — NON-NEGOTIABLE per mentorship ("la regla del 1% es innegociable")
     max_total_risk: float = 0.07          # 7% max simultaneous open risk
 
     # Correlated pairs risk reduction (ch18.3)
@@ -416,6 +416,7 @@ class Settings(BaseSettings):
     # Crypto position management style (Esp. Criptomonedas position management)
     # Three modes taught in the specialization:
     #   "long_term" = weekly EMA 50 trailing (default, safest)
+    #   "daily" = daily EMA 50 trailing (mentorship: dynamic support in bull, resistance in bear)
     #   "short_term" = H1 EMA 50 trailing (faster exits, ~7-10% moves)
     #   "aggressive" = M15 EMA 50 trailing / reference TP + M15 validation
     # Alex recommends beginners start with "long_term"
@@ -477,16 +478,15 @@ class Settings(BaseSettings):
     # Options: forex, forex_exotic, commodities, indices, equities, crypto
     active_watchlist_categories: List[str] = ["forex"]
 
-    # ── Capital Allocation (ch18.5 + Trading Plan PDF) ──────────────
-    # Trading Plan PDF: 80% trading (90% forex, 10% crypto), 20% investment
-    # Mentoría clase: 70% trading, 20% inversión, 10% cripto
-    # Using Trading Plan PDF values as authoritative
-    allocation_trading_pct: float = 0.80     # 80% in trading accounts (Trading Plan PDF)
-    allocation_forex_pct: float = 0.90       # 90% forex/indices/metals (within trading)
+    # ── Capital Allocation (ch18.5 Reparto del capital) ──────────────
+    # Mentoría: 70% trading, 20% stocks/ETFs, 10% crypto largo plazo
+    # Within trading: 70% forex, 20% other (indices/commodities/metals), 10% crypto
+    allocation_trading_pct: float = 0.70     # 70% in trading accounts (mentorship class)
+    allocation_forex_pct: float = 0.70       # 70% forex (within trading)
+    allocation_other_pct: float = 0.20       # 20% other: indices, commodities, metals (within trading)
     allocation_crypto_pct: float = 0.10      # 10% crypto (within trading)
-    allocation_investment_pct: float = 0.20  # 20% long-term (stocks/ETFs)
-    allocation_investment_stocks: float = 0.80  # 80% stocks/ETFs (70% VT/S&P500, 30% sectors)
-    allocation_investment_crypto: float = 0.20  # 20% crypto (70% BTC, 20% ETH, 10% alts)
+    allocation_investment_pct: float = 0.20  # 20% long-term stocks/ETFs (70% VT/S&P500, 30% sectors)
+    allocation_crypto_longterm_pct: float = 0.10  # 10% crypto long-term (70% BTC, 20% ETH, 10% alts)
 
     # Extended crypto correlation groups (mentoría: most cryptos move together)
     crypto_correlation_groups: List[List[str]] = [
@@ -554,13 +554,13 @@ _apply_funded_evaluation_defaults()
 TRADING_PROFILES = {
     "tradinglab_recommended": {
         "name": "TradingLab Recommended",
-        "description": "Configuración exacta de Alex Ruiz: Day Trading, 1% riesgo, salida rápida, sin parciales, BE al 1%",
+        "description": "Configuración exacta de Alex Ruiz: Day Trading, 1% riesgo en todos los estilos, salida rápida, sin parciales, BE al 1%",
         "settings": {
             "trading_style": "day_trading",
             # Risk management — Alex's exact values
             "risk_day_trading": 0.01,       # 1% per trade
             "risk_scalping": 0.005,         # 0.5%
-            "risk_swing": 0.03,             # 3%
+            "risk_swing": 0.01,             # 1% — NON-NEGOTIABLE
             "max_total_risk": 0.07,         # 7% max simultaneous
             "correlated_risk_pct": 0.0075,  # 0.75% per correlated pair
             "min_rr_ratio": 1.5,            # 1.5:1 minimum R:R

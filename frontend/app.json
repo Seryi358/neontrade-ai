@@ -37,7 +37,6 @@
         "projectId": ""
       }
     },
-    "entryPoint": "./index.js",
     "plugins": [],
     "experiments": {
       "baseUrl": "."

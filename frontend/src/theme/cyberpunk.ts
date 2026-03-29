@@ -10,17 +10,17 @@
  * - Angular, clipped corners (CP2077 UI signature)
  * - Scan lines, grid overlays, glitch effects
  * - HUD-style data presentation (trading = combat readiness)
- * - Dark navy/purple backgrounds for eye comfort during long sessions
+ * - Cold dark backgrounds with blue tint for eye comfort during long sessions
  */
 
 export const theme = {
   colors: {
-    // Primary backgrounds (Daemon-2.0: deep navy-purple gradient)
-    background: '#14101f',      // BG_DARK from Daemon-2.0
-    backgroundDark: '#0a0812',  // Deeper for modals/overlays
-    backgroundLight: '#1c1630', // Elevated cards
-    backgroundCard: '#18122a',  // Card surfaces
-    backgroundHUD: '#110e1d',   // HUD overlay background
+    // Primary backgrounds (cold dark palette — true blacks with blue tint)
+    background: '#0a0e14',      // True black with cold blue tint
+    backgroundDark: '#050508',  // Near-OLED black
+    backgroundLight: '#111824', // Cold dark navy
+    backgroundCard: '#0d1219',  // Cold card surface
+    backgroundHUD: '#080c12',   // Cold HUD overlay
 
     // CP2077 Primary accent — iconic yellow
     cp2077Yellow: '#fcee09',
@@ -49,26 +49,31 @@ export const theme = {
     neonOrange: '#ff6b35',      // Warning
     neonYellow: '#ffb800',      // Caution/pending
 
-    // Text (Daemon-2.0: off-white with slight warmth)
+    // New cold accent colors
+    neonBlue: '#0088ff',        // Cool blue accent
+    coldGray: '#2a3a4d',        // Cold gray for borders/dividers
+    iceWhite: '#e0e8f0',        // Cold white for secondary text
+
+    // Text (cold palette — iceWhite secondary, visible muted)
     textPrimary: '#fcee09',     // CP2077 yellow for headers/titles
-    textSecondary: '#dcdce6',   // Daemon-2.0 WHITE
-    textMuted: '#6b7080',       // Subdued labels
+    textSecondary: '#e0e8f0',   // iceWhite — colder secondary
+    textMuted: '#8a9bad',       // More visible in cold backgrounds
     textWhite: '#f0eef5',       // Pure content text
     textCyan: '#5df4fe',        // Tech/AI text
 
     // Status
     profit: '#00ff88',
     loss: '#da4453',
-    neutral: '#6b7080',
+    neutral: '#8a9bad',
     warning: '#ffb800',
 
     // Confidence levels
     confidenceHigh: '#5df4fe',
     confidenceMedium: '#ffb800',
-    confidenceLow: '#6b7080',
+    confidenceLow: '#8a9bad',
 
-    // Borders (angular CP2077 style)
-    border: '#2a2445',
+    // Borders (angular CP2077 style — colder)
+    border: '#1a2535',
     borderActive: '#fcee09',    // CP2077 yellow active border
     borderCyan: '#5df4fe',
     borderMagenta: '#ed00d9',
@@ -76,9 +81,9 @@ export const theme = {
     // Chart
     chartBullish: '#00ff88',
     chartBearish: '#da4453',
-    chartGrid: '#1a1535',
-    chartBackground: '#0a0812',
-    chartGridLines: '#1a1535',
+    chartGrid: '#111824',
+    chartBackground: '#050508',
+    chartGridLines: '#111824',
     chartCandleUp: '#00ff88',
     chartCandleDown: '#da4453',
     chartVolumeUp: 'rgba(0, 255, 136, 0.3)',
@@ -89,14 +94,14 @@ export const theme = {
     chartSupport: '#00ff88',
     chartResistance: '#da4453',
     chartPivot: '#ffb800',
-    chartTextColor: '#6b7080',
+    chartTextColor: '#8a9bad',
     chartCurrentPrice: '#fcee09',
 
     // Strategy detection colors (TradingLab 6-color system)
     strategyBlue: '#0088ff',
     strategyRed: '#da4453',
     strategyPink: '#ed00d9',
-    strategyWhite: '#dcdce6',
+    strategyWhite: '#e0e8f0',
     strategyBlack: '#888888',
     strategyGreen: '#00ff88',
     strategyDetected: '#fcee09',
@@ -113,6 +118,26 @@ export const theme = {
     bold: 'Rajdhani-Bold',
     fallback: "'Rajdhani', 'Segoe UI', sans-serif",
     monoFallback: "'TerminessNerdFont', 'Fira Code', monospace",
+  },
+
+  typography: {
+    hudMicro: {
+      fontSize: 8,
+      textTransform: 'uppercase' as const,
+      letterSpacing: 3,
+      fontFamily: 'Rajdhani-Medium',
+      color: '#8a9bad',
+    },
+    dataLarge: {
+      fontSize: 28,
+      fontFamily: 'Rajdhani-Bold',
+      fontVariant: ['tabular-nums' as const],
+    },
+    dataSmall: {
+      fontSize: 12,
+      fontFamily: 'TerminessNerdFont',
+      fontVariant: ['tabular-nums' as const],
+    },
   },
 
   spacing: {
@@ -194,6 +219,9 @@ export const cssTheme = `
     --neon-magenta-glow: ${theme.colors.neonMagentaGlow};
     --neon-red: ${theme.colors.neonRed};
     --neon-green: ${theme.colors.neonGreen};
+    --neon-blue: ${theme.colors.neonBlue};
+    --cold-gray: ${theme.colors.coldGray};
+    --ice-white: ${theme.colors.iceWhite};
 
     --text-primary: ${theme.colors.textPrimary};
     --text-secondary: ${theme.colors.textSecondary};
@@ -227,14 +255,29 @@ export const cssTheme = `
     padding: 0;
   }
 
-  /* ── CP2077 HUD Typography ─────────────────────────────── */
+  /* -- CP2077 HUD Typography ----------------------------------------- */
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 3px;
+    letter-spacing: 5px;
     color: var(--cp2077-yellow);
+  }
+
+  h1 { letter-spacing: 6px; }
+  h2 { letter-spacing: 5px; }
+  h3 { letter-spacing: 4px; }
+  h4, h5, h6 { letter-spacing: 4px; }
+
+  /* HUD micro text — tiny uppercase labels */
+  .hud-micro {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--text-muted);
   }
 
   /* Tabular numerals for financial data */
@@ -244,7 +287,24 @@ export const cssTheme = `
     font-feature-settings: "tnum";
   }
 
-  /* ── CP2077 Neon Text Effects ──────────────────────────── */
+  /* Data display — large numbers */
+  .data-large {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 28px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Data display — small monospace numbers */
+  .data-small {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* -- CP2077 Neon Text Effects -------------------------------------- */
 
   .neon-text {
     color: var(--cp2077-yellow);
@@ -265,7 +325,7 @@ export const cssTheme = `
                  0 0 14px var(--neon-magenta-glow);
   }
 
-  /* ── CP2077 Card & Border Styles ───────────────────────── */
+  /* -- CP2077 Card & Border Styles ----------------------------------- */
 
   .neon-border {
     border: 1px solid var(--cp2077-yellow);
@@ -281,7 +341,7 @@ export const cssTheme = `
 
   .cp2077-card {
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: 1px solid var(--cold-gray);
     border-left: 3px solid var(--cp2077-yellow);
     border-radius: var(--radius-sm);
     padding: 16px;
@@ -295,6 +355,35 @@ export const cssTheme = `
                 inset 0 0 5px rgba(252, 238, 9, 0.05);
   }
 
+  /* CP2077 header bar — thin line with yellow dot */
+  .cp2077-header-bar {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 12px;
+  }
+  .cp2077-header-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cp2077-yellow);
+    box-shadow: 0 0 6px var(--cp2077-yellow-glow);
+    transform: translateY(-50%);
+  }
+  .cp2077-header-bar::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--cp2077-yellow-dim), transparent);
+    transform: translateY(-50%);
+  }
+
   /* CP2077 clipped corner effect */
   .cp2077-clip {
     clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
@@ -304,14 +393,14 @@ export const cssTheme = `
     clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   }
 
-  /* ── CP2077 HUD Elements ───────────────────────────────── */
+  /* -- CP2077 HUD Elements ------------------------------------------- */
 
   .hud-header {
     font-family: var(--font-heading);
     font-weight: 700;
     font-size: 14px;
     text-transform: uppercase;
-    letter-spacing: 4px;
+    letter-spacing: 5px;
     color: var(--cp2077-yellow);
     border-bottom: 1px solid var(--cp2077-yellow);
     padding-bottom: 4px;
@@ -337,7 +426,7 @@ export const cssTheme = `
 
   .hud-divider {
     border: none;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--cold-gray);
     margin: 12px 0;
     position: relative;
   }
@@ -352,7 +441,7 @@ export const cssTheme = `
     background: var(--cp2077-yellow);
   }
 
-  /* ── Scan Lines (CP2077 CRT effect) ────────────────────── */
+  /* -- Scan Lines (CP2077 CRT effect) -------------------------------- */
 
   .scan-lines {
     position: relative;
@@ -376,7 +465,7 @@ export const cssTheme = `
     z-index: 10;
   }
 
-  /* ── CP2077 Grid Background ────────────────────────────── */
+  /* -- CP2077 Grid Background ---------------------------------------- */
 
   .grid-bg {
     background-image:
@@ -385,7 +474,55 @@ export const cssTheme = `
     background-size: 60px 60px;
   }
 
-  /* ── Price Animations ──────────────────────────────────── */
+  /* -- Chromatic Hover (RGB channel split) ---------------------------- */
+
+  .chromatic-hover {
+    position: relative;
+    transition: all 0.2s ease;
+  }
+  .chromatic-hover:hover {
+    text-shadow:
+      -1px 0 rgba(237, 0, 217, 0.6),
+      1px 0 rgba(93, 244, 254, 0.6);
+  }
+
+  /* -- Data Flicker Animation ---------------------------------------- */
+
+  @keyframes data-flicker {
+    0% { opacity: 1; }
+    5% { opacity: 0.4; letter-spacing: 2px; }
+    10% { opacity: 0.8; content: '##.##'; }
+    15% { opacity: 1; }
+    100% { opacity: 1; }
+  }
+  .data-flicker {
+    animation: data-flicker 0.6s ease-out;
+  }
+
+  /* -- Boot Line Animation ------------------------------------------- */
+
+  @keyframes boot-line-fill {
+    0% { width: 0; }
+    100% { width: 100%; }
+  }
+  .boot-line {
+    position: relative;
+    height: 2px;
+    background: var(--cold-gray);
+    overflow: hidden;
+  }
+  .boot-line::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: var(--cp2077-yellow);
+    box-shadow: 0 0 8px var(--cp2077-yellow-glow);
+    animation: boot-line-fill 1.5s ease-out forwards;
+  }
+
+  /* -- Price Animations ---------------------------------------------- */
 
   .profit { color: var(--profit); }
   .loss { color: var(--loss); }
@@ -442,13 +579,13 @@ export const cssTheme = `
   .hud-corner::before { top: 0; left: 0; }
   .hud-corner::after { bottom: 0; right: 0; }
 
-  /* ── Confidence Levels ─────────────────────────────────── */
+  /* -- Confidence Levels --------------------------------------------- */
 
   .confidence-high { color: ${theme.colors.confidenceHigh}; }
   .confidence-medium { color: ${theme.colors.confidenceMedium}; }
   .confidence-low { color: ${theme.colors.confidenceLow}; }
 
-  /* ── Chart Styles ──────────────────────────────────────── */
+  /* -- Chart Styles -------------------------------------------------- */
 
   --chart-bg: ${theme.colors.chartBackground};
   --chart-grid: ${theme.colors.chartGridLines};
@@ -472,7 +609,7 @@ export const cssTheme = `
                 0 0 4px rgba(93, 244, 254, 0.08);
   }
 
-  /* ── Glow Utilities ────────────────────────────────────── */
+  /* -- Glow Utilities ------------------------------------------------ */
 
   .glow-yellow {
     box-shadow: 0 0 8px rgba(252, 238, 9, 0.4),
@@ -511,7 +648,7 @@ export const cssTheme = `
     text-shadow: 0 0 6px rgba(237, 0, 217, 0.5);
   }
 
-  /* ── Scrollbar (CP2077 thin style) ─────────────────────── */
+  /* -- Scrollbar (CP2077 thin style — cold gray) --------------------- */
 
   ::-webkit-scrollbar {
     width: 4px;
@@ -521,7 +658,7 @@ export const cssTheme = `
     background: var(--bg-dark);
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--cp2077-yellow-dim);
+    background: var(--cold-gray);
     border-radius: 2px;
   }
   ::-webkit-scrollbar-thumb:hover {

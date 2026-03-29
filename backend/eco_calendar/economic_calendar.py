@@ -1,6 +1,24 @@
 """
-NeonTrade AI - Economic Calendar
-Fetches major economic events to avoid trading during high-impact news.
+NeonTrade AI - Economic Calendar (DEPRECATED)
+
+DEPRECATION NOTICE:
+    This module is a legacy implementation superseded by
+    ``core.news_filter.NewsFilter``, which is the authoritative
+    implementation for economic calendar / news filtering.
+
+    NewsFilter provides:
+      - Multiple data sources with priority fallback (FairEconomy, Trading
+        Economics, known recurring events)
+      - Per-trading-style danger windows (scalping / day trading / swing)
+      - Critical event keyword detection
+      - NewsAPI headline integration for the frontend
+
+    New code should import from ``core.news_filter`` instead.
+    This file is kept only for backward compatibility and will be
+    removed in a future release.
+
+Original purpose:
+    Fetches major economic events to avoid trading during high-impact news.
 
 From Trading Plan:
 - Don't execute any trade before important news

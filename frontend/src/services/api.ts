@@ -50,6 +50,9 @@ export function setBackendUrl(url: string): void {
   }
   API_URL = clean;
   WS_URL = clean.replace('http', 'ws') + '/ws';
+  // Reconnect WebSocket to new URL
+  wsManager.disconnect();
+  wsManager.connect();
 }
 
 /**
@@ -61,6 +64,9 @@ export function resetBackendUrl(): void {
   }
   API_URL = DEFAULT_URL;
   WS_URL = DEFAULT_URL.replace('http', 'ws') + '/ws';
+  // Reconnect WebSocket to default URL
+  wsManager.disconnect();
+  wsManager.connect();
 }
 
 // ── API Key for authenticated requests ──────────────────────────
@@ -109,7 +115,12 @@ export function authFetch(input: RequestInfo, init?: RequestInit): Promise<Respo
     }
   }
   if (key) headers['X-API-Key'] = key;
-  return fetch(input, { ...init, headers });
+
+  // Add 15s timeout to prevent indefinite hangs
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  return fetch(input, { ...init, headers, signal: controller.signal })
+    .finally(() => clearTimeout(timeout));
 }
 
 // ── Request timeout ──────────────────────────────────────────────

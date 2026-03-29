@@ -74,7 +74,7 @@ export default function ManualModeScreen() {
 
   useEffect(() => {
     fetchSetups();
-    const interval = setInterval(fetchSetups, 3000);
+    const interval = setInterval(fetchSetups, 10000);
     return () => clearInterval(interval);
   }, [fetchSetups]);
 

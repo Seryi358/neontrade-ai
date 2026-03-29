@@ -184,11 +184,8 @@ def _is_at_key_level(analysis: AnalysisResult, direction: str) -> Tuple[bool, fl
     supports = analysis.key_levels.get("supports", [])
     resistances = analysis.key_levels.get("resistances", [])
 
-    # Usamos la EMA H1 50 como proxy del precio actual si esta disponible
-    current_price = _ema_val(analysis, "EMA_H1_50")
-    if current_price is None:
-        # Fallback: usar EMA M5 5
-        current_price = _ema_val(analysis, "EMA_M5_5")
+    # Use actual current price first, then fall back to EMAs
+    current_price = _get_current_price_proxy(analysis)
     if current_price is None:
         return False, 0.0, "No se puede determinar precio actual"
 
@@ -304,8 +301,11 @@ def _check_ema_pullback(analysis: AnalysisResult, ema_key: str, direction: str) 
 
 
 def _get_current_price_proxy(analysis: AnalysisResult) -> Optional[float]:
-    """Mejor estimacion del precio actual usando EMAs de marcos bajos."""
-    # M2 EMAs not available (broker API doesn't support M2 candles), using M5 instead
+    """Best estimate of current price. Prefers actual price over EMA proxies."""
+    # 1. Use actual current price from market_analyzer (M5 latest close)
+    if analysis.current_price and analysis.current_price > 0:
+        return analysis.current_price
+    # 2. Fall back to shortest-period EMAs as proxy
     for key in ("EMA_M5_2", "EMA_M5_5", "EMA_M5_20", "EMA_H1_50"):
         v = _ema_val(analysis, key)
         if v is not None:
@@ -1555,7 +1555,7 @@ class BlueStrategy(BaseStrategy):
         # Validar R:R minimo (config: min_rr_ratio para Blue)
         min_rr = settings.min_rr_ratio
         if variant == "BLUE_C":
-            min_rr = 2.0  # TradingLab: Blue C requires minimum 2:1 R:R
+            min_rr = 2.0  # App default: Blue C is most restrictive variant, higher R:R recommended
 
         risk = abs(entry_price - sl)
         reward = abs(tp1 - entry_price)

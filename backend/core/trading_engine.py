@@ -580,7 +580,7 @@ class TradingEngine:
         # Morning heartbeat email (proof of life)
         await self._maybe_send_morning_heartbeat(now)
 
-        # Daily summary: send at end of trading day (21:00 UTC) once
+        # Daily summary: send at end of trading day (22:00 UTC = trading_end_hour) once
         if now.hour == settings.trading_end_hour and now.minute < 10:
             if not hasattr(self, '_daily_summary_sent_date') or self._daily_summary_sent_date != now.date():
                 self._daily_summary_sent_date = now.date()

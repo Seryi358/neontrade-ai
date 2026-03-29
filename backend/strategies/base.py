@@ -208,27 +208,41 @@ def _is_at_key_level(analysis: AnalysisResult, direction: str) -> Tuple[bool, fl
 
 def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
     """
-    TradingLab RCC: Ruptura + Cierre + Confirmación.
-    Checks that the PREVIOUS completed M5 candle closed on the correct side of the EMA,
-    confirming the breakout (not just a wick through).
-    Returns True if RCC is confirmed.
+    TradingLab RCC: Ruptura + Cierre + Confirmación (3 steps).
+    1. RUPTURA: Price breaks through the level (EMA)
+    2. CIERRE: A candle CLOSES past the level (not just a wick)
+    3. CONFIRMACIÓN: The NEXT candle CONTINUES in the direction
+
+    We need at least 3 candles: breakout candle, close candle, confirmation candle.
+    The last completed candle ([-2]) must have closed past the EMA (step 2),
+    AND the current forming candle ([-1]) must be continuing in the same
+    direction (step 3 — "la siguiente vela continúa").
     """
     ema_val = _ema_val(analysis, ema_key)
     if ema_val is None:
         return True  # Can't check, don't block
 
     m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
-    if len(m5_candles) < 2:
+    if len(m5_candles) < 3:
         return True  # Not enough data, don't block
 
-    # The second-to-last candle is the last COMPLETED candle (confirmation candle)
-    prev_candle = m5_candles[-2]
-    prev_close = prev_candle["close"]
+    # Step 2 (CIERRE): Previous completed candle closed past the EMA
+    close_candle = m5_candles[-2]
+    close_price = close_candle["close"]
+
+    # Step 3 (CONFIRMACIÓN): Current candle continues in the direction
+    confirm_candle = m5_candles[-1]
+    confirm_open = confirm_candle["open"]
+    confirm_current = confirm_candle["close"]  # Current price of forming candle
 
     if direction == "BUY":
-        return prev_close > ema_val  # Closed above EMA = confirmed breakout
+        step2 = close_price > ema_val  # Closed above EMA
+        step3 = confirm_current > confirm_open  # Current candle is bullish (continuing up)
+        return step2 and step3
     else:
-        return prev_close < ema_val  # Closed below EMA = confirmed breakdown
+        step2 = close_price < ema_val  # Closed below EMA
+        step3 = confirm_current < confirm_open  # Current candle is bearish (continuing down)
+        return step2 and step3
 
 
 def _check_ema_break(analysis: AnalysisResult, ema_key: str, direction: str) -> Tuple[bool, str]:
@@ -1397,14 +1411,17 @@ class BlueStrategy(BaseStrategy):
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
 
         # TradingLab: EMA 8 Weekly trend filter
-        if not _check_weekly_ema8_filter(analysis, direction):
-            return None  # Don't trade against weekly trend
+        # BLUE operates in Wave 1-2 (early trend changes) where the weekly EMA
+        # may not have turned yet. Use confidence penalty, not hard block.
+        weekly_ema8_aligned = _check_weekly_ema8_filter(analysis, direction)
 
         entry_price = _get_current_price_proxy(analysis)
         if entry_price is None:
             return None
 
         confidence = 0.0
+        if not weekly_ema8_aligned:
+            confidence -= 15.0  # Penalty for trading against weekly EMA 8
         met: List[str] = []
         failed: List[str] = []
 

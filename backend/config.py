@@ -458,6 +458,21 @@ class Settings(BaseSettings):
         "SLP_USD", "SUPER_USD", "TOMO_USD", "TRB_USD", "UMA_USD",
     ]
 
+    # Currency Strength Indices (from mentorship: Watchlist para Forex)
+    # Alex: "Te recomiendo encarecidamente que tengas estos principales indices"
+    # Used to understand what's driving each pair (e.g., AUDCHF: is AUD weak or CHF strong?)
+    # NOT for trading — for analysis context (currency strength comparison)
+    currency_strength_indices: List[str] = [
+        "DXY",   # US Dollar Index
+        "EXY",   # Euro Index
+        "BXY",   # British Pound Index
+        "JXY",   # Japanese Yen Index
+        "AXY",   # Australian Dollar Index
+        "SXY",   # Swiss Franc Index
+        "CXY",   # Canadian Dollar Index
+        "NXY",   # New Zealand Dollar Index
+    ]
+
     # Market View — macro dashboard symbols (from mentorship course materials)
     # NOT for trading — for context analysis (inflation, interest rates, global indices)
     market_view_symbols: List[str] = [

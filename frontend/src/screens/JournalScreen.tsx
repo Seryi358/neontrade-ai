@@ -889,9 +889,11 @@ const styles = StyleSheet.create({
   // Cards
   card: {
     backgroundColor: theme.colors.backgroundCard,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.cp2077Yellow,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
   },

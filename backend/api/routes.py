@@ -2015,3 +2015,133 @@ async def mark_trade_discretionary(trade_id: str, req: DiscretionaryRequest):
     if not success:
         raise HTTPException(404, f"Trade {trade_id} not found")
     return {"status": "updated", "trade_id": trade_id, "is_discretionary": req.is_discretionary}
+
+
+# ── Crypto Market Cycle (Esp. Criptomonedas) ────────────────────────
+
+@router.get("/crypto/cycle")
+async def get_crypto_cycle():
+    """
+    Get crypto market cycle status: BTC dominance, halving phase, BMSB,
+    Pi Cycle, altcoin season, rotation phase.
+    From TradingLab Esp. Criptomonedas modules 6-8.
+    """
+    from main import engine
+    if engine is None:
+        raise HTTPException(503, "Engine not available")
+
+    # Get cycle data from the crypto cycle analyzer
+    crypto_analyzer = getattr(engine, '_crypto_cycle_analyzer', None)
+    if crypto_analyzer is None:
+        # Try to create one from the trading engine
+        try:
+            from core.crypto_cycle import CryptoCycleAnalyzer
+            crypto_analyzer = CryptoCycleAnalyzer(engine.broker)
+        except Exception as e:
+            return {
+                "error": f"Crypto cycle analyzer not available: {e}",
+                "btc_dominance": None,
+                "market_phase": "unknown",
+            }
+
+    try:
+        # Get latest scan results for BMSB/Pi Cycle data
+        bmsb_data = None
+        pi_cycle_data = None
+        for inst, result in engine.last_scan_results.items():
+            if "BTC" in inst:
+                bmsb_data = getattr(result, 'bmsb', None)
+                pi_cycle_data = getattr(result, 'pi_cycle', None)
+                break
+
+        cycle = await crypto_analyzer.get_cycle_status(
+            bmsb=bmsb_data,
+            pi_cycle=pi_cycle_data,
+        )
+
+        return {
+            "btc_dominance": cycle.btc_dominance,
+            "btc_dominance_trend": cycle.btc_dominance_trend,
+            "market_phase": cycle.market_phase,
+            "altcoin_season": cycle.altcoin_season,
+            "btc_eth_ratio": cycle.btc_eth_ratio,
+            "btc_eth_trend": cycle.btc_eth_trend,
+            "eth_outperforming_btc": cycle.eth_outperforming_btc,
+            "rotation_phase": cycle.rotation_phase,
+            "halving_phase": cycle.halving_phase,
+            "halving_phase_description": cycle.halving_phase_description,
+            "halving_sentiment": cycle.halving_sentiment,
+            "btc_rsi_14": cycle.btc_rsi_14,
+            "ema8_weekly_broken": cycle.ema8_weekly_broken,
+            "bmsb_status": cycle.bmsb_status,
+            "bmsb_consecutive_bearish_closes": cycle.bmsb_consecutive_bearish_closes,
+            "pi_cycle_status": cycle.pi_cycle_status,
+            "sma_d200_position": cycle.sma_d200_position,
+            "usdt_dominance_rising": cycle.usdt_dominance_rising,
+            "golden_cross": cycle.golden_cross,
+            "death_cross": cycle.death_cross,
+            "rsi_diagonal_bearish": cycle.rsi_diagonal_bearish,
+            "rsi_diagonal_bullish": cycle.rsi_diagonal_bullish,
+            "last_updated": cycle.last_updated,
+        }
+    except Exception as e:
+        logger.error(f"Crypto cycle endpoint error: {e}")
+        return {
+            "error": str(e),
+            "btc_dominance": None,
+            "market_phase": "unknown",
+        }
+
+
+@router.get("/crypto/indicators")
+async def get_crypto_indicators():
+    """
+    Get crypto-specific indicator values: BMSB, Pi Cycle, EMA 8 Weekly,
+    SMA 200 Daily, RSI 14 for BTC.
+    From TradingLab Esp. Criptomonedas Module 8.
+    """
+    from main import engine
+    if engine is None:
+        raise HTTPException(503, "Engine not available")
+
+    indicators = {
+        "bmsb": None,
+        "pi_cycle": None,
+        "ema8_weekly": None,
+        "sma200_daily": None,
+        "ema50_daily": None,
+        "rsi_14_daily": None,
+    }
+
+    # Search scan results for BTC data
+    for inst, result in engine.last_scan_results.items():
+        if "BTC" in inst:
+            indicators["bmsb"] = getattr(result, 'bmsb', None)
+            indicators["pi_cycle"] = getattr(result, 'pi_cycle', None)
+            indicators["ema8_weekly"] = getattr(result, 'ema_w8', None)
+            indicators["sma200_daily"] = getattr(result, 'sma_d200', None)
+            indicators["ema50_daily"] = result.ema_values.get("EMA_D_50")
+            indicators["rsi_14_daily"] = result.rsi_values.get("D")
+            break
+
+    return indicators
+
+
+@router.get("/crypto/allocation")
+async def get_crypto_allocation():
+    """
+    Get capital allocation breakdown per TradingLab Trading Plan.
+    80% trading (90% forex, 10% crypto), 20% investment.
+    """
+    from config import settings
+    return {
+        "trading_pct": settings.allocation_trading_pct,
+        "forex_pct": settings.allocation_forex_pct,
+        "crypto_pct": settings.allocation_crypto_pct,
+        "investment_pct": settings.allocation_investment_pct,
+        "investment_stocks_pct": settings.allocation_investment_stocks,
+        "investment_crypto_pct": settings.allocation_investment_crypto,
+        "crypto_default_strategy": settings.crypto_default_strategy,
+        "crypto_position_mgmt_style": settings.crypto_position_mgmt_style,
+        "memecoins_monitor_only": settings.memecoins_monitor_only,
+    }

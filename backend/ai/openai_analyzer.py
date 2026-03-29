@@ -345,7 +345,8 @@ NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequenti
 ═══════════════════════════════════════════════════════════════════
 
 Scalping Indicators (M5/M1):
-- MACD: zero-line crossovers for momentum shifts, histogram for acceleration/deceleration
+- MACD: zero-line crossovers for momentum shifts, MACD line direction for acceleration/deceleration
+  (TradingLab: use DEFAULT config, hide histogram and signal line, keep MACD line ONLY)
 - SMA 200 on H1: dynamic S/R level; price above = bullish bias, below = bearish bias
 - Volume: above-average volume confirms moves, low volume = suspect breakouts
 - MACD divergence on M5 = potential reversal signal for quick scalps
@@ -372,15 +373,41 @@ Scalping Position Management Methods:
 - Method 3 (Slow): Trail with EMA 50 on M5
 
 ═══════════════════════════════════════════════════════════════════
+             DAY TRADING INDICATOR GRID (TradingLab)
+═══════════════════════════════════════════════════════════════════
+
+MANDATORY indicator placement per timeframe (Day Trading):
+- Daily:  EMA 20 (white, small pullbacks), EMA 50 (red, trend changes), SMA 200 (blue, primary trend)
+- 4H:    EMA 50 (mandatory) + RSI 14
+- 1H:    EMA 50 (mandatory) + MACD (line only, no histogram)
+- 15min: Pivot Points (Traditional, P/S1/R1) + Volume + MACD + Time Zone
+- 5min:  EMA 50 (mandatory) + Volume + Pivot Points
+
+EMA ROLES (do NOT confuse):
+- EMA 20: Detects small discounts/pullbacks. Very dynamic. NOT used for trend changes.
+- EMA 50: 100% MANDATORY on ALL timeframes. Detects medium pullbacks and trend changes.
+- SMA 200: Detects large pullbacks. Above = bullish primary trend. Below = bearish.
+- EMAs are DYNAMIC support/resistance, NOT for crossover signals.
+
+═══════════════════════════════════════════════════════════════════
                     EMA MANAGEMENT
 ═══════════════════════════════════════════════════════════════════
 
-Day Trading Position Management:
-- EMA 50 on the management style timeframe (Largo Plazo (LP): Weekly/H4/M15, Corto Plazo (CP): H1/M15/M1, Corto Plazo Agresivo (CPA): M15/M2/30s)
-- SMA 200 (H1): major trend filter from Scalping Workshop
+Position Management EMA Grid (Forex):
+- LP (Long-term):  Swing=Daily EMA50, Day=H1 EMA50, Scalp=M15 EMA50
+- CP (Short-term):  Swing=H1 EMA50, Day=M5 EMA50, Scalp=M1 EMA50
+- CPA (Aggressive): Swing=M15 EMA50, Day=M2 EMA50, Scalp=M1 EMA50
+
+Position Management EMA Grid (Crypto — wider due to volatility):
+- LP (Long-term):  Swing=Weekly EMA50, Day=H4 EMA50, Scalp=M15 EMA50
+- CP (Short-term):  Swing=H1 EMA50, Day=M15 EMA50, Scalp=M1 EMA50
+- CPA (Aggressive): Swing=M15 EMA50, Day=M5 EMA50, Scalp=M1 EMA50
+
+SMA 200 (H1): Major trend filter from Scalping Workshop — heavily used by algorithmic traders.
 
 EMA Trailing Rules:
 - Trail SL using EMA 50 on the management style timeframe
+- Give space to the EMA — buffer slightly below/above, never place SL exactly on it
 - If price closes beyond EMA 50 against position → close immediately
 
 ═══════════════════════════════════════════════════════════════════
@@ -423,9 +450,9 @@ Minimum R:R Ratios:
 
 Drawdown Management (Fixed Levels Method):
 - Normal: 1.0% risk per trade
-- At -5% drawdown: reduce to 0.75% risk per trade
-- At -7.5% drawdown: reduce to 0.50% risk per trade
-- At -10% drawdown: reduce to 0.25% risk per trade
+- Mentorship reference levels: -5% -> 0.75%, -7.5% -> 0.50%, -10% -> 0.25%
+- Trading Plan PDF calculated levels (4 trades * 1.03% avg loss): -4.12% -> 0.75%, -6.18% -> 0.50%, -8.23% -> 0.25%
+- App uses the PDF calculated levels as they are more precise; both are valid approaches
 
 Delta Risk Algorithm (Winning Streaks):
 - Parameter: 0.60 (range 0.20-0.90, higher = more aggressive)
@@ -452,7 +479,12 @@ Phase 2 — SL_MOVED:
   This locks in partial protection without being at BE yet
 
 Phase 3 — BREAK_EVEN (BE):
-  Triggered when price reaches 50% of the distance to TP1 (Trading Plan: "por la mitad del beneficio hasta el TP1")
+  Default method (risk_distance): Triggered when profit >= 1x risk distance.
+    Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"
+    For 1% risk, this means BE at 1% profit (R:R 1:1 point).
+  Alternative method (pct_to_tp1): Triggered at 50% of distance to TP1.
+    Trading Plan PDF: "por la mitad del beneficio hasta el TP1"
+    For 2:1 R:R at 1% risk, both methods coincide (1% profit = 50% to TP1).
   SL moved to entry price (zero-risk position)
   RULE: No new trades on the same or correlated pairs until BE is set on existing trade
 
@@ -478,10 +510,10 @@ Entry Types:
 - Stop entry: ONLY when you cannot monitor AND all timeframes fully align
 
 Trading Hours:
-- London session: 07:00-16:00 UTC (primary)
-- New York session: 12:00-21:00 UTC (secondary, overlap 12:00-16:00 is best)
+- London session: 08:00-17:00 UTC (primary)
+- New York session: 13:00-22:00 UTC (secondary, overlap 13:00-17:00 is best)
 - AVOID: Asian session for most pairs (low volatility, unpredictable moves)
-- BEST: London-NY overlap (12:00-16:00 UTC) — highest liquidity and volume
+- BEST: London-NY overlap (13:00-17:00 UTC) — highest liquidity and volume
 
 Friday Close Rule:
 - Close ALL open positions before Friday 20:00 UTC

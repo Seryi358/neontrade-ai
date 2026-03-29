@@ -50,6 +50,7 @@ import ManualModeScreen from './src/screens/ManualModeScreen';
 import WatchlistScreen from './src/screens/WatchlistScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import JournalScreen from './src/screens/JournalScreen';
+import CryptoScreen from './src/screens/CryptoScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -100,18 +101,23 @@ export default function App() {
           headerShown: false,
           tabBarStyle: {
             backgroundColor: theme.colors.backgroundDark,
-            borderTopColor: theme.colors.border,
+            borderTopColor: theme.colors.cp2077YellowDim,
             borderTopWidth: 1,
-            height: 65,
-            paddingBottom: 8,
+            height: 60,
+            paddingBottom: 6,
             paddingTop: 4,
+            elevation: 12,
+            shadowColor: theme.colors.cp2077Yellow,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
           },
           tabBarActiveTintColor: theme.colors.cp2077Yellow,
           tabBarInactiveTintColor: theme.colors.textMuted,
           tabBarLabelStyle: {
             fontFamily: 'Rajdhani-SemiBold',
-            fontSize: 9,
-            letterSpacing: 2,
+            fontSize: 8,
+            letterSpacing: 1,
             textTransform: 'uppercase',
           },
         }}
@@ -163,6 +169,16 @@ export default function App() {
             tabBarLabel: 'WATCH',
             tabBarIcon: ({ focused }) => (
               <TabIcon label="◉" focused={focused} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Crypto"
+          component={CryptoScreen}
+          options={{
+            tabBarLabel: 'CRYPTO',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon label="₿" focused={focused} />
             ),
           }}
         />

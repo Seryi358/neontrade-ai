@@ -1247,15 +1247,17 @@ const styles = StyleSheet.create({
   // Cards
   card: {
     backgroundColor: theme.colors.backgroundCard,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.cp2077Yellow,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
   },
   cardTitle: {
     fontFamily: theme.fonts.heading,
-    fontSize: 11,
+    fontSize: 12,
     color: theme.colors.cp2077Yellow,
     letterSpacing: 3,
     marginBottom: theme.spacing.sm,

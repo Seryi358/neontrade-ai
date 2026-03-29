@@ -266,7 +266,7 @@ class Settings(BaseSettings):
     # Alex (experienced): 80% precision, 20% discretion.
     discretion_pct: float = 0.0  # 0% discretion for beginners
 
-    # ── Forex Watchlist (from FOREX.txt) ──────────────────────────
+    # ── Forex Watchlist (from mentorship course materials) ──────────────────────────
     # TradingLab focus: "mercado de Divisas (including indices and metals)"
     # Commodities are NOT the primary focus and should be avoided by beginners.
     # Exotics: USD exotics are better than EUR exotics (more volume, better
@@ -309,7 +309,7 @@ class Settings(BaseSettings):
         # Exotic USD (more volume = better pattern respect — Alex keeps these)
         "USD_CNH", "USD_CZK", "USD_HUF", "USD_MXN", "USD_NOK",
         "USD_PLN", "USD_SEK", "USD_SGD", "USD_TRY", "USD_ZAR",
-        # Exotic EUR (reduced — worse than USD exotics per Alex, but kept per FOREX.txt)
+        # Exotic EUR (reduced — worse than USD exotics per Alex, but kept per mentorship course materials)
         "EUR_CNH", "EUR_MXN", "EUR_NOK", "EUR_SGD", "EUR_ZAR",
         # Precious metals (beyond Gold/Silver)
         "XPD_USD", "XPT_USD",
@@ -318,31 +318,31 @@ class Settings(BaseSettings):
     # Commodities — NOT recommended by TradingLab for primary trading.
     # Available only for backtesting/analysis.
     commodities_watchlist: List[str] = [
-        # Energy (COMMODITIES.txt: CL, QM, HO, NG, QG, EH, RB)
+        # Energy (from mentorship course materials: CL, QM, HO, NG, QG, EH, RB)
         "BCO_USD", "WTICO_USD", "NATGAS_USD",
-        # Agricultural (COMMODITIES.txt: ZW, KE, ZC, ZO, ZS, ZL, ZM, ZR, SB, KC, CC, LBS + livestock)
+        # Agricultural (from mentorship course materials: ZW, KE, ZC, ZO, ZS, ZL, ZM, ZR, SB, KC, CC, LBS + livestock)
         # Oanda CFDs available:
         "WHEAT_USD", "CORN_USD", "SOYBN_USD", "SUGAR_USD",
         # Not available as Oanda CFDs: oats (ZO), soybean oil (ZL), soybean meal (ZM),
         # rough rice (ZR), KC wheat (KE), cocoa (CC), coffee (KC), lumber (LBS),
         # lean hogs (HE), live cattle (LE), feeder cattle (GF), milk (DC)
-        # Metals (COMMODITIES.txt: PL, PA, SI, GC, HG)
+        # Metals (from mentorship course materials: PL, PA, SI, GC, HG)
         "XAU_USD", "XAG_USD", "XPT_USD", "XPD_USD", "XCU_USD",
     ]
 
-    # Indices — from FOREX.txt (US500, SX5E, US2000)
+    # Indices (from mentorship course materials: US500, SX5E, US2000)
     indices_watchlist: List[str] = [
         "US30_USD", "US2000_USD", "NAS100_USD", "SPX500_USD",
         "DE30_EUR", "FR40_EUR", "UK100_GBP",
         "JP225_USD", "AU200_AUD", "HK33_HKD", "CN50_USD",
     ]
 
-    # Equities — US sector ETFs for swing trading (from EQUITIES_IND.txt)
+    # Equities — US sector ETFs for swing trading (from mentorship course materials)
     # TradingLab: use sector ETFs to detect opportunities, then drill into holdings.
     # Alex: "yo enfoco el trading en acciones como swing trading en acciones de EEUU"
     # Available only via IBKR (not Oanda/Capital.com).
     equities_watchlist: List[str] = [
-        # Innovation (ARK) — EQUITIES_IND.txt
+        # Innovation (ARK) — from mentorship course materials
         "ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX", "PRNT", "IZRL",
         # Airlines
         "JETS", "AAL", "DAL", "UAL",
@@ -457,20 +457,20 @@ class Settings(BaseSettings):
         "SLP_USD", "SUPER_USD", "TOMO_USD", "TRB_USD", "UMA_USD",
     ]
 
-    # Market View — macro dashboard symbols (from MARKET_VIEW.txt)
+    # Market View — macro dashboard symbols (from mentorship course materials)
     # NOT for trading — for context analysis (inflation, interest rates, global indices)
     market_view_symbols: List[str] = [
-        # Europe indices (MARKET_VIEW.txt: DE30, SX5E, FR40, ESP35, ITA40, UK100)
+        # Europe indices (from mentorship course materials: DE30, SX5E, FR40, ESP35, ITA40, UK100)
         "DE30_EUR", "EU50_EUR", "FR40_EUR", "ESP35_EUR", "UK100_GBP",
-        # US indices (MARKET_VIEW.txt: US30, US2000, NAS100, US500, NDQ, SPX, DJI, RTY)
+        # US indices (from mentorship course materials: US30, US2000, NAS100, US500, NDQ, SPX, DJI, RTY)
         "US30_USD", "US2000_USD", "NAS100_USD", "SPX500_USD",
-        # World indices (MARKET_VIEW.txt: CN50, HK33, IX0118, JP225, AU200, NZ50G)
+        # World indices (from mentorship course materials: CN50, HK33, IX0118, JP225, AU200, NZ50G)
         "CN50_USD", "HK33_HKD", "JP225_USD", "AU200_AUD",
-        # Metals (MARKET_VIEW.txt: XAUXAG ratio, XAUUSD, XAGUSD, XPDUSD, XPTUSD, XCUUSD)
+        # Metals (from mentorship course materials: XAUXAG ratio, XAUUSD, XAGUSD, XPDUSD, XPTUSD, XCUUSD)
         "XAU_USD", "XAG_USD", "XPD_USD", "XPT_USD", "XCU_USD",
-        # Energy / Commodities (MARKET_VIEW.txt: NATGAS, NG, SOYBN, WHEAT, KC, UKOIL, WTICO)
+        # Energy / Commodities (from mentorship course materials: NATGAS, NG, SOYBN, WHEAT, KC, UKOIL, WTICO)
         "NATGAS_USD", "BCO_USD", "WTICO_USD", "SOYBN_USD", "WHEAT_USD",
-        # Crypto (macro view — BTC + ETH only, per MARKET_VIEW.txt)
+        # Crypto (macro view — BTC + ETH only, per mentorship course materials)
         "BTC_USD", "ETH_USD",
     ]
 

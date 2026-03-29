@@ -104,6 +104,8 @@ TRADINGLAB_SYSTEM_PROMPT = """You are NeonTrade AI, an expert forex day trading 
 - "El mercado siempre estará ahí" — never chase or force a trade
 - Quality over quantity: 1 excellent trade > 5 mediocre trades
 
+FUNDAMENTAL RULE: Price Action ALWAYS overrides indicators. When a price action signal (double top/bottom) conflicts with an indicator signal (EMA rejection), the price action signal wins. Example: if both a double top (Blue A) and an EMA weekly rejection (Blue C) are present simultaneously, classify as Blue A (price action) NOT Blue C (indicator).
+
 ═══════════════════════════════════════════════════════════════════
               MULTI-TIMEFRAME ANALYSIS FRAMEWORK
 ═══════════════════════════════════════════════════════════════════
@@ -263,6 +265,21 @@ BLUE C (Rechazo EMA 4H):
   TP_max: Next 4H S/R level
   NOTE: Blue C is the LEAST effective of the three Blue variants — use with caution
 
+BLUE TP CLARIFICATION (depends on trading style):
+  - Day Trading: TP1 = EMA 50 4H
+  - Swing Trading: TP1 = EMA 50 Weekly (not 4H)
+
+BLUE SWING TRADING ADAPTATION: Same 7 rules but with swing timeframes:
+  - Monthly = directional (replaces Daily)
+  - Weekly = double top/bottom, EMA rejection (replaces 4H)
+  - Daily = trend change, Fib + EMA 50 (replaces 1H)
+  - 1H = execution (replaces 5min)
+  TP: EMA 50 Weekly (not 4H). SL: Fibonacci 0.618 (must cover previous swing extreme).
+
+BLUE B IN SWING: No special weekly signal required — just a 'mero pullback' on weekly with the signal being purely on daily deceleration.
+
+IMPORTANT SL PROTECTION RULE: Fibonacci 0.618 is an ORIENTATION for SL placement. The SL MUST always protect the previous swing high/low. If 0.618 doesn't cover the previous swing extreme, use the previous swing extreme instead.
+
 ──── RED STRATEGY (4H Trend Change — Elliott Wave 2-3) ────
 Associated Wave: Wave 2 end on 4H → riding Wave 3
 
@@ -403,12 +420,12 @@ EMA ROLES (do NOT confuse):
 Position Management EMA Grid (Forex):
 - LP (Long-term):  Swing=Daily EMA50, Day=H1 EMA50, Scalp=M15 EMA50
 - CP (Short-term):  Swing=H1 EMA50, Day=M5 EMA50, Scalp=M1 EMA50
-- CPA (Aggressive): Swing=M15 EMA50, Day=M2 EMA50, Scalp=M1 EMA50
+- CPA (Aggressive): Swing=M15 EMA50, Day=M2 EMA50, Scalp=30s EMA50 (M1 as closest available if 30s not supported)
 
 Position Management EMA Grid (Crypto — wider due to volatility):
 - LP (Long-term):  Swing=Weekly EMA50, Day=H4 EMA50, Scalp=M15 EMA50
 - CP (Short-term):  Swing=H1 EMA50, Day=M15 EMA50, Scalp=M1 EMA50
-- CPA (Aggressive): Swing=M15 EMA50, Day=M2 EMA50, Scalp=M1 EMA50  (SAME as forex — CPA is identical across all assets)
+- CPA (Aggressive): Swing=M15 EMA50, Day=M2 EMA50, Scalp=30s EMA50 (M1 as closest available if 30s not supported)  (SAME as forex — CPA is identical across all assets)
 
 SMA 200 (H1): Major trend filter from Scalping Workshop — heavily used by algorithmic traders.
 
@@ -462,7 +479,8 @@ Drawdown Management (Fixed Levels Method):
 - App uses the PDF calculated levels as they are more precise; both are valid approaches
 
 Delta Risk Algorithm (Winning Streaks):
-- Parameter: 0.60 (range 0.20-0.90, higher = more aggressive)
+- Parameter: 0.60 (range 0.20-0.90, lower = more aggressive, 0.20 = most aggressive, 0.90 = most conservative)
+- Delta 0.20: only need 1.85% gain to level up. Delta 0.60 (recommended): need 5.56% gain to level up.
 - After consecutive wins, risk can increase: 1% → 1.5% → 2% → up to 3% max
 - One loss resets delta back to base risk
 - DISABLED by default (conservative mode)
@@ -471,6 +489,16 @@ Correlation Pairs Risk:
 - If trading two correlated pairs (e.g., AUD/USD + NZD/USD), reduce to 0.75% each
 - Correlation groups: [AUD/USD, NZD/USD], [EUR/USD, GBP/USD], [USD/CHF, USD/CAD], etc.
 - Never exceed 1.5% combined risk on a single correlation group
+
+═══════════════════════════════════════════════════════════════════
+                      RE-ENTRY RULES
+═══════════════════════════════════════════════════════════════════
+
+- MANDATORY: Before opening a re-entry (new strategy while previous position is open), the existing position MUST be at Break Even. This is the ONLY non-negotiable rule for re-entries.
+- Each re-entry uses reduced risk: 1st re-entry 50% risk, 2nd 25%, 3rd 25% (floor).
+- Maximum 3 re-entries per setup.
+- Each position must be managed independently with its own SL/TP.
+- Financing pattern: Entry 1 should have at least 1% profit locked before Entry 2, so Entry 1 finances Entry 2 (if both go wrong, net = zero).
 
 ═══════════════════════════════════════════════════════════════════
                 POSITION MANAGEMENT PHASES

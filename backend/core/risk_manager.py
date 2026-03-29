@@ -15,7 +15,8 @@ Rules:
 Drawdown Management (ch18.7):
 - Fixed 1%: always use base risk
 - Variable: adjust based on win rate
-- Fixed levels: 1% -> 0.75% at -5% DD -> 0.50% at -7.5% DD -> 0.25% at -10% DD
+- Fixed levels (Trading Plan PDF calc): 1% -> 0.75% at -4.12% DD -> 0.50% at -6.18% DD -> 0.25% at -8.23% DD
+  (Mentorship round numbers: -5% -> 0.75%, -7.5% -> 0.50%, -10% -> 0.25%)
 
 Delta Risk Algorithm (ch18.8):
 - Increase risk during winning streaks

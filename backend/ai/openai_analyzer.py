@@ -322,7 +322,7 @@ NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequenti
 
   7 Sequential Steps:
   Step 1 (Trend): Identify the trend on the highest timeframe (Weekly for swing, 4H for day trading)
-  Step 2 (Breakout): Confirm breakout on the structure timeframe (Daily for swing, 1H for day trading)
+  Step 2 (Pattern): The weekly correction forms a recognizable pattern on the next lower timeframe (Daily for swing, 1H for day) — wedge, triangle, flag, channel
   Step 3 (Pullback): Wait for pullback on the intermediate timeframe
   Step 4 (Pattern): Identify continuation pattern (flag, pennant, triangle, wedge)
   Step 5 (Diagonal): Draw diagonal/trendline on the pullback pattern
@@ -546,7 +546,8 @@ GREEN is the ONLY valid strategy for crypto:
 
 BMSB - Bull Market Support Band (Crypto Module 8):
 - SMA 20 + EMA 21 on the WEEKLY chart
-- Requires a weekly CLOSE (not intraday) to confirm signals
+- Requires a weekly CLOSE below BMSB PLUS confirmation (next weekly close also below) to confirm bearish
+- A single wick below without closing does NOT count — must be a candle body close
 - Price above both = bull market intact (bullish)
 - Price below both = bull market support lost (bearish)
 - During bull runs, BMSB acts as dynamic support on pullbacks
@@ -554,7 +555,8 @@ BMSB - Bull Market Support Band (Crypto Module 8):
 Pi Cycle Top/Bottom Indicator:
 - Near top: SMA 111 approaching 2x SMA 350 cross (historically marks cycle tops)
 - Near bottom: SMA 150 approaching SMA 471 cross (historically marks cycle bottoms)
-- Use as macro confirmation, NOT as a timing tool
+- Use as an ALERT signal that triggers deeper analysis with other indicators (RSI 14, BMSB)
+- Do NOT use as standalone buy/sell signal — combine with other confirmations
 
 EMA 8 Weekly Close:
 - If BTC weekly candle CLOSES below EMA 8, it signals potential trend weakness

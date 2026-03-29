@@ -117,9 +117,10 @@ _EMA_TIMEFRAME_GRID_CRYPTO: Dict[tuple, str] = {
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",
     (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
-    # CPA (Short-term Aggressive): same as forex — Swing=M15, Day=M2 (M5), Scalp=30s (M1)
+    # CPA (Short-term Aggressive): SAME as forex — Swing=M15, Day=M2, Scalp=M1
+    # Mentorship: "CPA is the same across all asset classes"
     (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
-    (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M5_50",
+    (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M2_50",
     (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M1_50",
 }
 

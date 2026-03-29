@@ -3478,15 +3478,11 @@ class GreenStrategy(BaseStrategy):
                 if any(k in ptype.lower() for k in ("diagonal", "wedge", "triangle", "channel", "trendline")):
                     has_diagonal = True
                     break
-        # Also check for structure break on 1H as proxy for diagonal break
+        # TradingLab: "Si no hay diagonal en una hora, no hay trade. Esto no es negociable."
+        # BOS/CHOCH is NOT a substitute for a diagonal pattern per the mentorship.
+        # A diagonal/wedge/triangle/channel/trendline MUST be present.
         if not has_diagonal:
-            structure_breaks = getattr(analysis, 'structure_breaks', [])
-            for sb in structure_breaks:
-                if isinstance(sb, dict) and sb.get("type") in ("BOS", "CHOCH"):
-                    has_diagonal = True
-                    break
-        if not has_diagonal:
-            failed.append("Green REQUIERE diagonal en 1H (non-negotiable)")
+            failed.append("Green REQUIERE diagonal en 1H (non-negotiable) — sin patron diagonal, cuña, triangulo o canal")
             return None
 
         # --- Paso 4: Cambio de tendencia en 1H al final del patron ---

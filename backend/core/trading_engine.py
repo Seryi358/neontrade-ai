@@ -242,7 +242,7 @@ class TradingEngine:
         #   Reentry 3: 25% of normal risk (minimum floor)
         # Alex: "necesitas 6 meses de experiencia antes de reentrar"
         self._reentry_candidates: Dict[str, Dict] = {}
-        self._max_reentries_per_setup: int = 3
+        self._max_reentries_per_setup: int = settings.max_reentries_per_setup
 
         # Daily activity counters (reset each day) — proves the app was alive
         self._daily_scan_count: int = 0
@@ -1199,17 +1199,17 @@ class TradingEngine:
                 setup = await self._detect_setup(analysis)
                 if setup:
                     # Check if this is a reentry opportunity
-                    # TradingLab progressive risk reduction:
-                    #   Reentry 1: 50% risk (1% -> 0.5%)
-                    #   Reentry 2: 25% risk (1% -> 0.25%)
-                    #   Reentry 3: 25% risk (floor)
+                    # TradingLab: re-entry risk is CONFIGURABLE per trader's plan.
+                    # Defaults: Reentry 1=50%, Reentry 2=25%, Reentry 3+=25% of normal risk.
                     reentry = self._reentry_candidates.get(instrument)
                     if reentry and setup.direction == reentry.get("direction"):
                         reentry_count = reentry.get("count", 0) + 1
                         if reentry_count == 1:
-                            risk_multiplier = 0.50
+                            risk_multiplier = settings.reentry_risk_1
+                        elif reentry_count == 2:
+                            risk_multiplier = settings.reentry_risk_2
                         else:
-                            risk_multiplier = 0.25  # Reentry 2+ = minimum risk
+                            risk_multiplier = settings.reentry_risk_3
                         setup.risk_percent *= risk_multiplier
                         setup.units = int(setup.units * risk_multiplier) or (1 if setup.units > 0 else -1)
                         logger.info(

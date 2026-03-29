@@ -131,6 +131,14 @@ class Settings(BaseSettings):
     move_sl_to_be_pct_to_tp1: float = 0.50  # Only used when be_trigger_method="pct_to_tp1"
 
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
+
+    # Re-entry risk reduction (configurable per trader's plan)
+    # Mentorship: "Cada uno pone sus normas" — these are DEFAULTS, not hard rules.
+    # Alex uses 0.5% and 0.25% as examples but says the trader defines their own plan.
+    max_reentries_per_setup: int = 3       # Max re-entries per setup (0 = disabled)
+    reentry_risk_1: float = 0.50           # Reentry 1: 50% of normal risk (e.g., 1% -> 0.5%)
+    reentry_risk_2: float = 0.25           # Reentry 2: 25% of normal risk (e.g., 1% -> 0.25%)
+    reentry_risk_3: float = 0.25           # Reentry 3+: 25% of normal risk (floor)
     partial_taking: bool = False      # Alex does NOT take partials — prefers quick exit at TP1
     # Partial profit taking: Alex personally doesn't use it, but the mentorship
     # teaches it as optional and the CPA section recommends partial closes at

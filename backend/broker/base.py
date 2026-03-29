@@ -146,6 +146,23 @@ class BaseBroker(ABC):
         """Place a limit order at a specific price."""
         pass
 
+    @abstractmethod
+    async def place_stop_order(
+        self,
+        instrument: str,
+        units: float,
+        stop_price: float,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+    ) -> OrderResult:
+        """Place a stop order (pending order triggered at stop_price).
+        units > 0 = BUY stop, units < 0 = SELL stop."""
+        pass
+
+    async def warm_epic_cache(self, instruments: List[str]):
+        """Pre-cache instrument metadata. Override for brokers that need it."""
+        pass  # Default no-op, Capital.com overrides
+
     # ── Trade Management ─────────────────────────────────────────
 
     @abstractmethod

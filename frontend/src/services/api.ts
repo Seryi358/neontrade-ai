@@ -285,6 +285,63 @@ export const api = {
     apiPut<any>(`/api/v1/journal/trades/${tradeId}/discretionary`, {
       is_discretionary: isDiscretionary, discretionary_notes: notes,
     }),
+
+  // Missed Trades
+  getMissedTrades: (limit = 50, offset = 0) =>
+    apiGet<any>(`/api/v1/missed-trades?limit=${limit}&offset=${offset}`),
+  getMissedTradeStats: () => apiGet<any>('/api/v1/missed-trades/stats'),
+
+  // Risk Management
+  getRiskConfig: () => apiGet<any>('/api/v1/risk-config'),
+  updateRiskConfig: (data: any) => apiPut<any>('/api/v1/risk-config', data),
+  getRiskStatus: () => apiGet<any>('/api/v1/risk-status'),
+
+  // Equity
+  getEquityCurve: () => apiGet<any>('/api/v1/equity-curve'),
+
+  // Alerts
+  getAlertConfig: () => apiGet<any>('/api/v1/alerts/config'),
+  updateAlertConfig: (data: any) => apiPut<any>('/api/v1/alerts/config', data),
+  testAlert: (channel: string) => apiPost<any>(`/api/v1/alerts/test/${channel}`),
+
+  // Crypto
+  getCryptoIndicators: () => apiGet<any>('/api/v1/crypto/indicators'),
+
+  // Scalping
+  getScalpingStatus: () => apiGet<any>('/api/v1/scalping/status'),
+  toggleScalping: (enabled: boolean) => apiPost<any>('/api/v1/scalping/toggle', { enabled }),
+
+  // Funded Account
+  getFundedStatus: () => apiGet<any>('/api/v1/funded/status'),
+  toggleFunded: (enabled: boolean) => apiPost<any>('/api/v1/funded/toggle', { enabled }),
+
+  // Calendar & News
+  getCalendar: () => apiGet<any>('/api/v1/calendar'),
+  getNews: () => apiGet<any>('/api/v1/news'),
+
+  // Profiles
+  getProfiles: () => apiGet<any>('/api/v1/profiles'),
+  applyProfile: (name: string) => apiPost<any>('/api/v1/profiles/apply', { profile: name }),
+
+  // Journal
+  getJournalStats: () => apiGet<any>('/api/v1/journal/stats'),
+  getJournalTrades: (limit = 50, offset = 0) =>
+    apiGet<any>(`/api/v1/journal/trades?limit=${limit}&offset=${offset}`),
+  updateEmotionalNotes: (tradeId: string, data: any) =>
+    apiPut<any>(`/api/v1/journal/trades/${tradeId}/emotional-notes`, data),
+  updateASR: (tradeId: string, data: any) =>
+    apiPut<any>(`/api/v1/journal/trades/${tradeId}/asr`, data),
+  getASRStats: () => apiGet<any>('/api/v1/journal/asr-stats'),
+
+  // Backtest
+  runBacktest: (config: any) => apiPost<any>('/api/v1/backtest', config),
+
+  // Daily Activity
+  getDailyActivity: () => apiGet<any>('/api/v1/daily-activity'),
+
+  // Strategies Config
+  getStrategiesConfig: () => apiGet<any>('/api/v1/strategies/config'),
+  updateStrategiesConfig: (data: any) => apiPut<any>('/api/v1/strategies/config', data),
 };
 
 // ── Shared Constants ─────────────────────────────────────────────

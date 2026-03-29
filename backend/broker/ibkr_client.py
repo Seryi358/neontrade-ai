@@ -710,6 +710,95 @@ class IBKRClient(BaseBroker):
         except httpx.HTTPStatusError as e:
             return OrderResult(success=False, units=units, error=str(e))
 
+    async def place_stop_order(
+        self,
+        instrument: str,
+        units: float,
+        stop_price: float,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+    ) -> OrderResult:
+        """Place a stop order (pending order triggered at stop_price).
+        units > 0 = BUY stop, units < 0 = SELL stop.
+
+        IBKR REST API supports STP (stop) orders via /iserver/account/{acctId}/orders.
+        """
+        await self._ensure_account_id()
+        conid = await self._resolve_conid(instrument)
+
+        side = "BUY" if units > 0 else "SELL"
+        quantity = abs(units)
+
+        orders = [{
+            "acctId": self._account_id,
+            "conid": conid,
+            "orderType": "STP",
+            "side": side,
+            "quantity": quantity,
+            "price": stop_price,
+            "tif": "GTC",
+        }]
+
+        if stop_loss is not None:
+            sl_side = "SELL" if side == "BUY" else "BUY"
+            orders.append({
+                "acctId": self._account_id,
+                "conid": conid,
+                "orderType": "STP",
+                "side": sl_side,
+                "quantity": quantity,
+                "price": stop_loss,
+                "tif": "GTC",
+                "isClose": True,
+            })
+
+        if take_profit is not None:
+            tp_side = "SELL" if side == "BUY" else "BUY"
+            orders.append({
+                "acctId": self._account_id,
+                "conid": conid,
+                "orderType": "LMT",
+                "side": tp_side,
+                "quantity": quantity,
+                "price": take_profit,
+                "tif": "GTC",
+                "isClose": True,
+            })
+
+        try:
+            data = await self._post(
+                f"/iserver/account/{self._account_id}/orders",
+                json_data={"orders": orders},
+            )
+
+            if isinstance(data, list) and data:
+                first = data[0]
+                if first.get("id") and first.get("message"):
+                    confirm = await self._post(
+                        f"/iserver/reply/{first['id']}",
+                        json_data={"confirmed": True},
+                    )
+                    if isinstance(confirm, list) and confirm:
+                        first = confirm[0]
+
+                order_id = first.get("order_id") or first.get("orderId")
+                status = first.get("order_status", "")
+                logger.info(f"IBKR stop order: {instrument} {side} {quantity} @ {stop_price} | ID={order_id}")
+
+                return OrderResult(
+                    success=status not in ("Rejected", "Cancelled"),
+                    trade_id=str(order_id) if order_id else None,
+                    units=units,
+                    raw_response=first,
+                )
+
+            return OrderResult(success=False, units=units, error=str(data))
+
+        except httpx.HTTPStatusError as e:
+            error_msg = e.response.text if hasattr(e, 'response') else str(e)
+            logger.error(f"IBKR stop order failed: {error_msg}")
+            return OrderResult(success=False, units=units, error=error_msg)
+
     # ── Trade Management ─────────────────────────────────────
 
     async def get_open_trades(self) -> List[TradeInfo]:

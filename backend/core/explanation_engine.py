@@ -260,8 +260,35 @@ class ExplanationEngine:
                 "3. Cambio de tendencia confirmado en 1H (EMA 50 1H rota + máximos crecientes)",
                 "4. Pullback hasta EMA 50 1H + niveles de Fibonacci",
                 "5. Desaceleración y giro en 1H",
-                "6. Ruptura + cierre + confirmación en 5M",
+                "6. Rompe, Cierra, Confirma (RCC) en 5M",
                 "7. SL en Fibonacci 0.618 / mínimo anterior | TP en EMA 50 4H",
+            ],
+            "BLUE_A": [
+                "1. Soporte/resistencia en temporalidad directional (Daily/Monthly)",
+                "2. Ataque al nivel, desaceleración y giro",
+                "3. Doble suelo/techo forma ANTES de romper EMA 50 1H — variante más efectiva",
+                "4. Pullback a EMA 50 1H + niveles Fibonacci",
+                "5. Desaceleración y giro en 1H",
+                "6. Ejecución en 5M: Rompe, Cierra, Confirma (RCC) — prioridad: EMA 50 5M > diagonal > EMA 2M",
+                "7. SL: debajo del 0.618 Fibonacci / debajo del mínimo anterior. TP: EMA 50 4H (básico), extensiones 1.272/1.618 (Blue A)",
+            ],
+            "BLUE_B": [
+                "1. Soporte/resistencia en temporalidad directional (Daily/Monthly)",
+                "2. Ataque al nivel, desaceleración y giro",
+                "3. Impulso-pullback tras romper EMA 50 1H — sin patrón de reversión previo. Variante más común",
+                "4. Pullback a EMA 50 1H + niveles Fibonacci",
+                "5. Desaceleración y giro en 1H",
+                "6. Ejecución en 5M: Rompe, Cierra, Confirma (RCC) — prioridad: EMA 50 5M > diagonal > EMA 2M",
+                "7. SL: debajo del 0.618 Fibonacci / debajo del mínimo anterior. TP: EMA 50 4H (sin extensiones)",
+            ],
+            "BLUE_C": [
+                "1. Soporte/resistencia en temporalidad directional (Daily/Monthly)",
+                "2. Ataque al nivel, desaceleración y giro",
+                "3. Precio rechaza EMA 50 4H antes del pullback — variante menos efectiva. Requiere: HTF a favor + R:R mínimo 2:1",
+                "4. Pullback a EMA 50 1H + niveles Fibonacci (con condición: EMA 50 4H ya rechazó el precio)",
+                "5. Desaceleración y giro en 1H (confirmar que HTF sigue a favor)",
+                "6. Ejecución en 5M: Rompe, Cierra, Confirma (RCC) — prioridad: EMA 50 5M > diagonal > EMA 2M",
+                "7. SL: debajo del 0.618 Fibonacci / debajo del mínimo anterior. TP: EMA 50 4H (sin extensiones). R:R mínimo 2:1 obligatorio",
             ],
             "RED": [
                 "1. Nivel de soporte/resistencia en gráfico diario identificado",
@@ -269,7 +296,7 @@ class ExplanationEngine:
                 "3. Cambio de tendencia confirmado en 4H (EMA 50 4H rota)",
                 "4. Pullback en 1H hasta EMA 50 1H + EMA 50 4H + Fibonacci",
                 "5. Desaceleración en 1H",
-                "6. Ruptura + cierre + confirmación en 5M",
+                "6. Rompe, Cierra, Confirma (RCC) en 5M",
                 "7. SL debajo de EMA 50 4H | TP en máximo/mínimo anterior o extensión Fibonacci",
             ],
             "PINK": [
@@ -285,8 +312,8 @@ class ExplanationEngine:
                 "2. Impulso + pullback formado en 1H tras la Pink",
                 "3. Pullback hasta EMA 50 1H + Fibonacci",
                 "4. Desaceleración/giro (mismos criterios que Blue)",
-                "5. Ruptura + cierre + confirmación en 5M",
-                "6. SL encima del máximo anterior | TP en nivel de la Pink",
+                "5. Rompe, Cierra, Confirma (RCC) en 5M",
+                "6. SL más allá del extremo anterior (máximo para ventas, mínimo para compras) | TP en nivel de la Pink",
             ],
             "BLACK": [
                 "1. Nivel de soporte/resistencia diario (OBLIGATORIO)",
@@ -295,7 +322,7 @@ class ExplanationEngine:
                 "4. Verificar que EMA 50 1H NO actue como soporte/resistencia dinamica (si lo hace, no hay Black)",
                 "5. Sobrecompra clara en 4H (precio lejos de EMA 50 4H) + consolidación",
                 "6. Patrón de reversión en 1H (triángulo/cuña, NO canal). RSI divergencia",
-                "7. Esperar patrón completo + candlestick de reversión + ruptura en 5M",
+                "7. Esperar patrón completo + candlestick de reversión + Rompe, Cierra, Confirma (RCC) en 5M",
                 "8. SL encima del máximo anterior | TP en EMA 50 4H | R:R mínimo 2:1",
             ],
             "GREEN": [
@@ -303,7 +330,7 @@ class ExplanationEngine:
                 "2. Corrección semanal forma patrón en gráfico diario",
                 "3. Niveles de soporte: Fibonacci + S/R + medias móviles",
                 "4. Cambio de tendencia en 1H al final del patrón (diagonal/HCH)",
-                "5. Copiar nivel de 1H a 15M y ejecutar en primera ruptura + confirmación",
+                "5. Copiar nivel de 1H a 15M y ejecutar en primera Rompe, Cierra, Confirma (RCC)",
                 "6. SL debajo del mínimo de 1H (ajustado) | TP en máximo/mínimo diario anterior",
             ],
         }
@@ -366,6 +393,18 @@ class ExplanationEngine:
         if analysis.score >= 65 and convergence:
             return "RECOMENDACIÓN: Buena estructura pero sin señal de entrada clara aún. Monitorear."
         return "RECOMENDACIÓN: No se recomienda operar este par en este momento. Esperar mejor configuración."
+
+    def _build_position_management_explanation(self, signal) -> str:
+        """Explain position management per TradingLab phases."""
+        return (
+            "Gestión de posición (TradingLab):\n"
+            "1. INICIAL: SL en posición original\n"
+            "2. REDUCCIÓN 50%: Al primer movimiento favorable, reducir riesgo 50%\n"
+            "3. BREAK EVEN: Al alcanzar 1:1 R:R (1% beneficio), mover SL a entrada\n"
+            "4. TRAILING: Seguir precio con EMA 50 del timeframe de gestión\n"
+            "5. CPA: Cerca del TP o situaciones especiales (doble techo, noticias, viernes), "
+            "usar EMA más agresiva"
+        )
 
     def format_for_notification(self, explanation: StrategyExplanation) -> str:
         """Format a short version for push notifications."""

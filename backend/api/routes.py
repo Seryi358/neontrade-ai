@@ -2026,6 +2026,24 @@ async def mark_trade_discretionary(trade_id: str, req: DiscretionaryRequest):
 
 # ── Crypto Market Cycle (Esp. Criptomonedas) ────────────────────────
 
+@router.get("/missed-trades")
+async def get_missed_trades(limit: int = 50, offset: int = 0):
+    """Get missed trade opportunities."""
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        raise HTTPException(503, "Trade journal not initialized")
+    return engine.trade_journal.get_missed_trades(limit=limit, offset=offset)
+
+
+@router.get("/missed-trades/stats")
+async def get_missed_trade_stats():
+    """Get missed trade statistics."""
+    from main import engine
+    if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
+        raise HTTPException(503, "Trade journal not initialized")
+    return engine.trade_journal.get_missed_trade_stats()
+
+
 @router.get("/crypto/cycle")
 async def get_crypto_cycle():
     """

@@ -560,10 +560,10 @@ class MarketAnalyzer:
         if df.empty or len(df) < 50:
             return MarketCondition.NEUTRAL
 
-        # ── RSI for overbought/oversold ──
+        # ── RSI for overbought/oversold (Wilder's smoothing, matches TradingView) ──
         delta = df["close"].diff()
-        gain = delta.where(delta > 0, 0).rolling(14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        gain = delta.where(delta > 0, 0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
 
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
@@ -1333,8 +1333,10 @@ class MarketAnalyzer:
             return None
 
         delta = df["close"].diff()
-        gain = delta.where(delta > 0, 0).rolling(period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+        # Wilder's smoothing (same as TradingView RSI, NOT Cutler's SMA-based RSI)
+        # ewm(alpha=1/period) is equivalent to Wilder's exponential smoothing
+        gain = delta.where(delta > 0, 0).ewm(alpha=1/period, adjust=False).mean()
+        loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/period, adjust=False).mean()
 
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
@@ -1353,10 +1355,10 @@ class MarketAnalyzer:
         if df.empty or len(df) < 30:
             return None
 
-        # Calculate RSI
+        # Calculate RSI (Wilder's smoothing, matches TradingView)
         delta = df["close"].diff()
-        gain = delta.where(delta > 0, 0).rolling(14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        gain = delta.where(delta > 0, 0).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
         rsi = rsi.fillna(100.0)

@@ -633,9 +633,27 @@ class Backtester:
                         last_signal = None
 
             # ── 3c. Attempt entry ────────────────────────────────────
+            # R29 fix: enforce trading hours and Friday rules from mentorship
+            _allow_new_trade = True
+            try:
+                from datetime import datetime as _dt
+                _bar_dt = _dt.fromisoformat(bar_time.replace("Z", "+00:00")) if isinstance(bar_time, str) else None
+                if _bar_dt:
+                    _h = _bar_dt.hour
+                    _wd = _bar_dt.weekday()  # 0=Mon, 4=Fri
+                    # Trading hours: 07:00-22:00 UTC (London+NY)
+                    if _h < 7 or _h >= 22:
+                        _allow_new_trade = False
+                    # Friday: no new trades after 18:00 UTC
+                    if _wd == 4 and _h >= 18:
+                        _allow_new_trade = False
+            except Exception:
+                pass  # If bar_time parsing fails, allow trade (don't block)
+
             if (
                 last_signal is not None
                 and cooldown_remaining <= 0
+                and _allow_new_trade
                 and len(open_positions) < config.max_concurrent_positions
             ):
                 new_pos = self._try_open_position(

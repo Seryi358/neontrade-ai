@@ -66,7 +66,7 @@ async def get_status():
     mode_str = mode.value if mode else "AUTO"
     pending = getattr(engine, 'pending_setups', [])
     broker_name = getattr(engine.broker, 'broker_type', None)
-    broker_str = broker_name.value if broker_name else "oanda"
+    broker_str = broker_name.value if broker_name else "capital"
 
     return {
         "running": status["running"],
@@ -670,7 +670,7 @@ async def get_current_broker():
         connected = False
 
     return {
-        "broker": broker_type.value if broker_type else "oanda",
+        "broker": broker_type.value if broker_type else "capital",
         "connected": connected,
         "available_brokers": [
             {

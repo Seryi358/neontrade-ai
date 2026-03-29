@@ -75,6 +75,46 @@ class SetupSignal:
 
 
 # ---------------------------------------------------------------------------
+# Timeframe mapping per trading style (TradingLab MTFA)
+# ---------------------------------------------------------------------------
+# Day Trading:  Daily(direction) -> H4(confirmation) -> H1(setup) -> M5(execution)
+# Swing Trading: Monthly(direction) -> Weekly(confirmation) -> Daily(setup) -> H1(execution)
+# Scalping:     H1(direction) -> M15(confirmation) -> M5(setup) -> M1(execution)
+#
+# EMA keys used by strategies adapt based on trading_style setting.
+# This mapping ensures BLUE/RED/PINK/WHITE/BLACK strategies work correctly
+# for ALL three trading styles, not just day trading.
+
+def _get_trading_style() -> str:
+    """Get current trading style from config."""
+    try:
+        return settings.trading_style
+    except Exception:
+        return "day_trading"
+
+
+def _tf_ema(role: str, period: int = 50) -> str:
+    """Get the EMA key for a given role in the current trading style.
+
+    Roles (TradingLab MTFA):
+      - 'setup': The timeframe where strategies detect patterns (1H for day, D for swing)
+      - 'confirm': The confirmation timeframe (4H for day, W for swing)
+      - 'exec': The execution timeframe (M5 for day, H1 for swing)
+      - 'direction': The directional timeframe (D for day, W or M for swing)
+
+    Returns EMA key like 'EMA_H1_50' or 'EMA_D_50'.
+    """
+    style = _get_trading_style()
+    tf_map = {
+        "day_trading": {"setup": "H1", "confirm": "H4", "exec": "M5", "direction": "D"},
+        "swing": {"setup": "D", "confirm": "W", "exec": "H1", "direction": "W"},
+        "scalping": {"setup": "M5", "confirm": "M15", "exec": "M1", "direction": "H1"},
+    }
+    tf = tf_map.get(style, tf_map["day_trading"]).get(role, "H1")
+    return f"EMA_{tf}_{period}"
+
+
+# ---------------------------------------------------------------------------
 # Utilidades compartidas
 # ---------------------------------------------------------------------------
 

@@ -1497,8 +1497,22 @@ class TradingEngine:
             logger.info(f"R:R validation failed for {signal.instrument} ({signal.strategy_variant})")
             return None
 
-        # Calculate position size
-        style = TradingStyle.DAY_TRADING
+        # TradingLab: Scale-in rule — no new trade unless BE on existing
+        # "si tú no tienes como mínimo el breakeven puesto, tú no puedes reentrar"
+        if not self.risk_manager.can_scale_in(signal.instrument):
+            logger.info(
+                f"Scale-in blocked for {signal.instrument}: "
+                f"existing position has not reached BE"
+            )
+            return None
+
+        # Calculate position size using the configured trading style
+        style_map = {
+            "day_trading": TradingStyle.DAY_TRADING,
+            "swing": TradingStyle.SWING,
+            "scalping": TradingStyle.SCALPING,
+        }
+        style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
         units = await self.risk_manager.calculate_position_size(
             signal.instrument, style, signal.entry_price, signal.stop_loss
         )

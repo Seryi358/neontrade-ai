@@ -1118,6 +1118,36 @@ class TradingEngine:
                         if entry_dist > 0 and tp_dist / entry_dist < 0.3:
                             self.position_manager.set_cpa_trigger(pos.trade_id, "indecision_near_tp")
 
+            # Condition 5: Price approaching key reference levels (previous highs/lows, Fib extensions)
+            # TradingLab mentorship: "en momentos donde estemos llegando a puntos determinantes,
+            # como soportes o resistencias" — CPA activates at key structural levels
+            if getattr(settings, 'cpa_auto_on_key_levels', True):
+                analysis = self._last_scan_results.get(pos.instrument)
+                raw_price = prices.get(pos.instrument)
+                if analysis and raw_price is not None:
+                    current_price = raw_price.bid if hasattr(raw_price, 'bid') else float(raw_price)
+                    key_levels = []
+                    # Previous swing highs/lows from H1 structure detection
+                    for sh in getattr(analysis, 'swing_highs', []):
+                        key_levels.append(sh)
+                    for sl_level in getattr(analysis, 'swing_lows', []):
+                        key_levels.append(sl_level)
+                    # Fibonacci extension levels (1.272, 1.618 — key profit-taking zones)
+                    fib = getattr(analysis, 'fibonacci_levels', {}) or {}
+                    for ext_key in ['ext_bull_1.272', 'ext_bull_1.618', 'ext_bear_1.272', 'ext_bear_1.618']:
+                        if ext_key in fib:
+                            key_levels.append(fib[ext_key])
+
+                    for level in key_levels:
+                        if level and current_price > 0 and abs(current_price - level) / current_price < 0.02:
+                            self.position_manager.set_cpa_trigger(
+                                pos.trade_id,
+                                f"key_level_proximity:{level:.5f}",
+                                temporary=True,
+                                revert_level=level,
+                            )
+                            break
+
     # ── Analysis-Only Scan (off-hours / news active) ───────────
 
     async def _scan_analysis_only(self):
@@ -1251,6 +1281,54 @@ class TradingEngine:
                     # Defaults: Reentry 1=50%, Reentry 2=25%, Reentry 3+=25% of normal risk.
                     reentry = self._reentry_candidates.get(instrument)
                     if reentry and setup.direction == reentry.get("direction"):
+                        # Validate setup "essence" is preserved (TradingLab: Reentradas Efectivas)
+                        # A reentry is only valid if the original setup conditions still hold:
+                        #   1. HTF trend must still be aligned with the reentry direction
+                        #   2. No structural break (BOS/CHOCH) against the direction
+                        #   3. Key support/resistance zones still intact
+                        reentry_valid = True
+                        if analysis:
+                            # Check 1: HTF trend alignment
+                            htf_trend = getattr(analysis, 'htf_trend', None)
+                            if htf_trend is not None:
+                                if setup.direction == "BUY" and htf_trend.value == "bearish":
+                                    reentry_valid = False
+                                    logger.info(
+                                        f"[{instrument}] Reentry REJECTED — HTF trend bearish, "
+                                        f"setup direction BUY. Essence not preserved."
+                                    )
+                                elif setup.direction == "SELL" and htf_trend.value == "bullish":
+                                    reentry_valid = False
+                                    logger.info(
+                                        f"[{instrument}] Reentry REJECTED — HTF trend bullish, "
+                                        f"setup direction SELL. Essence not preserved."
+                                    )
+
+                            # Check 2: No structural break against direction (BOS/CHOCH)
+                            if reentry_valid:
+                                structure_breaks = getattr(analysis, 'structure_breaks', [])
+                                for sb in structure_breaks:
+                                    sb_type = sb.get("type", "").lower() if isinstance(sb, dict) else ""
+                                    sb_dir = sb.get("direction", "").lower() if isinstance(sb, dict) else ""
+                                    if "choch" in sb_type:
+                                        # CHOCH = Change of Character = structural trend reversal
+                                        if (setup.direction == "BUY" and sb_dir == "bearish") or \
+                                           (setup.direction == "SELL" and sb_dir == "bullish"):
+                                            reentry_valid = False
+                                            logger.info(
+                                                f"[{instrument}] Reentry REJECTED — CHOCH detected "
+                                                f"against {setup.direction}. Structural break invalidates reentry."
+                                            )
+                                            break
+
+                        if not reentry_valid:
+                            # Skip this reentry — essence is not preserved
+                            logger.info(
+                                f"[{instrument}] Reentry skipped — setup essence not preserved "
+                                f"(mentorship: Reentradas Efectivas)"
+                            )
+                            continue
+
                         reentry_count = reentry.get("count", 0) + 1
                         if reentry_count == 1:
                             risk_multiplier = settings.reentry_risk_1

@@ -96,11 +96,12 @@ _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
     (ManagementStyle.LP, TradingStyle.SWING): "EMA_D_50",
     (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H1_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
-    # DAILY (mid-term): uses Daily EMA 50 across all trading styles
-    # For forex this mirrors LP swing; exists for symmetry with crypto DAILY mode.
+    # DAILY (mid-term): Daily EMA 50 only appropriate for swing.
+    # For day_trading and scalping, fall back to LP-equivalent timeframes
+    # since Daily EMA 50 is too wide for intraday styles.
     (ManagementStyle.DAILY, TradingStyle.SWING): "EMA_D_50",
-    (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_D_50",
-    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_D_50",
+    (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_H1_50",
+    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_M15_50",
     # CP (Short-term): Swing=H1, Day=M5, Scalp=M1
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
@@ -124,10 +125,12 @@ _EMA_TIMEFRAME_GRID_CRYPTO: Dict[tuple, str] = {
     (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H4_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
     # DAILY (mid-term crypto): Daily EMA 50 — between LP (Weekly) and CP (H1)
-    # Mentorship: crypto position management has LP=Weekly, now DAILY=Daily, CP=H1, CPA=M15
+    # Mentorship: DAILY style is designed for swing trading; for day_trading and scalping
+    # it falls back to more appropriate timeframes (H4 and M15 respectively) since
+    # Daily EMA 50 is too wide for intraday styles.
     (ManagementStyle.DAILY, TradingStyle.SWING): "EMA_D_50",
-    (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_D_50",
-    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_D_50",
+    (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_H4_50",
+    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_M15_50",
     # CP (Short-term): Swing=H1, Day=M15, Scalp=M1
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",
@@ -159,6 +162,9 @@ class ManagedPosition:
     phase: PositionPhase = PositionPhase.INITIAL
     highest_price: float = 0.0    # For BUY: highest since entry
     lowest_price: float = float('inf')  # For SELL: lowest since entry
+    cpa_temporary: bool = False   # True when CPA was triggered by key level proximity (can revert to LP/CP)
+    cpa_revert_level: float = 0   # Key level that triggered temporary CPA; if price breaks through cleanly, revert
+    pre_cpa_phase: Optional[str] = None  # Phase before CPA was triggered (for reverting)
 
 
 class PositionManager:
@@ -266,7 +272,7 @@ class PositionManager:
             return self._crypto_cpa_ema_key
         return self._cpa_ema_key
 
-    def set_cpa_trigger(self, trade_id: str, reason: str):
+    def set_cpa_trigger(self, trade_id: str, reason: str, temporary: bool = False, revert_level: float = 0):
         """Signal that CPA (aggressive trailing) should activate for a position.
 
         Called by trading_engine when it detects conditions that warrant
@@ -275,10 +281,17 @@ class PositionManager:
           - high-impact news approaching
           - Friday close approaching (weekend gap risk)
           - price indecision near key levels
+          - price approaching key reference levels (temporary CPA)
 
         Alex: "en momentos donde estemos llegando a puntos determinantes,
         como soportes o resistencias, en momentos donde vayan a haber noticias,
         o en momentos donde vaya a finalizar la semana"
+
+        Args:
+            trade_id: The trade to switch to CPA
+            reason: Human-readable reason for the trigger
+            temporary: If True, CPA can revert to previous style if price breaks through
+            revert_level: The key level; if price moves >1% past it, revert to previous style
         """
         pos = self.positions.get(trade_id)
         if pos is None:
@@ -291,11 +304,18 @@ class PositionManager:
             )
             return
 
+        # Don't re-trigger temporary CPA if already in aggressive phase
+        if pos.phase == PositionPhase.BEYOND_TP1:
+            return
+
         cpa_key = self._get_cpa_ema_key(pos.instrument)
+        pos.pre_cpa_phase = pos.phase.value
         pos.phase = PositionPhase.BEYOND_TP1
+        pos.cpa_temporary = temporary
+        pos.cpa_revert_level = revert_level
         logger.info(
             f"{trade_id}: CPA AUTO-TRIGGER '{reason}' — switching to aggressive trailing "
-            f"(CPA: {cpa_key})"
+            f"(CPA: {cpa_key}, temporary={temporary})"
         )
 
     def set_ema_values(self, instrument: str, emas: Dict[str, float]):
@@ -702,7 +722,33 @@ class PositionManager:
 
         Uses the CPA EMA 50 timeframe for tighter trailing to maximize profit.
         Position closes at TP_max or via trailing SL hit.
+
+        If CPA was triggered temporarily (key level proximity), revert to previous
+        management style once price breaks cleanly through the key level (>1% beyond).
+        Alex: "if price breaks through cleanly, remove CPA and continue with long-term."
         """
+        # Revert temporary CPA if price has broken cleanly past the key level
+        if pos.cpa_temporary and pos.cpa_revert_level > 0:
+            if pos.direction == "BUY":
+                # For BUY: price breaking above the key level means it cleared resistance
+                beyond = current_price > pos.cpa_revert_level * 1.01
+            else:
+                # For SELL: price breaking below the key level means it cleared support
+                beyond = current_price < pos.cpa_revert_level * 0.99
+
+            if beyond:
+                # Revert to previous phase (TRAILING or BREAK_EVEN)
+                prev_phase = pos.pre_cpa_phase or PositionPhase.TRAILING_TO_TP1.value
+                pos.phase = PositionPhase(prev_phase)
+                pos.cpa_temporary = False
+                pos.cpa_revert_level = 0
+                pos.pre_cpa_phase = None
+                logger.info(
+                    f"{pos.trade_id}: CPA REVERTED — price broke cleanly past key level "
+                    f"(price={current_price:.5f}). Returning to {pos.phase.value} management."
+                )
+                return  # Let the next update cycle handle with the restored phase
+
         # Check if TP_max has been reached -> close full position
         if pos.take_profit_max:
             tp_max_reached = (

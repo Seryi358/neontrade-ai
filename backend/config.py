@@ -158,6 +158,7 @@ class Settings(BaseSettings):
     cpa_auto_on_news: bool = True              # Switch to CPA before high-impact news
     cpa_auto_on_friday_close: bool = True      # Switch to CPA approaching Friday close
     cpa_auto_on_indecision: bool = True        # Switch to CPA on indecision near TP/key levels
+    cpa_auto_on_key_levels: bool = True        # Switch to CPA near key reference levels (prev highs/lows, Fib extensions)
 
     # Drawdown-based risk adjustment (ch18.7)
     # Methods: "fixed_1pct" (always 1%, recommended for beginners),
@@ -594,6 +595,7 @@ TRADING_PROFILES = {
             "cpa_auto_on_news": True,
             "cpa_auto_on_friday_close": True,
             "cpa_auto_on_indecision": True,
+            "cpa_auto_on_key_levels": True,
             # Drawdown — fixed 1% for safety
             "drawdown_method": "fixed_1pct",
             "delta_enabled": False,
@@ -638,6 +640,7 @@ TRADING_PROFILES = {
             "cpa_auto_on_news": True,
             "cpa_auto_on_friday_close": True,
             "cpa_auto_on_indecision": True,
+            "cpa_auto_on_key_levels": True,
             # Drawdown — fixed 1% (safest for beginners)
             "drawdown_method": "fixed_1pct",
             "delta_enabled": False,

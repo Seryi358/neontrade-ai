@@ -2770,7 +2770,7 @@ class WhiteStrategy(BaseStrategy):
                 f"White requiere contexto post-Pink: solo {pink_proxy_score}/4 "
                 f"condiciones proxy cumplidas (BOS={has_recent_bos}, "
                 f"patron_correctivo={has_corrective_pattern}, "
-                f"EMA_1H_ok={ema_1h_check}, elliott={bool(elliott)})"
+                f"EMA_1H_ok={ema_1h_check}, elliott={bool(ew_detail)})"
             )
             return None
 
@@ -2948,7 +2948,7 @@ class WhiteStrategy(BaseStrategy):
             # Previous swing high above entry price (same as PINK)
             valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
             if valid_swing_highs:
-                result["tp1"] = valid_swing_highs[-1]
+                result["tp1"] = min(valid_swing_highs)
             else:
                 above = sorted([r for r in resistances if r > entry_price])
                 if len(above) >= 2:
@@ -2961,7 +2961,7 @@ class WhiteStrategy(BaseStrategy):
             if tp1:
                 further_highs = [sh for sh in swing_highs if sh > tp1]
                 if further_highs:
-                    result["tp_max"] = further_highs[-1]
+                    result["tp_max"] = min(further_highs)
                 else:
                     further_res = [r for r in resistances if r > tp1]
                     if further_res:
@@ -2970,7 +2970,7 @@ class WhiteStrategy(BaseStrategy):
             # Previous swing low below entry price (same as PINK)
             valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
             if valid_swing_lows:
-                result["tp1"] = valid_swing_lows[-1]
+                result["tp1"] = max(valid_swing_lows)
             else:
                 below = sorted([s for s in supports if s < entry_price], reverse=True)
                 if len(below) >= 2:
@@ -2983,7 +2983,7 @@ class WhiteStrategy(BaseStrategy):
             if tp1:
                 further_lows = [sl for sl in swing_lows if sl < tp1]
                 if further_lows:
-                    result["tp_max"] = further_lows[-1]
+                    result["tp_max"] = max(further_lows)
                 else:
                     further_sup = [s for s in supports if s < tp1]
                     if further_sup:

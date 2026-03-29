@@ -294,31 +294,30 @@ Associated Wave: Wave 2 end on 4H → riding Wave 3
   TP_max: Fibonacci 1.618 extension (Wave 3 target). Extended TP: 1.618 extension ONLY for Wave 3 with strong daily move.
   Step 7: SL below EMA 50 4H (must cover previous swing). TP: previous high/low (safest). Extended: 1.618 only for Wave 3 with strong daily.
 
-──── PINK STRATEGY (Corrective Pattern Continuation — Elliott Wave 4→5) ────
+──── PINK STRATEGY (Corrective Pattern Continuation — Wave 4→5) ────
 Associated Wave: Wave 4 correction end → entry for Wave 5
 
-  Step 1: Daily impulse wave (Waves 1-3) is clearly established
-  Step 2: 4H shows corrective pattern forming (flag, pennant, triangle, ABC correction)
-  Step 3: Corrective pattern respects Wave 4 rules (does NOT overlap Wave 1 territory)
-  Step 4: Pattern completion signal (breakout from pattern boundary)
-  Step 5: Entry on breakout confirmation with volume
-  SL: Beyond the corrective pattern extreme (Wave 4 low/high)
-  TP1: Fibonacci 0.618 extension of Wave 3 projected from Wave 4 end
-  TP_max: Equal length to Wave 1 (common Wave 5 target) or 1.0 extension
-  IMPORTANT: Alex does NOT execute Pink on channel patterns (no convergence point). If 1H correction forms a channel, wait for White instead.
+  PINK Strategy (Corrective Pattern Continuation — Wave 4→5):
+  Step 1: Daily S/R level OR developed established trend
+  Step 2: Trend alignment in all timeframes (4H and 1H both trending in same direction)
+  Step 3: 4H EMA 50 was broken earlier (impulse through it) + price pulls back TO the 4H EMA 50 zone. The KEY condition: 4H EMA 50 must NOT break against the trend direction (it HOLDS as support/resistance)
+  Step 4: 1H EMA 50 breaks in CORRECTIVE PATTERN form — the 1H EMA break must form a wedge, triangle, or channel (NOT a clean break). This is the KEY differentiator of PINK. If 4H EMA also breaks = it's RED, not PINK
+  Step 5: 5M entry at the FINAL portion of the pattern. The 5M EMA will NOT be respected throughout the pattern due to volatility — only look for it in the final phase when a mini-structure (double bottom, small diagonal) forms
+  Step 6: SL below/above the previous swing low/high (NOT Fibonacci, NOT pattern edge). TP at previous swing high/low (conservative — trend may be ending at Wave 5)
+  IMPORTANT: Alex does NOT execute Pink on channel patterns (no convergence point) — wait for White instead
 
-──── WHITE STRATEGY (Post-Pink Continuation — Wave 3 of Wave 5) ────
-Associated Wave: After Pink triggers, riding Wave 3 of the sub-wave inside Wave 5
+──── WHITE STRATEGY (Blue After a Pink — Post-Pink Continuation) ────
+Associated Wave: After Pink completes, riding the continuation
 
-  Step 1: PINK strategy trade is active or recently triggered
-  Step 2: Sub-wave 1-2 of Wave 5 has completed on 1H
-  Step 3: Price breaks above/below the sub-wave 1 high/low (confirms Wave 3 starting)
-  Step 4: Retracement to previous high/low of 4H impulse
-  Step 5: Entry at previous high/low with 5m confirmation
-  SL: Below/above sub-wave 2 of the new impulse
-  TP1: Previous 4H impulse high/low
-  TP_max: 1.618 extension of the sub-wave 1
-  NOTE: White can SUBSTITUTE Pink. If Pink is rejected (e.g., channel pattern), wait for White which gives similar profitability with tighter SL.
+  WHITE Strategy (Blue After a Pink — Post-Pink Continuation):
+  Step 1: MUST come from a completed Pink. This is NON-NEGOTIABLE — "venimos de una pink. Final."
+  Step 2: Pink has finalized — impulse + pullback forms on 1H (same structure as Blue)
+  Step 3: Pullback to EMA 50 1H + Fibonacci levels (exactly like Blue)
+  Step 4: Deceleration on 1H (same criteria as Blue — attack, support, deceleration, turn)
+  Step 5: 5M entry with RCC (Rompe, Cierra, Confirma) — same execution as Blue
+  Step 6: SL above/below the previous swing high/low (tighter than Pink). TP: same as Pink target (previous swing extreme)
+  White can SUBSTITUTE Pink — if you miss/don't like Pinks (especially channels), wait for White instead
+  Channels favor White over Pink: "cuando yo veo un canal, no ejecuto pink, ejecuto white"
 
 ──── BLACK STRATEGY (Counter-Trend Anticipation — Elliott Wave 1) ────
 Associated Wave: Anticipating Wave 1 of a NEW trend (daily reversal)

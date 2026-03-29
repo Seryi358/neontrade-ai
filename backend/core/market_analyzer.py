@@ -95,6 +95,8 @@ class AnalysisResult:
     current_price: Optional[float] = None
     # Active trading session (ASIAN, LONDON, OVERLAP, NEW_YORK, OFF_HOURS)
     session: Optional[str] = None
+    # Session detail: distinguishes TOKYO vs SYDNEY within ASIAN block
+    session_detail: Optional[str] = None
     # Elliott Wave detail from daily candle analysis
     elliott_wave_detail: Dict[str, Any] = field(default_factory=dict)
     # Pivot Points (P, S1, R1) from daily data — mentorship only uses these three
@@ -339,7 +341,7 @@ class MarketAnalyzer:
         current_price = float(m5_df.iloc[-1]["close"]) if not m5_df.empty else None
 
         # Step 18: Trading session detection
-        session = self._detect_session()
+        session, session_detail = self._detect_session()
 
         # Step 19: Elliott Wave counting from daily candles
         elliott_wave_detail = self._count_elliott_waves(
@@ -452,6 +454,7 @@ class MarketAnalyzer:
             last_candles=last_candles,
             current_price=current_price,
             session=session,
+            session_detail=session_detail,
             elliott_wave_detail=elliott_wave_detail,
             pivot_points=pivot_points,
             premium_discount_zone=premium_discount_zone,
@@ -989,6 +992,91 @@ class MarketAnalyzer:
                 result["confirmed"] = float(last["close"]) < float(prev["close"])
                 if not result["confirmed"] and float(last["close"]) > level:
                     result["false_breakout"] = True
+
+        return result
+
+    def _verify_sr_breakout(
+        self,
+        candles: pd.DataFrame,
+        level: float,
+        direction: str,
+    ) -> Dict[str, Any]:
+        """
+        Alex's three-step S/R breakout verification (AT Basico):
+          1) BREAK:   Price crosses the S/R level (wick or body)
+          2) CLOSE:   A candle closes beyond the level (not just wick)
+          3) CONFIRM: The NEXT candle continues in the breakout direction
+
+        Uses the last 5 candles to check for recent breakout attempts.
+        A break without close/confirm is flagged as a false breakout —
+        itself a powerful reversal signal per the mentorship.
+
+        Args:
+            candles: OHLC DataFrame (needs at least 2 candles).
+            level: The support/resistance price level.
+            direction: "BUY" (break above resistance) or "SELL" (break below support).
+
+        Returns:
+            Dict with verified, step_1_break, step_2_close, step_3_confirm, false_breakout.
+        """
+        result: Dict[str, Any] = {
+            "verified": False,
+            "step_1_break": False,
+            "step_2_close": False,
+            "step_3_confirm": False,
+            "false_breakout": False,
+        }
+
+        if candles.empty or len(candles) < 2:
+            return result
+
+        # Use last 5 candles (or fewer if not available)
+        recent = candles.tail(5)
+        if len(recent) < 2:
+            return result
+
+        direction_upper = direction.upper()
+
+        if direction_upper == "BUY":
+            # Step 1: Any candle's high crossed above the level
+            for i in range(len(recent) - 1):
+                if float(recent.iloc[i]["high"]) > level:
+                    result["step_1_break"] = True
+                    # Step 2: That candle closed above the level
+                    if float(recent.iloc[i]["close"]) > level:
+                        result["step_2_close"] = True
+                        # Step 3: The next candle continues upward
+                        next_idx = i + 1
+                        if next_idx < len(recent):
+                            next_close = float(recent.iloc[next_idx]["close"])
+                            prev_close = float(recent.iloc[i]["close"])
+                            if next_close > prev_close:
+                                result["step_3_confirm"] = True
+                                result["verified"] = True
+                                return result
+                    break  # Only check the first break attempt
+        else:  # SELL
+            # Step 1: Any candle's low crossed below the level
+            for i in range(len(recent) - 1):
+                if float(recent.iloc[i]["low"]) < level:
+                    result["step_1_break"] = True
+                    # Step 2: That candle closed below the level
+                    if float(recent.iloc[i]["close"]) < level:
+                        result["step_2_close"] = True
+                        # Step 3: The next candle continues downward
+                        next_idx = i + 1
+                        if next_idx < len(recent):
+                            next_close = float(recent.iloc[next_idx]["close"])
+                            prev_close = float(recent.iloc[i]["close"])
+                            if next_close < prev_close:
+                                result["step_3_confirm"] = True
+                                result["verified"] = True
+                                return result
+                    break  # Only check the first break attempt
+
+        # If we broke but didn't fully verify, it's a false breakout
+        if result["step_1_break"] and not result["verified"]:
+            result["false_breakout"] = True
 
         return result
 
@@ -1793,35 +1881,52 @@ class MarketAnalyzer:
 
     # ── Trading Session Detection ─────────────────────────────────────
 
-    def _detect_session(self) -> str:
+    def _detect_session(self) -> tuple:
         """
-        Return the currently active trading session based on UTC hour.
+        Return the currently active trading session and sub-session detail.
 
         Sessions (corrected per mentorship):
-          ASIAN     : 00:00-08:00 UTC (Tokyo/Sydney)
+          ASIAN     : 00:00-08:00 UTC
+            - SYDNEY sub-session: 21:00-06:00 UTC (overlaps into ASIAN)
+            - TOKYO  sub-session: 00:00-09:00 UTC
+            - 21:00-00:00 is Sydney-only (mapped to OFF_HOURS for main session)
+            - 00:00-06:00 is Sydney+Tokyo overlap
+            - 06:00-08:00 is Tokyo-only
           LONDON    : 08:00-16:00 UTC (full London session)
           OVERLAP   : 13:00-17:00 UTC (London+NY overlap - highest volatility)
           NEW_YORK  : 13:00-21:00 UTC (full NY session)
-          OFF_HOURS : 21:00-00:00 UTC
+          OFF_HOURS : 21:00-00:00 UTC (includes Sydney open)
 
         Note: OVERLAP is a subset of both LONDON and NEW_YORK.
         Priority: OVERLAP > LONDON > NEW_YORK (overlap has highest volatility).
+
+        Returns:
+            Tuple of (session: str, session_detail: str).
+            session_detail distinguishes TOKYO vs SYDNEY within the ASIAN block.
         """
         utc_hour = datetime.now(timezone.utc).hour
 
         if 0 <= utc_hour < 8:
-            return "ASIAN"
+            # ASIAN block with Sydney/Tokyo distinction
+            if utc_hour < 6:
+                # 00:00-06:00: Sydney + Tokyo overlap
+                detail = "ASIAN_SYDNEY_TOKYO"
+            else:
+                # 06:00-08:00: Tokyo only (Sydney closed at 06:00)
+                detail = "ASIAN_TOKYO"
+            return ("ASIAN", detail)
         elif 13 <= utc_hour < 17:
             # Overlap takes priority (subset of both London and NY)
-            return "OVERLAP"
+            return ("OVERLAP", "LONDON_NY_OVERLAP")
         elif 8 <= utc_hour < 13:
             # London-only hours (before NY opens)
-            return "LONDON"
+            return ("LONDON", "LONDON")
         elif 17 <= utc_hour < 21:
             # NY-only hours (after London closes)
-            return "NEW_YORK"
+            return ("NEW_YORK", "NEW_YORK")
         else:
-            return "OFF_HOURS"
+            # 21:00-00:00: Off-hours but Sydney is already open
+            return ("OFF_HOURS", "SYDNEY_PRE_ASIAN")
 
     # ── Basic Elliott Wave Counting ───────────────────────────────────
 
@@ -2404,7 +2509,7 @@ class MarketAnalyzer:
         if df.empty or len(df) < 10:
             return {}
 
-        session = self._detect_session()
+        session, _session_detail = self._detect_session()
         data = df.copy()
 
         # Ensure we have a time-based index

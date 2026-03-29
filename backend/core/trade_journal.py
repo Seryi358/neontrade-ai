@@ -438,6 +438,12 @@ class TradeJournal:
                     trade["emotional_notes_during"] = emotional_notes_during
                 if emotional_notes_post is not None:
                     trade["emotional_notes_post"] = emotional_notes_post
+
+                # Freshness check: Alex recommends journaling "del mismo momento"
+                freshness_warning = self._check_journal_freshness(trade)
+                if freshness_warning:
+                    trade["freshness_warning"] = freshness_warning
+
                 self._save()
                 logger.info(f"Journal notes updated for trade {trade_id}")
                 return True
@@ -486,6 +492,12 @@ class TradeJournal:
                 if lessons is not None:
                     trade["asr_lessons"] = lessons
                 trade["asr_completed"] = True
+
+                # Freshness check: Alex recommends journaling "del mismo momento"
+                freshness_warning = self._check_journal_freshness(trade)
+                if freshness_warning:
+                    trade["freshness_warning"] = freshness_warning
+
                 self._save()
                 logger.info(f"ASR completed for trade {trade_id}")
                 return True
@@ -631,6 +643,43 @@ class TradeJournal:
         except Exception as e:
             logger.warning(f"Missed trades load failed: {e}")
             self._missed_trades = []
+
+    # ── Freshness Check ────────────────────────────────────────────
+
+    def _check_journal_freshness(self, trade: Dict) -> Optional[str]:
+        """Check if journaling is happening too long after the trade closed.
+
+        Alex recommends writing notes 'del mismo momento' to avoid emotional
+        bias and revisionist thinking. If the trade closed more than 24 hours
+        ago, return a warning message.
+
+        Args:
+            trade: The trade record dict (must have 'date' key with ISO timestamp).
+
+        Returns:
+            Warning string if stale, None if fresh.
+        """
+        close_time_str = trade.get("date")
+        if not close_time_str:
+            return None
+
+        try:
+            close_time = datetime.fromisoformat(close_time_str)
+            # Ensure timezone-aware comparison
+            if close_time.tzinfo is None:
+                close_time = close_time.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            elapsed = now - close_time
+            if elapsed.total_seconds() > 86400:  # 24 hours
+                return (
+                    "Journaling mas de 24h despues del cierre. "
+                    "Alex recomienda escribir notas 'del mismo momento' "
+                    "para evitar sesgo emocional."
+                )
+        except (ValueError, TypeError):
+            pass
+
+        return None
 
     # ── Classification ────────────────────────────────────────────
 

@@ -710,7 +710,13 @@ class CapitalClient(BaseBroker):
             order_data["profitLevel"] = take_profit
 
         try:
-            resp = await self._post("/api/v1/workingorders", json_data=order_data)
+            # Single attempt only - retrying POST can duplicate orders
+            resp = await self._client.post(
+                "/api/v1/workingorders",
+                headers=self._auth_headers(),
+                json=order_data,
+            )
+            resp.raise_for_status()
             raw = resp.json()
             deal_ref = raw.get("dealReference")
 
@@ -795,7 +801,8 @@ class CapitalClient(BaseBroker):
             entry = float(pos.get("level", 0))
             current_bid = float(market.get("bid", entry))
             current_ask = float(market.get("offer", entry))
-            current = current_bid if direction == "SELL" else current_ask
+            # BUY closes at bid, SELL closes at ask (exit price = opposite side of spread)
+            current = current_bid if direction == "BUY" else current_ask
 
             pnl = float(pos.get("profit", 0))
 

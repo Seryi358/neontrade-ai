@@ -201,7 +201,7 @@ class EconomicCalendar:
 
     def get_currencies_from_pair(self, instrument: str) -> List[str]:
         """Extract currencies from an OANDA instrument name (e.g., EUR_USD -> [EUR, USD])."""
-        parts = instrument.split("_")
+        parts = instrument.replace("/", "_").split("_")
         return parts if len(parts) == 2 else []
 
     def should_avoid_trading(self, instrument: str) -> bool:

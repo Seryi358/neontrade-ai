@@ -155,6 +155,7 @@ class MarketAnalyzer:
             except Exception as e:
                 logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
                 candles[tf] = pd.DataFrame()
+
                 # M2 fallback: if broker returns 404 for MINUTE_2, use M1 candles
                 # and compute M2-equivalent EMAs from M1 data
                 if tf == "M2" and "M1" in candles and not candles["M1"].empty:
@@ -165,6 +166,30 @@ class MarketAnalyzer:
                     candles["M2"] = candles["M1"].copy()
             # Throttle between timeframe fetches to avoid broker rate limits
             await asyncio.sleep(0.3)
+
+        # Derive Monthly candles from Weekly data (Capital.com has no MONTH resolution)
+        # Needed for swing MTFA direction chart (TradingLab: Monthly = directional for swing)
+        try:
+            w_df = candles.get("W", pd.DataFrame())
+            if not w_df.empty and "date" in w_df.columns:
+                w_copy = w_df.copy()
+                w_copy["month"] = pd.to_datetime(w_copy["date"]).dt.to_period("M")
+                monthly = w_copy.groupby("month").agg({
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "date": "last",
+                }).reset_index(drop=True)
+                if "volume" in w_copy.columns:
+                    vol = w_copy.groupby("month")["volume"].sum().reset_index(drop=True)
+                    monthly["volume"] = vol
+                candles["M"] = monthly
+            else:
+                candles["M"] = pd.DataFrame()
+        except Exception as e:
+            logger.warning(f"Failed to derive Monthly candles from Weekly: {e}")
+            candles["M"] = pd.DataFrame()
 
         # Step 2: HTF Analysis (Weekly direction, Daily confirmation)
         htf_trend = self._detect_trend(candles.get("W", pd.DataFrame()))
@@ -1887,13 +1912,16 @@ class MarketAnalyzer:
             elif ll and lh:
                 downtrend = True
 
-        # ── Step 4: Count waves ──
+        # ── Step 4: Count waves and record wave boundaries ──
         # Walk through filtered swings and count alternating impulse/correction
         # legs relative to the detected trend.
+        # wave_points stores the swing value at each wave boundary:
+        #   key = wave number (1,2,3,...), value = (index, price)
         wave_count = 0
         phase = "impulse"
         prev_swing = filtered[0]
         in_impulse = True
+        wave_points: Dict[int, Tuple[int, float]] = {0: (prev_swing[0], prev_swing[1])}
 
         for s in filtered[1:]:
             if uptrend or (not downtrend):
@@ -1903,10 +1931,12 @@ class MarketAnalyzer:
                         # Impulse leg continues / completes
                         wave_count += 1
                         in_impulse = False  # next expect correction
+                        wave_points[wave_count] = (s[0], s[1])
                 elif s[2] == "L" and not in_impulse:
                     # Correction leg
                     wave_count += 1
                     in_impulse = True  # next expect impulse
+                    wave_points[wave_count] = (s[0], s[1])
                     if wave_count > 5:
                         # Switch to corrective phase
                         phase = "corrective"
@@ -1916,13 +1946,63 @@ class MarketAnalyzer:
                     if s[1] <= prev_swing[1]:
                         wave_count += 1
                         in_impulse = False
+                        wave_points[wave_count] = (s[0], s[1])
                 elif s[2] == "H" and not in_impulse:
                     wave_count += 1
                     in_impulse = True
+                    wave_points[wave_count] = (s[0], s[1])
                     if wave_count > 5:
                         phase = "corrective"
 
             prev_swing = s
+
+        # ── Step 4b: Calculate wave_lengths (absolute price movement per wave) ──
+        wave_lengths: Dict[str, float] = {}
+        for w in range(1, min(wave_count, 10) + 1):
+            if w in wave_points and (w - 1) in wave_points:
+                wave_lengths[str(w)] = abs(wave_points[w][1] - wave_points[w - 1][1])
+
+        # ── Step 4c: Validate Elliott cardinal rules ──
+        invalid_structure = False
+
+        # Rule 1: Wave 2 cannot retrace beyond Wave 1 start
+        if 0 in wave_points and 1 in wave_points and 2 in wave_points:
+            w0_price = wave_points[0][1]  # Wave 1 start
+            w2_price = wave_points[2][1]  # Wave 2 end
+            if uptrend or (not downtrend):
+                # Bullish: Wave 2 low must stay above Wave 1 start (w0)
+                if w2_price < w0_price:
+                    invalid_structure = True
+                    wave_count = min(wave_count, 1)
+            else:
+                # Bearish: Wave 2 high must stay below Wave 1 start (w0)
+                if w2_price > w0_price:
+                    invalid_structure = True
+                    wave_count = min(wave_count, 1)
+
+        # Rule 2: Wave 3 is never the shortest impulse wave
+        w1_len = wave_lengths.get("1", 0)
+        w3_len = wave_lengths.get("3", 0)
+        w5_len = wave_lengths.get("5", 0)
+        if w3_len > 0 and w1_len > 0 and w5_len > 0:
+            if w3_len < w1_len and w3_len < w5_len:
+                invalid_structure = True
+                wave_count = min(wave_count, 2)
+
+        # Rule 3: Wave 4 cannot enter Wave 1 territory
+        if 1 in wave_points and 4 in wave_points:
+            w1_price = wave_points[1][1]  # Wave 1 end (top for bullish)
+            w4_price = wave_points[4][1]  # Wave 4 end (low for bullish)
+            if uptrend or (not downtrend):
+                # Bullish: Wave 4 low must be above Wave 1 high
+                if w4_price < w1_price:
+                    invalid_structure = True
+                    wave_count = min(wave_count, 3)
+            else:
+                # Bearish: Wave 4 high must be below Wave 1 low
+                if w4_price > w1_price:
+                    invalid_structure = True
+                    wave_count = min(wave_count, 3)
 
         # ── Step 5: Map to Elliott label and strategy colour ──
         strategy_map_impulse = {
@@ -1955,6 +2035,8 @@ class MarketAnalyzer:
             "wave_count": wave_label,
             "phase": phase,
             "suggested_strategy": suggested,
+            "wave_lengths": wave_lengths,
+            "invalid_structure": invalid_structure,
         }
 
     # ── Pivot Points (TradingLab ch12) ─────────────────────────────────

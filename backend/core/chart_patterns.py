@@ -29,6 +29,8 @@ class ChartPattern:
     neckline: float      # Key breakout level
     target: float        # Projected price target
     description: str     # Human-readable description (Spanish)
+    duration_ratio: float = 0.0   # How far along the pattern (0-1); >0.67 = past 2/3
+    likely_reversal: bool = False  # True if pattern past 2/3 duration (TradingLab rule)
 
 
 def detect_chart_patterns(df: pd.DataFrame, lookback: int = 100) -> List[ChartPattern]:
@@ -493,16 +495,27 @@ def _detect_ascending_triangle(
     if len(recent_highs) >= 3:
         confidence += 5.0
 
+    # TradingLab: Triangle 2/3 duration rule
+    end_idx = len(data) - 1
+    start_idx = min(recent_highs[0][0], recent_lows[0][0])
+    high_idx_span = recent_highs[-1][0] - recent_highs[0][0]
+    low_idx_span = recent_lows[-1][0] - recent_lows[0][0]
+    avg_span = max(1, (high_idx_span + low_idx_span) / 2)
+    duration_ratio = (end_idx - start_idx) / max(1, avg_span) if avg_span > 0 else 0
+    likely_reversal = duration_ratio > 0.67
+
     return ChartPattern(
         name="ASCENDING_TRIANGLE",
         direction="bullish",
         confidence=min(confidence, 95.0),
-        start_idx=min(recent_highs[0][0], recent_lows[0][0]),
-        end_idx=len(data) - 1,
+        start_idx=start_idx,
+        end_idx=end_idx,
         neckline=neckline,
         target=target,
         description=f"Triangulo Ascendente: Resistencia plana en {neckline:.5f}, "
                     f"soportes ascendentes. Objetivo: {target:.5f}",
+        duration_ratio=duration_ratio,
+        likely_reversal=likely_reversal,
     )
 
 
@@ -549,16 +562,27 @@ def _detect_descending_triangle(
     if len(recent_lows) >= 3:
         confidence += 5.0
 
+    # TradingLab: Triangle 2/3 duration rule
+    end_idx = len(data) - 1
+    start_idx = min(recent_highs[0][0], recent_lows[0][0])
+    high_idx_span = recent_highs[-1][0] - recent_highs[0][0]
+    low_idx_span = recent_lows[-1][0] - recent_lows[0][0]
+    avg_span = max(1, (high_idx_span + low_idx_span) / 2)
+    duration_ratio = (end_idx - start_idx) / max(1, avg_span) if avg_span > 0 else 0
+    likely_reversal = duration_ratio > 0.67
+
     return ChartPattern(
         name="DESCENDING_TRIANGLE",
         direction="bearish",
         confidence=min(confidence, 95.0),
-        start_idx=min(recent_highs[0][0], recent_lows[0][0]),
-        end_idx=len(data) - 1,
+        start_idx=start_idx,
+        end_idx=end_idx,
         neckline=neckline,
         target=target,
         description=f"Triangulo Descendente: Soporte plano en {neckline:.5f}, "
                     f"resistencias descendentes. Objetivo: {target:.5f}",
+        duration_ratio=duration_ratio,
+        likely_reversal=likely_reversal,
     )
 
 
@@ -640,6 +664,8 @@ def _detect_symmetrical_triangle(
         neckline=midpoint,
         target=target,
         description=description,
+        duration_ratio=triangle_progress,
+        likely_reversal=triangle_progress > 0.67,
     )
 
 

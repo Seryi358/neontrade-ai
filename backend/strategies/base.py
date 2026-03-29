@@ -107,7 +107,7 @@ def _tf_ema(role: str, period: int = 50) -> str:
     style = _get_trading_style()
     tf_map = {
         "day_trading": {"setup": "H1", "confirm": "H4", "exec": "M5", "direction": "D"},
-        "swing": {"setup": "D", "confirm": "W", "exec": "H1", "direction": "W"},
+        "swing": {"setup": "D", "confirm": "W", "exec": "H1", "direction": "M"},
         "scalping": {"setup": "M5", "confirm": "M15", "exec": "M1", "direction": "H1"},
     }
     tf = tf_map.get(style, tf_map["day_trading"]).get(role, "H1")

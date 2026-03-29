@@ -281,9 +281,9 @@ export const api = {
     apiPost<any>(`/api/v1/monthly-review/generate?month=${month}`),
 
   // Discretionary Trade Tracking
-  markTradeDiscretionary: (tradeId: string, notes: string) =>
+  markTradeDiscretionary: (tradeId: string, isDiscretionary: boolean, notes: string) =>
     apiPut<any>(`/api/v1/journal/trades/${tradeId}/discretionary`, {
-      is_discretionary: true, discretionary_notes: notes,
+      is_discretionary: isDiscretionary, discretionary_notes: notes,
     }),
 };
 

@@ -246,7 +246,7 @@ export default function JournalScreen() {
 
     const newValue = !trade.is_discretionary;
     try {
-      await api.markTradeDiscretionary(tradeId, trade.discretionary_notes || '');
+      await api.markTradeDiscretionary(tradeId, newValue, trade.discretionary_notes || '');
       setTrades((prev) =>
         prev.map((t) =>
           t.trade_id === tradeId ? { ...t, is_discretionary: newValue } : t,

@@ -2138,22 +2138,38 @@ class PinkStrategy(BaseStrategy):
             return False, score, met, failed
 
         # --- Paso 3: PINK key condition ---
-        # TradingLab: 1H EMA 50 breaks AGAINST the trend direction (corrective pattern
-        # breaks it the wrong way). For BUY, price < EMA (broke below). For SELL, price > EMA.
-        # This differentiates PINK from RED (which requires BOTH to break WITH the trend).
+        # TradingLab: The corrective pattern (Wave 4) MUST have broken the 1H EMA 50
+        # against the trend. By the time PINK triggers, the correction is ending and
+        # price may have returned near/above the EMA. We check HISTORICAL candles to
+        # see if the EMA WAS broken during the correction, not just current position.
         opposite = "SELL" if direction == "BUY" else "BUY"
-        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", opposite)
+
+        # Check if 1H EMA was historically broken during correction (last 20 H1 candles)
+        ema_h1_val = _ema_val(analysis, "EMA_H1_50")
+        h1_candles = getattr(analysis, 'last_candles', {}).get("H1", [])
+        ema_1h_was_broken = False
+        if ema_h1_val and len(h1_candles) >= 5:
+            for candle in h1_candles[-20:]:
+                close = candle.get("close", 0)
+                if direction == "BUY" and close < ema_h1_val:
+                    ema_1h_was_broken = True
+                    break
+                elif direction == "SELL" and close > ema_h1_val:
+                    ema_1h_was_broken = True
+                    break
+        else:
+            # Fallback to current check if no historical data
+            ema_1h_was_broken, _ = _check_ema_break(analysis, "EMA_H1_50", opposite)
+
         # TradingLab: 4H EMA must NOT be broken by the correction (opposite direction).
-        # For BUY: correction goes down, so check if price broke BELOW 4H EMA (it shouldn't have).
-        # For SELL: correction goes up, so check if price broke ABOVE 4H EMA (it shouldn't have).
         ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", opposite)
 
-        # 1H EMA 50 must be broken (corrective pattern broke it)
-        if ema_1h_break:
+        # 1H EMA 50 must have been broken during correction (historical check)
+        if ema_1h_was_broken:
             score += 15.0
-            met.append(f"Paso 3a: EMA 50 1H rota - {ema_1h_desc}")
+            met.append(f"Paso 3a: EMA 50 1H fue rota durante corrección (histórico)")
         else:
-            failed.append(f"Paso 3a: EMA 50 1H NO rota - {ema_1h_desc}")
+            failed.append(f"Paso 3a: EMA 50 1H NO fue rota durante corrección")
             return False, score, met, failed
 
         # 4H EMA 50 must NOT be broken (if it were, this would be RED, not PINK)
@@ -2583,9 +2599,10 @@ class WhiteStrategy(BaseStrategy):
         if ema_1h_check:
             pink_proxy_score += 1
 
-        # Also accept Elliott wave data as confirmation
-        elliott = analysis.elliott_wave
-        if elliott:
+        # Accept Elliott wave data ONLY if it's Wave 4 or 5 context (PINK territory)
+        ew_detail = getattr(analysis, 'elliott_wave_detail', {})
+        wave_count = str(ew_detail.get("wave_count", "")).strip() if ew_detail else ""
+        if wave_count in ("4", "5"):
             pink_proxy_score += 1
 
         # Need at least 2 of the 4 proxy conditions to confirm PINK phase

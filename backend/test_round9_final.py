@@ -149,8 +149,12 @@ def make_analysis(**kwargs):
         power_of_three={"phase": "distribution", "direction_bias": "bullish"},
         last_candles={
             "M5": [
-                {"close": 1.1045}, {"close": 1.1048}, {"close": 1.1051},
-                {"close": 1.1054}, {"close": 1.1057}, {"close": 1.1060},
+                {"open": 1.1043, "high": 1.1047, "low": 1.1042, "close": 1.1045, "volume": 100},
+                {"open": 1.1045, "high": 1.1050, "low": 1.1044, "close": 1.1048, "volume": 110},
+                {"open": 1.1048, "high": 1.1053, "low": 1.1047, "close": 1.1051, "volume": 120},
+                {"open": 1.1051, "high": 1.1056, "low": 1.1050, "close": 1.1054, "volume": 130},
+                {"open": 1.1054, "high": 1.1059, "low": 1.1053, "close": 1.1057, "volume": 140},
+                {"open": 1.1057, "high": 1.1062, "low": 1.1056, "close": 1.1060, "volume": 150},
             ]
         },
     )
@@ -261,7 +265,7 @@ def test_block_1_imports():
     check("Trend has 3 values", len(Trend) == 3)
     check("MarketCondition has 6 values", len(MarketCondition) == 6)  # includes CONSOLIDATING
     check("PositionPhase has 5 values", len(PositionPhase) == 5)
-    check("ManagementStyle has 4 values", len(ManagementStyle) == 4)
+    check("ManagementStyle has 5 values", len(ManagementStyle) == 5)
 
 
 # ===================================================================
@@ -539,29 +543,31 @@ def test_block_4_position_manager():
     check("PositionPhase.TRAILING_TO_TP1", PositionPhase.TRAILING_TO_TP1.value == "trailing")
     check("PositionPhase.BEYOND_TP1", PositionPhase.BEYOND_TP1.value == "aggressive")
 
-    # EMA timeframe grid (9 entries = 3 styles x 3 trading styles)
-    check("EMA grid has 9 entries", len(_EMA_TIMEFRAME_GRID) == 9)
-    check("LP+swing -> EMA_W_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_W_50")
-    check("LP+daytrading -> EMA_H4_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.DAY_TRADING)] == "EMA_H4_50")
+    # EMA timeframe grid (12 entries = 4 styles x 3 trading styles, includes DAILY)
+    check("EMA grid has 12 entries", len(_EMA_TIMEFRAME_GRID) == 12)
+    # Forex grid values (NOT crypto — crypto uses _EMA_TIMEFRAME_GRID_CRYPTO)
+    check("LP+swing -> EMA_D_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_D_50")
+    check("LP+daytrading -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.DAY_TRADING)] == "EMA_H1_50")
     check("LP+scalping -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SCALPING)] == "EMA_M15_50")
     check("CP+swing -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SWING)] == "EMA_H1_50")
-    check("CP+daytrading -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M15_50")
+    check("CP+daytrading -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M5_50")
     check("CP+scalping -> EMA_M1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SCALPING)] == "EMA_M1_50")
     check("CPA+swing -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.SWING)] == "EMA_M15_50")
-    check("CPA+daytrading -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.DAY_TRADING)] == "EMA_M5_50")
+    check("CPA+daytrading -> EMA_M2_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.DAY_TRADING)] == "EMA_M2_50")
     check("CPA+scalping -> EMA_M1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.SCALPING)] == "EMA_M1_50")
 
     # PositionManager initialization
+    # Forex grid: LP/day=EMA_H1_50, CPA/day=EMA_M2_50, CP/day=EMA_M5_50
     pm_lp = PositionManager(broker, management_style="lp", trading_style="day_trading")
-    check("PM base_ema is EMA_H4_50 for LP+daytrading", pm_lp._base_ema_key == "EMA_H4_50")
-    check("PM cpa_ema is EMA_M5_50 for CPA+daytrading", pm_lp._cpa_ema_key == "EMA_M5_50")
+    check("PM base_ema is EMA_H1_50 for LP+daytrading", pm_lp._base_ema_key == "EMA_H1_50")
+    check("PM cpa_ema is EMA_M2_50 for CPA+daytrading", pm_lp._cpa_ema_key == "EMA_M2_50")
 
     pm_cp = PositionManager(broker, management_style="cp", trading_style="day_trading")
-    check("CP+daytrading base=EMA_M15_50", pm_cp._base_ema_key == "EMA_M15_50")
+    check("CP+daytrading base=EMA_M5_50", pm_cp._base_ema_key == "EMA_M5_50")
 
     pm_pa = PositionManager(broker, management_style="price_action", trading_style="day_trading")
     check("PRICE_ACTION base_ema is None", pm_pa._base_ema_key is None)
-    check("PRICE_ACTION cpa_ema set", pm_pa._cpa_ema_key == "EMA_M5_50")
+    check("PRICE_ACTION cpa_ema set", pm_pa._cpa_ema_key == "EMA_M2_50")
 
     # Track position
     pos = ManagedPosition(

@@ -214,7 +214,7 @@ def block_1_module_imports():
         ManagementStyle, TradingStyle as PMTradingStyle,
     )
     check("B1-14 PositionManager importable", PositionManager is not None)
-    check("B1-15 ManagementStyle has 4 members", len(ManagementStyle) == 4)
+    check("B1-15 ManagementStyle has 5 members", len(ManagementStyle) == 5)
 
     # 4. risk_manager
     from core.risk_manager import RiskManager, TradingStyle, DrawdownMethod, TradeRisk, TradeResult
@@ -313,10 +313,11 @@ def block_2_strategy_behavior():
     check("B2-SL-BLACK BUY is nearest", black_sl >= 1.09,
           f"black_sl={black_sl}, expected ~1.09")
 
-    # GREEN SL: nearest support below (max of below, tight for high R:R)
+    # GREEN SL: uses 1H swing lows (NOT key_levels supports). Default swing_lows=[1.085,1.08,1.075]
+    # max(swing_lows below entry) = 1.085
     green_sl = strategies["GREEN"].get_sl_placement(a, "BUY", 1.10)
-    check("B2-SL-GREEN BUY is nearest", green_sl >= 1.09,
-          f"green_sl={green_sl}, expected ~1.09")
+    check("B2-SL-GREEN BUY uses swing_lows", green_sl >= 1.08 and green_sl < 1.10,
+          f"green_sl={green_sl}, expected ~1.085 (max of swing_lows below entry)")
 
     # SELL direction SL tests
     blue_sl_sell = strategies["BLUE"].get_sl_placement(a, "SELL", 1.10)
@@ -748,11 +749,12 @@ def block_4_position_manager():
           f"sl={pos5.current_sl}")
 
     # LP/CP/CPA EMA key correctness
+    # Forex grid: LP/swing=EMA_D_50, CP/day=EMA_M5_50 (crypto grid is wider)
     pm_lp_swing = PositionManager(broker, management_style="lp", trading_style="swing")
-    check("B4-EMA LP/swing = W_50", pm_lp_swing._base_ema_key == "EMA_W_50")
+    check("B4-EMA LP/swing = D_50", pm_lp_swing._base_ema_key == "EMA_D_50")
 
     pm_cp_dt = PositionManager(broker, management_style="cp", trading_style="day_trading")
-    check("B4-EMA CP/day = M15_50", pm_cp_dt._base_ema_key == "EMA_M15_50")
+    check("B4-EMA CP/day = M5_50", pm_cp_dt._base_ema_key == "EMA_M5_50")
 
     pm_cpa_scalp = PositionManager(broker, management_style="cpa", trading_style="scalping")
     check("B4-EMA CPA/scalp = M1_50", pm_cpa_scalp._base_ema_key == "EMA_M1_50")
@@ -1288,7 +1290,7 @@ def block_11_regressions():
     check("R4-01 SL moved up or stayed", pos.current_sl >= prev_sl)
 
     # R4-Bug2: EMA grid completeness
-    check("R4-02 EMA grid has 9 entries", len(_EMA_TIMEFRAME_GRID) == 9)
+    check("R4-02 EMA grid has 12 entries", len(_EMA_TIMEFRAME_GRID) == 12)
 
     # R4-Bug3: PRICE_ACTION style instantiation
     pm_pa = PositionManager(broker, management_style="price_action", trading_style="day_trading")

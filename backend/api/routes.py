@@ -54,8 +54,23 @@ class TradeResponse(BaseModel):
 
 
 # ── Engine Status ─────────────────────────────────────────────────
-# Removed Pydantic response_model to avoid stripping dynamic fields
-# like positions, daily_activity, etc. that the frontend needs.
+# Note: response_model is NOT used on the endpoint (to avoid stripping
+# dynamic fields), but EngineStatusResponse is kept as a schema reference
+# for tests and documentation.
+
+class EngineStatusResponse(BaseModel):
+    """Schema reference for the /status endpoint response."""
+    running: bool = False
+    mode: str = "AUTO"
+    broker: str = "capital"
+    open_positions: int = 0
+    pending_setups: int = 0
+    total_risk: float = 0.0
+    watchlist_count: int = 0
+    startup_error: str = ""
+    scanned_instruments: int = 0
+    positions: List[Dict] = []
+    daily_activity: Dict = {}
 
 @router.get("/status")
 async def get_status():

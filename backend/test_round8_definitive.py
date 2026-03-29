@@ -284,7 +284,7 @@ def test_imports():
         from dataclasses import fields as dc_fields2
         mp_fields = {f.name for f in dc_fields2(ManagedPosition)}
         check("T23: ManagedPosition dataclass", 'trade_id' in mp_fields)
-        check("T24: _EMA_TIMEFRAME_GRID has 9 entries", len(_EMA_TIMEFRAME_GRID) == 9)
+        check("T24: _EMA_TIMEFRAME_GRID has 12 entries", len(_EMA_TIMEFRAME_GRID) == 12)
     except Exception as e:
         check("T19-T24: position_manager imports", False, str(e))
 
@@ -727,7 +727,7 @@ def test_market_analyzer():
 
     # --- EMA calculation (110-120) ---
     candles_dict = {}
-    for tf in ("W", "D", "H4", "H1", "M15", "M5", "M1"):
+    for tf in ("W", "D", "H4", "H1", "M15", "M5", "M2", "M1"):
         n = 200
         candles_dict[tf] = pd.DataFrame({
             "open": np.linspace(1.0, 1.1, n),
@@ -820,7 +820,9 @@ def test_market_analyzer():
 
     # --- Session detection (134-138) ---
     session = analyzer._detect_session()
-    check("T134: Session is a valid string", session in ("ASIAN", "LONDON", "OVERLAP", "NEW_YORK", "OFF_HOURS"))
+    # _detect_session returns (session_name, detail) tuple
+    session_name = session[0] if isinstance(session, tuple) else session
+    check("T134: Session is a valid string", session_name in ("ASIAN", "LONDON", "OVERLAP", "NEW_YORK", "OFF_HOURS"))
 
     # --- Key levels detection (139-142) ---
     levels = analyzer._find_key_levels(candles_dict)
@@ -901,10 +903,10 @@ def test_position_risk():
     pm = PositionManager(broker, management_style="lp", trading_style="day_trading")
     check("T151: PM management_style is LP", pm.management_style == ManagementStyle.LP)
     check("T152: PM trading_style is DAY_TRADING", pm.trading_style == TradingStyle.DAY_TRADING)
-    check("T153: PM base EMA key for LP/DayTrading is EMA_H4_50",
-          pm._base_ema_key == "EMA_H4_50")
-    check("T154: PM CPA EMA key for DayTrading is EMA_M5_50",
-          pm._cpa_ema_key == "EMA_M5_50")
+    check("T153: PM base EMA key for LP/DayTrading is EMA_H1_50",
+          pm._base_ema_key == "EMA_H1_50")
+    check("T154: PM CPA EMA key for DayTrading is EMA_M2_50",
+          pm._cpa_ema_key == "EMA_M2_50")
 
     pm_cp = PositionManager(broker, management_style="cp", trading_style="swing")
     check("T155: CP/Swing base EMA is EMA_H1_50", pm_cp._base_ema_key == "EMA_H1_50")
@@ -914,11 +916,11 @@ def test_position_risk():
 
     pm_pa = PositionManager(broker, management_style="price_action", trading_style="day_trading")
     check("T157: PRICE_ACTION base EMA is None", pm_pa._base_ema_key is None)
-    check("T158: PRICE_ACTION CPA EMA still set", pm_pa._cpa_ema_key == "EMA_M5_50")
+    check("T158: PRICE_ACTION CPA EMA still set", pm_pa._cpa_ema_key == "EMA_M2_50")
 
     # All 9 grid combos
-    check("T159: Grid has LP/SWING -> EMA_W_50",
-          _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_W_50")
+    check("T159: Grid has LP/SWING -> EMA_D_50",
+          _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_D_50")
     check("T160: Grid has CP/SCALPING -> EMA_M1_50",
           _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SCALPING)] == "EMA_M1_50")
 
@@ -1543,9 +1545,11 @@ def test_integration():
     check("T352: Pipeline 2 - Red HTF bearish GBP_USD", htf_ok2)
 
     # Dataset 3: Counter-trend on overbought
+    # Black with bullish HTF -> SELL direction -> needs price near resistance
     analysis3 = _make_analysis(
         instrument="USD_JPY", htf_trend_val="bullish", htf_condition_val="overbought",
-        ema_values={"EMA_H1_50": 150.500, "EMA_H4_50": 149.800, "EMA_M5_5": 150.500},
+        current_price=150.500,
+        ema_values={"EMA_H1_50": 150.500, "EMA_H4_50": 149.800, "EMA_M5_5": 150.500, "EMA_M5_2": 150.500},
         key_levels={"supports": [149.0], "resistances": [150.500, 151.0], "fvg": [], "fvg_zones": [], "liquidity_pools": []},
     )
     black = BlackStrategy()
@@ -1762,8 +1766,8 @@ def test_integration():
     # Check that the analyzer ema_configs could produce these keys
     analyzer_keys = set()
     ema_configs = {
-        "W": [8, 50], "D": [20, 50], "H4": [50], "H1": [50],
-        "M15": [5, 20, 50], "M5": [2, 5, 20, 50], "M1": [50],
+        "W": [8, 50], "D": [20, 50], "H4": [20, 50], "H1": [20, 50],
+        "M15": [5, 20, 50], "M5": [2, 5, 20, 50], "M2": [5, 50], "M1": [50],
     }
     for tf, periods in ema_configs.items():
         for period in periods:

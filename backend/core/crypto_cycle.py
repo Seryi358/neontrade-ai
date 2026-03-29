@@ -41,6 +41,10 @@ class CryptoMarketCycle:
     # Golden Cross / Death Cross (Esp. Criptomonedas Section 8 - SMA 200 Daily)
     golden_cross: bool = False  # SMA 50 crossed above SMA 200 (strong bullish signal)
     death_cross: bool = False   # SMA 50 crossed below SMA 200 (strong bearish signal)
+    # RSI Diagonal Trendline Analysis (Esp. Criptomonedas Section 8)
+    # Alex: drawing diagonals on RSI peaks/troughs is MORE reliable than fixed levels
+    rsi_diagonal_bearish: bool = False  # RSI peaks forming descending trendline (distribution)
+    rsi_diagonal_bullish: bool = False  # RSI troughs forming ascending trendline (accumulation)
     last_updated: Optional[str] = None
 
 
@@ -371,12 +375,63 @@ class CryptoCycleAnalyzer:
                 rs = avg_gain / avg_loss
                 rsi = 100 - (100 / (1 + rs))
             cycle.btc_rsi_14 = rsi
-            # NOTE: Standard RSI thresholds are 70 (overbought) and 30 (oversold).
-            # For BTC cycle analysis on weekly/2-week charts we use more extreme
-            # levels (>80 / <25) because crypto markets on higher-timeframe charts
-            # routinely sustain RSI above 70 during bull runs and below 30 during
-            # prolonged bear markets. The extreme thresholds filter out noise and
-            # only flag true cycle distribution tops and accumulation bottoms.
+
+            # RSI Diagonal Trendline Analysis (Esp. Criptomonedas Section 8)
+            # Alex: "ha sido capaz de enlazar de forma muy clara diferentes
+            # estructuras de máximos" — drawing descending diagonals on RSI peaks
+            # across multiple cycles is MORE useful than fixed overbought/oversold.
+            # Detect: if RSI peaks are forming a descending trendline (each peak
+            # lower than the last), this signals distribution even if RSI < 80.
+            rsi_series = self._calculate_rsi_series(closes)
+            if len(rsi_series) >= 10:
+                # Find RSI peaks (local maxima in last 20 weekly candles)
+                peaks = []
+                for i in range(1, len(rsi_series) - 1):
+                    if rsi_series[i] > rsi_series[i - 1] and rsi_series[i] > rsi_series[i + 1]:
+                        peaks.append((i, rsi_series[i]))
+
+                if len(peaks) >= 3:
+                    # Check if RSI peaks form a descending trendline
+                    recent_peaks = peaks[-4:]  # Last 4 peaks
+                    peak_values = [p[1] for p in recent_peaks]
+                    descending = all(
+                        peak_values[i] > peak_values[i + 1]
+                        for i in range(len(peak_values) - 1)
+                    )
+                    if descending and peak_values[-1] < peak_values[0] * 0.9:
+                        cycle.rsi_diagonal_bearish = True
+                        logger.info(
+                            f"RSI DIAGONAL BEARISH: peaks declining "
+                            f"{[f'{p:.1f}' for p in peak_values]} — "
+                            f"distribution signal (Alex: 'enlazar máximos decrecientes')"
+                        )
+                    else:
+                        cycle.rsi_diagonal_bearish = False
+
+                    # Also check ascending trendline on RSI troughs (accumulation)
+                    troughs = []
+                    for i in range(1, len(rsi_series) - 1):
+                        if rsi_series[i] < rsi_series[i - 1] and rsi_series[i] < rsi_series[i + 1]:
+                            troughs.append((i, rsi_series[i]))
+                    if len(troughs) >= 3:
+                        recent_troughs = troughs[-4:]
+                        trough_values = [t[1] for t in recent_troughs]
+                        ascending = all(
+                            trough_values[i] < trough_values[i + 1]
+                            for i in range(len(trough_values) - 1)
+                        )
+                        if ascending and trough_values[-1] > trough_values[0] * 1.1:
+                            cycle.rsi_diagonal_bullish = True
+                            logger.info(
+                                f"RSI DIAGONAL BULLISH: troughs rising "
+                                f"{[f'{t:.1f}' for t in trough_values]} — "
+                                f"accumulation signal"
+                            )
+                        else:
+                            cycle.rsi_diagonal_bullish = False
+
+            # Fixed threshold analysis (NeonTrade AI defaults, not mentorship)
+            # Alex focuses on diagonal trendlines, not fixed levels.
             if rsi > 80:
                 cycle.market_phase = "distribution"  # Potential cycle top
             elif rsi < 25:
@@ -560,6 +615,29 @@ class CryptoCycleAnalyzer:
             cycle.market_phase = "accumulation"
         else:
             cycle.market_phase = "distribution"
+
+    @staticmethod
+    def _calculate_rsi_series(closes: list, period: int = 14) -> list:
+        """Calculate RSI for each point in the series (for diagonal analysis)."""
+        if len(closes) < period + 1:
+            return []
+        rsi_values = []
+        gains, losses = [], []
+        for i in range(1, len(closes)):
+            diff = closes[i] - closes[i - 1]
+            gains.append(max(diff, 0))
+            losses.append(max(-diff, 0))
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+            if avg_loss == 0:
+                rsi_values.append(100.0)
+            else:
+                rs = avg_gain / avg_loss
+                rsi_values.append(100 - (100 / (1 + rs)))
+        return rsi_values
 
     async def get_crypto_trailing_ema(
         self,

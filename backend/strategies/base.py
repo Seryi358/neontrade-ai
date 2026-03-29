@@ -419,6 +419,21 @@ def _validate_elliott_fibonacci(analysis, direction: str) -> tuple[bool, str]:
     fib = analysis.fibonacci_levels
     price = analysis.current_price
 
+    # Elliott Wave fundamental rule: "la onda 3 nunca es la más corta"
+    # Wave 3 can NEVER be the shortest impulse wave (1, 3, or 5)
+    wave_lengths = ew.get("wave_lengths", {})
+    if wave_lengths:
+        w1 = wave_lengths.get("1", 0)
+        w3 = wave_lengths.get("3", 0)
+        w5 = wave_lengths.get("5", 0)
+        if w3 > 0 and w1 > 0 and w5 > 0:
+            if w3 < w1 and w3 < w5:
+                return False, (
+                    f"INVALIDO: Onda 3 ({w3:.5f}) es la más corta "
+                    f"(W1={w1:.5f}, W5={w5:.5f}). "
+                    f"Regla de Elliott: la Onda 3 NUNCA puede ser la más corta."
+                )
+
     if not price or not fib:
         return True, ""
 
@@ -3524,38 +3539,62 @@ class GreenStrategy(BaseStrategy):
                         break
 
         # Fallback: EMA breaks if no diagonal detected.
-        # Day Trading mode: try M5 first (closest proxy to M2 which brokers don't provide),
-        # then fall back to M15 if M5 data isn't available.
+        # GREEN execution timeframe per mentorship:
+        #   Swing: 15M execution → try M15 EMAs first
+        #   Day Trading: 2M execution (M5 proxy) → try M5 EMAs first
+        #   Scalping: 30s execution (M1 proxy) → try M1 EMAs
         if not diagonal_breakout_detected:
-            # Try M5 EMAs first (proxy for M2 execution in Day Trading mode)
-            ema_m5_break, ema_m5_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
-            ema_m5_20_break, ema_m5_20_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+            # Determine primary execution EMA based on trading style
+            trading_style = getattr(settings, 'trading_style', 'day_trading') if 'settings' in dir() else 'day_trading'
+            try:
+                from config import settings as _s
+                trading_style = _s.trading_style
+            except Exception:
+                pass
+
+            if trading_style == "swing":
+                # Swing: 15M is the execution timeframe (mentorship)
+                primary_ema = "EMA_M15_50"
+                primary_ema2 = "EMA_M15_20"
+                fallback_ema = "EMA_M5_50"
+                fallback_ema2 = "EMA_M5_20"
+                style_label = "Swing"
+            else:
+                # Day Trading: M5 is proxy for M2 (broker API limitation)
+                primary_ema = "EMA_M5_50"
+                primary_ema2 = "EMA_M5_20"
+                fallback_ema = "EMA_M15_50"
+                fallback_ema2 = "EMA_M15_20"
+                style_label = "Day Trading"
+
+            ema_m5_break, ema_m5_desc = _check_ema_break(analysis, primary_ema, direction)
+            ema_m5_20_break, ema_m5_20_desc = _check_ema_break(analysis, primary_ema2, direction)
 
             if ema_m5_break and ema_m5_20_break:
-                if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
+                if _check_rcc_confirmation(analysis, primary_ema, direction):
                     confidence += 12.0
-                    met.append(f"Paso 5: M5 proxy (Day Trading) - RCC confirmado (EMA 50 + EMA 20 de M5)")
+                    met.append(f"Paso 5: {style_label} - RCC confirmado ({primary_ema} + {primary_ema2})")
                 else:
                     confidence += 7.0
-                    met.append(f"Paso 5: M5 proxy (Day Trading) - Rompimiento doble sin RCC")
+                    met.append(f"Paso 5: {style_label} - Rompimiento doble sin RCC")
             elif ema_m5_break:
                 confidence += 4.0
-                met.append(f"Paso 5: M5 proxy (Day Trading) - Rompimiento parcial - {ema_m5_desc}")
+                met.append(f"Paso 5: {style_label} - Rompimiento parcial - {ema_m5_desc}")
             else:
-                # Fall back to M15 EMAs if M5 data not available or no break
-                ema_15m_break, ema_15m_desc = _check_ema_break(analysis, "EMA_M15_5", direction)
-                ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, "EMA_M15_20", direction)
+                # Fall back to secondary timeframe EMAs
+                ema_15m_break, ema_15m_desc = _check_ema_break(analysis, fallback_ema, direction)
+                ema_15m_20_break, ema_15m_20_desc = _check_ema_break(analysis, fallback_ema2, direction)
 
                 if ema_15m_break and ema_15m_20_break:
-                    if _check_rcc_confirmation(analysis, "EMA_M15_5", direction):
+                    if _check_rcc_confirmation(analysis, fallback_ema, direction):
                         confidence += 10.0
-                        met.append(f"Paso 5: Fallback EMA - RCC confirmado (EMA 5 + EMA 20 de M15)")
+                        met.append(f"Paso 5: Fallback - RCC confirmado ({fallback_ema} + {fallback_ema2})")
                     else:
                         confidence += 5.0
-                        met.append(f"Paso 5: Fallback EMA - Rompimiento doble sin RCC")
+                        met.append(f"Paso 5: Fallback - Rompimiento doble sin RCC")
                 elif ema_15m_break:
                     confidence += 3.0
-                    met.append(f"Paso 5: Fallback EMA - Rompimiento parcial - {ema_15m_desc}")
+                    met.append(f"Paso 5: Fallback - Rompimiento parcial - {ema_15m_desc}")
                 else:
                     failed.append(f"Paso 5: Sin rompimiento de diagonal ni EMA en M5/M15 - {ema_15m_desc}")
 

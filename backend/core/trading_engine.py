@@ -620,10 +620,19 @@ class TradingEngine:
                         f"Funded mode: news filter blocking ALL activity: {news_desc}"
                     )
                     return
-                logger.info(f"News filter active: {news_desc} — skipping trade execution")
-                # Still scan for analysis but don't execute
-                await self._scan_analysis_only()
-                return
+                # Swing trading: mentorship says "podemos llegar a ejecutar incluso"
+                # Don't hard-block execution for swing — just warn and continue
+                if settings.trading_style == "swing":
+                    logger.warning(
+                        f"News active during swing trading: {news_desc} — "
+                        f"proceeding with caution (mentorship: swing can execute during news)"
+                    )
+                    # Continue to normal scan — swing is allowed during news
+                else:
+                    logger.info(f"News filter active: {news_desc} — skipping trade execution")
+                    # Still scan for analysis but don't execute
+                    await self._scan_analysis_only()
+                    return
 
             # Step 0: Sync balance for drawdown tracking (risk manager)
             try:

@@ -488,6 +488,15 @@ def _validate_elliott_fibonacci(analysis, direction: str) -> tuple[bool, str]:
                     f"Regla de Elliott: la Onda 3 NUNCA puede ser la más corta."
                 )
 
+    # Wave 3/5 role exchange: "si la onda 3 es excesivamente justa, intercambiamos papeles"
+    # When Wave 3 is shorter than Wave 1, Wave 5 can target 1.618 extension
+    wave3_short = False
+    if wave_lengths:
+        w1 = wave_lengths.get("1", 0)
+        w3 = wave_lengths.get("3", 0)
+        if w1 > 0 and w3 > 0 and w3 < w1:
+            wave3_short = True  # Used by strategies to allow extended Wave 5 targets
+
     if not price or not fib:
         return True, ""
 

@@ -217,6 +217,7 @@ class TradeJournal:
             "asr_management_correct": None,     # Was position managed correctly?
             "asr_would_enter_again": None,      # Would you enter again?
             "asr_lessons": "",                  # Lessons/comments/points to note
+            "asr_error_type": None,             # Error taxonomy (ASR Ponencia): PERCEPTION, TECHNICAL, ROUTINE, EMOTIONAL
         }
 
         self._trades.append(trade_record)

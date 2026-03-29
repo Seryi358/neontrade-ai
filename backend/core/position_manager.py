@@ -476,6 +476,25 @@ class PositionManager:
             else (pos.entry_price - current_price)
         )
 
+        # Intermediate step: at 50% of BE threshold, reduce risk by 50%
+        # Mentorship transcription: "antes del break-even, al 50% de beneficio, muevo el SL
+        # para eliminar el 50% del riesgo" — progressive risk reduction before full BE.
+        half_be_profit = risk_distance * 0.5
+        if current_profit >= half_be_profit and not getattr(pos, '_half_risk_applied', False):
+            # Move SL to reduce 50% of remaining risk
+            if pos.direction == "BUY":
+                half_sl = pos.current_sl + (pos.entry_price - pos.current_sl) * 0.5
+                if half_sl > pos.current_sl:
+                    await self._update_sl(pos, half_sl)
+                    pos._half_risk_applied = True  # type: ignore[attr-defined]
+                    logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
+            else:
+                half_sl = pos.current_sl - (pos.current_sl - pos.entry_price) * 0.5
+                if half_sl < pos.current_sl:
+                    await self._update_sl(pos, half_sl)
+                    pos._half_risk_applied = True  # type: ignore[attr-defined]
+                    logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
+
         # Calculate BE threshold based on configured method
         if settings.be_trigger_method == "risk_distance":
             # Alex's rule: BE when unrealized profit >= 1x risk distance (e.g., 1% profit at 1% risk)

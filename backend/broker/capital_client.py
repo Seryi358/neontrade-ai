@@ -598,7 +598,7 @@ class CapitalClient(BaseBroker):
     async def place_limit_order(
         self,
         instrument: str,
-        units: int,
+        units: float,
         price: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
@@ -663,7 +663,7 @@ class CapitalClient(BaseBroker):
     async def place_stop_order(
         self,
         instrument: str,
-        units: int,
+        units: float,
         stop_price: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
@@ -724,7 +724,7 @@ class CapitalClient(BaseBroker):
             logger.error(f"Stop order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
 
-    async def _confirm_deal(self, deal_reference: str, units: int) -> OrderResult:
+    async def _confirm_deal(self, deal_reference: str, units: float) -> OrderResult:
         """Confirm a deal was executed using the dealReference."""
         await asyncio.sleep(0.5)  # Brief delay for deal processing
         try:

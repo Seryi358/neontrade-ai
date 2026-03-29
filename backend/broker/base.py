@@ -46,7 +46,7 @@ class OrderResult:
     success: bool
     trade_id: Optional[str] = None
     fill_price: Optional[float] = None
-    units: int = 0
+    units: float = 0
     error: Optional[str] = None
     raw_response: Optional[Dict] = None
 
@@ -69,7 +69,7 @@ class TradeInfo:
     trade_id: str
     instrument: str
     direction: str  # "BUY" or "SELL"
-    units: int
+    units: float
     entry_price: float
     current_price: float
     unrealized_pnl: float
@@ -126,7 +126,7 @@ class BaseBroker(ABC):
     async def place_market_order(
         self,
         instrument: str,
-        units: int,
+        units: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
     ) -> OrderResult:
@@ -137,7 +137,7 @@ class BaseBroker(ABC):
     async def place_limit_order(
         self,
         instrument: str,
-        units: int,
+        units: float,
         price: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,

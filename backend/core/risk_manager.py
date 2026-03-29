@@ -402,6 +402,9 @@ class RiskManager:
             balance = await self.broker.get_account_balance()
             balance_cache.set("account_balance", balance)
 
+        if balance <= 0:
+            return 0
+
         risk_percent = self.get_risk_for_style(style)
         risk_percent = self._adjust_for_correlation(instrument, risk_percent)
 
@@ -418,6 +421,9 @@ class RiskManager:
         # so we must NOT multiply by it. Direct division gives correct CFD units.
         # Example: $100 risk, 0.0050 SL distance = 20,000 units
         units = int(risk_amount / sl_distance)
+
+        if units <= 0:
+            return 0  # Cannot trade with 0 or negative units
 
         # Cap maximum position size to prevent broker rejections
         MAX_UNITS = 10_000_000

@@ -134,6 +134,9 @@ async def lifespan(app: FastAPI):
     # Start WebSocket status broadcast loop
     status_task = asyncio.create_task(_status_broadcast_loop())
 
+    # Start periodic cleanup (rate limiter + old DB data)
+    cleanup_task = asyncio.create_task(_periodic_cleanup())
+
     yield
 
     # Shutdown — cancel tasks and await them to prevent CancelledError warnings
@@ -141,7 +144,8 @@ async def lifespan(app: FastAPI):
     await engine.stop()
     engine_task.cancel()
     status_task.cancel()
-    for task in (engine_task, status_task):
+    cleanup_task.cancel()
+    for task in (engine_task, status_task, cleanup_task):
         try:
             await task
         except asyncio.CancelledError:
@@ -170,6 +174,32 @@ async def _status_broadcast_loop():
         except Exception as e:
             logger.debug(f"Status broadcast error: {e}")
         await asyncio.sleep(3)
+
+
+_last_db_cleanup_date: str = ""
+
+
+async def _periodic_cleanup():
+    """Periodic cleanup of rate limiter and old data."""
+    global _last_db_cleanup_date
+    while True:
+        await asyncio.sleep(300)  # Every 5 minutes
+        try:
+            from core.security import rate_limiter
+            rate_limiter.cleanup()
+        except Exception:
+            pass
+
+        # DB retention cleanup — once per day
+        try:
+            from datetime import datetime
+            today = datetime.utcnow().strftime("%Y-%m-%d")
+            if db is not None and today != _last_db_cleanup_date:
+                await db.cleanup_old_data(days=90)
+                _last_db_cleanup_date = today
+                logger.info("DB retention cleanup completed (90-day policy)")
+        except Exception as e:
+            logger.debug(f"DB cleanup error: {e}")
 
 
 # ── FastAPI App ──────────────────────────────────────────────────

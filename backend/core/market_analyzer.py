@@ -1122,7 +1122,10 @@ class MarketAnalyzer:
                 key = f"EMA_{tf}_{period}"
                 ema = df["close"].ewm(span=period).mean()
                 if not ema.empty:
-                    emas[key] = ema.iloc[-1]
+                    ema_value = ema.iloc[-1]
+                    if pd.isna(ema_value):
+                        continue  # Skip NaN EMAs instead of storing them
+                    emas[key] = ema_value
 
         return emas
 

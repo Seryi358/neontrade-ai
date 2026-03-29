@@ -574,6 +574,21 @@ class TradeDatabase:
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
+    # ── Data Retention ───────────────────────────────────────────
+
+    async def cleanup_old_data(self, days: int = 90):
+        """Delete analysis_log and equity_snapshots older than N days."""
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        await self._db.execute(
+            "DELETE FROM analysis_log WHERE timestamp < ?", (cutoff,)
+        )
+        await self._db.execute(
+            "DELETE FROM equity_snapshots WHERE timestamp < ?", (cutoff,)
+        )
+        await self._db.commit()
+        logger.info(f"Cleaned up analysis_log and equity_snapshots older than {days} days")
+
     # ── Trade Notes ──────────────────────────────────────────────
 
     async def update_trade_notes(self, trade_id: str, notes: str) -> bool:

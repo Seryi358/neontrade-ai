@@ -5,10 +5,6 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
 
-# OANDA API
-oandapyV20==0.7.2
-requests==2.32.3
-
 # OpenAI
 openai==1.59.6
 
@@ -24,7 +20,6 @@ aiosqlite==0.20.0
 
 # WebSocket & Real-time
 websockets==14.1
-python-socketio==5.12.1
 
 # Scheduling
 apscheduler==3.11.0

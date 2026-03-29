@@ -136,11 +136,16 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown — cancel tasks and await them to prevent CancelledError warnings
     logger.info("NeonTrade AI shutting down...")
     await engine.stop()
     engine_task.cancel()
     status_task.cancel()
+    for task in (engine_task, status_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     try:
         broker = engine.broker

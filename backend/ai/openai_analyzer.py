@@ -294,6 +294,13 @@ Associated Wave: Wave 2 end on 4H → riding Wave 3
   TP_max: Fibonacci 1.618 extension (Wave 3 target). Extended TP: 1.618 extension ONLY for Wave 3 with strong daily move.
   Step 7: SL below EMA 50 4H (must cover previous swing). TP: previous high/low (safest). Extended: 1.618 only for Wave 3 with strong daily.
 
+Swing Trading Red Adaptation:
+  - Timeframes: Monthly (direction) → Weekly (trend change, EMA 50 Weekly break) → Daily (pullback to EMA 50 Daily + EMA 50 Weekly + Fibonacci) → 1H (execution)
+  - IMPORTANT: In swing, Daily EMA 50 breaks during the pullback are NORMAL and expected. Do NOT invalidate Red because of Daily EMA breaks — "no puedes exigirle tanto a la correlación entre gráfico semanal y gráfico diario."
+  - SL: Below/above EMA 50 Weekly (must cover previous swing extreme)
+  - TP: Previous high/low. Extended: 1.618 only for Wave 3 with strong Monthly direction
+  - At ATH (no Monthly resistance): require 2+ deceleration candles + 1 reversal candle on Monthly
+
 ──── PINK STRATEGY (Corrective Pattern Continuation — Wave 4→5) ────
 Associated Wave: Wave 4 correction end → entry for Wave 5
 
@@ -305,6 +312,11 @@ Associated Wave: Wave 4 correction end → entry for Wave 5
   Step 5: 5M entry at the FINAL portion of the pattern. The 5M EMA will NOT be respected throughout the pattern due to volatility — only look for it in the final phase when a mini-structure (double bottom, small diagonal) forms
   Step 6: SL below/above the previous swing low/high (NOT Fibonacci, NOT pattern edge). TP at previous swing high/low (conservative — trend may be ending at Wave 5)
   IMPORTANT: Alex PREFERS White over Pink for channel patterns (channels can be valid but less ideal for Pink — no convergence point makes timing harder)
+
+Swing Trading Pink Adaptation:
+  - Timeframes: Monthly (S/R or trend) → Weekly (trend + EMA 50 Weekly break + pullback to it) → Daily (corrective pattern: wedge/triangle/channel where EMA 50 Daily breaks in pattern form) → 1H (execution at final portion)
+  - The corrective pattern forms on the DAILY chart (not 1H as in day trading)
+  - Post-execution pullback is NORMAL in swing — price may retrace before continuing. This is expected, not a bad entry.
 
 ──── WHITE STRATEGY (Blue After a Pink — Post-Pink Continuation) ────
 Associated Wave: After Pink completes, riding the continuation
@@ -318,6 +330,10 @@ Associated Wave: After Pink completes, riding the continuation
   Step 6: SL above/below the previous swing high/low (tighter than Pink). TP: same as Pink target (previous swing extreme)
   White can SUBSTITUTE Pink — if you miss/don't like Pinks (especially channels), wait for White instead
   Channels favor White over Pink: "cuando yo veo un canal, no ejecuto pink, ejecuto white"
+
+Swing Trading White Adaptation:
+  - Timeframes: Monthly (must come from completed Pink) → Weekly (confirm Pink completed + impulse) → Daily (impulse + pullback to EMA 50 Daily + Fibonacci) → 1H (execution)
+  - Same rules as day trading but shifted timeframes. "Las pautas van a ser literalmente las mismas."
 
 ──── BLACK STRATEGY (Counter-Trend Anticipation — Elliott Wave 1) ────
 Associated Wave: Anticipating Wave 1 of a NEW trend (daily reversal)
@@ -336,6 +352,13 @@ Risk Level: HIGHEST — requires minimum 2:1 R:R
   MANDATORY: R:R must be >= 2.0 for BLACK strategy
   CRITICAL: If EMA 50 1H has rejected price repeatedly (2+ times in recent candles), BLACK is INVALID — the EMA has become established dynamic S/R against trade direction. A single touch/rejection is acceptable; repeated rejections mean the level is respected and BLACK will likely fail.
   CRITICAL: 1H corrective pattern is normally a triangle or wedge. Channels are very rare for BLACK ("muy pocas veces será un canal" — Alex) — not invalid but significantly less reliable. Penalize confidence, don't hard-block.
+
+Swing Trading Black Adaptation:
+  - Timeframes: Monthly (S/R level + EMA 50 Monthly as key reference) → Weekly (overbought/oversold + RSI divergence + consolidation) → Daily (reversal pattern: triangle, wedge, accumulation) → 1H (execution: diagonal + EMA 50 1H break)
+  - TP1: EMA 50 WEEKLY (not 4H). This is a critical difference from day trading.
+  - Monthly EMA 50 is very important for Black Swing as dynamic S/R reference
+  - Weekly RSI divergence is a key confirmation signal
+  - Pattern completion timing on Daily is critical — do not enter early
 
 ──── GREEN STRATEGY (Trend + Breakout + Pullback + Pattern — Most Lucrative) ────
 Primary use: Crypto (GREEN is the ONLY strategy for crypto markets)

@@ -31,6 +31,7 @@ class CryptoMarketCycle:
     bmsb_status: Optional[str] = None  # "bullish", "bearish", or None
     bmsb_consecutive_bearish_closes: int = 0  # Weekly closes below BMSB (need 2+ for confirmed bearish)
     pi_cycle_status: Optional[str] = None  # "near_top", "near_bottom", or None
+    sma_d200_position: Optional[str] = None  # "above" = bullish, "below" = bearish (price vs SMA 200 Daily)
     dominance_transition: Optional[Dict[str, str]] = None  # From get_dominance_transition()
     crypto_trailing_ema50: Optional[float] = None  # EMA 50 value for trailing stop
     using_fixed_tp_warning: bool = False  # True if fixed TPs detected instead of EMA trailing
@@ -87,6 +88,7 @@ class CryptoCycleAnalyzer:
         self._analyze_halving_phase(cycle)
         await self._analyze_rsi(cycle)
         await self._check_ema8_weekly(cycle)
+        await self._check_sma200_daily(cycle)
 
         # Incorporate BMSB and Pi Cycle from market_analyzer AnalysisResult
         self._apply_bmsb(cycle, bmsb)
@@ -398,6 +400,36 @@ class CryptoCycleAnalyzer:
         except Exception as e:
             logger.debug(f"EMA 8 weekly check failed: {e}")
 
+    async def _check_sma200_daily(self, cycle: CryptoMarketCycle):
+        """Check BTC price position relative to SMA 200 Daily.
+
+        From TradingLab mentorship: "above SMA 200 daily = bullish, below = bearish."
+        This is a fundamental macro indicator for determining overall market bias.
+        SMA 200 on the daily chart is the most widely watched moving average in
+        all of finance — institutional traders, funds, and algorithms all use it
+        as the dividing line between bull and bear markets.
+        """
+        if not self.broker:
+            return
+        try:
+            candles = await self.broker.get_candles("BTC_USD", granularity="D", count=210)
+            if not candles or len(candles) < 200:
+                return
+            closes = [c.close for c in candles]
+            # Calculate SMA 200 from daily close prices
+            sma_200 = sum(closes[-200:]) / 200
+            current_price = closes[-1]
+            if current_price > sma_200:
+                cycle.sma_d200_position = "above"
+            else:
+                cycle.sma_d200_position = "below"
+            logger.debug(
+                f"SMA 200 Daily: {sma_200:.2f} | BTC price: {current_price:.2f} "
+                f"| Position: {cycle.sma_d200_position}"
+            )
+        except Exception as e:
+            logger.debug(f"SMA 200 Daily check failed: {e}")
+
     def _apply_bmsb(self, cycle: CryptoMarketCycle, bmsb: Optional[Dict]):
         """Apply Bull Market Support Band status to cycle.
 
@@ -448,7 +480,7 @@ class CryptoCycleAnalyzer:
         """Determine overall market phase from combined signals.
 
         Signal weighting:
-        - RSI 14 weekly, BMSB: 1.0 vote each (most reliable per mentorship)
+        - RSI 14 weekly, BMSB, SMA 200 Daily: 1.0 vote each (most reliable per mentorship)
         - Pi Cycle: 0.5 vote (less reliable than RSI 14 and BMSB per mentorship)
         - Dominance, halving, altseason, dominance transition: 1.0 vote each
         """
@@ -482,6 +514,12 @@ class CryptoCycleAnalyzer:
             bear_votes += 0.5  # Distribution / cycle top
         elif cycle.pi_cycle_status == "near_bottom":
             bull_votes += 0.5  # Accumulation / cycle bottom
+
+        # SMA 200 Daily: fundamental macro filter (mentorship: above = bullish, below = bearish)
+        if cycle.sma_d200_position == "above":
+            bull_votes += 1.0
+        elif cycle.sma_d200_position == "below":
+            bear_votes += 1.0
 
         # Integrate dominance transition analysis (BTC.D trend + BTC price trend)
         transition = self.get_dominance_transition(cycle)
@@ -576,6 +614,10 @@ class CryptoCycleAnalyzer:
             )
         if cycle.usdt_dominance_rising is True:
             reason += " | WARNING: USDT.D rising — money flowing to stablecoins (risk-off, NOT altseason)"
+        if cycle.sma_d200_position == "below":
+            reason += " | WARNING: BTC below SMA 200 Daily (bearish macro bias)"
+        elif cycle.sma_d200_position == "above":
+            reason += " | BTC above SMA 200 Daily (bullish macro bias)"
         if ema50 is not None:
             reason += f" | EMA 50 weekly trailing stop: {ema50:.2f}"
         return True, reason

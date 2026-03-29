@@ -71,6 +71,7 @@ class SetupSignal:
     limit_price: Optional[float] = None  # Price for limit/stop orders
     confluence_score: int = 0      # Positive confluence points count
     anti_confluence_score: int = 0  # Negative confluence points count
+    trailing_tp_only: bool = False  # True for crypto GREEN: use EMA 50 trailing, NOT fixed TP exits
 
 
 # ---------------------------------------------------------------------------
@@ -3009,6 +3010,20 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append("Paso 5c: Sin divergencia RSI en 4H (añadido deseable, no obligatorio)")
 
+        # MACD Divergence on H1 — bonus, NOT hard block
+        # TradingLab: "La divergencia MACD en 1H siempre estará presente" para BLACK,
+        # pero no bloqueamos si no hay datos suficientes.
+        macd_div = getattr(analysis, 'macd_divergence', None)
+        if macd_div:
+            expected_macd_div = "bullish" if direction == "BUY" else "bearish"
+            if macd_div == expected_macd_div:
+                confidence += 10.0
+                met.append(f"Paso 5c2: MACD divergencia {macd_div} en H1 alineada con {direction}")
+            else:
+                confidence -= 5.0
+                failed.append(f"Paso 5c2: MACD divergencia {macd_div} en H1 contraria a {direction} (penalizacion)")
+        # If None: no change, don't block — data may be insufficient
+
         # Consolidacion (patron correctivo formandose)
         if "DOJI" in analysis.candlestick_patterns:
             confidence += 5.0
@@ -3613,6 +3628,20 @@ class GreenStrategy(BaseStrategy):
         if failed:
             explanation_es += "\n" + "\n".join(f"  - {f}" for f in failed)
 
+        # Crypto instruments use EMA 50 trailing, NOT fixed TP exits
+        # Mentorship: "crypto should use EMA 50 trailing on weekly chart"
+        _CRYPTO_PREFIXES = (
+            "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
+            "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB",
+            "FTM", "ALGO", "XLM", "EOS", "XTZ", "VET",
+        )
+        is_crypto = any(analysis.instrument.upper().startswith(p) for p in _CRYPTO_PREFIXES)
+        if is_crypto:
+            met.append(
+                "CRYPTO: TP levels are REFERENCE only — position managed with EMA 50 trailing, "
+                "NOT hard TP exits (per mentorship)"
+            )
+
         return SetupSignal(
             strategy=self.color,
             strategy_variant="GREEN",
@@ -3630,6 +3659,7 @@ class GreenStrategy(BaseStrategy):
             risk_reward_ratio=rr,
             conditions_met=met,
             conditions_failed=failed,
+            trailing_tp_only=is_crypto,
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
@@ -3662,6 +3692,12 @@ class GreenStrategy(BaseStrategy):
         """
         TP en maximo/minimo diario anterior.
         TP_max en el segundo nivel (para capturar R:R mas altos).
+
+        CRYPTO NOTE: For crypto instruments, these TP levels are REFERENCE levels
+        only, NOT hard exit points. The mentorship says crypto should use EMA 50
+        trailing on weekly chart, NOT fixed TPs. The levels are still calculated
+        for R:R validation and as visual reference, but the position manager will
+        skip hard TP1 close and continue trailing with EMA 50 instead.
         """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])

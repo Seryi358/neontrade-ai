@@ -76,6 +76,8 @@ class AnalysisResult:
     rsi_values: Dict[str, float] = field(default_factory=dict)
     # RSI divergence detection (required for Black strategy)
     rsi_divergence: Optional[str] = None  # "bullish", "bearish", or None
+    # MACD divergence detection (required for Black strategy and Scalping)
+    macd_divergence: Optional[str] = None  # "bullish", "bearish", or None
     # Order Blocks (from SMC workshop)
     order_blocks: List[Dict] = field(default_factory=list)
     # BOS/CHOCH detection (from SMC workshop)
@@ -229,6 +231,11 @@ class MarketAnalyzer:
             candles.get("H4", pd.DataFrame())
         )
 
+        # MACD divergence on H1 (mentorship: "MACD divergence on 1H is always present in Black strategy")
+        macd_divergence = self._detect_macd_divergence(
+            candles.get("H1", pd.DataFrame())
+        )
+
         # Step 11: BOS/CHOCH first (needed by OB detection)
         structure_breaks = self._detect_structure_breaks(
             candles.get("H1", pd.DataFrame())
@@ -253,9 +260,9 @@ class MarketAnalyzer:
                         h1_data["low"].iloc[i] < h1_data["low"].iloc[i+1]):
                     swing_lows_list.append(float(h1_data["low"].iloc[i]))
 
-        # Step 13a: Volume analysis on H1 and M5 (TradingLab course)
+        # Step 13a: Volume analysis on H1, M15 and M5 (TradingLab course)
         volume_analysis = {}
-        for tf in ("H1", "M5"):
+        for tf in ("H1", "M15", "M5"):
             df = candles.get(tf, pd.DataFrame())
             if not df.empty:
                 vol_data = self._analyze_volume(df)
@@ -396,6 +403,7 @@ class MarketAnalyzer:
             sma_values=sma_values,
             rsi_values=rsi_values,
             rsi_divergence=rsi_divergence,
+            macd_divergence=macd_divergence,
             order_blocks=order_blocks,
             structure_breaks=structure_breaks,
             score=score,
@@ -1399,6 +1407,73 @@ class MarketAnalyzer:
 
         return None
 
+    def _detect_macd_divergence(self, df: pd.DataFrame) -> Optional[str]:
+        """
+        Detect MACD histogram divergence on H1.
+        Required for Black strategy and Scalping (mentorship: "MACD divergence
+        on 1H is always present in Black strategy").
+
+        Bullish divergence: price makes lower low, MACD histogram makes higher low.
+        Bearish divergence: price makes higher high, MACD histogram makes lower high.
+        """
+        if df.empty or len(df) < 30:
+            return None
+
+        # Calculate MACD histogram (12, 26, 9)
+        ema12 = df["close"].ewm(span=12, adjust=False).mean()
+        ema26 = df["close"].ewm(span=26, adjust=False).mean()
+        macd_line = ema12 - ema26
+        signal_line = macd_line.ewm(span=9, adjust=False).mean()
+        histogram = macd_line - signal_line
+
+        # Look at last 20 candles for swing points
+        recent_price = df.tail(20)
+        recent_hist = histogram.tail(20)
+
+        if len(recent_price) < 10:
+            return None
+
+        data = recent_price.reset_index(drop=True)
+        hist_data = recent_hist.reset_index(drop=True)
+
+        # Find price swing lows and MACD histogram at those points
+        price_lows = []
+        for i in range(2, len(data) - 2):
+            if (data["low"].iloc[i] < data["low"].iloc[i-1] and
+                data["low"].iloc[i] < data["low"].iloc[i-2] and
+                data["low"].iloc[i] < data["low"].iloc[i+1] and
+                data["low"].iloc[i] < data["low"].iloc[i+2]):
+                hist_val = hist_data.iloc[i] if i < len(hist_data) else None
+                if hist_val is not None and not pd.isna(hist_val):
+                    price_lows.append((i, data["low"].iloc[i], hist_val))
+
+        # Check bullish divergence (price lower low, histogram higher low)
+        if len(price_lows) >= 2:
+            prev_low = price_lows[-2]
+            curr_low = price_lows[-1]
+            if curr_low[1] < prev_low[1] and curr_low[2] > prev_low[2]:
+                return "bullish"
+
+        # Find price swing highs
+        price_highs = []
+        for i in range(2, len(data) - 2):
+            if (data["high"].iloc[i] > data["high"].iloc[i-1] and
+                data["high"].iloc[i] > data["high"].iloc[i-2] and
+                data["high"].iloc[i] > data["high"].iloc[i+1] and
+                data["high"].iloc[i] > data["high"].iloc[i+2]):
+                hist_val = hist_data.iloc[i] if i < len(hist_data) else None
+                if hist_val is not None and not pd.isna(hist_val):
+                    price_highs.append((i, data["high"].iloc[i], hist_val))
+
+        # Check bearish divergence (price higher high, histogram lower high)
+        if len(price_highs) >= 2:
+            prev_high = price_highs[-2]
+            curr_high = price_highs[-1]
+            if curr_high[1] > prev_high[1] and curr_high[2] < prev_high[2]:
+                return "bearish"
+
+        return None
+
     # ── Order Blocks (from SMC workshop ch416-418) ───────────────────
 
     def _detect_order_blocks(
@@ -1862,23 +1937,18 @@ class MarketAnalyzer:
         if df.empty or len(df) < 2:
             return {}
 
-        # Average over the last 5 completed sessions for smoother pivots
-        sessions = min(5, len(df) - 1)
-        if sessions < 1:
-            return {}
+        # Use the single previous completed daily candle (iloc[-2] since -1 is current incomplete day)
+        candle = df.iloc[-2]
+        h, l, c = float(candle["high"]), float(candle["low"]), float(candle["close"])
+        p = (h + l + c) / 3.0
 
-        totals = {"P": 0.0, "R1": 0.0, "S1": 0.0, "R2": 0.0, "S2": 0.0}
-        for i in range(sessions):
-            candle = df.iloc[-(i + 2)]  # Skip current incomplete candle
-            h, l, c = float(candle["high"]), float(candle["low"]), float(candle["close"])
-            p = (h + l + c) / 3.0
-            totals["P"] += p
-            totals["R1"] += 2 * p - l
-            totals["S1"] += 2 * p - h
-            totals["R2"] += p + (h - l)
-            totals["S2"] += p - (h - l)
-
-        return {k: round(v / sessions, 5) for k, v in totals.items()}
+        return {
+            "P": round(p, 5),
+            "R1": round(2 * p - l, 5),
+            "S1": round(2 * p - h, 5),
+            "R2": round(p + (h - l), 5),
+            "S2": round(p - (h - l), 5),
+        }
 
     # ── Volume Divergence Detection (TradingLab Gap #6) ──────────────
 

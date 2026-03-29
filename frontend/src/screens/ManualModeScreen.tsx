@@ -177,10 +177,15 @@ export default function ManualModeScreen() {
     setExpandedId(expandedId === id ? null : id);
   };
 
+  const getPipMultiplier = (instrument: string): number => {
+    return instrument.toUpperCase().includes('JPY') ? 100 : 10000;
+  };
+
   const renderSetupCard = ({ item }: { item: PendingSetup }) => {
     const isExpanded = expandedId === item.id;
     const isApproving = actionLoading === `approve-${item.id}`;
     const isRejecting = actionLoading === `reject-${item.id}`;
+    const pipMultiplier = getPipMultiplier(item.instrument);
 
     return (
       <View style={styles.setupCard}>
@@ -231,14 +236,14 @@ export default function ManualModeScreen() {
             <Text style={styles.priceLabel}>STOP LOSS</Text>
             <Text style={[styles.priceValue, styles.loss]}>
               {(item.stop_loss || 0).toFixed(5)}
-              <Text style={styles.priceDistance}> ({(Math.abs(item.entry_price - item.stop_loss) * 10000).toFixed(1)} pips)</Text>
+              <Text style={styles.priceDistance}> ({(Math.abs(item.entry_price - item.stop_loss) * pipMultiplier).toFixed(1)} pips)</Text>
             </Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>TAKE PROFIT</Text>
             <Text style={[styles.priceValue, styles.profit]}>
               {(item.take_profit || 0).toFixed(5)}
-              <Text style={styles.priceDistance}> ({(Math.abs(item.take_profit - item.entry_price) * 10000).toFixed(1)} pips)</Text>
+              <Text style={styles.priceDistance}> ({(Math.abs(item.take_profit - item.entry_price) * pipMultiplier).toFixed(1)} pips)</Text>
             </Text>
           </View>
         </View>

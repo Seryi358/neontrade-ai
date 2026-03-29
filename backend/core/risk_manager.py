@@ -4,7 +4,7 @@ Implements all risk management rules from the TradingLab Trading Plan.
 
 Rules:
 - 1% risk per Day Trade
-- 0.5% risk per Scalping trade
+- 0.5% risk per Scalping trade (NeonTrade AI default)
 - 3% risk per Swing Trade (Trading Plan PDF)
 - Max 7% total risk at any time
 - Correlated pairs: 0.75% each instead of full risk
@@ -448,11 +448,16 @@ class RiskManager:
         entry_price: float,
         stop_loss: float,
         take_profit_1: float,
+        strategy: str = "",
     ) -> bool:
         """
         Validate that the trade meets minimum R:R ratio.
-        Minimum R:R to TP1 uses config min_rr_ratio (default 1.5:1).
-        Range: 1.5:1 to 2.5:1 per ch18.3. BLACK/GREEN use 2.0:1 min.
+        Strategy-specific minimums (from TradingLab mentoría):
+        - BLACK -> settings.min_rr_black (2.0) — counter-trend, mandatory 2:1
+        - GREEN -> settings.min_rr_green (2.0) — crypto swing, mandatory 2:1
+        - BLUE_C -> 2.0 — mentoría says 2:1 min for Blue C
+        - All others -> settings.min_rr_ratio (1.5) — general minimum
+        Range: 1.5:1 to 2.5:1 per ch18.3.
         """
         risk = abs(entry_price - stop_loss)
         reward = abs(take_profit_1 - entry_price)
@@ -460,17 +465,31 @@ class RiskManager:
         if risk == 0:
             return False
 
+        # Determine strategy-specific minimum R:R
+        strategy_upper = strategy.upper() if strategy else ""
+        if strategy_upper == "BLACK":
+            min_rr = settings.min_rr_black
+        elif strategy_upper == "GREEN":
+            min_rr = settings.min_rr_green
+        elif strategy_upper == "BLUE_C":
+            min_rr = 2.0  # Mentoría: Blue C requires 2:1 minimum
+        else:
+            min_rr = settings.min_rr_ratio
+
         rr_ratio = reward / risk
         # Use small epsilon for floating-point comparison to avoid rejecting
         # trades that are exactly at the minimum ratio (e.g., 2.0 computed as 1.9999...)
-        if rr_ratio < settings.min_rr_ratio - 1e-9:
+        if rr_ratio < min_rr - 1e-9:
             logger.warning(
-                f"R:R ratio {rr_ratio:.2f} is below minimum {settings.min_rr_ratio}. "
-                f"Trade rejected."
+                f"R:R ratio {rr_ratio:.2f} is below minimum {min_rr} "
+                f"for strategy '{strategy_upper or 'DEFAULT'}'. Trade rejected."
             )
             return False
 
-        logger.info(f"R:R ratio: {rr_ratio:.2f} (min: {settings.min_rr_ratio})")
+        logger.info(
+            f"R:R ratio: {rr_ratio:.2f} (min: {min_rr}, "
+            f"strategy: {strategy_upper or 'DEFAULT'})"
+        )
         return True
 
     def register_trade(self, trade_id: str, instrument: str, risk_percent: float):

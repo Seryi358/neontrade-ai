@@ -83,17 +83,17 @@ class TradingStyle(Enum):
 # FOREX/EQUITIES/INDICES — from Trading Mastery position management module
 # Mentorship grid (4-timeframe box per style):
 #   Swing:       Weekly -> Daily  -> H1   -> M15
-#   Day Trading: H4     -> H1    -> M15  -> M2/M5
+#   Day Trading: H4     -> H1    -> M5   -> M2/M5
 #   Scalping:    M15    -> M5    -> M1   -> 30s/M1
-# LP = first box, CP = third box, CPA = fourth box
+# LP = second box (PRIMARY), CP = third box, CPA = fourth box
 _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
-    # LP (Long-term): Swing=Weekly, Day=H4, Scalp=M15
-    (ManagementStyle.LP, TradingStyle.SWING): "EMA_W_50",
-    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H4_50",
+    # LP (Long-term): Swing=Daily, Day=H1, Scalp=M15
+    (ManagementStyle.LP, TradingStyle.SWING): "EMA_D_50",
+    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H1_50",
     (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
-    # CP (Short-term): Swing=H1, Day=M15, Scalp=M1
+    # CP (Short-term): Swing=H1, Day=M5, Scalp=M1
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
-    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M15_50",
+    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
     (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
     # CPA (Short-term Aggressive): Swing=M15, Day=M2 (M5 fallback), Scalp=M1
     (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
@@ -136,6 +136,8 @@ class ManagedPosition:
     take_profit_max: Optional[float] = None
     units: int = 0                  # Position size (signed: +BUY, -SELL)
     style: str = "day_trading"     # Trading style: "day_trading", "swing", "scalping"
+    strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED" — for strategy-specific logic
+    trailing_tp_only: bool = False  # True for crypto GREEN: skip hard TP1 close, use EMA 50 trailing
     phase: PositionPhase = PositionPhase.INITIAL
     highest_price: float = 0.0    # For BUY: highest since entry
     lowest_price: float = float('inf')  # For SELL: lowest since entry
@@ -146,9 +148,9 @@ class PositionManager:
     Manages all open positions according to TradingLab mentorship rules.
 
     5-phase structure:
-      Phase 1 (INITIAL)    - Move SL to structure after initial move
+      Phase 1 (INITIAL)    - Move SL to previous swing high/low (structural level)
       Phase 2 (SL_MOVED)   - Move to Break Even at 1% unrealized profit
-      Phase 3 (BREAK_EVEN) - Transition to trailing at 70% to TP1
+      Phase 3 (BREAK_EVEN) - Transition to trailing once EMA 50 is favorable
       Phase 4 (TRAILING)   - Trail SL with EMA 50 on style-appropriate timeframe
       Phase 5 (AGGRESSIVE) - Beyond TP1, switch to CPA EMA for tighter trailing
 
@@ -389,9 +391,15 @@ class PositionManager:
         """
         Phase 1: Price has started moving in our favor.
         Trading Plan: "Pondré el SL por encima o debajo del máximo o mínimo anterior"
-        Move SL to cut ~50% of initial risk when price moves out of entry zone.
-        Trigger: when profit exceeds 30% of initial risk distance (conservative proxy
+        Move SL to the nearest previous swing low (BUY) or swing high (SELL)
+        that sits between the original SL and entry price — i.e. the structural
+        level that price has just broken out of.
+
+        Trigger: profit exceeds 30% of initial risk distance (conservative proxy
         for "price leaving the pattern structure").
+
+        Fallback: if no swing data is available, reduce risk by 50% of the
+        original SL-to-entry distance (legacy behaviour).
         """
         risk_distance = abs(pos.entry_price - pos.original_sl)
         current_profit = (
@@ -399,12 +407,47 @@ class PositionManager:
             else (pos.entry_price - current_price)
         )
 
-        # When price has moved ~30% of risk distance, move SL to cut risk
+        # When price has moved ~30% of risk distance, move SL to structure
         if current_profit > risk_distance * 0.30:
+            new_sl = None
+            swings = self._latest_swings.get(pos.instrument, {})
+
             if pos.direction == "BUY":
-                new_sl = pos.original_sl + (pos.entry_price - pos.original_sl) * 0.5
+                # Look for the nearest swing low between original SL and entry
+                swing_lows = swings.get("lows", [])
+                valid = [
+                    sl for sl in swing_lows
+                    if pos.original_sl < sl < pos.entry_price
+                ]
+                if valid:
+                    # Pick the highest valid swing low (closest to entry = least risk)
+                    new_sl = max(valid)
+                    logger.debug(
+                        f"{pos.trade_id}: structural SL from swing low {new_sl:.5f}"
+                    )
             else:
-                new_sl = pos.original_sl - (pos.original_sl - pos.entry_price) * 0.5
+                # SELL: look for the nearest swing high between entry and original SL
+                swing_highs = swings.get("highs", [])
+                valid = [
+                    sh for sh in swing_highs
+                    if pos.entry_price < sh < pos.original_sl
+                ]
+                if valid:
+                    # Pick the lowest valid swing high (closest to entry = least risk)
+                    new_sl = min(valid)
+                    logger.debug(
+                        f"{pos.trade_id}: structural SL from swing high {new_sl:.5f}"
+                    )
+
+            # Fallback: no usable swing data — cut risk by 50%
+            if new_sl is None:
+                if pos.direction == "BUY":
+                    new_sl = pos.original_sl + (pos.entry_price - pos.original_sl) * 0.5
+                else:
+                    new_sl = pos.original_sl - (pos.original_sl - pos.entry_price) * 0.5
+                logger.debug(
+                    f"{pos.trade_id}: no swing data, fallback 50% risk cut -> {new_sl:.5f}"
+                )
 
             await self._update_sl(pos, new_sl)
             pos.phase = PositionPhase.SL_MOVED
@@ -457,29 +500,47 @@ class PositionManager:
         """
         Phase 3: After BE, transition to EMA trailing.
         Trading Plan PDF: "A partir de aqui usaré siempre las dos medias móviles más cortas"
-        Transition happens once price breaks the recent consolidation/high after BE.
-        Proxy: when price moves an additional 20% of distance to TP1 beyond BE point.
-        """
-        distance_to_tp1 = abs(pos.take_profit_1 - pos.entry_price)
-        current_profit = (
-            (current_price - pos.entry_price) if pos.direction == "BUY"
-            else (pos.entry_price - current_price)
-        )
 
-        # Start trailing when beyond BE + 20% more toward TP1
-        from config import settings
-        risk_distance = abs(pos.entry_price - pos.original_sl)
-        if settings.be_trigger_method == "risk_distance":
-            be_distance = risk_distance
-        else:
-            be_distance = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
-        trailing_trigger = be_distance + distance_to_tp1 * 0.20
-        if current_profit >= trailing_trigger:
+        Transition happens as soon as the management-timeframe EMA 50 is
+        available and favorable (above entry for BUY, below entry for SELL).
+        No additional profit buffer is required — the mentorship says
+        trailing starts right after Break Even.
+        """
+        base_key = self._get_base_ema_key(pos.instrument)
+
+        # For PRICE_ACTION style there is no base EMA — transition immediately
+        if base_key is None:
             pos.phase = PositionPhase.TRAILING_TO_TP1
-            base_key = self._get_base_ema_key(pos.instrument)
             logger.info(
                 f"{pos.trade_id}: Phase -> TRAILING_TO_TP1 "
-                f"(style={self.management_style.value}, ema={base_key})"
+                f"(style={self.management_style.value}, ema=PRICE_ACTION)"
+            )
+            return
+
+        ema_value = self._get_trail_ema(pos.instrument, base_key)
+
+        if ema_value is None:
+            # No EMA data available — transition immediately (don't block trailing
+            # just because EMA hasn't been calculated yet; price is already at BE+)
+            pos.phase = PositionPhase.TRAILING_TO_TP1
+            logger.info(
+                f"{pos.trade_id}: Phase -> TRAILING_TO_TP1 "
+                f"(style={self.management_style.value}, ema={base_key}, "
+                f"ema_value=N/A — no data, transitioning immediately)"
+            )
+            return
+
+        # EMA 50 must be favorable: acting as support (BUY) or resistance (SELL)
+        ema_favorable = (
+            (ema_value >= pos.entry_price) if pos.direction == "SELL"
+            else (ema_value <= pos.entry_price)
+        )
+        if ema_favorable:
+            pos.phase = PositionPhase.TRAILING_TO_TP1
+            logger.info(
+                f"{pos.trade_id}: Phase -> TRAILING_TO_TP1 "
+                f"(style={self.management_style.value}, ema={base_key}, "
+                f"ema_value={ema_value:.5f})"
             )
 
     async def _handle_trailing_phase(self, pos: ManagedPosition, current_price: float):
@@ -501,27 +562,40 @@ class PositionManager:
             (pos.direction == "SELL" and current_price <= pos.take_profit_1)
         )
         if tp1_reached:
-            # If partial profits enabled, close part of the position at TP1
-            if self.allow_partial_profits and pos.units != 0:
-                partial_units = pos.units // 2  # Close half
-                if partial_units != 0:
-                    try:
-                        await self.broker.close_trade(pos.trade_id, units=partial_units)
-                        pos.units -= partial_units
-                        logger.info(
-                            f"{pos.trade_id}: PARTIAL PROFIT at TP1 — closed {partial_units} units, "
-                            f"remaining {pos.units} units"
-                        )
-                    except Exception as e:
-                        logger.error(f"{pos.trade_id}: Failed partial close at TP1: {e}")
+            # GREEN/crypto trailing_tp_only: Do NOT hard-close at TP1.
+            # Mentorship: crypto uses EMA 50 trailing on weekly chart, NOT fixed TPs.
+            # TP1 is a reference level only — continue trailing with EMA 50.
+            if pos.trailing_tp_only:
+                logger.info(
+                    f"{pos.trade_id}: TP1 level reached but trailing_tp_only=True "
+                    f"(GREEN/crypto) — skipping hard close, continuing EMA 50 trailing. "
+                    f"TP1={pos.take_profit_1:.5f}, price={current_price:.5f}"
+                )
+                # Do NOT switch to CPA or close — just continue trailing in this phase.
+                # The position will only exit via trailing SL hit (EMA 50 break).
+                # Fall through to the normal trailing logic below.
+            else:
+                # Standard behavior: partial profit at TP1 + switch to aggressive trailing
+                if self.allow_partial_profits and pos.units != 0:
+                    partial_units = pos.units // 2  # Close half
+                    if partial_units != 0:
+                        try:
+                            await self.broker.close_trade(pos.trade_id, units=partial_units)
+                            pos.units -= partial_units
+                            logger.info(
+                                f"{pos.trade_id}: PARTIAL PROFIT at TP1 — closed {partial_units} units, "
+                                f"remaining {pos.units} units"
+                            )
+                        except Exception as e:
+                            logger.error(f"{pos.trade_id}: Failed partial close at TP1: {e}")
 
-            cpa_key = self._get_cpa_ema_key(pos.instrument)
-            pos.phase = PositionPhase.BEYOND_TP1
-            logger.info(
-                f"{pos.trade_id}: TP1 REACHED -> Phase AGGRESSIVE "
-                f"(switching to CPA: {cpa_key})"
-            )
-            return
+                cpa_key = self._get_cpa_ema_key(pos.instrument)
+                pos.phase = PositionPhase.BEYOND_TP1
+                logger.info(
+                    f"{pos.trade_id}: TP1 REACHED -> Phase AGGRESSIVE "
+                    f"(switching to CPA: {cpa_key})"
+                )
+                return
 
         # PRICE_ACTION style: trail with swing highs/lows
         if self.management_style == ManagementStyle.PRICE_ACTION:

@@ -9,6 +9,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
@@ -53,12 +54,26 @@ export default function WatchlistScreen() {
     return theme.colors.neonRed;
   };
 
+  const showInstrumentInfo = (item: WatchlistItem) => {
+    const trend = item.trend === 'bullish' ? 'Alcista' : item.trend === 'bearish' ? 'Bajista' : 'Rango';
+    const details = [
+      `Tendencia: ${trend}`,
+      `Score: ${item.score.toFixed(0)}`,
+      item.convergence ? 'Convergencia: Si' : null,
+      item.condition && item.condition !== 'neutral' ? `Condicion: ${item.condition === 'overbought' ? 'Sobrecompra' : 'Sobreventa'}` : null,
+      item.strategy_detected ? `Estrategia: ${item.strategy_detected}` : null,
+      item.confidence_level ? `Confianza: ${item.confidence_level}` : null,
+    ].filter(Boolean).join('\n');
+    Alert.alert(item.instrument.replace('_', '/'), details);
+  };
+
   const renderItem = ({ item }: { item: WatchlistItem }) => (
     <TouchableOpacity
       style={[
         styles.item,
         item.strategy_detected ? { borderColor: STRATEGY_COLORS[item.strategy_detected] || theme.colors.border } : {},
       ]}
+      onPress={() => showInstrumentInfo(item)}
     >
       <View style={styles.itemLeft}>
         <Text style={styles.pair}>

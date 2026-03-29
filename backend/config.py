@@ -463,6 +463,22 @@ def _load_risk_overrides():
 _load_risk_overrides()
 
 
+def _apply_funded_evaluation_defaults():
+    """Auto-apply DD limits based on funded evaluation type.
+    Workshop: Sprint/1-phase = 4% daily DD, 6% total DD (tighter than standard 5%/10%)."""
+    if settings.funded_evaluation_type == "1phase":
+        # Only override if user hasn't manually set different values
+        if settings.funded_max_daily_dd == 0.05:  # still at default
+            settings.funded_max_daily_dd = 0.04
+        if settings.funded_max_total_dd == 0.10:  # still at default
+            settings.funded_max_total_dd = 0.06
+    elif settings.funded_evaluation_type == "instant":
+        # Instant Funding: no daily DD limit, 10% total
+        pass  # defaults are already correct
+
+_apply_funded_evaluation_defaults()
+
+
 # ── Trading Profile Presets ──────��─────────────────────────────
 # Pre-configured profiles that apply a batch of settings at once.
 # "tradinglab_recommended" = Alex Ruiz's exact preferences (Day Trading)

@@ -406,7 +406,7 @@ export default function DashboardScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>BROKER</Text>
         <Text style={[styles.statValue, { textAlign: 'center' }]}>
-          {(status?.broker ?? 'oanda').toUpperCase()}
+          {(status?.broker ?? 'capital').toUpperCase()}
         </Text>
       </View>
     </ScrollView>

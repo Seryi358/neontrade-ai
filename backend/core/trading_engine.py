@@ -1437,11 +1437,12 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"AI validation failed (proceeding without): {e}")
 
-        # Validate risk management
+        # Validate risk management (strategy-specific R:R minimums)
         if not self.risk_manager.validate_reward_risk(
-            signal.entry_price, signal.stop_loss, signal.take_profit_1
+            signal.entry_price, signal.stop_loss, signal.take_profit_1,
+            strategy=signal.strategy_variant,
         ):
-            logger.info(f"R:R validation failed for {signal.instrument}")
+            logger.info(f"R:R validation failed for {signal.instrument} ({signal.strategy_variant})")
             return None
 
         # Calculate position size

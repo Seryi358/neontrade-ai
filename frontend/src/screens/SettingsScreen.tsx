@@ -44,13 +44,6 @@ const BROKERS = [
     active: false,
     badge: 'Pendiente OAuth',
   },
-  {
-    id: 'oanda',
-    name: 'OANDA',
-    description: 'Broker regulado con API robusta para Forex',
-    active: false,
-    badge: 'Disponible',
-  },
 ];
 
 const STRATEGIES = [
@@ -67,9 +60,9 @@ const STRATEGIES = [
   },
   { key: 'RED', label: 'RED', description: 'Cambio de tendencia 4H', color: '#ff2e63', variants: [] },
   { key: 'PINK', label: 'PINK', description: 'Patron correctivo (Onda 4→5)', color: '#ff69b4', variants: [] },
-  { key: 'WHITE', label: 'WHITE', description: 'Continuacion post-Pink', color: '#f0e6ff', variants: [] },
+  { key: 'WHITE', label: 'WHITE', description: 'Continuacion post-Pink', color: '#ffffff', variants: [] },
   { key: 'BLACK', label: 'BLACK', description: 'Contratendencia (min 2:1 R:R)', color: '#888888', variants: [] },
-  { key: 'GREEN', label: 'GREEN', description: 'Semanal + Diario + 15M (hasta 10:1)', color: '#00ff88', variants: [] },
+  { key: 'GREEN', label: 'GREEN', description: 'Semanal + Diario + 15M (hasta 10:1)', color: '#00ff41', variants: [] },
 ];
 
 interface StrategyConfig {

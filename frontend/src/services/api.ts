@@ -46,7 +46,7 @@ export let WS_URL = API_URL.replace('http', 'ws') + '/ws';
 export function setBackendUrl(url: string): void {
   const clean = url.replace(/\/+$/, '');
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem('neontrade_backend_url', clean);
+    try { window.localStorage.setItem('neontrade_backend_url', clean); } catch {}
   }
   API_URL = clean;
   WS_URL = clean.replace('http', 'ws') + '/ws';
@@ -57,7 +57,7 @@ export function setBackendUrl(url: string): void {
  */
 export function resetBackendUrl(): void {
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem('neontrade_backend_url');
+    try { window.localStorage.removeItem('neontrade_backend_url'); } catch {}
   }
   API_URL = DEFAULT_URL;
   WS_URL = DEFAULT_URL.replace('http', 'ws') + '/ws';
@@ -82,13 +82,13 @@ function getApiKey(): string {
 
 export function setApiKey(key: string): void {
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem('neontrade_api_key', key);
+    try { window.localStorage.setItem('neontrade_api_key', key); } catch {}
   }
 }
 
 export function clearApiKey(): void {
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem('neontrade_api_key');
+    try { window.localStorage.removeItem('neontrade_api_key'); } catch {}
   }
 }
 

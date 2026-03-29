@@ -284,12 +284,14 @@ class TestBreakEvenPhase:
         assert pos.phase == PositionPhase.TRAILING_TO_TP1
 
     @patch("config.settings")
-    def test_no_transition_below_threshold(self, mock_settings, pm, broker):
+    def test_no_transition_when_ema_unfavorable(self, mock_settings, pm, broker):
+        """After dead-zone removal: transition blocked when EMA is available but unfavorable."""
         mock_settings.be_trigger_method = "risk_distance"
         pos = make_pos(direction="BUY", entry=1.1000, sl=1.0950, tp1=1.1100,
                        phase=PositionPhase.BREAK_EVEN)
+        # Provide EMA data that is ABOVE entry (unfavorable for BUY — EMA should be below)
+        pm._latest_emas[pos.instrument] = {"EMA_M5_50": 1.1050}
 
-        # profit = 0.006 < 0.007
         run(pm._handle_be_phase(pos, 1.1060))
         assert pos.phase == PositionPhase.BREAK_EVEN
 

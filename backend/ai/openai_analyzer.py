@@ -401,7 +401,7 @@ Position Management EMA Grid (Forex):
 Position Management EMA Grid (Crypto — wider due to volatility):
 - LP (Long-term):  Swing=Weekly EMA50, Day=H4 EMA50, Scalp=M15 EMA50
 - CP (Short-term):  Swing=H1 EMA50, Day=M15 EMA50, Scalp=M1 EMA50
-- CPA (Aggressive): Swing=M15 EMA50, Day=M5 EMA50, Scalp=M1 EMA50
+- CPA (Aggressive): Swing=M15 EMA50, Day=M2 EMA50, Scalp=M1 EMA50  (SAME as forex — CPA is identical across all assets)
 
 SMA 200 (H1): Major trend filter from Scalping Workshop — heavily used by algorithmic traders.
 

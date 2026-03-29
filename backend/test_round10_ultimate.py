@@ -141,10 +141,11 @@ ok("cfg_crypto_correlation_groups", len(s.crypto_correlation_groups) >= 2)
 ok("cfg_oanda_url_practice", "fxpractice" in get_oanda_url())
 ok("cfg_oanda_stream_practice", "fxpractice" in get_oanda_stream_url())
 
-# Allocation: forex+crypto=1.0 within trading, trading+investment=1.0 of total
-trading_sum = s.allocation_forex_pct + s.allocation_crypto_pct
+# Allocation: forex+other+crypto=1.0 within trading, trading+investment+crypto_longterm=1.0 of total
+trading_sum = s.allocation_forex_pct + s.allocation_other_pct + s.allocation_crypto_pct
 ok("cfg_allocation_trading_sum", abs(trading_sum - 1.0) < 0.01, f"got {trading_sum}")
-ok("cfg_allocation_total_sum", abs(s.allocation_trading_pct + s.allocation_investment_pct - 1.0) < 0.01)
+total_sum = s.allocation_trading_pct + s.allocation_investment_pct + s.allocation_crypto_longterm_pct
+ok("cfg_allocation_total_sum", abs(total_sum - 1.0) < 0.01, f"got {total_sum}")
 
 
 # ===========================================================================
@@ -695,7 +696,7 @@ ok("bt_cfg_balance", cfg.initial_balance == 10_000.0)
 ok("bt_cfg_risk", cfg.risk_per_trade == 0.01)
 ok("bt_cfg_slippage", cfg.slippage_pips == 0.5)
 ok("bt_cfg_spread", cfg.spread_pips == 1.0)
-ok("bt_cfg_min_rr", cfg.min_rr_ratio == 2.0)
+ok("bt_cfg_min_rr", cfg.min_rr_ratio == 1.5)
 ok("bt_cfg_max_concurrent", cfg.max_concurrent_positions == 3)
 ok("bt_cfg_cooldown", cfg.cooldown_bars == 2)
 

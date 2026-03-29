@@ -41,12 +41,13 @@ check("M1 validation uses ema50_m1",
 check("M1 validation checks EMA 50 break (close vs EMA)",
       "close_m1" in source and "ema50_m1" in source)
 
-# Verify the actual condition: price must be on correct side of M1 EMA 50
-# For BUY: close_m1 >= ema50_m1, for SELL: close_m1 <= ema50_m1
-check("M1 BUY check is price < ema50 = fail",
-      'direction == "BUY" and scalp_data.close_m1 < scalp_data.ema50_m1' in source)
-check("M1 SELL check is price > ema50 = fail",
-      'direction == "SELL" and scalp_data.close_m1 > scalp_data.ema50_m1' in source)
+# Verify the actual condition: M1 uses breakout detection (price on correct side = breakout)
+# For BUY: close_m1 > ema50_m1 = breakout confirmed
+# For SELL: close_m1 < ema50_m1 = breakout confirmed
+check("M1 BUY breakout is price > ema50",
+      'direction == "BUY" and scalp_data.close_m1 > scalp_data.ema50_m1' in source)
+check("M1 SELL breakout is price < ema50",
+      'direction == "SELL" and scalp_data.close_m1 < scalp_data.ema50_m1' in source)
 
 # Verify M1 does NOT use MACD for execution trigger
 # The function now makes MACD optional (confidence penalty, not rejection)

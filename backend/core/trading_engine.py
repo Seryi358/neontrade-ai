@@ -833,6 +833,20 @@ class TradingEngine:
                         self.risk_manager.unregister_trade(trade_id, pos.instrument)
                     closed += 1
                     logger.info(f"Friday close: Closed {instrument} (near {close_reason})")
+                    # Persist close to DB with PnL
+                    if self._db and trade_id and current and entry:
+                        try:
+                            direction = getattr(trade, 'direction', 'BUY')
+                            pnl_val = (current - entry) if direction == "BUY" else (entry - current)
+                            units = abs(getattr(trade, 'units', 0) or getattr(pos, 'units', 0) if pos else 0)
+                            await self._db.update_trade(trade_id, {
+                                "status": f"closed_friday_{close_reason.lower()}",
+                                "closed_at": datetime.now(timezone.utc).isoformat(),
+                                "exit_price": current,
+                                "pnl": pnl_val * units if units else pnl_val,
+                            })
+                        except Exception:
+                            pass
                 except Exception as e:
                     logger.error(f"Friday close failed for {trade_id}: {e}")
             else:
@@ -873,6 +887,22 @@ class TradingEngine:
                     self.risk_manager.record_funded_pnl(pnl)
                 except Exception as e:
                     logger.debug(f"Failed to calculate PnL for funded close: {e}")
+
+            # Persist closes to DB before clearing
+            if self._db:
+                for tid, pos in self.position_manager.positions.items():
+                    try:
+                        price_data = await self.broker.get_current_price(pos.instrument)
+                        cp = price_data.bid if pos.direction == "BUY" else price_data.ask
+                        pnl_val = (cp - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - cp)
+                        await self._db.update_trade(tid, {
+                            "status": "closed_funded_overnight",
+                            "closed_at": datetime.now(timezone.utc).isoformat(),
+                            "exit_price": cp,
+                            "pnl": pnl_val * abs(pos.units) if pos.units else pnl_val,
+                        })
+                    except Exception:
+                        pass
 
             await self.broker.close_all_trades()
             self.risk_manager.unregister_all_trades()
@@ -947,12 +977,16 @@ class TradingEngine:
                             "reason": "external",
                         })
 
-                    # Persist close to database
+                    # Persist close to database with PnL data
                     if self._db:
                         try:
+                            close_price = getattr(pos, 'highest_price', pos.entry_price) if pos.direction == "BUY" else getattr(pos, 'lowest_price', pos.entry_price)
+                            pnl_val = (close_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - close_price)
                             await self._db.update_trade(tid, {
                                 "status": "closed_manual",
                                 "closed_at": datetime.now(timezone.utc).isoformat(),
+                                "exit_price": close_price,
+                                "pnl": pnl_val * abs(pos.units),
                             })
                         except Exception:
                             pass

@@ -286,23 +286,37 @@ class CapitalClient(BaseBroker):
 
     @retry_async(max_retries=2, base_delay=0.5, exceptions=(httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException))
     async def _put(self, path: str, json_data: Optional[Dict] = None) -> httpx.Response:
-        """Authenticated PUT request with retry."""
+        """Authenticated PUT request with retry and circuit breaker."""
+        if broker_circuit_breaker.is_open:
+            raise ConnectionError("Circuit breaker OPEN — broker unavailable (PUT)")
         await self._ensure_session()
-        resp = await self._client.put(
-            path, headers=self._auth_headers(), json=json_data or {},
-        )
-        resp.raise_for_status()
-        return resp
+        try:
+            resp = await self._client.put(
+                path, headers=self._auth_headers(), json=json_data or {},
+            )
+            resp.raise_for_status()
+            broker_circuit_breaker.record_success()
+            return resp
+        except Exception:
+            broker_circuit_breaker.record_failure()
+            raise
 
     @retry_async(max_retries=2, base_delay=0.5, exceptions=(httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException))
     async def _delete(self, path: str, json_data: Optional[Dict] = None) -> httpx.Response:
-        """Authenticated DELETE request with retry."""
+        """Authenticated DELETE request with retry and circuit breaker."""
+        if broker_circuit_breaker.is_open:
+            raise ConnectionError("Circuit breaker OPEN — broker unavailable (DELETE)")
         await self._ensure_session()
-        resp = await self._client.request(
-            "DELETE", path, headers=self._auth_headers(), json=json_data,
-        )
-        resp.raise_for_status()
-        return resp
+        try:
+            resp = await self._client.request(
+                "DELETE", path, headers=self._auth_headers(), json=json_data,
+            )
+            resp.raise_for_status()
+            broker_circuit_breaker.record_success()
+            return resp
+        except Exception:
+            broker_circuit_breaker.record_failure()
+            raise
 
     # ── Instrument Resolution ────────────────────────────────────
 

@@ -278,6 +278,26 @@ class ScalpingAnalyzer:
                         f"{data.instrument} — SELL confluence +2"
                     )
 
+        # SMA 200 on H1 as dynamic S/R confluence — workshop says SMA 200 on H1
+        # is "incredibly used" as dynamic support/resistance.
+        if data.sma200_h1 is not None and data.close_h1 is not None:
+            sma200_proximity_pct = 0.003  # within 0.3% of SMA 200
+            dist_to_sma200 = abs(data.close_h1 - data.sma200_h1)
+            if data.sma200_h1 > 0 and dist_to_sma200 / data.sma200_h1 < sma200_proximity_pct:
+                # Price near SMA 200 — acts as dynamic S/R
+                if data.close_h1 > data.sma200_h1:
+                    buy_confluence += 1  # bouncing off SMA 200 as support
+                    logger.debug(
+                        f"Scalping H1: price near SMA 200 ({data.sma200_h1:.5f}) "
+                        f"as dynamic support — BUY confluence +1"
+                    )
+                else:
+                    sell_confluence += 1  # rejected at SMA 200 as resistance
+                    logger.debug(
+                        f"Scalping H1: price near SMA 200 ({data.sma200_h1:.5f}) "
+                        f"as dynamic resistance — SELL confluence +1"
+                    )
+
         # ── Primary direction logic (unchanged core) ──
         if price_above_ema50 and macd_bullish:
             if sma_filter is None or sma_filter:
@@ -741,22 +761,37 @@ class ScalpingAnalyzer:
             result["reasons"].append("M1 double breakout: EMA 50 + diagonal (strong confirmation)")
 
         # (c) Breakout confirmation: verify consecutive candle closes for EMA breakout
+        # Workshop: "we do NOT execute at breakout alone, we execute when there
+        # is breakout AND confirmation."
+        # - EMA 50 break + confirmation candle: full confidence
+        # - EMA 50 break + NO confirmation but diagonal break exists: -15 penalty
+        # - NO EMA break AND NO diagonal break: REJECT (hard gate)
         if m1_ema_breakout and not m1_df.empty and len(m1_df) >= 3:
             closes = m1_df["close"].values
             if len(closes) >= 52:
                 ema_vals = pd.Series(closes).ewm(span=50, adjust=False).mean().values
                 prev_close = closes[-2]
                 prev_ema = ema_vals[-2]
-                if direction == "BUY" and prev_close < prev_ema:
-                    result["confidence_adj"] -= 15
-                    result["reasons"].append(
-                        "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
-                    )
-                elif direction == "SELL" and prev_close > prev_ema:
-                    result["confidence_adj"] -= 15
-                    result["reasons"].append(
-                        "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes)"
-                    )
+                confirmation_failed = (
+                    (direction == "BUY" and prev_close < prev_ema)
+                    or (direction == "SELL" and prev_close > prev_ema)
+                )
+                if confirmation_failed:
+                    if m1_diagonal_breakout:
+                        # Diagonal break provides partial confirmation — penalty only
+                        result["confidence_adj"] -= 15
+                        result["reasons"].append(
+                            "M1 EMA 50 breakout not yet confirmed (need 2 consecutive closes), "
+                            "but diagonal breakout provides partial confirmation"
+                        )
+                    else:
+                        # No confirmation AND no diagonal break — hard reject
+                        result["valid"] = False
+                        result["reasons"].append(
+                            "REJECTED: M1 EMA 50 breakout without confirmation candle "
+                            "and no diagonal breakout — workshop requires breakout + confirmation"
+                        )
+                        return result
 
         # Condition 4: Volume on M5 — Workshop says volume is "important" on M5
         # but does NOT make it a hard entry requirement. Treat as confluence
@@ -1038,12 +1073,12 @@ class ScalpingAnalyzer:
         The mentorship explicitly states: "Stop Loss at the 0.618 Fibonacci
         retracement of the impulse move on the 15-minute chart."
 
-        IMPORTANT: The Fibonacci used here should ideally come from the
-        15-minute impulse move specifically (not from H4/Daily analysis).
-        Currently the code uses whatever Fibonacci levels are in the
-        AnalysisResult, which may come from a different timeframe. This is
-        a known limitation — the remapped analysis should provide M15-based
-        Fibonacci levels for maximum accuracy.
+        KNOWN LIMITATION: Fibonacci levels come from the analysis pipeline which uses
+        Daily/H4 for day trading. For scalping accuracy, these should be recomputed
+        from the M15 impulse move (swing low to swing high of the M15 EMA 50 break).
+        The current approach uses whatever Fibonacci the analysis provides, which may
+        be from a higher timeframe than ideal for scalping precision.
+        Future improvement: add _compute_scalping_fibonacci(m15_candles) method.
         """
         fib_618 = (analysis.fibonacci_levels or {}).get("0.618")
         if fib_618 is None or fib_618 <= 0:

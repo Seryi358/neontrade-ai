@@ -657,7 +657,10 @@ class OpenAIAnalyzer:
     """Uses OpenAI GPT-4o for advanced trading analysis with full TradingLab knowledge."""
 
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self.client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            timeout=30.0,  # 30s timeout to prevent blocking the trading engine scan loop
+        )
         self.model = "gpt-4o"
         self.system_prompt = TRADINGLAB_SYSTEM_PROMPT
 

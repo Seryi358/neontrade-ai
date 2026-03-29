@@ -1346,7 +1346,11 @@ class MarketAnalyzer:
 
         rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
-        rsi = rsi.fillna(100.0)
+        # When both gain=0 AND loss=0 (flat market), RSI should be 50 (neutral),
+        # not 100. Only fill with 100 when gain>0 but loss=0 (pure uptrend).
+        both_zero = (gain == 0) & (loss == 0)
+        rsi = rsi.fillna(100.0)  # Default: loss=0 means all gains → RSI=100
+        rsi[both_zero] = 50.0    # Override: flat market → neutral RSI
         val = rsi.iloc[-1]
         return val if not pd.isna(val) else None
 

@@ -254,6 +254,10 @@ class TradingEngine:
         self._daily_errors: int = 0
         self._daily_counter_date: str = ""  # YYYY-MM-DD of current counters
 
+        # Overtrading / revenge trading prevention (Psicología Avanzada)
+        self._consecutive_losses_today: int = 0
+        self._last_loss_time: Optional[datetime] = None
+
         # ── Scalping Module (Workshop de Scalping) ──
         self.scalping_analyzer: Optional['ScalpingAnalyzer'] = None
         if settings.scalping_enabled and _SCALPING_AVAILABLE:
@@ -1002,6 +1006,13 @@ class TradingEngine:
                         except Exception:
                             pass
 
+                    # Track consecutive losses for cooldown (Psicología Avanzada)
+                    if pnl_dollars < 0:
+                        self._consecutive_losses_today += 1
+                        self._last_loss_time = datetime.now(timezone.utc)
+                    else:
+                        self._consecutive_losses_today = 0  # Reset on win/BE
+
                     # Record in trade journal
                     if self.trade_journal:
                         try:
@@ -1242,7 +1253,7 @@ class TradingEngine:
         # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
         # "sobreoperar después de una pérdida" — top-5 failure mode per mentorship
         if settings.max_trades_per_day > 0:
-            today_trades = getattr(self, '_daily_executed_count', 0)
+            today_trades = self._daily_setups_executed
             if today_trades >= settings.max_trades_per_day:
                 logger.info(f"Max daily trades reached ({settings.max_trades_per_day}). Skipping scan.")
                 return
@@ -2215,6 +2226,8 @@ class TradingEngine:
             self._daily_setups_executed = 0
             self._daily_setups_skipped_ai = 0
             self._daily_errors = 0
+            self._consecutive_losses_today = 0
+            self._last_loss_time = None
             self._daily_counter_date = today
 
     def _build_presession_checklist(self, session_label: str) -> str:

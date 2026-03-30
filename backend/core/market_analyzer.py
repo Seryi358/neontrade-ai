@@ -155,16 +155,16 @@ class MarketAnalyzer:
                 raw = await self.broker.get_candles(instrument, tf, count)
                 candles[tf] = self._candles_to_dataframe(raw)
             except Exception as e:
-                logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
+                # M2 is expected to fail on Capital.com (no MINUTE_2 resolution)
+                # Use debug level to avoid flooding logs with known 404s
+                if tf == "M2":
+                    logger.debug(f"M2 candles unavailable for {instrument} (expected, using M1 fallback)")
+                else:
+                    logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
                 candles[tf] = pd.DataFrame()
 
-                # M2 fallback: if broker returns 404 for MINUTE_2, use M1 candles
-                # and compute M2-equivalent EMAs from M1 data
+                # M2 fallback: use M1 candles for M2 EMA computation
                 if tf == "M2" and "M1" in candles and not candles["M1"].empty:
-                    logger.info(
-                        f"M2 unavailable for {instrument}, "
-                        f"falling back to M1 candles for M2 EMA computation"
-                    )
                     candles["M2"] = candles["M1"].copy()
             # Throttle between timeframe fetches to avoid broker rate limits
             await asyncio.sleep(0.3)

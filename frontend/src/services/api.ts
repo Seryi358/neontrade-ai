@@ -347,13 +347,13 @@ export const api = {
 // ── Shared Constants ─────────────────────────────────────────────
 
 export const STRATEGY_COLORS: Record<string, string> = {
-  BLUE: '#08919a',    // Bitpunk: Color4 (8,145,154)
-  RED: '#ff4a57',     // Bitpunk: ForegroundNegative (255,74,87)
-  PINK: '#ea00d9',    // Bitpunk: DecorationHover (234,0,217)
-  WHITE: '#e0e8f0',   // Bitpunk: ForegroundNormal (224,232,240)
-  BLACK: '#8a9bad',   // Bitpunk: ForegroundInactive (138,155,173)
-  GREEN: '#2ed88c',   // Bitpunk: Color2 (46,216,140)
-  DETECTED: '#f3e600', // Bitpunk: ForegroundNeutral (243,230,0)
+  BLUE: '#3daee9',    // Daemon: ForegroundActive (61,174,233)
+  RED: '#fb3048',     // Daemon: ForegroundNegative (251,48,72)
+  PINK: '#ee00ff',    // Daemon: WM activeBackground (238,0,255)
+  WHITE: '#fcfcfc',   // Daemon: ForegroundNormal (252,252,252)
+  BLACK: '#a1a9b1',   // Daemon: ForegroundInactive (161,169,177)
+  GREEN: '#28c775',   // Daemon: ForegroundPositive (40,199,117)
+  DETECTED: '#fdf500', // Daemon: ForegroundNeutral (253,245,0)
 };
 
 export function getScoreColor(score: number): string {

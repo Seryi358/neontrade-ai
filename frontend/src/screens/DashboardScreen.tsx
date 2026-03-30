@@ -503,7 +503,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0e14',
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: theme.spacing.md,

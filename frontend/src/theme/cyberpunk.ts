@@ -1,123 +1,126 @@
 /**
- * NeonTrade AI - Cyberpunk 2077 Theme
- * Colors matched EXACTLY to user's Bitpunk KDE Plasma theme.
- * Font: Rajdhani (user's system font) — geometric, futuristic sans-serif.
+ * NeonTrade AI - Cyberpunk Theme
+ * Colors matched EXACTLY to user's Daemon 2.0 KDE Plasma theme.
+ * Font: Rajdhani EVERYWHERE — geometric, futuristic sans-serif.
  *
- * Design principles:
- * - Bitpunk yellow (#f3e600) as primary accent (ForegroundNeutral)
- * - Bitpunk cyan (#0abdc6) for tech/AI elements (DecorationFocus)
- * - Bitpunk magenta (#ea00d9) for critical alerts (DecorationHover)
- * - Angular, clipped corners (CP2077 UI signature)
- * - Scan lines, grid overlays, glitch effects
- * - HUD-style data presentation (trading = combat readiness)
- * - Bitpunk dark backgrounds (#0a0e14 window, #050505 view)
+ * Daemon 2.0 palette:
+ * - Backgrounds: deep burgundy/purple-black (#210e15, #14101f, #040a10)
+ * - Primary accent: bright cyan (#5df4fe) — ForegroundNormal & DecorationFocus
+ * - Secondary accent: neon purple (#ee00ff) — WM activeBackground
+ * - Active blue: #3daee9 — ForegroundActive
+ * - Negative/red: #fb3048 / #da4453
+ * - Positive/green: #28c775 / #27ae60
+ * - Neutral/yellow: #fdf500
+ * - Orange: #f67400
+ * - Magenta/visited: #cb1dcd
+ * - Text muted: #a1a9b1
  */
 
 export const theme = {
   colors: {
-    // Primary backgrounds (EXACT Bitpunk KDE theme values)
-    background: '#0a0e14',      // Bitpunk: Colors:Window BackgroundNormal (10,14,20)
-    backgroundDark: '#050505',  // Bitpunk: Colors:View BackgroundNormal (5,5,5)
-    backgroundLight: '#1c2632', // Bitpunk: Colors:Button BackgroundNormal (28,38,50)
-    backgroundCard: '#131a24',  // Bitpunk: Colors:Tooltip BackgroundNormal (19,26,36)
-    backgroundHUD: '#080c12',   // Derived: between View and Window BG
+    // Primary backgrounds (EXACT Daemon 2.0 values)
+    background: '#210e15',      // Daemon: Colors:Window BackgroundNormal (33,14,21)
+    backgroundDark: '#040a10',  // Daemon: Colors:Tooltip BackgroundNormal (4,10,16)
+    backgroundLight: '#14101f', // Daemon: Colors:Button BackgroundNormal (20,16,31)
+    backgroundCard: '#1a0f18',  // Derived: between Window and Tooltip BG
+    backgroundHUD: '#0d0610',   // Derived: darker variant for HUD overlays
 
-    // Bitpunk Primary accent — ForegroundNeutral yellow (243,230,0)
-    cp2077Yellow: '#f3e600',
-    cp2077YellowDim: '#a9a000',
-    cp2077YellowGlow: 'rgba(243, 230, 0, 0.3)',
+    // Daemon 2.0 Primary accent — DecorationFocus cyan (93,244,254)
+    cp2077Yellow: '#5df4fe',    // Daemon primary — bright cyan (replaces Bitpunk yellow)
+    cp2077YellowDim: '#3daee9', // Daemon: ForegroundActive (61,174,233)
+    cp2077YellowGlow: 'rgba(93, 244, 254, 0.3)',
 
-    // Bitpunk Cyan — DecorationFocus (10,189,198)
-    neonCyan: '#0abdc6',
-    neonCyanDim: '#08919a',
-    neonCyanGlow: 'rgba(10, 189, 198, 0.3)',
+    // Daemon Cyan — same as primary (93,244,254)
+    neonCyan: '#5df4fe',
+    neonCyanDim: '#3daee9',
+    neonCyanGlow: 'rgba(93, 244, 254, 0.3)',
 
-    // Bitpunk Magenta — DecorationHover (234,0,217)
-    neonMagenta: '#ea00d9',
-    neonMagentaDim: '#bb00ae',
-    neonMagentaGlow: 'rgba(234, 0, 217, 0.3)',
+    // Daemon Magenta/Purple — WM active (238,0,255) + Visited (203,29,205)
+    neonMagenta: '#ee00ff',
+    neonMagentaDim: '#cb1dcd',
+    neonMagentaGlow: 'rgba(238, 0, 255, 0.3)',
 
-    // Bitpunk Red — ForegroundNegative (255,74,87)
-    neonRed: '#ff4a57',
-    neonRedDim: '#c83a44',
-    neonRedGlow: 'rgba(255, 74, 87, 0.3)',
+    // Daemon Red — ForegroundNegative (251,48,72) / (218,68,83)
+    neonRed: '#fb3048',
+    neonRedDim: '#da4453',
+    neonRedGlow: 'rgba(251, 48, 72, 0.3)',
 
-    // Bitpunk Green — Color2/ForegroundPositive (46,216,140)
-    neonGreen: '#2ed88c',
-    neonGreenDim: '#24aa6e',
-    neonGreenGlow: 'rgba(46, 216, 140, 0.3)',
-    neonOrange: '#ff6b35',      // Warning (no Bitpunk equivalent, kept)
-    neonYellow: '#ffef4a',      // Caution/pending — Bitpunk Color3Intense (255,239,74)
+    // Daemon Green — ForegroundPositive (40,199,117) / (39,174,96)
+    neonGreen: '#28c775',
+    neonGreenDim: '#27ae60',
+    neonGreenGlow: 'rgba(40, 199, 117, 0.3)',
+    neonOrange: '#f67400',      // Daemon: ForegroundNeutral (246,116,0)
+    neonYellow: '#fdf500',      // Daemon: View ForegroundNeutral (253,245,0)
 
-    // Bitpunk accent colors
-    neonBlue: '#08919a',        // Bitpunk: Color4/ForegroundVisited (8,145,154)
-    coldGray: '#2a3a4d',        // Bitpunk: Color0Intense (42,58,77)
-    iceWhite: '#e0e8f0',        // Bitpunk: ForegroundNormal (224,232,240)
+    // Daemon accent colors
+    neonBlue: '#1d99f3',        // Daemon: ForegroundLink (29,153,243)
+    coldGray: '#355d65',        // Daemon: Selection BackgroundNormal (53,93,101)
+    iceWhite: '#fcfcfc',        // Daemon: Complementary ForegroundNormal (252,252,252)
 
-    // Text (EXACT Bitpunk values)
-    textPrimary: '#f3e600',     // Bitpunk: ForegroundNeutral (243,230,0)
-    textSecondary: '#e0e8f0',   // Bitpunk: ForegroundNormal (224,232,240)
-    textMuted: '#8a9bad',       // Bitpunk: ForegroundInactive (138,155,173)
-    textWhite: '#f0eef5',       // Pure content text
-    textCyan: '#0abdc6',        // Tech/AI text
+    // Text (EXACT Daemon 2.0 values)
+    textPrimary: '#5df4fe',     // Daemon: ForegroundNormal cyan (93,244,254)
+    textSecondary: '#d1c5c0',   // Daemon: Tooltip ForegroundNormal (209,197,192)
+    textMuted: '#a1a9b1',       // Daemon: ForegroundInactive (161,169,177)
+    textWhite: '#fcfcfc',       // Daemon: Complementary ForegroundNormal (252,252,252)
+    textCyan: '#5df4fe',        // Same as primary
 
     // Status
-    profit: '#2ed88c',
-    loss: '#ff4a57',
-    neutral: '#8a9bad',
-    warning: '#ffb800',
+    profit: '#28c775',          // Daemon green
+    loss: '#fb3048',            // Daemon red
+    neutral: '#a1a9b1',         // Daemon muted
+    warning: '#f67400',         // Daemon orange
 
     // Confidence levels
-    confidenceHigh: '#0abdc6',
-    confidenceMedium: '#ffb800',
-    confidenceLow: '#8a9bad',
+    confidenceHigh: '#5df4fe',  // Daemon cyan
+    confidenceMedium: '#f67400', // Daemon orange
+    confidenceLow: '#a1a9b1',  // Daemon muted
 
-    // Borders (angular CP2077 style — colder)
-    border: '#1a2535',
-    borderActive: '#f3e600',    // CP2077 yellow active border
-    borderCyan: '#0abdc6',
-    borderMagenta: '#ea00d9',
+    // Borders
+    border: '#2a1a22',          // Derived from Window BG lightened
+    borderActive: '#5df4fe',    // Daemon cyan active border
+    borderCyan: '#5df4fe',
+    borderMagenta: '#ee00ff',
 
     // Chart
-    chartBullish: '#2ed88c',
-    chartBearish: '#ff4a57',
-    chartGrid: '#111824',
-    chartBackground: '#050505',
-    chartGridLines: '#111824',
-    chartCandleUp: '#2ed88c',
-    chartCandleDown: '#ff4a57',
-    chartVolumeUp: 'rgba(0, 255, 136, 0.3)',
-    chartVolumeDown: 'rgba(218, 68, 83, 0.3)',
-    chartCrosshair: '#f3e600',
-    chartEma20: '#0abdc6',
-    chartEma50: '#ea00d9',
-    chartSupport: '#2ed88c',
-    chartResistance: '#ff4a57',
-    chartPivot: '#ffb800',
-    chartTextColor: '#8a9bad',
-    chartCurrentPrice: '#f3e600',
+    chartBullish: '#28c775',
+    chartBearish: '#fb3048',
+    chartGrid: '#1a0f18',
+    chartBackground: '#040a10',
+    chartGridLines: '#1a0f18',
+    chartCandleUp: '#28c775',
+    chartCandleDown: '#fb3048',
+    chartVolumeUp: 'rgba(40, 199, 117, 0.3)',
+    chartVolumeDown: 'rgba(251, 48, 72, 0.3)',
+    chartCrosshair: '#5df4fe',
+    chartEma20: '#5df4fe',
+    chartEma50: '#ee00ff',
+    chartSupport: '#28c775',
+    chartResistance: '#fb3048',
+    chartPivot: '#f67400',
+    chartTextColor: '#a1a9b1',
+    chartCurrentPrice: '#fdf500',
 
-    // Strategy detection colors (TradingLab 6-color system, Bitpunk-aligned)
-    strategyBlue: '#08919a',    // Bitpunk: Color4 (8,145,154)
-    strategyRed: '#ff4a57',     // Bitpunk: ForegroundNegative (255,74,87)
-    strategyPink: '#ea00d9',    // Bitpunk: DecorationHover (234,0,217)
-    strategyWhite: '#e0e8f0',   // Bitpunk: ForegroundNormal (224,232,240)
-    strategyBlack: '#8a9bad',   // Bitpunk: ForegroundInactive (138,155,173)
-    strategyGreen: '#2ed88c',   // Bitpunk: Color2 (46,216,140)
-    strategyDetected: '#f3e600', // Bitpunk: ForegroundNeutral (243,230,0)
+    // Strategy detection colors (TradingLab 6-color system, Daemon-aligned)
+    strategyBlue: '#3daee9',    // Daemon: ForegroundActive (61,174,233)
+    strategyRed: '#fb3048',     // Daemon: ForegroundNegative (251,48,72)
+    strategyPink: '#ee00ff',    // Daemon: WM activeBackground (238,0,255)
+    strategyWhite: '#fcfcfc',   // Daemon: ForegroundNormal white (252,252,252)
+    strategyBlack: '#a1a9b1',   // Daemon: ForegroundInactive (161,169,177)
+    strategyGreen: '#28c775',   // Daemon: ForegroundPositive (40,199,117)
+    strategyDetected: '#fdf500', // Daemon: ForegroundNeutral yellow (253,245,0)
   },
 
   fonts: {
-    // Rajdhani — geometric, futuristic, perfect for CP2077 HUD aesthetic
+    // Rajdhani EVERYWHERE — user's explicit request
     primary: 'Rajdhani',
     heading: 'Rajdhani-Bold',
     medium: 'Rajdhani-Medium',
     semibold: 'Rajdhani-SemiBold',
     light: 'Rajdhani-Light',
-    mono: 'TerminessNerdFont',  // Keep monospace for code/data
+    mono: 'Rajdhani',           // Rajdhani even for mono/data (user wants Rajdhani everywhere)
     bold: 'Rajdhani-Bold',
     fallback: "'Rajdhani', 'Segoe UI', sans-serif",
-    monoFallback: "'TerminessNerdFont', 'Fira Code', monospace",
+    monoFallback: "'Rajdhani', 'Segoe UI', sans-serif",
   },
 
   typography: {
@@ -126,7 +129,7 @@ export const theme = {
       textTransform: 'uppercase' as const,
       letterSpacing: 3,
       fontFamily: 'Rajdhani-Medium',
-      color: '#8a9bad',
+      color: '#a1a9b1',
     },
     dataLarge: {
       fontSize: 28,
@@ -135,7 +138,7 @@ export const theme = {
     },
     dataSmall: {
       fontSize: 12,
-      fontFamily: 'TerminessNerdFont',
+      fontFamily: 'Rajdhani',
       fontVariant: ['tabular-nums' as const],
     },
   },
@@ -150,7 +153,7 @@ export const theme = {
   },
 
   borderRadius: {
-    sm: 2,    // Sharper — CP2077 angular style
+    sm: 2,
     md: 4,
     lg: 8,
     xl: 12,
@@ -159,21 +162,21 @@ export const theme = {
 
   shadows: {
     cp2077Yellow: {
-      shadowColor: '#f3e600',
+      shadowColor: '#5df4fe',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.5,
       shadowRadius: 12,
       elevation: 12,
     },
     neonCyan: {
-      shadowColor: '#0abdc6',
+      shadowColor: '#5df4fe',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.4,
       shadowRadius: 10,
       elevation: 10,
     },
     neonMagenta: {
-      shadowColor: '#ea00d9',
+      shadowColor: '#ee00ff',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.4,
       shadowRadius: 8,
@@ -187,7 +190,7 @@ export const theme = {
       elevation: 6,
     },
     hudGlow: {
-      shadowColor: '#f3e600',
+      shadowColor: '#5df4fe',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.15,
       shadowRadius: 20,
@@ -237,7 +240,7 @@ export const cssTheme = `
 
     --font-primary: 'Rajdhani', 'Segoe UI', sans-serif;
     --font-heading: 'Rajdhani', sans-serif;
-    --font-mono: 'TerminessNerdFont', 'Fira Code', monospace;
+    --font-mono: 'Rajdhani', sans-serif;
 
     --radius-sm: ${theme.borderRadius.sm}px;
     --radius-md: ${theme.borderRadius.md}px;
@@ -255,8 +258,6 @@ export const cssTheme = `
     padding: 0;
   }
 
-  /* -- CP2077 HUD Typography ----------------------------------------- */
-
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     font-weight: 700;
@@ -270,7 +271,6 @@ export const cssTheme = `
   h3 { letter-spacing: 4px; }
   h4, h5, h6 { letter-spacing: 4px; }
 
-  /* HUD micro text — tiny uppercase labels */
   .hud-micro {
     font-family: var(--font-heading);
     font-weight: 500;
@@ -280,14 +280,12 @@ export const cssTheme = `
     color: var(--text-muted);
   }
 
-  /* Tabular numerals for financial data */
   .financial-num {
-    font-family: var(--font-mono);
+    font-family: var(--font-primary);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
 
-  /* Data display — large numbers */
   .data-large {
     font-family: var(--font-heading);
     font-weight: 700;
@@ -296,15 +294,12 @@ export const cssTheme = `
     font-feature-settings: "tnum";
   }
 
-  /* Data display — small monospace numbers */
   .data-small {
-    font-family: var(--font-mono);
+    font-family: var(--font-primary);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
-
-  /* -- CP2077 Neon Text Effects -------------------------------------- */
 
   .neon-text {
     color: var(--cp2077-yellow);
@@ -324,8 +319,6 @@ export const cssTheme = `
     text-shadow: 0 0 7px var(--neon-magenta-glow),
                  0 0 14px var(--neon-magenta-glow);
   }
-
-  /* -- CP2077 Card & Border Styles ----------------------------------- */
 
   .neon-border {
     border: 1px solid var(--cp2077-yellow);
@@ -352,10 +345,9 @@ export const cssTheme = `
   .cp2077-card:hover {
     border-color: var(--cp2077-yellow);
     box-shadow: 0 0 15px var(--cp2077-yellow-glow),
-                inset 0 0 5px rgba(252, 238, 9, 0.05);
+                inset 0 0 5px rgba(93, 244, 254, 0.05);
   }
 
-  /* CP2077 header bar — thin line with yellow dot */
   .cp2077-header-bar {
     position: relative;
     padding-left: 16px;
@@ -384,7 +376,6 @@ export const cssTheme = `
     transform: translateY(-50%);
   }
 
-  /* CP2077 clipped corner effect */
   .cp2077-clip {
     clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
   }
@@ -392,8 +383,6 @@ export const cssTheme = `
   .cp2077-clip-sm {
     clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   }
-
-  /* -- CP2077 HUD Elements ------------------------------------------- */
 
   .hud-header {
     font-family: var(--font-heading);
@@ -417,11 +406,11 @@ export const cssTheme = `
   }
 
   .hud-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-primary);
     font-size: 18px;
     font-weight: 600;
     color: var(--text-white);
-    text-shadow: 0 0 4px rgba(240, 238, 245, 0.2);
+    text-shadow: 0 0 4px rgba(252, 252, 252, 0.2);
   }
 
   .hud-divider {
@@ -440,8 +429,6 @@ export const cssTheme = `
     height: 1px;
     background: var(--cp2077-yellow);
   }
-
-  /* -- Scan Lines (CP2077 CRT effect) -------------------------------- */
 
   .scan-lines {
     position: relative;
@@ -465,8 +452,6 @@ export const cssTheme = `
     z-index: 10;
   }
 
-  /* -- CP2077 Grid Background ---------------------------------------- */
-
   .grid-bg {
     background-image:
       linear-gradient(rgba(93, 244, 254, 0.03) 1px, transparent 1px),
@@ -474,32 +459,26 @@ export const cssTheme = `
     background-size: 60px 60px;
   }
 
-  /* -- Chromatic Hover (RGB channel split) ---------------------------- */
-
   .chromatic-hover {
     position: relative;
     transition: all 0.2s ease;
   }
   .chromatic-hover:hover {
     text-shadow:
-      -1px 0 rgba(237, 0, 217, 0.6),
+      -1px 0 rgba(238, 0, 255, 0.6),
       1px 0 rgba(93, 244, 254, 0.6);
   }
-
-  /* -- Data Flicker Animation ---------------------------------------- */
 
   @keyframes data-flicker {
     0% { opacity: 1; }
     5% { opacity: 0.4; letter-spacing: 2px; }
-    10% { opacity: 0.8; content: '##.##'; }
+    10% { opacity: 0.8; }
     15% { opacity: 1; }
     100% { opacity: 1; }
   }
   .data-flicker {
     animation: data-flicker 0.6s ease-out;
   }
-
-  /* -- Boot Line Animation ------------------------------------------- */
 
   @keyframes boot-line-fill {
     0% { width: 0; }
@@ -522,23 +501,20 @@ export const cssTheme = `
     animation: boot-line-fill 1.5s ease-out forwards;
   }
 
-  /* -- Price Animations ---------------------------------------------- */
-
   .profit { color: var(--profit); }
   .loss { color: var(--loss); }
 
   @keyframes tick-up {
-    0% { background-color: rgba(0, 255, 136, 0.25); }
+    0% { background-color: rgba(40, 199, 117, 0.25); }
     100% { background-color: transparent; }
   }
   @keyframes tick-down {
-    0% { background-color: rgba(218, 68, 83, 0.25); }
+    0% { background-color: rgba(251, 48, 72, 0.25); }
     100% { background-color: transparent; }
   }
   .tick-up { animation: tick-up 0.4s ease-out; }
   .tick-down { animation: tick-down 0.4s ease-out; }
 
-  /* CP2077 glitch effect (use sparingly on alerts) */
   @keyframes glitch {
     0% { transform: translate(0); }
     20% { transform: translate(-2px, 2px); }
@@ -549,7 +525,6 @@ export const cssTheme = `
   }
   .glitch { animation: glitch 0.3s ease-in-out; }
 
-  /* Pulsing dot for live status */
   @keyframes pulse {
     0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--neon-green); }
     50% { opacity: 0.5; box-shadow: 0 0 8px var(--neon-green); }
@@ -562,7 +537,6 @@ export const cssTheme = `
     animation: pulse 2s ease-in-out infinite;
   }
 
-  /* HUD corner decorations */
   @keyframes corner-scan {
     0% { width: 0; }
     100% { width: 20px; }
@@ -579,13 +553,9 @@ export const cssTheme = `
   .hud-corner::before { top: 0; left: 0; }
   .hud-corner::after { bottom: 0; right: 0; }
 
-  /* -- Confidence Levels --------------------------------------------- */
-
   .confidence-high { color: ${theme.colors.confidenceHigh}; }
   .confidence-medium { color: ${theme.colors.confidenceMedium}; }
   .confidence-low { color: ${theme.colors.confidenceLow}; }
-
-  /* -- Chart Styles -------------------------------------------------- */
 
   --chart-bg: ${theme.colors.chartBackground};
   --chart-grid: ${theme.colors.chartGridLines};
@@ -605,50 +575,46 @@ export const cssTheme = `
     transition: box-shadow 0.3s ease;
   }
   .tv-lightweight-charts:hover {
-    box-shadow: 0 0 15px rgba(252, 238, 9, 0.1),
-                0 0 4px rgba(93, 244, 254, 0.08);
+    box-shadow: 0 0 15px rgba(93, 244, 254, 0.1),
+                0 0 4px rgba(238, 0, 255, 0.08);
   }
-
-  /* -- Glow Utilities ------------------------------------------------ */
 
   .glow-yellow {
-    box-shadow: 0 0 8px rgba(252, 238, 9, 0.4),
-                0 0 16px rgba(252, 238, 9, 0.15);
+    box-shadow: 0 0 8px rgba(93, 244, 254, 0.4),
+                0 0 16px rgba(93, 244, 254, 0.15);
   }
   .glow-green {
-    box-shadow: 0 0 6px rgba(0, 255, 136, 0.4),
-                0 0 12px rgba(0, 255, 136, 0.15);
+    box-shadow: 0 0 6px rgba(40, 199, 117, 0.4),
+                0 0 12px rgba(40, 199, 117, 0.15);
   }
   .glow-red {
-    box-shadow: 0 0 6px rgba(218, 68, 83, 0.4),
-                0 0 12px rgba(218, 68, 83, 0.15);
+    box-shadow: 0 0 6px rgba(251, 48, 72, 0.4),
+                0 0 12px rgba(251, 48, 72, 0.15);
   }
   .glow-cyan {
     box-shadow: 0 0 6px rgba(93, 244, 254, 0.4),
                 0 0 12px rgba(93, 244, 254, 0.15);
   }
   .glow-magenta {
-    box-shadow: 0 0 6px rgba(237, 0, 217, 0.4),
-                0 0 12px rgba(237, 0, 217, 0.15);
+    box-shadow: 0 0 6px rgba(238, 0, 255, 0.4),
+                0 0 12px rgba(238, 0, 255, 0.15);
   }
 
   .text-glow-yellow {
-    text-shadow: 0 0 6px rgba(252, 238, 9, 0.5);
+    text-shadow: 0 0 6px rgba(93, 244, 254, 0.5);
   }
   .text-glow-green {
-    text-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+    text-shadow: 0 0 6px rgba(40, 199, 117, 0.5);
   }
   .text-glow-red {
-    text-shadow: 0 0 6px rgba(218, 68, 83, 0.5);
+    text-shadow: 0 0 6px rgba(251, 48, 72, 0.5);
   }
   .text-glow-cyan {
     text-shadow: 0 0 6px rgba(93, 244, 254, 0.5);
   }
   .text-glow-magenta {
-    text-shadow: 0 0 6px rgba(237, 0, 217, 0.5);
+    text-shadow: 0 0 6px rgba(238, 0, 255, 0.5);
   }
-
-  /* -- Scrollbar (CP2077 thin style — cold gray) --------------------- */
 
   ::-webkit-scrollbar {
     width: 4px;
@@ -666,7 +632,6 @@ export const cssTheme = `
   }
 `;
 
-// HUD-style divider component CSS (for web)
 export const hudDividerCss = `
   .hud-divider-glow {
     border: none;
@@ -686,20 +651,18 @@ export const hudDividerCss = `
     box-shadow: 0 0 8px var(--cp2077-yellow-glow);
   }
 
-  /* CP2077 Status indicator */
   .status-online {
     color: var(--neon-green);
-    text-shadow: 0 0 4px rgba(0, 255, 136, 0.6);
+    text-shadow: 0 0 4px rgba(40, 199, 117, 0.6);
     animation: pulse 2s ease-in-out infinite;
   }
   .status-offline {
     color: var(--neon-red);
-    text-shadow: 0 0 4px rgba(218, 68, 83, 0.6);
+    text-shadow: 0 0 4px rgba(251, 48, 72, 0.6);
   }
 
-  /* Trading session indicator */
   .session-active {
-    background: linear-gradient(90deg, transparent, rgba(252, 238, 9, 0.08), transparent);
+    background: linear-gradient(90deg, transparent, rgba(93, 244, 254, 0.08), transparent);
     padding: 4px 0;
   }
 `;
@@ -720,7 +683,7 @@ export const getStrategyColor = (strategy: string): string => {
   return map[strategy.toUpperCase()] || theme.colors.cp2077Yellow;
 };
 
-// Score color helper (confidence/quality tiers)
+// Score color helper
 export const getScoreColor = (score: number): string => {
   if (score >= 80) return theme.colors.neonGreen;
   if (score >= 60) return theme.colors.cp2077Yellow;

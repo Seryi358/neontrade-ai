@@ -664,29 +664,16 @@ def _html_to_plain(html: str) -> str:
 
 
 def _build_email_html(title: str, body: str) -> str:
-    """Wrap *body* in a Daemon 2.0 cyberpunk-styled HTML email.
+    """Wrap *body* in a code-style HTML email using Daemon 2.0 colors.
 
-    Design uses EXACT colors from the user's KDE Daemon 2.0 .colors file:
-      - Outer BG: #040a10 (4,10,16) — Tooltip BackgroundNormal
-      - Card BG: #210e15 (33,14,21) — Window/Header BackgroundNormal
-      - Accent: #5df4fe (93,244,254) — DecorationFocus cyan
-      - Purple: #ee00ff — Tooltip BackgroundAlternate
-      - Selection: #355d65 (53,93,101) — Selection BackgroundNormal
-      - Text: #d1c5c0 (209,197,192) — Tooltip ForegroundNormal
-      - Inactive: #a1a9b1 (161,169,177) — ForegroundInactive
-      - Positive: #28c775 (40,199,117) — View ForegroundPositive
-      - Negative: #fb3048 (251,48,72) — View ForegroundNegative
-      - Warning: #fdf500 (253,245,0) — View ForegroundNeutral
-      - Button BG: #14101f (20,16,31) — Button BackgroundNormal
+    Style: plain text, code aesthetic, Rajdhani font, no gradients, no emojis,
+    no icons, no decorations. Just text on a dark background like a terminal.
 
-    Gmail dark mode protection:
-      - color-scheme: light only (prevents auto-inversion)
-      - All colors inline (not class-based)
-      - Background images as fallback for stubborn clients
-      - <u></u> Gmail wrapper hack to force full rendering
+    Colors from ~/.local/share/color-schemes/Daemon2.colors:
+      BG: #210e15, outer: #040a10, accent: #5df4fe, border: #355d65,
+      text: #d1c5c0, inactive: #a1a9b1
 
-    Responsive: max-width 580px, 100% width for mobile (iPhone 15 = 390px)
-    Font: Rajdhani from Google Fonts with system fallback
+    Gmail dark mode: forced light-only color scheme so colors never change.
     """
     body_html = body.replace("\n", "<br>\n")
     ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
@@ -700,139 +687,77 @@ def _build_email_html(title: str, body: str) -> str:
 <meta name="supported-color-schemes" content="light only">
 <title>NeonTrade AI</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<!--[if mso]><style>*{{font-family:Arial,sans-serif !important;}}</style><![endif]-->
+<!--[if mso]><style>*{{font-family:Consolas,monospace !important;}}</style><![endif]-->
 <style>
   :root {{ color-scheme: light only; }}
-  /* Gmail dark mode overrides — force our colors */
-  [data-ogsc] body, [data-ogsb] body,
-  .dark body, body.dark {{ background-color: #040a10 !important; }}
-  u + .body .gcard {{ background-color: #210e15 !important; }}
-  u + .body .gbody {{ color: #d1c5c0 !important; }}
-  u + .body .gcyan {{ color: #5df4fe !important; }}
-  u + .body .gpurp {{ color: #ee00ff !important; }}
-  u + .body .ginact {{ color: #a1a9b1 !important; }}
+  [data-ogsc] body, [data-ogsb] body {{ background-color: #040a10 !important; }}
+  u + .body .nt-card {{ background-color: #210e15 !important; }}
+  u + .body .nt-text {{ color: #d1c5c0 !important; }}
+  u + .body .nt-cyan {{ color: #5df4fe !important; }}
+  u + .body .nt-dim {{ color: #a1a9b1 !important; }}
   @media only screen and (max-width: 600px) {{
-    .outer-table {{ width: 100% !important; }}
-    .card-table {{ width: 100% !important; }}
-    .body-cell {{ padding: 14px 18px 16px 18px !important; }}
-    .header-cell {{ padding: 16px 18px 6px 18px !important; }}
-    .title-cell {{ padding: 6px 18px 4px 18px !important; }}
-    .footer-cell {{ padding: 10px 18px 12px 18px !important; }}
-    .divider-cell {{ padding: 0 18px !important; }}
-    .title-text {{ font-size: 18px !important; letter-spacing: 2px !important; }}
+    .nt-outer {{ width: 100% !important; }}
+    .nt-card {{ width: 100% !important; }}
+    .nt-pad {{ padding-left: 16px !important; padding-right: 16px !important; }}
   }}
 </style>
 </head>
-<!--[if mso]><body class="body" style="margin:0;padding:0;background-color:#040a10;"><![endif]-->
-<!--[if !mso]><!--><body class="body" style="margin:0;padding:0;background-color:#040a10;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;"><!--<![endif]-->
+<body class="body" style="margin:0;padding:0;background-color:#040a10;-webkit-text-size-adjust:100%;">
 <u></u>
-  <div style="background-color:#040a10;width:100%;margin:0;padding:0;">
-  <table role="presentation" class="outer-table" width="100%" cellpadding="0" cellspacing="0"
-         style="background-color:#040a10;margin:0;padding:0;">
-    <tr><td align="center" style="padding:20px 10px;">
+<div style="background-color:#040a10;width:100%;margin:0;padding:0;">
+<table role="presentation" class="nt-outer" width="100%" cellpadding="0" cellspacing="0" style="background-color:#040a10;">
+<tr><td align="center" style="padding:20px 8px;">
 
-      <!-- Card -->
-      <table role="presentation" class="card-table gcard" width="580" cellpadding="0" cellspacing="0"
-             style="max-width:580px;width:100%;background-color:#210e15;border-collapse:collapse;">
+<table role="presentation" class="nt-card" width="580" cellpadding="0" cellspacing="0"
+       style="max-width:580px;width:100%;background-color:#210e15;border:1px solid #355d65;border-collapse:separate;">
 
-        <!-- Top accent bar: cyan → purple gradient -->
-        <tr><td style="height:3px;background-color:#5df4fe;">
-          <div style="height:3px;background:linear-gradient(90deg,#5df4fe 0%,#ee00ff 60%,#210e15 100%);font-size:0;line-height:0;">&nbsp;</div>
-        </td></tr>
+  <!-- header -->
+  <tr><td class="nt-pad" style="padding:20px 24px 4px 24px;">
+    <span class="nt-dim" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:11px;font-weight:400;color:#355d65;letter-spacing:2px;">
+      // NEONTRADE AI</span>
+  </td></tr>
 
-        <!-- Left cyan border via nested table -->
-        <tr><td style="padding:0;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-            <tr>
-              <!-- 3px cyan left border -->
-              <td width="3" style="width:3px;background-color:#5df4fe;font-size:0;">&nbsp;</td>
-              <td style="background-color:#210e15;">
+  <!-- title -->
+  <tr><td class="nt-pad" style="padding:4px 24px 8px 24px;">
+    <span class="nt-cyan" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;color:#5df4fe;text-transform:uppercase;letter-spacing:2px;">
+      {title}</span>
+  </td></tr>
 
-                <!-- Header -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr><td class="header-cell" style="padding:18px 24px 6px 24px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td width="8" style="width:8px;height:8px;background-color:#5df4fe;border-radius:50%;font-size:0;line-height:0;">&nbsp;</td>
-                        <td style="padding-left:10px;">
-                          <span class="ginact" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:10px;font-weight:500;color:#a1a9b1;text-transform:uppercase;letter-spacing:3px;">
-                            NEONTRADE AI &bull; ALERT SYSTEM
-                          </span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td></tr>
-                </table>
+  <!-- divider -->
+  <tr><td class="nt-pad" style="padding:0 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="height:1px;background-color:#355d65;font-size:0;">&nbsp;</td></tr>
+    </table>
+  </td></tr>
 
-                <!-- Title -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr><td class="title-cell" style="padding:6px 24px 4px 24px;">
-                    <h2 class="title-text gcyan" style="margin:0;font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;color:#5df4fe;text-transform:uppercase;letter-spacing:2px;line-height:1.3;">
-                      {title}
-                    </h2>
-                  </td></tr>
-                </table>
+  <!-- body -->
+  <tr><td class="nt-pad nt-text" style="padding:16px 24px 20px 24px;font-family:'Rajdhani',Helvetica,Arial,sans-serif;color:#d1c5c0;font-size:15px;line-height:1.8;font-weight:400;">
+    {body_html}
+  </td></tr>
 
-                <!-- Divider -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr><td class="divider-cell" style="padding:4px 24px 0 24px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td width="36" style="width:36px;height:1px;background-color:#5df4fe;font-size:0;line-height:0;">&nbsp;</td>
-                        <td style="height:1px;background-color:#355d65;font-size:0;line-height:0;">&nbsp;</td>
-                      </tr>
-                    </table>
-                  </td></tr>
-                </table>
+  <!-- footer divider -->
+  <tr><td class="nt-pad" style="padding:0 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="height:1px;background-color:#355d65;font-size:0;">&nbsp;</td></tr>
+    </table>
+  </td></tr>
 
-                <!-- Body -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr><td class="body-cell gbody" style="padding:14px 24px 18px 24px;font-family:'Rajdhani',Helvetica,Arial,sans-serif;color:#d1c5c0;font-size:15px;line-height:1.75;font-weight:400;">
-                    {body_html}
-                  </td></tr>
-                </table>
+  <!-- footer -->
+  <tr><td class="nt-pad" style="padding:12px 24px 16px 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="nt-dim" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
+          // NeonTrade AI v2.2 / TradingLab</td>
+        <td align="right" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
+          {ts}</td>
+      </tr>
+    </table>
+  </td></tr>
 
-                <!-- Footer divider -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr><td class="divider-cell" style="padding:0 24px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr><td style="height:1px;background-color:#355d65;font-size:0;line-height:0;">&nbsp;</td></tr>
-                    </table>
-                  </td></tr>
-                </table>
+</table>
 
-                <!-- Footer -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr><td class="footer-cell" style="padding:10px 24px 14px 24px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td class="ginact" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:10px;font-weight:500;color:#a1a9b1;text-transform:uppercase;letter-spacing:2px;">
-                          NEONTRADE AI v2.2 &bull; TRADINGLAB
-                        </td>
-                        <td align="right" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
-                          {ts}
-                        </td>
-                      </tr>
-                    </table>
-                  </td></tr>
-                </table>
-
-              </td>
-              <!-- 1px right border -->
-              <td width="1" style="width:1px;background-color:#355d65;font-size:0;">&nbsp;</td>
-            </tr>
-          </table>
-        </td></tr>
-
-        <!-- Bottom accent bar: purple → cyan gradient (opposite direction) -->
-        <tr><td style="height:3px;background-color:#ee00ff;">
-          <div style="height:3px;background:linear-gradient(90deg,#210e15 0%,#ee00ff 40%,#5df4fe 100%);font-size:0;line-height:0;">&nbsp;</div>
-        </td></tr>
-
-      </table>
-
-    </td></tr>
-  </table>
-  </div>
+</td></tr>
+</table>
+</div>
 </body>
 </html>"""

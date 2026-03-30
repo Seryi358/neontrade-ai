@@ -193,8 +193,18 @@ class MarketAnalyzer:
             logger.warning(f"Failed to derive Monthly candles from Weekly: {e}")
             candles["M"] = pd.DataFrame()
 
-        # Step 2: HTF Analysis (Weekly direction, Daily confirmation)
-        htf_trend = self._detect_trend(candles.get("W", pd.DataFrame()))
+        # Step 2: HTF Analysis (direction TF depends on trading style per TradingLab MTFA)
+        # Swing: Monthly is the direction TF
+        # Day Trading: Daily is the direction TF
+        # Scalping: H1 is the direction TF
+        from config import settings
+        _style = getattr(settings, "trading_style", "day_trading")
+        if _style == "swing":
+            htf_trend = self._detect_trend(candles.get("M", pd.DataFrame()))
+        elif _style == "scalping":
+            htf_trend = self._detect_trend(candles.get("H1", pd.DataFrame()))
+        else:  # day_trading (default)
+            htf_trend = self._detect_trend(candles.get("D", pd.DataFrame()))
         htf_condition = self._detect_condition(candles.get("D", pd.DataFrame()))
 
         # Step 2b: H4 Analysis (MTFA bridge: strategy selection + RSI overbought/oversold)
@@ -2909,6 +2919,27 @@ class MarketAnalyzer:
                 pools.append({"level": london_high, "type": "london_high", "strength": 1})
                 pools.append({"level": london_low, "type": "london_low", "strength": 1})
 
+        # --- New York session High / Low (13:00-21:00 UTC) ---
+        if not h1.empty and isinstance(h1.index, pd.DatetimeIndex):
+            now_liq = datetime.now(timezone.utc)
+            ny_start = now_liq.replace(hour=13, minute=0, second=0, microsecond=0)
+            ny_end = now_liq.replace(hour=21, minute=0, second=0, microsecond=0)
+            ny_candles = h1[
+                (h1.index >= ny_start) & (h1.index < ny_end)
+            ]
+            if ny_candles.empty:
+                from datetime import timedelta as _td_liq
+                ny_start_y = ny_start - _td_liq(days=1)
+                ny_end_y = ny_end - _td_liq(days=1)
+                ny_candles = h1[
+                    (h1.index >= ny_start_y) & (h1.index < ny_end_y)
+                ]
+            if not ny_candles.empty:
+                ny_high = float(ny_candles["high"].max())
+                ny_low = float(ny_candles["low"].min())
+                pools.append({"level": ny_high, "type": "ny_high", "strength": 1})
+                pools.append({"level": ny_low, "type": "ny_low", "strength": 1})
+
         # --- S/R levels from key_levels as liquidity targets ---
         for res in key_levels.get("resistances", []):
             # S/R levels can be zone dicts or plain floats
@@ -2982,7 +3013,7 @@ class MarketAnalyzer:
 
                 # Swept highs: wick went above level but close came back below
                 if ptype in ("equal_highs", "pdh", "asian_high",
-                             "london_high", "resistance",
+                             "london_high", "ny_high", "resistance",
                              "trendline_resistance"):
                     if recent_high > lvl and current_price < lvl and prev_close < lvl:
                         sweep = {"level": lvl, "direction": "swept_highs"}
@@ -2990,7 +3021,7 @@ class MarketAnalyzer:
 
                 # Swept lows: wick went below level but close came back above
                 if ptype in ("equal_lows", "pdl", "asian_low",
-                             "london_low", "support",
+                             "london_low", "ny_low", "support",
                              "trendline_support"):
                     if recent_low < lvl and current_price > lvl and prev_close > lvl:
                         sweep = {"level": lvl, "direction": "swept_lows"}

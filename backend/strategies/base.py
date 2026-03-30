@@ -3677,8 +3677,11 @@ class GreenStrategy(BaseStrategy):
     La mas lucrativa (hasta 10:1 R:R)
     TradingLab: GREEN is the ONLY strategy valid for crypto trading.
 
-    FIXED layout (NO style differentiation): Daily + 1H + 15min
-    Timeframes: Weekly (trend) -> Daily (pattern) -> 1H (diagonal) -> 15M (execution)
+    Timeframe layouts:
+    - Forex/General (all styles): W->D->H1->M15 (fixed, per Trading Mastery)
+    - Crypto Swing:       W->D->H1->M15 (same as forex)
+    - Crypto Day Trading: H4->H1->M15->M2 (per Crypto Mastery)
+    - Crypto Scalping:    M15->M5->M1->M1 (M1 as fallback for 30s, per Crypto Mastery)
 
     7 Pasos:
     1. Direccion de tendencia semanal (alcista/bajista)
@@ -3690,11 +3693,33 @@ class GreenStrategy(BaseStrategy):
     6. SL debajo del minimo anterior de 1H (ajustado!). TP en maximo/minimo diario anterior
     """
 
+    # Crypto timeframe layouts per trading style (Crypto Mastery)
+    # Keys: direction, pattern, diagonal, execution
+    CRYPTO_TIMEFRAMES = {
+        "swing":       {"direction": "W",   "pattern": "D",  "diagonal": "H1",  "execution": "M15"},
+        "day_trading": {"direction": "H4",  "pattern": "H1", "diagonal": "M15", "execution": "M2"},
+        "scalping":    {"direction": "M15", "pattern": "M5", "diagonal": "M1",  "execution": "M1"},
+    }
+    # Forex/general: fixed layout regardless of style
+    FOREX_TIMEFRAMES = {"direction": "W", "pattern": "D", "diagonal": "H1", "execution": "M15"}
+
     def __init__(self):
         super().__init__()
         self.color = StrategyColor.GREEN
         self.name = "GREEN - Semanal + Diario + 15M (Hasta 10:1 R:R)"
         self.min_confidence = 55.0
+
+    def _get_green_timeframes(self, instrument: str) -> dict:
+        """Get the correct timeframe layout for GREEN strategy.
+
+        For forex/general instruments: always W->D->H1->M15 (Trading Mastery).
+        For crypto: depends on current trading style (Crypto Mastery).
+        """
+        is_crypto = _is_crypto_instrument(instrument)
+        if not is_crypto:
+            return self.FOREX_TIMEFRAMES
+        style = _get_trading_style()
+        return self.CRYPTO_TIMEFRAMES.get(style, self.CRYPTO_TIMEFRAMES["swing"])
 
     def check_htf_conditions(self, analysis: AnalysisResult) -> Tuple[bool, float, List[str], List[str]]:
         score = 0.0
@@ -4041,6 +4066,13 @@ class GreenStrategy(BaseStrategy):
                 "NOT hard TP exits (per mentorship)"
             )
 
+        # Determine timeframes used based on instrument type and trading style
+        green_tf = self._get_green_timeframes(analysis.instrument)
+        tf_list = list(dict.fromkeys([  # unique, ordered
+            green_tf["direction"], green_tf["pattern"],
+            green_tf["diagonal"], green_tf["execution"],
+        ]))
+
         return SetupSignal(
             strategy=self.color,
             strategy_variant="GREEN",
@@ -4051,10 +4083,10 @@ class GreenStrategy(BaseStrategy):
             take_profit_1=tp1,
             take_profit_max=tp_max,
             confidence=confidence,
-            reasoning=f"GREEN: Weekly trend + daily corrective pattern. Entry on 15M/5M first break. Tight SL for high R:R.",
+            reasoning=f"GREEN: {green_tf['direction']} trend + {green_tf['pattern']} corrective pattern. Entry on {green_tf['execution']} first break. Tight SL for high R:R.",
             explanation_es=explanation_es,
             elliott_wave_phase="Correccion semanal -> impulso",
-            timeframes_analyzed=["W", "D", "H4", "H1", "M15", "M5"],
+            timeframes_analyzed=tf_list,
             risk_reward_ratio=rr,
             conditions_met=met,
             conditions_failed=failed,
@@ -4063,11 +4095,23 @@ class GreenStrategy(BaseStrategy):
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
         """
-        SL debajo del minimo anterior de 1H (ajustado para lograr alto R:R).
-        Green usa SL muy ajustado, por eso logra R:R tan altos.
+        Green SL placement depends on green_sl_mode config:
+
+        - "advanced" (default): SL below last swing before diagonal break.
+          Tight SL for high R:R — the mentorship method.
+        - "beginner": SL below pattern minimum (wider, simpler).
+          Uses the lowest low / highest high of the corrective pattern.
+
         TradingLab: Use 1H swing lows/highs (NOT daily S/R levels).
         Previous 1H swing low/high only, NO Fibonacci.
         """
+        # Check green_sl_mode from config
+        sl_mode = "advanced"
+        try:
+            sl_mode = settings.green_sl_mode
+        except Exception:
+            pass
+
         # Use swing_lows/swing_highs which come from 1H analysis (not daily S/R)
         swing_lows = getattr(analysis, 'swing_lows', [])
         swing_highs = getattr(analysis, 'swing_highs', [])
@@ -4077,6 +4121,22 @@ class GreenStrategy(BaseStrategy):
         supports = analysis.key_levels.get("supports", []) if analysis.key_levels else []
         resistances = analysis.key_levels.get("resistances", []) if analysis.key_levels else []
 
+        if sl_mode == "beginner":
+            # Beginner mode: SL below pattern minimum (wider, simpler)
+            if direction == "BUY":
+                all_lows = swing_lows + supports
+                below = [s for s in all_lows if s < entry_price]
+                if below:
+                    return min(below)  # Widest SL = pattern minimum
+                return entry_price * 0.99  # 1% fallback (wider than advanced)
+            else:
+                all_highs = swing_highs + resistances
+                above = [s for s in all_highs if s > entry_price]
+                if above:
+                    return max(above)  # Widest SL = pattern maximum
+                return entry_price * 1.01
+
+        # Advanced mode (default): SL below last swing before diagonal
         if direction == "BUY":
             # 1H swing lows below entry = SL placement
             below = [sl for sl in swing_lows if sl < entry_price]

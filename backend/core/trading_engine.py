@@ -731,7 +731,7 @@ class TradingEngine:
 
     # ── Market Hours ─────────────────────────────────────────────
 
-    def _get_session_quality(self, now: datetime) -> tuple:
+    def _get_session_quality(self, now: datetime, instrument: str = "") -> tuple:
         """
         Return (session_name, quality_score) based on current UTC hour.
 
@@ -748,7 +748,14 @@ class TradingEngine:
 
         Quality scores reflect TradingLab guidance: overlap is peak volatility,
         London is the most liquid session, NY carries major news impact.
+
+        For crypto instruments, ASIAN session gets a higher score (0.7) because
+        crypto markets are active during Asian hours (TradingLab Crypto Mastery).
         """
+        # Check if instrument is crypto
+        from backend.strategies.base import _is_crypto_instrument
+        is_crypto = bool(instrument) and _is_crypto_instrument(instrument)
+
         hour = now.hour
         if 13 <= hour < 17:
             return ("OVERLAP", 1.0)
@@ -757,7 +764,8 @@ class TradingEngine:
         elif 17 <= hour < 22:
             return ("NEW_YORK", 0.8)
         elif 0 <= hour < 8:
-            return ("ASIAN", 0.5)
+            # Crypto is active in Asian hours — higher quality score
+            return ("ASIAN", 0.7 if is_crypto else 0.5)
         elif 22 <= hour or hour < 0:
             return ("SYDNEY", 0.4)
         else:
@@ -1372,7 +1380,7 @@ class TradingEngine:
 
                     # Session quality filter: reduce confidence or skip during low-quality sessions
                     now_utc = datetime.now(timezone.utc)
-                    session_name, session_quality = self._get_session_quality(now_utc)
+                    session_name, session_quality = self._get_session_quality(now_utc, instrument)
                     logger.info(
                         f"Setup on {instrument} during {session_name} session "
                         f"(quality={session_quality:.1f})"

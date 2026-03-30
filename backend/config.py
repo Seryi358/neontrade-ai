@@ -271,6 +271,11 @@ class Settings(BaseSettings):
     funded_no_news_trading: bool = False  # True only for FTMO "normal" accounts
     funded_no_weekend: bool = False  # True only for FTMO "normal" accounts
 
+    # ── Green Strategy SL Mode ──────────────────────────────────
+    # "advanced" (default) = SL below last swing before diagonal (mentorship method)
+    # "beginner" = SL below pattern minimum (simpler, wider SL)
+    green_sl_mode: str = "advanced"
+
     # ── Discretion Level (ch22.1 Trading Plan) ──────────────────
     # Beginners: 100% precision, 0% discretion. Follow the plan exactly.
     # Alex (experienced): 80% precision, 20% discretion.
@@ -617,8 +622,11 @@ TRADING_PROFILES = {
             "active_watchlist_categories": ["forex", "forex_exotic", "commodities", "indices", "crypto"],
             # Discretion — Alex uses 20% but default for users is 0%
             "discretion_pct": 0.0,
-            # Scalping/Funded off by default
+            # Green SL mode — advanced (below last swing before diagonal)
+            "green_sl_mode": "advanced",
+            # Scalping — Alex prefers quick exits with M1 EMA 50 trailing
             "scalping_enabled": False,
+            "scalping_exit_method": "fast",
             "funded_account_mode": False,
         },
     },

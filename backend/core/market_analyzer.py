@@ -1102,6 +1102,7 @@ class MarketAnalyzer:
         """Calculate EMA values for multiple timeframes."""
         emas = {}
         ema_configs = {
+            "M": [20],     # EMA 20 Monthly — swing trading direction filter (derived from W)
             "W": [8, 50],  # EMA 8 Weekly: mentorship Class 3 (trend/close signal)
             "D": [20, 50],
             "H4": [20, 50],  # EMA 20 added per mentorship: "las tres medias en todos los gráficos"

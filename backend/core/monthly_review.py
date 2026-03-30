@@ -99,17 +99,27 @@ class MonthlyReport:
 class MonthlyReviewGenerator:
     """Generates comprehensive monthly trading reviews."""
 
-    # Keywords indicating negative emotional states
+    # Keywords indicating negative emotional states (English + Spanish)
     NEGATIVE_EMOTION_KEYWORDS = [
+        # English
         "stressed", "anxious", "frustrated", "angry", "revenge",
         "fomo", "fear", "impatient", "tired", "bored",
         "overconfident", "greedy", "desperate", "nervous",
+        # Spanish (TradingLab mentorship is in Spanish)
+        "estresado", "ansioso", "frustrado", "enojado", "venganza",
+        "miedo", "impaciente", "cansado", "aburrido",
+        "sobreconfiado", "codicioso", "desesperado", "nervioso",
+        "rabia", "ira", "agotado", "inseguro", "presionado",
     ]
 
-    # Keywords indicating positive/neutral emotional states
+    # Keywords indicating positive/neutral emotional states (English + Spanish)
     POSITIVE_EMOTION_KEYWORDS = [
+        # English
         "calm", "focused", "confident", "disciplined", "patient",
         "clear", "prepared", "relaxed",
+        # Spanish (TradingLab mentorship is in Spanish)
+        "tranquilo", "enfocado", "confiado", "disciplinado", "paciente",
+        "claro", "preparado", "relajado", "sereno", "seguro",
     ]
 
     def __init__(self, data_dir: str = "data"):

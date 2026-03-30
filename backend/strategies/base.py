@@ -1477,8 +1477,9 @@ class BlueStrategy(BaseStrategy):
         else:
             failed.append("Paso 2: Sin desaceleracion clara en diario")
 
-        # --- Paso 3: Cambio de tendencia en 1H (EMA 50 1H rota) ---
-        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", direction)
+        # --- Paso 3: Cambio de tendencia en setup TF (1H for day, Daily for swing) ---
+        setup_ema_key = _tf_ema("setup", 50)
+        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, setup_ema_key, direction)
         if ema_1h_break:
             score += 20.0
             met.append(f"Paso 3: {ema_1h_desc}")
@@ -1529,8 +1530,8 @@ class BlueStrategy(BaseStrategy):
             confidence -= 3.0
             failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
-        # --- Paso 4: Pullback a EMA 50 1H + Fibonacci ---
-        pb_ok, pb_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
+        # --- Paso 4: Pullback a setup-TF EMA 50 + Fibonacci ---
+        pb_ok, pb_desc = _check_ema_pullback(analysis, setup_ema_key, direction)
         if pb_ok:
             confidence += 15.0
             met.append(f"Paso 4: {pb_desc}")

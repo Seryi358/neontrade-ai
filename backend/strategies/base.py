@@ -1897,11 +1897,13 @@ class RedStrategy(BaseStrategy):
         else:
             failed.append("Paso 2: Sin desaceleracion clara en diario")
 
-        # --- Paso 3: Cambio de tendencia en 4H Y 1H (AMBAS EMA 50 rotas) ---
-        # TradingLab: RED requires BOTH 1H AND 4H EMA 50 broken.
-        # Used for Wave 3 (target up to 1.618 extension) or Wave 5.
-        ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", direction)
-        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", direction)
+        # --- Paso 3: Cambio de tendencia en confirm + setup TF (AMBAS EMA 50 rotas) ---
+        # TradingLab: RED requires BOTH setup AND confirm EMA 50 broken.
+        # Style-adaptive: day=H1+H4, swing=D+W, scalping=M5+M15
+        setup_ema_key = _tf_ema("setup", 50)
+        confirm_ema_key = _tf_ema("confirm", 50)
+        ema_4h_break, ema_4h_desc = _check_ema_break(analysis, confirm_ema_key, direction)
+        ema_1h_break, ema_1h_desc = _check_ema_break(analysis, setup_ema_key, direction)
 
         if ema_1h_break:
             score += 10.0
@@ -1964,13 +1966,14 @@ class RedStrategy(BaseStrategy):
             confidence -= 3.0
             failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
-        # --- Paso 3.5: Check for uncontrolled 1H EMA break ---
-        # TradingLab: be "permisivos" with the 1H EMA break during pullback,
+        # --- Paso 3.5: Check for uncontrolled setup EMA break ---
+        # TradingLab: be "permisivos" with the setup EMA break during pullback,
         # BUT if the break is "uncontrolled" (price continues strongly through
         # with large bodies, no pullback), it's NOT a RED - it's just momentum.
-        # Check if the last 2-3 candles after breaking 1H EMA 50 continued
-        # aggressively in the break direction.
-        ema_1h_val = _ema_val(analysis, "EMA_H1_50")
+        # Style-adaptive: day=H1, swing=D, scalping=M5
+        setup_ema_key = _tf_ema("setup", 50)
+        confirm_ema_key = _tf_ema("confirm", 50)
+        ema_1h_val = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
         m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
         if ema_1h_val and len(m5_candles) >= 3:
             aggressive_count = 0
@@ -1999,9 +2002,10 @@ class RedStrategy(BaseStrategy):
                 )
                 return None
 
-        # --- Paso 4: Pullback a EMA 50 1H + EMA 50 4H + Fibonacci ---
-        pb_1h, pb_1h_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
-        pb_4h, pb_4h_desc = _check_ema_pullback(analysis, "EMA_H4_50", direction)
+        # --- Paso 4: Pullback a EMA 50 setup + confirm TF + Fibonacci ---
+        # Style-adaptive: day=H1+H4, swing=D+W, scalping=M5+M15
+        pb_1h, pb_1h_desc = _check_ema_pullback(analysis, setup_ema_key, direction)
+        pb_4h, pb_4h_desc = _check_ema_pullback(analysis, confirm_ema_key, direction)
 
         if pb_1h:
             confidence += 10.0
@@ -2182,8 +2186,10 @@ class RedStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL debajo de EMA 50 4H o minimo anterior (para BUY). Inverso para SELL."""
-        ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
+        """SL debajo de EMA 50 confirm TF o minimo anterior (para BUY). Inverso para SELL."""
+        # Style-adaptive: day=H4, swing=W, scalping=M15 (with hardcoded fallback)
+        confirm_ema_key = _tf_ema("confirm", 50)
+        ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
 
@@ -2378,14 +2384,17 @@ class PinkStrategy(BaseStrategy):
             return False, score, met, failed
 
         # --- Paso 3: PINK key condition ---
-        # TradingLab: The corrective pattern (Wave 4) MUST have broken the 1H EMA 50
+        # TradingLab: The corrective pattern (Wave 4) MUST have broken the setup EMA 50
         # against the trend. By the time PINK triggers, the correction is ending and
         # price may have returned near/above the EMA. We check HISTORICAL candles to
         # see if the EMA WAS broken during the correction, not just current position.
+        # Style-adaptive: day=H1+H4, swing=D+W, scalping=M5+M15
         opposite = "SELL" if direction == "BUY" else "BUY"
+        setup_ema_key = _tf_ema("setup", 50)
+        confirm_ema_key = _tf_ema("confirm", 50)
 
-        # Check if 1H EMA was historically broken during correction (last 20 H1 candles)
-        ema_h1_val = _ema_val(analysis, "EMA_H1_50")
+        # Check if setup EMA was historically broken during correction (last 20 candles)
+        ema_h1_val = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
         h1_candles = getattr(analysis, 'last_candles', {}).get("H1", [])
         ema_1h_was_broken = False
         if ema_h1_val and len(h1_candles) >= 5:
@@ -2398,11 +2407,12 @@ class PinkStrategy(BaseStrategy):
                     ema_1h_was_broken = True
                     break
         else:
-            # Fallback to current check if no historical data
-            ema_1h_was_broken, _ = _check_ema_break(analysis, "EMA_H1_50", opposite)
+            # Fallback to current check if no historical data (style-adaptive)
+            ema_1h_was_broken, _ = _check_ema_break(analysis, setup_ema_key, opposite)
 
-        # TradingLab: 4H EMA must NOT be broken by the correction (opposite direction).
-        ema_4h_break, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", opposite)
+        # TradingLab: confirm EMA must NOT be broken by the correction (opposite direction).
+        # Style-adaptive: day=H4, swing=W, scalping=M15
+        ema_4h_break, ema_4h_desc = _check_ema_break(analysis, confirm_ema_key, opposite)
 
         # 1H EMA 50 must have been broken during correction (historical check)
         if ema_1h_was_broken:

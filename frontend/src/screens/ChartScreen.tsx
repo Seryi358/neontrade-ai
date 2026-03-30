@@ -331,7 +331,7 @@ export default function ChartScreen() {
       layout: {
         background: { type: ColorType.Solid, color: CHART_COLORS.background },
         textColor: CHART_COLORS.textColor,
-        fontFamily: "'Terminess Nerd Font', 'Fira Code', 'Courier New', monospace",
+        fontFamily: "'Rajdhani', 'Fira Code', 'Courier New', monospace",
         fontSize: 11,
       },
       grid: {
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
   },
   tfPillActive: {
     borderColor: theme.colors.cp2077Yellow,
-    backgroundColor: 'rgba(252, 238, 9, 0.08)',
+    backgroundColor: 'rgba(93, 244, 254, 0.08)',
   },
   tfPillText: {
     fontFamily: theme.fonts.mono,
@@ -1217,12 +1217,12 @@ const styles = StyleSheet.create({
   supportLevel: {
     borderTopWidth: 1,
     borderStyle: 'dashed' as any,
-    borderColor: 'rgba(0, 255, 136, 0.5)',
+    borderColor: 'rgba(40, 199, 117, 0.5)',
   },
   resistanceLevel: {
     borderTopWidth: 1,
     borderStyle: 'dashed' as any,
-    borderColor: 'rgba(218, 68, 83, 0.5)',
+    borderColor: 'rgba(251, 48, 72, 0.5)',
   },
   pivotLevel: {
     borderTopWidth: 1,

@@ -1569,7 +1569,7 @@ const styles = StyleSheet.create({
   },
   brokerItemActive: {
     borderColor: theme.colors.neonGreen,
-    backgroundColor: 'rgba(0, 255, 136, 0.05)',
+    backgroundColor: 'rgba(40, 199, 117, 0.05)',
   },
   brokerInfo: {
     flex: 1,
@@ -1675,7 +1675,7 @@ const styles = StyleSheet.create({
   errorBlock: {
     marginTop: theme.spacing.sm,
     padding: theme.spacing.sm,
-    backgroundColor: 'rgba(218, 68, 83, 0.1)',
+    backgroundColor: 'rgba(251, 48, 72, 0.1)',
     borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.neonRed,
@@ -1745,7 +1745,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
   },
   emergencyBtn: {
-    backgroundColor: 'rgba(218, 68, 83, 0.2)',
+    backgroundColor: 'rgba(251, 48, 72, 0.2)',
     borderWidth: 2,
     borderColor: theme.colors.neonRed,
     borderRadius: theme.borderRadius.md,

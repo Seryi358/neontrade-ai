@@ -224,7 +224,7 @@ export default function DashboardScreen() {
       <HUDCard>
         <HUDSectionTitle title="ACCOUNT" icon="\u25C8" />
 
-        {/* Balance - large yellow */}
+        {/* Balance - large cyan */}
         <Text style={styles.balanceAmount}>
           {account ? formatCurrency(account.balance) : '---'}
         </Text>

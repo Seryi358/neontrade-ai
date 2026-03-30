@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   patternTag: {
-    backgroundColor: 'rgba(252, 238, 9, 0.06)',
+    backgroundColor: 'rgba(93, 244, 254, 0.06)',
     borderRadius: 3,
     paddingHorizontal: 6,
     paddingVertical: 2,

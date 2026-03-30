@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   },
   filterPillActive: {
     borderColor: theme.colors.cp2077Yellow,
-    backgroundColor: 'rgba(252, 238, 9, 0.12)',
+    backgroundColor: 'rgba(93, 244, 254, 0.12)',
   },
   filterDot: {
     width: 8,

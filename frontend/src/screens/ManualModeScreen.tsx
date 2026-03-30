@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   rejectBtn: {
-    backgroundColor: 'rgba(218, 68, 83, 0.12)',
+    backgroundColor: 'rgba(251, 48, 72, 0.12)',
     borderWidth: 1,
     borderColor: theme.colors.neonRed,
   },
@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   bulkRejectBtn: {
-    backgroundColor: 'rgba(218, 68, 83, 0.12)',
+    backgroundColor: 'rgba(251, 48, 72, 0.12)',
     borderWidth: 1,
     borderColor: theme.colors.neonRed,
   },

@@ -70,7 +70,7 @@ class ErrorBoundary extends React.Component<
 const errorStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050505',
+    backgroundColor: theme.colors.backgroundDark,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
@@ -84,33 +84,33 @@ const errorStyles = StyleSheet.create({
     opacity: 0.04,
     // Simulated scan lines via repeating borders
     borderTopWidth: 1,
-    borderTopColor: 'rgba(218, 68, 83, 0.2)',
+    borderTopColor: 'rgba(251, 48, 72, 0.2)',
   },
   icon: {
     fontSize: 52,
-    color: '#ff4a57',
+    color: theme.colors.neonRed,
     fontFamily: 'Rajdhani-Bold',
-    textShadowColor: 'rgba(218, 68, 83, 0.6)',
+    textShadowColor: 'rgba(251, 48, 72, 0.6)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 30,
     marginBottom: 8,
   },
   title: {
-    color: '#ff4a57',
+    color: theme.colors.neonRed,
     fontFamily: 'Rajdhani-Bold',
     fontSize: 24,
     letterSpacing: 8,
     textTransform: 'uppercase',
-    textShadowColor: 'rgba(218, 68, 83, 0.5)',
+    textShadowColor: 'rgba(251, 48, 72, 0.5)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
   divider: {
     width: '50%',
     height: 1,
-    backgroundColor: '#ff4a57',
+    backgroundColor: theme.colors.neonRed,
     marginVertical: 16,
-    shadowColor: '#ff4a57',
+    shadowColor: theme.colors.neonRed,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 8,
@@ -120,32 +120,32 @@ const errorStyles = StyleSheet.create({
     marginBottom: 12,
   },
   errorDetail: {
-    color: '#ff4a57',
-    fontFamily: 'TerminessNerdFont',
+    color: theme.colors.neonRed,
+    fontFamily: 'Rajdhani',
     fontSize: 11,
     textAlign: 'center',
     letterSpacing: 1,
     opacity: 0.8,
   },
   code: {
-    color: '#6b7080',
-    fontFamily: 'TerminessNerdFont',
+    color: theme.colors.textMuted,
+    fontFamily: 'Rajdhani',
     fontSize: 9,
     letterSpacing: 3,
     marginBottom: 24,
   },
   rebootBtn: {
-    color: '#0abdc6',
+    color: theme.colors.neonCyan,
     fontFamily: 'Rajdhani-Bold',
     fontSize: 14,
     letterSpacing: 4,
     textTransform: 'uppercase',
     borderWidth: 1,
-    borderColor: '#0abdc6',
+    borderColor: theme.colors.neonCyan,
     paddingHorizontal: 28,
     paddingVertical: 10,
     borderRadius: 2,
-    textShadowColor: 'rgba(93, 244, 254, 0.4)',
+    textShadowColor: theme.colors.neonCyanGlow,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
@@ -177,7 +177,7 @@ function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
   const ActiveComponent = tabs[activeTab].component;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0a0e14' }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {/* Sub-tab bar at top */}
       <SafeAreaView style={subTabStyles.safeArea}>
         <View style={subTabStyles.bar}>
@@ -205,13 +205,13 @@ function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
 
 const subTabStyles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#050505',
+    backgroundColor: theme.colors.backgroundDark,
   },
   bar: {
     flexDirection: 'row',
-    backgroundColor: '#050505',
+    backgroundColor: theme.colors.backgroundDark,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2445',
+    borderBottomColor: theme.colors.border,
     paddingHorizontal: 8,
     paddingTop: 8,
   },
@@ -221,16 +221,16 @@ const subTabStyles = StyleSheet.create({
     fontFamily: 'Rajdhani-Bold',
     fontSize: 11,
     letterSpacing: 3,
-    color: '#6b7080',
+    color: theme.colors.textMuted,
     paddingVertical: 10,
     textTransform: 'uppercase',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    color: '#f3e600',
-    borderBottomColor: '#f3e600',
-    textShadowColor: 'rgba(252, 238, 9, 0.4)',
+    color: theme.colors.cp2077Yellow,
+    borderBottomColor: theme.colors.cp2077Yellow,
+    textShadowColor: theme.colors.cp2077YellowGlow,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 6,
   },
@@ -288,7 +288,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
       style={[
         tabIconStyles.icon,
         {
-          color: focused ? theme.colors.cp2077Yellow : '#8a9bad',
+          color: focused ? theme.colors.cp2077Yellow : theme.colors.textMuted,
           textShadowColor: focused ? theme.colors.cp2077YellowGlow : 'transparent',
           textShadowOffset: { width: 0, height: 0 },
           textShadowRadius: focused ? 10 : 0,
@@ -372,15 +372,15 @@ function BootScreen() {
 const bootStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050505',
+    backgroundColor: theme.colors.backgroundDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bootLine: {
     height: 2,
-    backgroundColor: '#f3e600',
+    backgroundColor: theme.colors.cp2077Yellow,
     marginBottom: 24,
-    shadowColor: '#f3e600',
+    shadowColor: theme.colors.cp2077Yellow,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 12,
@@ -389,25 +389,25 @@ const bootStyles = StyleSheet.create({
   title: {
     fontFamily: 'Rajdhani-Bold',
     fontSize: 36,
-    color: '#f3e600',
+    color: theme.colors.cp2077Yellow,
     letterSpacing: 12,
     textTransform: 'uppercase',
-    textShadowColor: 'rgba(252, 238, 9, 0.4)',
+    textShadowColor: theme.colors.cp2077YellowGlow,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 25,
   },
   versionText: {
-    fontFamily: 'TerminessNerdFont',
+    fontFamily: 'Rajdhani',
     fontSize: 11,
-    color: '#6b7080',
+    color: theme.colors.textMuted,
     letterSpacing: 3,
     marginTop: 12,
     textTransform: 'uppercase',
   },
   poweredBy: {
-    fontFamily: 'TerminessNerdFont',
+    fontFamily: 'Rajdhani',
     fontSize: 9,
-    color: '#6b7080',
+    color: theme.colors.textMuted,
     letterSpacing: 4,
     marginTop: 8,
     textTransform: 'uppercase',
@@ -439,27 +439,27 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#050505' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.backgroundDark }}>
         <NavigationContainer>
           <StatusBar style="light" />
           <Tab.Navigator
             screenOptions={{
               headerShown: false,
               tabBarStyle: {
-                backgroundColor: '#050505',
+                backgroundColor: theme.colors.backgroundDark,
                 borderTopWidth: 1,
-                borderTopColor: '#f3e600',
+                borderTopColor: theme.colors.cp2077Yellow,
                 height: 60,
                 paddingBottom: 6,
                 paddingTop: 6,
                 elevation: 16,
-                shadowColor: '#f3e600',
+                shadowColor: theme.colors.cp2077Yellow,
                 shadowOffset: { width: 0, height: -2 },
                 shadowOpacity: 0.15,
                 shadowRadius: 10,
               },
-              tabBarActiveTintColor: '#f3e600',
-              tabBarInactiveTintColor: '#8a9bad',
+              tabBarActiveTintColor: theme.colors.cp2077Yellow,
+              tabBarInactiveTintColor: theme.colors.textMuted,
               tabBarLabelStyle: {
                 fontFamily: 'Rajdhani-Bold',
                 fontSize: 9,

@@ -695,7 +695,6 @@ def _build_email_html(title: str, body: str) -> str:
   u + .body .nt-text {{ color: #d1c5c0 !important; }}
   u + .body .nt-cyan {{ color: #5df4fe !important; }}
   u + .body .nt-dim {{ color: #a1a9b1 !important; }}
-  * {{ font-family: 'Rajdhani', Helvetica, Arial, sans-serif !important; }}
   @media only screen and (max-width: 600px) {{
     .nt-outer {{ width: 100% !important; }}
     .nt-card {{ width: 100% !important; }}
@@ -714,13 +713,13 @@ def _build_email_html(title: str, body: str) -> str:
 
   <!-- header -->
   <tr><td class="nt-pad" style="padding:20px 24px 4px 24px;">
-    <span class="nt-dim" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:11px;font-weight:400;color:#355d65;letter-spacing:2px;">
+    <span class="nt-dim" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:11px;font-weight:400;color:#355d65;letter-spacing:2px;">
       // NEONTRADE AI</span>
   </td></tr>
 
   <!-- title -->
   <tr><td class="nt-pad" style="padding:4px 24px 8px 24px;">
-    <span class="nt-cyan" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;color:#5df4fe;text-transform:uppercase;letter-spacing:2px;">
+    <span class="nt-cyan" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;color:#5df4fe;text-transform:uppercase;letter-spacing:2px;">
       {title}</span>
   </td></tr>
 
@@ -732,7 +731,7 @@ def _build_email_html(title: str, body: str) -> str:
   </td></tr>
 
   <!-- body -->
-  <tr><td class="nt-pad nt-text" style="padding:16px 24px 20px 24px;font-family:'Rajdhani',Helvetica,Arial,sans-serif;color:#d1c5c0;font-size:15px;line-height:1.8;font-weight:400;">
+  <tr><td class="nt-pad nt-text" style="padding:16px 24px 20px 24px;font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;color:#d1c5c0;font-size:15px;line-height:1.8;font-weight:400;">
     {body_html}
   </td></tr>
 
@@ -747,9 +746,9 @@ def _build_email_html(title: str, body: str) -> str:
   <tr><td class="nt-pad" style="padding:12px 24px 16px 24px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
-        <td class="nt-dim" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
+        <td class="nt-dim" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
           // NeonTrade AI v2.2 / TradingLab</td>
-        <td align="right" style="font-family:'Rajdhani',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
+        <td align="right" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
           {ts}</td>
       </tr>
     </table>

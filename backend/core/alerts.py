@@ -233,16 +233,23 @@ class AlertManager:
         if not self._config.notify_trade_executed:
             return
 
-        direction_emoji = "\U0001F7E2" if direction.upper() == "BUY" else "\U0001F534"  # green / red circle
-        title = f"{direction_emoji} Trade Executed: {instrument}"
+        dir_color = "#28c775" if direction.upper() == "BUY" else "#fb3048"
+        dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
+        title = f"TRADE EXECUTED // {instrument}"
         body = (
-            f"<b>Instrument:</b> {instrument}\n"
-            f"<b>Direction:</b> {direction.upper()}\n"
-            f"<b>Strategy:</b> {strategy}\n"
-            f"<b>Entry:</b> {entry}\n"
-            f"<b>Stop Loss:</b> {sl}\n"
-            f"<b>Take Profit:</b> {tp}\n"
-            f"<b>R:R Ratio:</b> {rr:.2f}"
+            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
+            f'{instrument}</span>\n'
+            f'<span style="color:{dir_color};font-size:16px;font-weight:600;">'
+            f'{dir_icon} {direction.upper()}</span> '
+            f'<span style="color:#a1a9b1;">// {strategy}</span>\n\n'
+            f'<span style="color:#a1a9b1;">ENTRY</span> '
+            f'<span style="color:#fcfcfc;font-weight:600;">{entry}</span>\n'
+            f'<span style="color:#fb3048;">SL</span> '
+            f'<span style="color:#fcfcfc;">{sl}</span>\n'
+            f'<span style="color:#28c775;">TP</span> '
+            f'<span style="color:#fcfcfc;">{tp}</span>\n'
+            f'<span style="color:#a1a9b1;">R:R</span> '
+            f'<span style="color:#fdf500;font-weight:600;">{rr:.2f}:1</span>'
         )
         data = {
             "instrument": instrument,
@@ -265,12 +272,22 @@ class AlertManager:
         if not self._config.notify_setup_pending:
             return
 
-        title = f"\U0001F50E Setup Pending: {instrument}"  # magnifying glass
+        title = f"SETUP DETECTED // {instrument}"
+        dir_color = "#28c775" if direction.upper() == "BUY" else "#fb3048"
+        dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
         body = (
-            f"<b>Instrument:</b> {instrument}\n"
-            f"<b>Direction:</b> {direction.upper()}\n"
-            f"<b>Pending Entry:</b> {entry}\n"
-            f"<b>Expected R:R:</b> {rr:.2f}"
+            f'<span style="color:#a1a9b1;font-size:11px;letter-spacing:2px;text-transform:uppercase;">'
+            f'PENDING APPROVAL</span>\n\n'
+            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
+            f'{instrument}</span>\n'
+            f'<span style="color:{dir_color};font-size:16px;font-weight:600;">'
+            f'{dir_icon} {direction.upper()}</span>\n\n'
+            f'<span style="color:#a1a9b1;">ENTRY</span> '
+            f'<span style="color:#fcfcfc;font-weight:600;">{entry}</span>\n'
+            f'<span style="color:#a1a9b1;">R:R</span> '
+            f'<span style="color:#fdf500;font-weight:600;">{rr:.2f}:1</span>\n\n'
+            f'<span style="color:#ee00ff;font-size:11px;letter-spacing:2px;">'
+            f'OPEN APP TO APPROVE OR REJECT</span>'
         )
         data = {
             "instrument": instrument,
@@ -291,15 +308,21 @@ class AlertManager:
         if not self._config.notify_trade_closed:
             return
 
-        result_emoji = "\U00002705" if pnl >= 0 else "\U0000274C"  # check / cross
-        title = f"{result_emoji} Trade Closed: {instrument}"
+        pnl_color = "#28c775" if pnl >= 0 else "#fb3048"
+        result_label = "WIN" if pnl > 0 else ("BREAK EVEN" if pnl == 0 else "LOSS")
         sign = "+" if pnl >= 0 else ""
+        title = f"TRADE CLOSED // {instrument}"
         body = (
-            f"<b>Instrument:</b> {instrument}\n"
-            f"<b>Strategy:</b> {strategy}\n"
-            f"<b>P&L:</b> {sign}{pnl:.2f}\n"
-            f"<b>Pips:</b> {sign}{pips:.1f}\n"
-            f"<b>Reason:</b> {reason}"
+            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
+            f'{instrument}</span> '
+            f'<span style="color:#a1a9b1;">// {strategy}</span>\n\n'
+            f'<span style="color:{pnl_color};font-size:22px;font-weight:700;">'
+            f'{sign}${pnl:.2f}</span> '
+            f'<span style="color:{pnl_color};font-size:13px;">{result_label}</span>\n'
+            f'<span style="color:#a1a9b1;">PIPS</span> '
+            f'<span style="color:#fcfcfc;">{sign}{pips:.1f}</span>\n'
+            f'<span style="color:#a1a9b1;">REASON</span> '
+            f'<span style="color:#ee00ff;">{reason}</span>'
         )
         data = {
             "instrument": instrument,
@@ -641,32 +664,97 @@ def _html_to_plain(html: str) -> str:
 
 
 def _build_email_html(title: str, body: str) -> str:
-    """Wrap *body* (already contains <b> etc.) in a styled HTML email."""
-    # Replace newlines with <br> for email rendering
+    """Wrap *body* in a Daemon 2.0 cyberpunk-styled HTML email.
+
+    Design: dark burgundy backgrounds, cyan (#5df4fe) accents, neon purple
+    (#ee00ff) highlights, Rajdhani font, HUD-style borders, scan-line
+    aesthetic — matching the user's KDE Daemon 2.0 plasma theme.
+    """
     body_html = body.replace("\n", "<br>\n")
+    ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
     return f"""\
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#0d1117;font-family:
-  -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d1117;">
-    <tr><td align="center" style="padding:24px 0;">
-      <table width="560" cellpadding="0" cellspacing="0"
-             style="background:#161b22;border-radius:12px;border:1px solid #30363d;">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#040a10;font-family:'Rajdhani','Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#040a10;">
+    <tr><td align="center" style="padding:24px 12px;">
+      <table width="580" cellpadding="0" cellspacing="0"
+             style="background:#210e15;border:1px solid #355d65;border-left:3px solid #5df4fe;">
+
+        <!-- Scan line top accent -->
+        <tr><td style="height:2px;background:linear-gradient(90deg,#5df4fe,#ee00ff,transparent);"></td></tr>
+
         <!-- Header -->
-        <tr><td style="padding:24px 32px 12px 32px;">
-          <h2 style="margin:0;color:#00ff9d;font-size:20px;">{title}</h2>
+        <tr><td style="padding:20px 28px 8px 28px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="width:8px;height:8px;background:#5df4fe;border-radius:50%;
+                         box-shadow:0 0 8px rgba(93,244,254,0.6);"></td>
+              <td style="padding-left:12px;">
+                <span style="font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:500;
+                             color:#a1a9b1;text-transform:uppercase;letter-spacing:4px;">
+                  NEONTRADE AI // ALERT SYSTEM
+                </span>
+              </td>
+            </tr>
+          </table>
         </td></tr>
+
+        <!-- Title -->
+        <tr><td style="padding:8px 28px 4px 28px;">
+          <h2 style="margin:0;font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;
+                     color:#5df4fe;text-transform:uppercase;letter-spacing:3px;
+                     text-shadow:0 0 10px rgba(93,244,254,0.4);">
+            {title}
+          </h2>
+        </td></tr>
+
+        <!-- Divider -->
+        <tr><td style="padding:0 28px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="width:40px;height:1px;background:#5df4fe;"></td>
+              <td style="height:1px;background:#355d65;"></td>
+            </tr>
+          </table>
+        </td></tr>
+
         <!-- Body -->
-        <tr><td style="padding:12px 32px 24px 32px;color:#c9d1d9;font-size:14px;line-height:1.6;">
+        <tr><td style="padding:16px 28px 20px 28px;font-family:'Rajdhani',sans-serif;
+                       color:#d1c5c0;font-size:15px;line-height:1.7;font-weight:400;">
           {body_html}
         </td></tr>
-        <!-- Footer -->
-        <tr><td style="padding:12px 32px 20px 32px;border-top:1px solid #30363d;
-                        color:#8b949e;font-size:11px;">
-          NeonTrade AI &middot; {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+
+        <!-- Footer divider -->
+        <tr><td style="padding:0 28px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td style="height:1px;background:#355d65;"></td></tr>
+          </table>
         </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:12px 28px 16px 28px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:500;
+                         color:#a1a9b1;text-transform:uppercase;letter-spacing:3px;">
+                NEONTRADE AI v2.2 // POWERED BY TRADINGLAB
+              </td>
+              <td align="right" style="font-family:'Rajdhani',sans-serif;font-size:10px;
+                                       font-weight:400;color:#355d65;letter-spacing:2px;">
+                {ts}
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+
+        <!-- Scan line bottom accent -->
+        <tr><td style="height:2px;background:linear-gradient(90deg,transparent,#ee00ff,#5df4fe);"></td></tr>
+
       </table>
     </td></tr>
   </table>

@@ -1732,32 +1732,42 @@ class BlueStrategy(BaseStrategy):
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
         """
-        SL debajo de Fib 0.618 o minimo anterior (el que sea mas bajo para BUY).
-        SL encima de Fib 0.618 o maximo anterior (el que sea mas alto para SELL).
+        TradingLab BLUE SL: SIEMPRE proteger el minimo/maximo anterior.
+        Fib 0.618 es solo orientacion — si el minimo esta por debajo de 0.618,
+        SL va debajo del minimo. Si el minimo esta por ENCIMA de 0.618,
+        SL va debajo del minimo (NO en 0.618).
+        Alex: "siempre protegemos el minimo anterior, 0.618 simplemente es una orientacion"
+        Alex: "dandole un poquito de espacio" — buffer de 0.2% debajo del nivel.
         """
         fib_618 = analysis.fibonacci_levels.get("0.618", 0.0)
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        buffer_pct = 0.002  # "poquito de espacio" — 0.2% buffer
 
         if direction == "BUY":
-            candidates = [fib_618] if fib_618 > 0 and fib_618 < entry_price else []
-            # Minimo anterior (soporte mas cercano por debajo)
+            # Minimo anterior (soporte mas cercano por debajo) tiene PRIORIDAD
             below = [s for s in supports if s < entry_price]
-            if below:
-                candidates.append(max(below))
-            if not candidates:
-                # Fallback: 1% debajo de entrada
-                return entry_price * 0.99
-            # El mas bajo de los dos (proteccion maxima)
-            return min(candidates)
+            prev_min = max(below) if below else None
+            if prev_min is not None:
+                # Mentorship: SL siempre debajo del minimo anterior
+                sl = prev_min * (1 - buffer_pct)
+            elif fib_618 > 0 and fib_618 < entry_price:
+                # Fallback a Fib 0.618 si no hay minimo anterior
+                sl = fib_618 * (1 - buffer_pct)
+            else:
+                # Ultimo recurso: 1% debajo de entrada
+                sl = entry_price * 0.99
+            return sl
         else:  # SELL
-            candidates = [fib_618] if fib_618 > 0 and fib_618 > entry_price else []
             above = [r for r in resistances if r > entry_price]
-            if above:
-                candidates.append(min(above))
-            if not candidates:
+            prev_max = min(above) if above else None
+            if prev_max is not None:
+                sl = prev_max * (1 + buffer_pct)
+            elif fib_618 > 0 and fib_618 > entry_price:
+                sl = fib_618 * (1 + buffer_pct)
+            else:
                 return entry_price * 1.01
-            return max(candidates)
+            return sl
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float, variant: str = "BLUE_B") -> Dict[str, float]:
         """

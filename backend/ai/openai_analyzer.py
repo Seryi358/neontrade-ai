@@ -366,16 +366,20 @@ Also works on: Strong trending forex/indices when all HTFs align
 Potential R:R: Up to 10:1
 NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequential process
 
-  7 Sequential Steps:
-  Step 1 (Trend): Weekly direction (always weekly, Green does NOT differentiate day/swing — weekly is ALWAYS the starting point)
-  Step 2 (Pattern): The weekly correction forms a recognizable pattern on the DAILY chart (always daily — Green does NOT differentiate day/swing) — wedge, triangle, flag, channel
-  Step 3 (Pullback): Wait for pullback on the intermediate timeframe
-  Step 4 (Pattern): Identify continuation pattern (flag, pennant, triangle, wedge)
-  Step 5 (Diagonal): Draw diagonal/trendline on the pullback pattern
-  Step 6 (RCC Entry): Execute using RCC — Ruptura (price breaks the diagonal), Cierre (candle closes beyond it), Confirmacion (next candle confirms the break direction)
-  Step 7 (SL/TP): Set SL below/above the pattern low/high; TP at measured move or Fibonacci extension
+  7 Sequential Steps (same rules, different timeframes per style):
+  Step 1 (Trend): Directional structure on the highest timeframe
+  Step 2 (Breakout): Important S/R level breaks on the highest timeframe
+  Step 3 (Pullback): Pullback to broken level + Fibonacci confluence on the highest TF
+  Step 4 (Pattern): Correction forms a pattern (wedge/triangle/channel) on the setup timeframe
+  Step 5 (Diagonal NON-NEGOTIABLE): Find diagonal/trendline on the confirmation timeframe — "Si no hay diagonal en una hora, no hay trade"
+  Step 6 (RCC Entry): Execute on the lowest TF — Ruptura + Cierre + Confirmacion of the diagonal break
+  Step 7 (SL/TP): SL below last swing low on confirmation TF; TP at measured move or previous structure
 
-  NOTE: In the app implementation, GREEN uses a FIXED layout (Weekly->Daily->1H->15M) regardless of trading style, per the mentorship principle that Green does not differentiate day/swing.
+  GREEN Timeframe Layout per Trading Style:
+  - Swing: Weekly (trend) -> Daily (pattern) -> 1H (diagonal) -> 15M (execution)
+  - Day Trading: 4H (trend) -> 1H (pattern) -> 15M (diagonal) -> 2M (execution)
+  - Scalping: 15M (trend) -> 5M (pattern) -> 1M (diagonal) -> 30s (execution)
+  NOTE: The 7 STEPS are identical across styles, only the TIMEFRAMES change.
 
   SL: Below/above the LAST 1H swing low/high immediately preceding the diagonal break (the tightest possible SL). NOT the full pattern structure — Alex: 'queremos cubrir lo mínimo posible, el mínimo anterior en gráfico horario, previo justo a la ruptura de esa diagonal'.
   TP1: Next structure level on the intermediate timeframe

@@ -154,7 +154,7 @@ class ManagedPosition:
     current_sl: float
     take_profit_1: float
     take_profit_max: Optional[float] = None
-    units: int = 0                  # Position size (signed: +BUY, -SELL)
+    units: float = 0.0              # Position size (signed: +BUY, -SELL), float for crypto fractional lots
     style: str = "day_trading"     # Trading style: "day_trading", "swing", "scalping"
     strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED" — for strategy-specific logic
     trailing_tp_only: bool = False  # True for crypto GREEN: skip hard TP1 close, use EMA 50 trailing

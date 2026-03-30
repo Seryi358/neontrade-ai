@@ -53,7 +53,7 @@ class TradeRisk:
     instrument: str
     style: TradingStyle
     risk_percent: float
-    units: int
+    units: float  # float for fractional crypto lots (e.g. 0.001 BTC)
     stop_loss: float
     take_profit_1: float
     take_profit_max: Optional[float]
@@ -422,7 +422,10 @@ class RiskManager:
         # The pip_value from broker is pip SIZE (e.g., 0.0001), NOT dollar-per-pip,
         # so we must NOT multiply by it. Direct division gives correct CFD units.
         # Example: $100 risk, 0.0050 SL distance = 20,000 units
-        units = int(risk_amount / sl_distance)
+        raw_units = risk_amount / sl_distance
+        # For forex: round to integer (standard lots). For crypto: keep fractional.
+        # Capital.com accepts fractional units for crypto CFDs.
+        units = round(raw_units, 6) if raw_units < 100 else int(raw_units)
 
         if units <= 0:
             return 0  # Cannot trade with 0 or negative units

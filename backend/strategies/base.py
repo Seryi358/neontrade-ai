@@ -3645,8 +3645,10 @@ class BlackStrategy(BaseStrategy):
             return entry_price * 1.015
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
-        """TP en EMA 50 4H (with slight offset — Alex: "sacrificas 10 pips por salir antes")."""
-        ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
+        """TP en confirm-TF EMA 50 (with slight offset — Alex: "sacrificas 10 pips por salir antes").
+        Swing: EMA 50 Weekly. Day Trading: EMA 50 4H. Scalping: EMA 50 M15."""
+        confirm_ema_key = _tf_ema("confirm", 50)
+        ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
         result: Dict[str, float] = {}
 
         if ema_4h_50 and ema_4h_50 > 0:

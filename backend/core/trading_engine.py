@@ -1194,6 +1194,14 @@ class TradingEngine:
         """Run analysis on all watchlist pairs at startup.
         Populates _last_scan_results so the UI has data immediately.
         Also detects setups so the user sees results right away."""
+        # Recover any open positions from broker (survives redeploys)
+        try:
+            await self._sync_positions_from_broker()
+            if self.position_manager.positions:
+                logger.info(f"Recovered {len(self.position_manager.positions)} open position(s) from broker")
+        except Exception as e:
+            logger.warning(f"Initial position sync failed: {e}")
+
         logger.info(f"Initial scan: analyzing {len(settings.forex_watchlist)} pairs...")
         setups_found = 0
         for instrument in settings.forex_watchlist:

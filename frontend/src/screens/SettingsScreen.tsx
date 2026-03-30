@@ -72,7 +72,7 @@ const STRATEGIES = [
     key: 'BLUE',
     label: 'BLUE',
     description: 'Cambio de tendencia 1H',
-    color: '#0088ff',
+    color: '#08919a',
     variants: [
       { key: 'BLUE_A', label: 'Tipo A', description: 'Doble suelo/techo' },
       { key: 'BLUE_B', label: 'Tipo B', description: 'Estandar' },

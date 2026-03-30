@@ -3645,16 +3645,19 @@ class BlackStrategy(BaseStrategy):
             return entry_price * 1.015
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
-        """TP en EMA 50 4H."""
+        """TP en EMA 50 4H (with slight offset — Alex: "sacrificas 10 pips por salir antes")."""
         ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
         result: Dict[str, float] = {}
 
         if ema_4h_50 and ema_4h_50 > 0:
-            # Only use EMA as TP if it's on the correct side of entry
+            # Apply 97% offset: exit slightly before EMA 4H, not exactly on it
+            # Alex: "no queremos ser el último en salir" — sacrifice a few pips for safety
             if direction == "BUY" and ema_4h_50 > entry_price:
-                result["tp1"] = ema_4h_50
+                offset_tp = entry_price + (ema_4h_50 - entry_price) * 0.97
+                result["tp1"] = offset_tp
             elif direction == "SELL" and ema_4h_50 < entry_price:
-                result["tp1"] = ema_4h_50
+                offset_tp = entry_price - (entry_price - ema_4h_50) * 0.97
+                result["tp1"] = offset_tp
 
         if "tp1" not in result:
             # BLACK TP is ALWAYS EMA 50 4H per mentorship.

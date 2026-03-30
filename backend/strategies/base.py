@@ -2852,18 +2852,20 @@ class WhiteStrategy(BaseStrategy):
             failed.append("Paso 1b: Sin convergencia HTF/LTF — WHITE bloqueado (no operes contra tendencia)")
             return False, score, met, failed
 
-        # --- Paso 2: Impulso + pullback en 1H ---
-        # Verificar que EMA 50 1H esta en el lado correcto (tendencia ya rota previamente)
-        ema_1h_ok, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", direction)
+        # --- Paso 2: Impulso + pullback en setup TF ---
+        # Verificar que EMA 50 setup-TF esta en el lado correcto (tendencia ya rota previamente)
+        setup_ema_key = _tf_ema("setup", 50)
+        confirm_ema_key = _tf_ema("confirm", 50)
+        ema_1h_ok, ema_1h_desc = _check_ema_break(analysis, setup_ema_key, direction)
         if ema_1h_ok:
             score += 10.0
-            met.append(f"Paso 2: Tendencia 1H intacta - {ema_1h_desc}")
+            met.append(f"Paso 2: Tendencia setup-TF intacta - {ema_1h_desc}")
         else:
-            failed.append(f"Paso 2: Tendencia 1H perdida - {ema_1h_desc}")
+            failed.append(f"Paso 2: Tendencia setup-TF perdida - {ema_1h_desc}")
             return False, score, met, failed
 
-        # EMA 50 4H tambien debe estar rota a favor
-        ema_4h_ok, ema_4h_desc = _check_ema_break(analysis, "EMA_H4_50", direction)
+        # EMA 50 confirm-TF tambien debe estar rota a favor
+        ema_4h_ok, ema_4h_desc = _check_ema_break(analysis, confirm_ema_key, direction)
         if ema_4h_ok:
             score += 10.0
             met.append(f"Paso 2b: EMA 50 4H a favor - {ema_4h_desc}")
@@ -2906,8 +2908,9 @@ class WhiteStrategy(BaseStrategy):
                     pink_proxy_score += 1
                     break
 
-        # (c) Check if price is on correct side of EMA 50 1H
-        ema_1h_check, _ = _check_ema_break(analysis, "EMA_H1_50", direction)
+        # (c) Check if price is on correct side of EMA 50 setup-TF
+        setup_ema_key = _tf_ema("setup", 50)
+        ema_1h_check, _ = _check_ema_break(analysis, setup_ema_key, direction)
         if ema_1h_check:
             pink_proxy_score += 1
 
@@ -3287,8 +3290,9 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append("Paso 3: Sin senales de desaceleracion en diario")
 
-        # --- Paso 4: 4H sobrecomprado + precio lejos de EMA 50 4H ---
-        ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
+        # --- Paso 4: Confirm-TF sobrecomprado + precio lejos de EMA 50 confirm-TF ---
+        confirm_ema_key = _tf_ema("confirm", 50)
+        ema_4h_50 = _ema_val(analysis, confirm_ema_key)
         price = _get_current_price_proxy(analysis)
 
         if ema_4h_50 and price:
@@ -3362,9 +3366,10 @@ class BlackStrategy(BaseStrategy):
         elif not vol_ok:
             failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion")
 
-        # --- Paso 5: Patron de reversal en 1H ---
-        # EMA 50 1H NO debe actuar como S/R dinamico (precio debe estar lejos o cruzandola)
-        ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
+        # --- Paso 5: Patron de reversal en setup-TF ---
+        # EMA 50 setup-TF NO debe actuar como S/R dinamico (precio debe estar lejos o cruzandola)
+        setup_ema_key = _tf_ema("setup", 50)
+        ema_1h_50 = _ema_val(analysis, setup_ema_key)
         if ema_1h_50:
             dist_1h = abs(entry_price - ema_1h_50) / ema_1h_50 * 100
             if dist_1h > 0.3:

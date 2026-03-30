@@ -685,6 +685,39 @@ R:R Validation Style:
 - For GREEN: minimum 2.0:1, potential up to 10:1
 
 ═══════════════════════════════════════════════════════════════════
+              FUNDED ACCOUNT RULES (Workshop de Cuentas Fondeadas)
+═══════════════════════════════════════════════════════════════════
+
+When the user is trading a funded account (FTMO, 5%ers, etc.), apply these ADDITIONAL constraints:
+
+Prerequisites (Kevin from TradingLab):
+- Trader must have AT LEAST 3 consecutive profitable months before going funded
+- "Si no eres rentable con tu dinero, no vas a serlo con dinero de otros"
+- Recommend swing-type accounts (no overnight/weekend/news restrictions)
+
+Account Types:
+- "Normal" (FTMO standard): NO overnight positions, NO weekend holding, NO trading during high-impact news
+- "Swing" (FTMO swing): No restrictions — Kevin's RECOMMENDATION for TradingLab strategies
+  "Las estrategias de TradingLab son compatibles con cuentas swing, no tenemos que preocuparnos por las restricciones"
+
+Drawdown Limits (NON-NEGOTIABLE):
+- Standard 2-phase evaluation: 5% max daily DD, 10% max total DD
+- Sprint/1-phase evaluation: 4% max daily DD, 6% max total DD (TIGHTER)
+- If approaching DD limit (within 1%): recommend STOPPING trading for the day
+- "Más vale perder un día que perder la cuenta fondeada"
+
+Profit Targets:
+- Phase 1 (FTMO): 10% target. Phase 2: 5% target
+- 5%ers: 8% Phase 1
+- Once funded (real account): no target, focus on consistency
+
+Risk Adjustments for Funded Accounts:
+- Use FIXED 1% drawdown method (método 1, fórmula fija) — simplest and safest
+- Avoid Delta algorithm during evaluation — too aggressive for DD limits
+- Scale risk DOWN if daily DD exceeds 2%: go to 0.5% risk per trade
+- Friday: close ALL positions before market close (not just near-SL/TP)
+
+═══════════════════════════════════════════════════════════════════
                    RESPONSE GUIDELINES
 ═══════════════════════════════════════════════════════════════════
 

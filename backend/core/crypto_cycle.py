@@ -670,14 +670,16 @@ class CryptoCycleAnalyzer:
     ) -> Optional[float]:
         """Return the EMA 50 value for crypto trailing stop management.
 
-        The mentorship teaches THREE crypto position management modes
+        The mentorship teaches FOUR crypto position management modes
         (Esp. Criptomonedas position management section):
 
         1. "long_term" (default): Weekly EMA 50 trailing — safest, keeps you
            in major bull runs. Close when weekly candle closes below EMA 50.
-        2. "short_term": H1 EMA 50 trailing — faster exits, captures ~7-10% moves.
+        2. "daily": Daily EMA 50 trailing — mid-term, between LP and CP.
+           Mentorship: "dynamic support in bull, resistance in bear."
+        3. "short_term": H1 EMA 50 trailing — faster exits, captures ~7-10% moves.
            Close when H1 candle closes below EMA 50.
-        3. "aggressive": M15 EMA 50 trailing / reference TP + M15 validation.
+        4. "aggressive": M15 EMA 50 trailing / reference TP + M15 validation.
            Set TP1 at key level, then trail with M15 EMA 50. When price reaches
            TP zone, drop to M15 to check if reversing.
 
@@ -691,11 +693,12 @@ class CryptoCycleAnalyzer:
         if not self.broker:
             return None
 
-        # Map style to timeframe (from mentorship)
+        # Map style to timeframe (from mentorship — 4 modes)
         style_tf_map = {
-            "long_term": "W",     # Weekly EMA 50
-            "short_term": "H1",   # H1 EMA 50
-            "aggressive": "M15",  # M15 EMA 50
+            "long_term": "W",     # Weekly EMA 50 (safest, default)
+            "daily": "D",         # Daily EMA 50 (mid-term — between LP and CP for crypto)
+            "short_term": "H1",   # H1 EMA 50 (~7-10% moves)
+            "aggressive": "M15",  # M15 EMA 50 / reference TP + M15 validation
         }
         granularity = style_tf_map.get(style, "W")
         count = 60 if granularity == "W" else 200

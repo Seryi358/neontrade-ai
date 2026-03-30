@@ -1757,10 +1757,13 @@ class BlueStrategy(BaseStrategy):
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float, variant: str = "BLUE_B") -> Dict[str, float]:
         """
         BLUE TP levels — variant-specific per TradingLab mentorship:
-        - BLUE_A: TP1 = 4H EMA50, TP_max = Fib 1.272 or 1.618 extension
-        - BLUE_B/C: TP1 = 4H EMA50 only (no Fib extensions)
+        - BLUE_A: TP1 = confirm-TF EMA50, TP_max = Fib 1.272 or 1.618 extension
+        - BLUE_B/C: TP1 = confirm-TF EMA50 only (no Fib extensions)
+        Swing adaptation: TP1 = EMA 50 Weekly (not 4H) per mentorship.
         """
-        ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
+        # Use style-adaptive confirm-timeframe EMA (4H for day, Weekly for swing, M15 for scalping)
+        confirm_ema_key = _tf_ema("confirm", 50)
+        ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
         resistances = analysis.key_levels.get("resistances", [])
         supports = analysis.key_levels.get("supports", [])
 
@@ -2285,11 +2288,18 @@ class RedStrategy(BaseStrategy):
                         result["tp_max"] = further[0]
 
         else:
-            # Default / daily pullback: use 1.272 extension
-            if fib_1272_dir and tp1:
-                valid = (fib_1272_dir > tp1) if direction == "BUY" else (fib_1272_dir < tp1)
-                if valid:
-                    result["tp_max"] = fib_1272_dir
+            # Default / daily pullback: Alex prefers recent high/low only
+            # "voy al maximo o al minimo reciente. Me olvido."
+            # tp1 already set to nearest swing high/low. tp_max = next S/R beyond tp1.
+            if tp1:
+                if direction == "BUY":
+                    further = sorted([r for r in resistances if r > tp1])
+                    if further:
+                        result["tp_max"] = further[0]
+                else:
+                    further = sorted([s for s in supports if s < tp1], reverse=True)
+                    if further:
+                        result["tp_max"] = further[0]
 
         # Final fallback to ext_1.0 if no tp_max set
         if "tp_max" not in result and fib_100 and tp1:

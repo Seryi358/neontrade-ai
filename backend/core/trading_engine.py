@@ -1684,6 +1684,8 @@ class TradingEngine:
             direction=signal.direction,
             entry_type=getattr(signal, 'entry_type', 'MARKET'),
             limit_price=getattr(signal, 'limit_price', None),
+            trailing_tp_only=getattr(signal, 'trailing_tp_only', False),
+            strategy_variant=getattr(signal, 'strategy_variant', None),
         )
 
     def _calculate_sl_tp(
@@ -1931,6 +1933,8 @@ class TradingEngine:
                     style=setup.style.value if hasattr(setup.style, 'value') else str(setup.style),
                     highest_price=setup.entry_price,
                     lowest_price=setup.entry_price,
+                    trailing_tp_only=getattr(setup, 'trailing_tp_only', False),
+                    strategy_variant=getattr(setup, 'strategy_variant', None),
                 ))
 
                 # Persist trade to database

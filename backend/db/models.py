@@ -43,7 +43,7 @@ class TradeDatabase:
                 strategy TEXT,
                 strategy_variant TEXT,
                 direction TEXT NOT NULL CHECK(direction IN ('BUY', 'SELL')),
-                units INTEGER NOT NULL,
+                units REAL NOT NULL,
                 entry_price REAL NOT NULL,
                 exit_price REAL,
                 stop_loss REAL NOT NULL,

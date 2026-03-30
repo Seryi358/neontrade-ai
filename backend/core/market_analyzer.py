@@ -1198,10 +1198,12 @@ class MarketAnalyzer:
         levels: Dict[str, float] = {
             # Retracement levels (from swing high down)
             "0.0": swing_high,
+            "0.236": swing_high - diff * 0.236,
             "0.382": swing_high - diff * 0.382,
             "0.5": swing_high - diff * 0.5,
             "0.618": swing_high - diff * 0.618,
             "0.750": swing_high - diff * 0.750,
+            "0.786": swing_high - diff * 0.786,
             "1.0": swing_low,
             # Bearish extensions (below swing low)
             "ext_bear_0.618": swing_low - diff * 0.618,

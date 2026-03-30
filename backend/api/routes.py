@@ -2171,7 +2171,7 @@ async def get_crypto_indicators():
 async def get_crypto_allocation():
     """
     Get capital allocation breakdown per TradingLab Trading Plan.
-    80% trading (90% forex, 10% crypto), 20% investment.
+    70% trading (70% forex, 20% other, 10% crypto), 20% stocks/ETFs, 10% crypto long-term.
     """
     from config import settings
     return {

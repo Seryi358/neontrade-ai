@@ -197,8 +197,9 @@ class TradingEngine:
         else:
             self.alert_manager = None
 
-        # Trading mode — AUTO = proactive trading
-        self.mode: TradingMode = TradingMode.AUTO
+        # Trading mode — MANUAL by default (mentorship: 100% precisión, 0% discreción para principiantes)
+        # User must explicitly switch to AUTO after gaining confidence with 100+ trades
+        self.mode: TradingMode = TradingMode.MANUAL
         self.pending_setups: List[PendingSetup] = []
         self._setup_expiry_minutes: int = 30  # Configurable expiry
 

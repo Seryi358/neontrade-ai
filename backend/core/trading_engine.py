@@ -753,7 +753,7 @@ class TradingEngine:
         crypto markets are active during Asian hours (TradingLab Crypto Mastery).
         """
         # Check if instrument is crypto
-        from backend.strategies.base import _is_crypto_instrument
+        from strategies.base import _is_crypto_instrument
         is_crypto = bool(instrument) and _is_crypto_instrument(instrument)
 
         hour = now.hour

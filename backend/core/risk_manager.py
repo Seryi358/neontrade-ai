@@ -549,7 +549,10 @@ class RiskManager:
 
         # Use start-of-day balance for daily DD (most prop firms use this method)
         # Workshop: Instant Funding has NO daily DD limit — skip this check.
+        # Guard: if sod_balance is 0 (balance not yet initialized), allow trading
         sod_balance = self._funded_start_of_day_balance or self._current_balance
+        if sod_balance <= 0:
+            return (True, "")  # Balance not yet initialized — don't block on stale data
         if settings.funded_evaluation_type != "instant" and sod_balance > 0:
             daily_dd_limit = settings.funded_max_daily_dd * sod_balance
             if self._funded_daily_pnl < 0 and abs(self._funded_daily_pnl) >= daily_dd_limit:

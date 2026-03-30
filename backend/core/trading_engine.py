@@ -1389,7 +1389,8 @@ class TradingEngine:
                         else:
                             risk_multiplier = settings.reentry_risk_3
                         setup.risk_percent *= risk_multiplier
-                        setup.units = int(setup.units * risk_multiplier) or (1 if setup.units > 0 else -1)
+                        raw = setup.units * risk_multiplier
+                        setup.units = round(raw, 6) if abs(raw) < 100 else int(raw) or (1 if setup.units > 0 else -1)
                         logger.info(
                             f"[{instrument}] Reentry #{reentry_count} — "
                             f"risk reduced to {setup.risk_percent:.2%} ({risk_multiplier:.0%} of normal)"
@@ -1416,7 +1417,8 @@ class TradingEngine:
                     elif session_quality <= 0.5:
                         # SYDNEY/ASIAN sessions: reduce risk (proxy for confidence penalty of -15 pts)
                         setup.risk_percent *= 0.85
-                        setup.units = int(setup.units * 0.85) or (1 if setup.units > 0 else -1)
+                        raw_units = setup.units * 0.85
+                        setup.units = round(raw_units, 6) if abs(raw_units) < 100 else int(raw_units) or (1 if setup.units > 0 else -1)
                         logger.info(
                             f"Reduced risk for {instrument}: {session_name} session "
                             f"(quality={session_quality:.1f}) — risk adjusted to {setup.risk_percent:.2%}"

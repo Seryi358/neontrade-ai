@@ -1503,6 +1503,10 @@ class BlueStrategy(BaseStrategy):
             else:
                 return None
 
+        # Style-adaptive EMA keys (same as check_htf_conditions)
+        setup_ema_key = _tf_ema("setup", 50)
+        confirm_ema_key = _tf_ema("confirm", 50)
+
         # TradingLab: Volume confirmation - confluence scoring, not hard block
         # The mentorship does NOT make volume a hard requirement for every entry.
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")

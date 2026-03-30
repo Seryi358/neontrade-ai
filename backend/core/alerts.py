@@ -686,15 +686,16 @@ def _build_email_html(title: str, body: str) -> str:
 <meta name="color-scheme" content="light only">
 <meta name="supported-color-schemes" content="light only">
 <title>NeonTrade AI</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <!--[if mso]><style>*{{font-family:Consolas,monospace !important;}}</style><![endif]-->
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
   :root {{ color-scheme: light only; }}
   [data-ogsc] body, [data-ogsb] body {{ background-color: #040a10 !important; }}
   u + .body .nt-card {{ background-color: #210e15 !important; }}
   u + .body .nt-text {{ color: #d1c5c0 !important; }}
   u + .body .nt-cyan {{ color: #5df4fe !important; }}
   u + .body .nt-dim {{ color: #a1a9b1 !important; }}
+  * {{ font-family: 'Rajdhani', Helvetica, Arial, sans-serif !important; }}
   @media only screen and (max-width: 600px) {{
     .nt-outer {{ width: 100% !important; }}
     .nt-card {{ width: 100% !important; }}

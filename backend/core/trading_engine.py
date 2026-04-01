@@ -735,6 +735,21 @@ class TradingEngine:
 
     # ── Market Hours ─────────────────────────────────────────────
 
+    @staticmethod
+    def _dst_offset(now: datetime) -> int:
+        """Return DST offset: 0 during EDT (summer), 1 during EST (winter).
+
+        During EST (Nov-Mar), US markets open/close 1 hour later in UTC.
+        Config hours are set for EDT. Add this offset to compensate.
+        """
+        try:
+            from zoneinfo import ZoneInfo
+            et = now.astimezone(ZoneInfo("America/New_York"))
+            # EDT = UTC-4 (dst=1h), EST = UTC-5 (dst=0h)
+            return 0 if et.dst() else 1
+        except Exception:
+            return 0  # Fallback: assume EDT (no offset)
+
     def _get_session_quality(self, now: datetime, instrument: str = "") -> tuple:
         """
         Return (session_name, quality_score) based on current UTC hour.
@@ -776,24 +791,30 @@ class TradingEngine:
             return ("SYDNEY", 0.4)
 
     def _is_market_open(self, now: datetime) -> bool:
-        """Check if forex market is open (Mon-Fri, trading hours)."""
+        """Check if forex market is open (Mon-Fri, trading hours).
+        Adjusts for DST: EST (winter) shifts session hours +1h in UTC."""
         # Forex is closed on weekends
         if now.weekday() >= 5:  # Saturday=5, Sunday=6
             return False
 
-        # Only trade during London + NY sessions
+        # Only trade during London + NY sessions (DST-adjusted)
         hour = now.hour
-        return settings.trading_start_hour <= hour < settings.trading_end_hour
+        offset = self._dst_offset(now)
+        start = settings.trading_start_hour + offset
+        end = settings.trading_end_hour + offset
+        return start <= hour < end
 
     def _should_close_friday(self, now: datetime) -> bool:
-        """Check if we should close all positions (Friday rule)."""
+        """Check if we should close all positions (Friday rule). DST-adjusted."""
+        offset = self._dst_offset(now)
         return (now.weekday() == 4 and
-                now.hour >= settings.close_before_friday_hour)
+                now.hour >= settings.close_before_friday_hour + offset)
 
     def _is_friday_no_new_trades(self, now: datetime) -> bool:
-        """Trading Plan: No new trades after Friday 18:00 UTC."""
+        """Trading Plan: No new trades after Friday 18:00 UTC. DST-adjusted."""
+        offset = self._dst_offset(now)
         return (now.weekday() == 4 and
-                now.hour >= settings.no_new_trades_friday_hour)
+                now.hour >= settings.no_new_trades_friday_hour + offset)
 
     async def _handle_friday_close(self):
         """Close only positions near SL or TP before Friday market close (Trading Plan rule).
@@ -1064,9 +1085,19 @@ class TradingEngine:
         ))
         try:
             # Feed latest EMA values to position manager for trailing
+            # Skip stale data (older than 3x scan interval) to avoid trailing on outdated EMAs
+            now = datetime.now(timezone.utc)
+            max_age_seconds = self._scan_interval * 3
             for inst in instruments:
                 if inst in self._last_scan_results:
                     result = self._last_scan_results[inst]
+                    scan_ts = getattr(result, '_scan_timestamp', None)
+                    if scan_ts and (now - scan_ts).total_seconds() > max_age_seconds:
+                        logger.warning(
+                            f"Skipping stale EMA data for {inst}: "
+                            f"last scan {(now - scan_ts).total_seconds():.0f}s ago"
+                        )
+                        continue
                     self.position_manager.set_ema_values(inst, result.ema_values)
                     # Feed swing data for Phase 1 structural SL movement
                     swing_highs = getattr(result, 'swing_highs', [])
@@ -1313,6 +1344,7 @@ class TradingEngine:
 
                 # Run full analysis
                 analysis = await self.market_analyzer.full_analysis(instrument)
+                analysis._scan_timestamp = datetime.now(timezone.utc)  # Staleness tracking
                 self._last_scan_results[instrument] = analysis
 
                 # Generate explanation for this instrument

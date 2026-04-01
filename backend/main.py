@@ -106,8 +106,8 @@ async def lifespan(app: FastAPI):
     # Startup diagnostics (mask secrets but confirm they exist)
     logger.info("Config check: broker={}, identifier={}, api_key={}, password={}",
                 settings.active_broker,
-                settings.capital_identifier[:3] + "***" if settings.capital_identifier else "EMPTY",
-                settings.capital_api_key[:4] + "***" if settings.capital_api_key else "EMPTY",
+                "SET" if settings.capital_identifier else "EMPTY",
+                "SET" if settings.capital_api_key else "EMPTY",
                 "SET" if settings.capital_password else "EMPTY")
     logger.info("Config check: openai={}, finnhub={}, gmail={}",
                 "SET" if settings.openai_api_key else "EMPTY",

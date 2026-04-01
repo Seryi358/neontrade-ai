@@ -183,12 +183,8 @@ class PositionManager:
     phases 4 and 5. At key levels, CPA is used for tighter trailing.
     """
 
-    # Crypto instrument prefixes for EMA 50 trailing logic
-    _CRYPTO_PREFIXES = (
-        "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
-        "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB",
-        "FTM", "ALGO", "XLM", "EOS", "XTZ", "VET",
-    )
+    # Crypto detection uses the canonical function from strategies.base
+    # which checks against settings.crypto_watchlist (100+ instruments)
 
     def __init__(
         self,
@@ -252,8 +248,11 @@ class PositionManager:
         )
 
     def _is_crypto(self, instrument: str) -> bool:
-        """Check if an instrument is a crypto pair."""
-        return any(instrument.upper().startswith(p) for p in self._CRYPTO_PREFIXES)
+        """Check if an instrument is a crypto pair.
+        Uses the canonical _is_crypto_instrument from strategies.base
+        which checks against settings.crypto_watchlist."""
+        from strategies.base import _is_crypto_instrument
+        return _is_crypto_instrument(instrument)
 
     def _get_base_ema_key(self, instrument: str) -> Optional[str]:
         """Get the base EMA key for trailing, using crypto-specific wider

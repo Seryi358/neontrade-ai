@@ -1841,6 +1841,9 @@ class TradingEngine:
         # Attach strategy name from explanation to setup for later use
         setup._strategy_name = getattr(explanation, 'strategy_detected', None) or "DETECTED"
 
+        # Attach reasoning to setup so it's available in _execute_setup for DB/alerts
+        setup._reasoning = reasoning
+
         if self.mode == TradingMode.AUTO:
             # Execute immediately (original behavior)
             await self._execute_setup(setup)
@@ -2057,7 +2060,7 @@ class TradingEngine:
                             "mode": self.mode.value,
                             "confidence": setup.reward_risk_ratio * 33,
                             "risk_reward_ratio": setup.reward_risk_ratio,
-                            "reasoning": f"R:R {setup.reward_risk_ratio:.2f} | Risk {setup.risk_percent:.2%}",
+                            "reasoning": getattr(setup, '_reasoning', None) or f"R:R {setup.reward_risk_ratio:.2f} | Risk {setup.risk_percent:.2%}",
                         })
                     except Exception as db_err:
                         logger.warning(f"DB record_trade failed (non-critical): {db_err}")

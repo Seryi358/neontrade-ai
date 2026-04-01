@@ -770,10 +770,10 @@ class TradingEngine:
         elif 0 <= hour < 8:
             # Crypto is active in Asian hours — higher quality score
             return ("ASIAN", 0.7 if is_crypto else 0.5)
-        elif 22 <= hour or hour < 0:
+        elif 22 <= hour:
             return ("SYDNEY", 0.4)
         else:
-            return ("OFF_HOURS", 0.3)
+            return ("SYDNEY", 0.4)
 
     def _is_market_open(self, now: datetime) -> bool:
         """Check if forex market is open (Mon-Fri, trading hours)."""
@@ -890,8 +890,9 @@ class TradingEngine:
                 f"FUNDED OVERNIGHT CLOSE: Closing {len(open_trades)} open trades "
                 f"(no overnight holding)"
             )
-            # Record PnL for each position before closing
-            for pos in list(self.position_manager.positions.values()):
+            # Record PnL and persist to DB in a single pass (avoid double API calls)
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for tid, pos in list(self.position_manager.positions.items()):
                 try:
                     price_data = await self.broker.get_current_price(pos.instrument)
                     current_price = (
@@ -900,24 +901,16 @@ class TradingEngine:
                     price_diff = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
                     pnl = price_diff * abs(pos.units) if pos.units != 0 else price_diff
                     self.risk_manager.record_funded_pnl(pnl)
-                except Exception as e:
-                    logger.debug(f"Failed to calculate PnL for funded close: {e}")
 
-            # Persist closes to DB before clearing
-            if self._db:
-                for tid, pos in self.position_manager.positions.items():
-                    try:
-                        price_data = await self.broker.get_current_price(pos.instrument)
-                        cp = price_data.bid if pos.direction == "BUY" else price_data.ask
-                        pnl_val = (cp - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - cp)
+                    if self._db:
                         await self._db.update_trade(tid, {
                             "status": "closed_funded_overnight",
-                            "closed_at": datetime.now(timezone.utc).isoformat(),
-                            "exit_price": cp,
-                            "pnl": pnl_val * abs(pos.units) if pos.units else pnl_val,
+                            "closed_at": now_iso,
+                            "exit_price": current_price,
+                            "pnl": pnl,
                         })
-                    except Exception:
-                        pass
+                except Exception as e:
+                    logger.debug(f"Failed to process funded close for {tid}: {e}")
 
             await self.broker.close_all_trades()
             self.risk_manager.unregister_all_trades()

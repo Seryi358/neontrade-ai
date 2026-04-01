@@ -1000,6 +1000,42 @@ async def apply_profile(request: ApplyProfileRequest):
     }
 
 
+class ApplyFundedPresetRequest(BaseModel):
+    preset_id: str
+
+
+@router.post("/funded/apply-preset")
+async def apply_funded_preset_endpoint(request: ApplyFundedPresetRequest):
+    """Apply a funded account preset (FTMO, Bitfunded, etc.)."""
+    from config import apply_funded_preset, FUNDED_ACCOUNT_PRESETS
+    if request.preset_id not in FUNDED_ACCOUNT_PRESETS:
+        available = list(FUNDED_ACCOUNT_PRESETS.keys())
+        raise HTTPException(400, f"Preset '{request.preset_id}' no existe. Disponibles: {available}")
+
+    applied = apply_funded_preset(request.preset_id)
+    preset = FUNDED_ACCOUNT_PRESETS[request.preset_id]
+
+    return {
+        "preset": request.preset_id,
+        "name": preset["name"],
+        "applied_settings": len(applied),
+        "message": f"Preset '{preset['name']}' aplicado correctamente ({len(applied)} ajustes)",
+    }
+
+
+@router.get("/funded/presets")
+async def list_funded_presets():
+    """List available funded account presets."""
+    from config import FUNDED_ACCOUNT_PRESETS
+    return {
+        preset_id: {
+            "name": preset["name"],
+            "description": preset["description"],
+        }
+        for preset_id, preset in FUNDED_ACCOUNT_PRESETS.items()
+    }
+
+
 @router.get("/risk-config")
 async def get_risk_config():
     """Get current risk management configuration."""

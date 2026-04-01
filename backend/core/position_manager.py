@@ -165,6 +165,7 @@ class ManagedPosition:
     cpa_temporary: bool = False   # True when CPA was triggered by key level proximity (can revert to LP/CP)
     cpa_revert_level: float = 0   # Key level that triggered temporary CPA; if price breaks through cleanly, revert
     pre_cpa_phase: Optional[str] = None  # Phase before CPA was triggered (for reverting)
+    _half_risk_applied: bool = False  # Track 50% risk reduction step before BE
 
 
 class PositionManager:
@@ -528,13 +529,13 @@ class PositionManager:
                 half_sl = pos.current_sl + (pos.entry_price - pos.current_sl) * 0.5
                 if half_sl > pos.current_sl:
                     await self._update_sl(pos, half_sl)
-                    pos._half_risk_applied = True  # type: ignore[attr-defined]
+                    pos._half_risk_applied = True
                     logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
             else:
                 half_sl = pos.current_sl - (pos.current_sl - pos.entry_price) * 0.5
                 if half_sl < pos.current_sl:
                     await self._update_sl(pos, half_sl)
-                    pos._half_risk_applied = True  # type: ignore[attr-defined]
+                    pos._half_risk_applied = True
                     logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
 
         # Calculate BE threshold based on configured method

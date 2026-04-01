@@ -101,6 +101,7 @@ const WATCHLIST_CATEGORIES = [
   { key: 'forex_exotic', label: 'EXOTIC' },
   { key: 'commodities', label: 'COMMODITIES' },
   { key: 'indices', label: 'INDICES' },
+  { key: 'equities', label: 'EQUITIES' },
   { key: 'crypto', label: 'CRYPTO' },
 ];
 

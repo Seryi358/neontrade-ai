@@ -173,16 +173,25 @@ class MarketAnalyzer:
         # Needed for swing MTFA direction chart (TradingLab: Monthly = directional for swing)
         try:
             w_df = candles.get("W", pd.DataFrame())
-            if not w_df.empty and "date" in w_df.columns:
+            if not w_df.empty:
                 w_copy = w_df.copy()
-                w_copy["month"] = pd.to_datetime(w_copy["date"]).dt.to_period("M")
-                monthly = w_copy.groupby("month").agg({
+                # Weekly DF has time in the index (set_index("time") during _candles_to_dataframe)
+                # so use the index directly for month grouping
+                if isinstance(w_copy.index, pd.DatetimeIndex):
+                    w_copy["month"] = w_copy.index.to_period("M")
+                elif "date" in w_copy.columns:
+                    w_copy["month"] = pd.to_datetime(w_copy["date"]).dt.to_period("M")
+                else:
+                    w_copy["month"] = pd.to_datetime(w_copy.index).to_period("M")
+                agg_dict = {
                     "open": "first",
                     "high": "max",
                     "low": "min",
                     "close": "last",
-                    "date": "last",
-                }).reset_index(drop=True)
+                }
+                if "date" in w_copy.columns:
+                    agg_dict["date"] = "last"
+                monthly = w_copy.groupby("month").agg(agg_dict).reset_index(drop=True)
                 if "volume" in w_copy.columns:
                     vol = w_copy.groupby("month")["volume"].sum().reset_index(drop=True)
                     monthly["volume"] = vol

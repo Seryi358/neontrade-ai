@@ -677,6 +677,73 @@ TRADING_PROFILES = {
     },
 }
 
+# ── Funded Account Presets (Workshop de Cuentas Fondeadas) ────────────
+# Pre-configured settings for specific prop firm evaluation parameters.
+FUNDED_ACCOUNT_PRESETS = {
+    "ftmo_2phase": {
+        "name": "FTMO 2-Phase",
+        "description": "Standard FTMO evaluation: Phase 1=10%, Phase 2=5%, DD 5%/10%",
+        "settings": {
+            "funded_evaluation_type": "2phase",
+            "funded_max_daily_dd": 0.05,
+            "funded_max_total_dd": 0.10,
+            "funded_profit_target_phase1": 0.10,
+            "funded_profit_target_phase2": 0.05,
+        },
+    },
+    "ftmo_sprint": {
+        "name": "FTMO Sprint (1-Phase)",
+        "description": "FTMO Sprint evaluation: tighter DD (4%/6%), single phase",
+        "settings": {
+            "funded_evaluation_type": "1phase",
+            "funded_max_daily_dd": 0.04,
+            "funded_max_total_dd": 0.06,
+            "funded_profit_target_phase1": 0.10,
+            "funded_profit_target_phase2": 0.05,
+        },
+    },
+    "ftmo_instant": {
+        "name": "FTMO Instant Funding",
+        "description": "Instant funding: no daily DD limit, 10% total DD",
+        "settings": {
+            "funded_evaluation_type": "instant",
+            "funded_max_daily_dd": 1.0,  # No daily DD limit for instant
+            "funded_max_total_dd": 0.10,
+            "funded_profit_target_phase1": 0.0,
+            "funded_profit_target_phase2": 0.0,
+        },
+    },
+    "bitfunded": {
+        "name": "Bitfunded (Crypto)",
+        "description": "Bitfunded crypto prop firm: Stage 1=8%, Stage 2=5%, DD 5%/10%, 80% profit share, max 5x leverage",
+        "settings": {
+            "funded_evaluation_type": "2phase",
+            "funded_max_daily_dd": 0.05,
+            "funded_max_total_dd": 0.10,
+            "funded_profit_target_phase1": 0.08,  # 8% for Stage 1 (vs FTMO 10%)
+            "funded_profit_target_phase2": 0.05,  # 5% for Stage 2
+        },
+    },
+}
+
+
+def apply_funded_preset(preset_id: str) -> dict:
+    """Apply a funded account preset to the current settings.
+    Returns the dict of settings that were applied."""
+    if preset_id not in FUNDED_ACCOUNT_PRESETS:
+        raise ValueError(f"Preset '{preset_id}' no existe. Disponibles: {list(FUNDED_ACCOUNT_PRESETS.keys())}")
+
+    preset = FUNDED_ACCOUNT_PRESETS[preset_id]
+    applied = {}
+    for key, value in preset["settings"].items():
+        if hasattr(settings, key):
+            setattr(settings, key, value)
+            applied[key] = value
+
+    settings.funded_account_mode = True
+    applied["funded_account_mode"] = True
+    return applied
+
 
 def apply_trading_profile(profile_id: str) -> dict:
     """Apply a trading profile preset to the current settings.

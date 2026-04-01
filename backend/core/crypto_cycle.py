@@ -98,6 +98,11 @@ class CryptoCycleAnalyzer:
         await self._check_ema8_weekly(cycle)
         await self._check_sma200_daily(cycle)
 
+        # Estimate USDT.D direction from BTC+ETH combined performance
+        # If both BTC and ETH are falling simultaneously, money is likely flowing to stablecoins (USDT.D rising)
+        # If both are rising, money is leaving stablecoins (USDT.D falling)
+        self._estimate_usdt_dominance(cycle)
+
         # Incorporate BMSB and Pi Cycle from market_analyzer AnalysisResult
         self._apply_bmsb(cycle, bmsb)
         self._apply_pi_cycle(cycle, pi_cycle)
@@ -436,6 +441,40 @@ class CryptoCycleAnalyzer:
                 cycle.market_phase = "accumulation"  # Potential cycle bottom
         except Exception as e:
             logger.debug(f"RSI analysis failed: {e}")
+
+    def _estimate_usdt_dominance(self, cycle: CryptoMarketCycle):
+        """Estimate USDT dominance direction from BTC+ETH combined performance.
+
+        From mentorship: "If USDT.D is rising while BTC.D falls, money going to
+        stablecoins (NOT altcoins) — bearish signal."
+
+        Without direct USDT.D data, we approximate:
+        - If BTC AND ETH both falling → capital likely flowing to stablecoins → USDT.D rising
+        - If BTC AND ETH both rising → capital leaving stablecoins → USDT.D falling
+        - Mixed → inconclusive, leave as None
+        """
+        btc_perf = getattr(cycle, '_btc_perf_7d', None)
+        eth_perf = getattr(cycle, '_eth_perf_7d', None)
+        if btc_perf is None or eth_perf is None:
+            return
+
+        # Both assets declining significantly → money going to stablecoins
+        if btc_perf < -0.02 and eth_perf < -0.02:
+            cycle.usdt_dominance_rising = True
+            logger.info(
+                f"USDT.D estimated RISING: BTC {btc_perf:+.2%}, ETH {eth_perf:+.2%} "
+                f"— both declining, capital likely flowing to stablecoins"
+            )
+        # Both assets rising significantly → money leaving stablecoins
+        elif btc_perf > 0.02 and eth_perf > 0.02:
+            cycle.usdt_dominance_rising = False
+            logger.info(
+                f"USDT.D estimated FALLING: BTC {btc_perf:+.2%}, ETH {eth_perf:+.2%} "
+                f"— both rising, capital leaving stablecoins"
+            )
+        # Mixed or flat → inconclusive
+        else:
+            cycle.usdt_dominance_rising = None
 
     async def _check_ema8_weekly(self, cycle: CryptoMarketCycle):
         """Check if BTC weekly close broke below EMA 8 (bearish signal)."""

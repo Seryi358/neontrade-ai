@@ -193,7 +193,7 @@ async def _periodic_cleanup():
         # DB retention cleanup — once per day
         try:
             from datetime import datetime
-            today = datetime.utcnow().strftime("%Y-%m-%d")
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             if db is not None and today != _last_db_cleanup_date:
                 await db.cleanup_old_data(days=90)
                 _last_db_cleanup_date = today
@@ -213,12 +213,6 @@ app = FastAPI(
 # CORS for frontend (React Native / Expo Web / Electron / Remote)
 # Allow same-origin (static frontend served by this backend) + localhost dev
 # Also allow all origins for EasyPanel deploys where the URL varies
-_cors_origins = [
-    "https://n8n-neontrade-ai.zb12wf.easypanel.host",
-    "http://localhost:8000",
-    "http://localhost:19006",  # Expo Web dev server
-    "http://localhost:3000",
-]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow any origin (API key auth handles security)

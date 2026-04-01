@@ -100,6 +100,14 @@ class RiskManager:
         # Start-of-day balance for funded account DD calculation
         # Most prop firms calculate daily DD from start-of-day equity (or highest equity of day)
         self._funded_start_of_day_balance: float = 0.0
+        # Reentry tracking (Esp. Criptomonedas - Reentradas Efectivas)
+        # Track stop-outs per instrument to reduce risk on reentries
+        # Rules from mentorship:
+        #   - Re-enter only while "la esencia" (setup essence) is maintained
+        #   - Reduce position size on reentry (1% -> 0.5% -> 0.25%)
+        #   - Maximum ~3 reentries per setup/move
+        self._reentry_counts: Dict[str, int] = {}  # instrument -> count of consecutive stop-outs
+        self._reentry_timestamps: Dict[str, str] = {}  # instrument -> last stop-out ISO timestamp
 
     # ── Drawdown Management (ch18.7) ────────────────────────────────
 
@@ -265,6 +273,16 @@ class RiskManager:
             self._current_delta_risk = 0.0
             logger.info("Delta algorithm: reset after losing trade")
 
+        # Reentry tracking — increment consecutive stop-out count for this instrument
+        if pnl_percent < 0:
+            self._reentry_counts[instrument] = self._reentry_counts.get(instrument, 0) + 1
+            self._reentry_timestamps[instrument] = datetime.now(timezone.utc).isoformat()
+            logger.info(f"Reentry tracker: {instrument} stop-out #{self._reentry_counts[instrument]}")
+        else:
+            # Winning trade resets the reentry counter for this instrument
+            self._reentry_counts.pop(instrument, None)
+            self._reentry_timestamps.pop(instrument, None)
+
         # Keep history manageable
         if len(self._trade_history) > 200:
             self._trade_history = self._trade_history[-100:]
@@ -299,8 +317,31 @@ class RiskManager:
 
     # ── Core Risk Methods ───────────────────────────────────────────
 
-    def get_risk_for_style(self, style: TradingStyle) -> float:
-        """Get the risk percentage for a trading style, adjusted for drawdown and delta."""
+    def get_reentry_count(self, instrument: str) -> int:
+        """Get the number of consecutive stop-outs on this instrument.
+        Used by strategies to check reentry status.
+        Mentorship: max ~3 reentries per setup/move."""
+        return self._reentry_counts.get(instrument, 0)
+
+    def get_reentry_risk_multiplier(self, instrument: str) -> float:
+        """Get risk multiplier for reentries on this instrument.
+        From Esp. Criptomonedas - Reentradas Efectivas:
+        - 1st entry: 1.0x (full risk)
+        - 1st reentry: 0.5x (half risk)
+        - 2nd reentry: 0.25x (quarter risk)
+        - 3rd+ reentry: BLOCKED (returns 0.0)"""
+        count = self.get_reentry_count(instrument)
+        if count == 0:
+            return 1.0
+        elif count == 1:
+            return 0.5
+        elif count == 2:
+            return 0.25
+        else:
+            return 0.0  # Blocked: max 3 reentries exceeded
+
+    def get_risk_for_style(self, style: TradingStyle, instrument: str = "") -> float:
+        """Get the risk percentage for a trading style, adjusted for drawdown, delta, and reentries."""
         risk_map = {
             TradingStyle.DAY_TRADING: settings.risk_day_trading,
             TradingStyle.SCALPING: settings.risk_scalping,
@@ -314,6 +355,16 @@ class RiskManager:
         # Apply delta bonus (may increase risk during winning streaks)
         delta_bonus = self._get_delta_bonus(adjusted_risk)
         final_risk = adjusted_risk + delta_bonus
+
+        # Apply reentry risk reduction (Esp. Criptomonedas - Reentradas Efectivas)
+        if instrument:
+            reentry_mult = self.get_reentry_risk_multiplier(instrument)
+            if reentry_mult == 0.0:
+                logger.warning(f"Reentry BLOCKED for {instrument}: max reentries exceeded (3+)")
+                return 0.0
+            elif reentry_mult < 1.0:
+                final_risk *= reentry_mult
+                logger.info(f"Reentry risk reduction for {instrument}: {reentry_mult}x -> {final_risk:.4f}")
 
         # Never exceed style maximum * 3 (hard cap)
         final_risk = min(final_risk, base_risk * 3)
@@ -336,7 +387,10 @@ class RiskManager:
         if not self.can_scale_in(instrument):
             return False
 
-        risk = self.get_risk_for_style(style)
+        risk = self.get_risk_for_style(style, instrument)
+        if risk == 0.0:
+            logger.warning(f"Cannot take trade on {instrument}: max reentries exceeded")
+            return False
         # Check for correlated pairs
         risk = self._adjust_for_correlation(instrument, risk)
 

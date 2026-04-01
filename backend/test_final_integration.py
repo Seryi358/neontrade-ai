@@ -620,9 +620,9 @@ check("RiskManager R:R uses epsilon (1e-9)",
 print("\n  -- 7c: ManagementStyle enum values handled --")
 from core.position_manager import ManagementStyle, TradingStyle, PositionManager
 
-expected_styles = {"lp", "cp", "cpa", "price_action"}
+expected_styles = {"lp", "daily", "cp", "cpa", "price_action"}
 actual_styles = {s.value for s in ManagementStyle}
-check("ManagementStyle has all 4 values (lp, cp, cpa, price_action)",
+check("ManagementStyle has all 5 values (lp, daily, cp, cpa, price_action)",
       actual_styles == expected_styles,
       f"Expected {expected_styles}, got {actual_styles}")
 

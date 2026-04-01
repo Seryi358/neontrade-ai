@@ -443,7 +443,7 @@ class RiskManager:
         style: TradingStyle,
         entry_price: float,
         stop_loss: float,
-    ) -> int:
+    ) -> float:
         """
         Calculate the number of units to trade based on risk percentage.
 
@@ -459,6 +459,7 @@ class RiskManager:
             balance_cache.set("account_balance", balance)
 
         if balance <= 0:
+            logger.warning(f"Cannot size position for {instrument}: balance is {balance}")
             return 0
 
         risk_percent = self.get_risk_for_style(style, instrument)
@@ -481,8 +482,9 @@ class RiskManager:
         # Capital.com accepts fractional units for crypto CFDs.
         units = round(raw_units, 6) if raw_units < 100 else int(raw_units)
 
-        if units <= 0:
-            return 0  # Cannot trade with 0 or negative units
+        if units <= 0 or (raw_units < 100 and units < 0.001):
+            logger.debug(f"Position size too small for {instrument}: {units} units")
+            return 0  # Cannot trade with 0, negative, or negligible units
 
         # Cap maximum position size to prevent broker rejections
         MAX_UNITS = 10_000_000

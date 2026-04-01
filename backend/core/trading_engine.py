@@ -1121,7 +1121,7 @@ class TradingEngine:
                     swing_highs = getattr(result, 'swing_highs', [])
                     swing_lows = getattr(result, 'swing_lows', [])
                     if swing_highs or swing_lows:
-                        self.position_manager.set_swing_data(inst, swing_highs, swing_lows)
+                        self.position_manager.set_swing_values(inst, swing_highs, swing_lows)
 
             prices = await self.broker.get_prices_bulk(instruments)
             await self.position_manager.update_all_positions(prices)

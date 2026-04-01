@@ -499,6 +499,10 @@ class CapitalClient(BaseBroker):
             l = (float(l_data.get("bid", 0)) + float(l_data.get("ask", 0))) / 2
             c = (float(c_data.get("bid", 0)) + float(c_data.get("ask", 0))) / 2
 
+            # Skip candles with invalid OHLC (all zeros = missing data from broker)
+            if o == 0 and h == 0 and l == 0 and c == 0:
+                continue
+
             vol = int(p.get("lastTradedVolume", 0))
 
             result.append(CandleData(

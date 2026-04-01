@@ -1131,8 +1131,9 @@ class TradingEngine:
                                 reason="Position closed externally (broker/SL/TP)",
                                 strategy=getattr(pos, 'strategy_variant', '') or '',
                             )
-                        except Exception:
-                            pass
+                            logger.info(f"Close alert sent for {pos.instrument}")
+                        except Exception as ae:
+                            logger.warning(f"Close alert failed for {pos.instrument}: {ae}")
         except Exception as e:
             logger.debug(f"Position sync failed (non-critical): {e}")
 

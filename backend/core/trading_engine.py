@@ -2035,7 +2035,7 @@ class TradingEngine:
                             "id": trade_id,
                             "instrument": setup.instrument,
                             "strategy": getattr(setup, '_strategy_name', 'DETECTED'),
-                            "strategy_variant": getattr(setup, '_strategy_name', 'DETECTED'),
+                            "strategy_variant": setup.strategy_variant or getattr(setup, '_strategy_name', 'DETECTED'),
                             "direction": setup.direction,
                             "units": abs(setup.units),
                             "entry_price": setup.entry_price,

@@ -492,6 +492,7 @@ class MarketAnalyzer:
             current_price=current_price,
             session=session,
             session_detail=session_detail,
+            elliott_wave=f"Wave {elliott_wave_detail.get('wave_count', '?')}" if elliott_wave_detail else None,
             elliott_wave_detail=elliott_wave_detail,
             pivot_points=pivot_points,
             premium_discount_zone=premium_discount_zone,

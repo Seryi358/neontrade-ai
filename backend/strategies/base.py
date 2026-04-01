@@ -4356,6 +4356,81 @@ def detect_all_setups(
     return signals
 
 
+def get_strategy_checklist(analysis: AnalysisResult, enabled_strategies: Optional[Dict[str, bool]] = None) -> List[Dict]:
+    """Run all strategies and return step-by-step status for each, even when they fail.
+
+    Returns a list of dicts, one per strategy:
+    {
+        "strategy": "BLUE",
+        "name": "Cambio de tendencia 1H",
+        "htf_passed": True/False,
+        "htf_score": float,
+        "steps_met": ["Paso 1: ...", "Paso 2: ..."],
+        "steps_failed": ["Paso 3: ...", "Paso 4: ..."],
+        "setup_found": True/False,
+        "direction": "BUY"/"SELL"/None,
+        "confidence": float,
+        "rr": float,
+    }
+    """
+    is_crypto = _is_crypto_instrument(analysis.instrument)
+    results = []
+
+    STRATEGY_LABELS = {
+        "BLUE": "Cambio de tendencia 1H",
+        "RED": "Cambio de tendencia 4H",
+        "PINK": "Patrón correctivo (Onda 4→5)",
+        "WHITE": "Continuación post-Pink",
+        "BLACK": "Contratendencia (min 2:1)",
+        "GREEN": "Semanal + Diario + 15M",
+    }
+
+    for strategy in ALL_STRATEGIES:
+        color = strategy.color.value
+        if is_crypto and strategy.color != StrategyColor.GREEN:
+            continue
+        if enabled_strategies and not enabled_strategies.get(color, False):
+            continue
+
+        entry = {
+            "strategy": color,
+            "name": STRATEGY_LABELS.get(color, color),
+            "htf_passed": False,
+            "htf_score": 0,
+            "steps_met": [],
+            "steps_failed": [],
+            "setup_found": False,
+            "direction": None,
+            "confidence": 0,
+            "rr": 0,
+        }
+
+        try:
+            htf_ok, htf_score, htf_met, htf_failed = strategy.check_htf_conditions(analysis)
+            entry["htf_passed"] = htf_ok
+            entry["htf_score"] = htf_score
+            entry["steps_met"] = htf_met
+            entry["steps_failed"] = htf_failed
+
+            if htf_ok:
+                signal = strategy.check_ltf_entry(analysis)
+                if signal:
+                    entry["setup_found"] = True
+                    entry["direction"] = signal.direction
+                    entry["confidence"] = signal.confidence + htf_score
+                    entry["steps_met"] = htf_met + signal.conditions_met
+                    entry["steps_failed"] = htf_failed + signal.conditions_failed
+                    sl_dist = abs(signal.entry_price - signal.stop_loss)
+                    if sl_dist > 0:
+                        entry["rr"] = round(abs(signal.take_profit_1 - signal.entry_price) / sl_dist, 2)
+        except Exception as e:
+            entry["steps_failed"].append(f"Error: {str(e)[:100]}")
+
+        results.append(entry)
+
+    return results
+
+
 def _apply_elliott_wave_priority(
     analysis: AnalysisResult,
     setups: List[SetupSignal],

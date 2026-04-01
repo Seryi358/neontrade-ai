@@ -136,6 +136,28 @@ export default function WatchlistScreen() {
             )}
           </View>
         )}
+
+        {/* Strategy checklist — shows which strategies pass/fail HTF */}
+        {item.strategy_checklist && item.strategy_checklist.length > 0 && (
+          <View style={styles.checklistRow}>
+            {item.strategy_checklist.map((c: any) => (
+              <View key={c.strategy} style={styles.checklistItem}>
+                <Text style={[
+                  styles.checklistDot,
+                  { color: c.setup_found ? theme.colors.neonGreen : c.htf_passed ? theme.colors.neonCyan : theme.colors.textMuted }
+                ]}>
+                  {c.setup_found ? '✓' : c.htf_passed ? '◐' : '✗'}
+                </Text>
+                <Text style={[
+                  styles.checklistLabel,
+                  { color: c.setup_found ? theme.colors.neonGreen : c.htf_passed ? theme.colors.neonCyan : theme.colors.textMuted }
+                ]}>
+                  {c.strategy}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </HUDCard>
     </TouchableOpacity>
   );
@@ -238,6 +260,30 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+  },
+  // Strategy checklist
+  checklistRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    flexWrap: 'wrap',
+  },
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  checklistDot: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 11,
+  },
+  checklistLabel: {
+    fontFamily: theme.fonts.mono,
+    fontSize: 9,
+    letterSpacing: 1,
   },
   // Header stats
   headerStatsRow: {

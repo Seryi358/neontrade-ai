@@ -495,10 +495,50 @@ async def get_watchlist():
                 entry["strategy_detected"] = expl.strategy_detected
                 entry["confidence_level"] = expl.confidence_level
 
+            # Add strategy checklist summary (which strategies pass/fail HTF)
+            try:
+                from strategies.base import get_strategy_checklist
+                checklist = get_strategy_checklist(analysis, engine._enabled_strategies)
+                entry["strategy_checklist"] = [
+                    {
+                        "strategy": c["strategy"],
+                        "name": c["name"],
+                        "htf_passed": c["htf_passed"],
+                        "setup_found": c["setup_found"],
+                        "met_count": len(c["steps_met"]),
+                        "failed_count": len(c["steps_failed"]),
+                        "top_failure": c["steps_failed"][0] if c["steps_failed"] else None,
+                    }
+                    for c in checklist
+                ]
+            except Exception:
+                pass
+
         watchlist.append(entry)
 
     watchlist.sort(key=lambda x: x["score"], reverse=True)
     return watchlist
+
+
+@router.get("/watchlist/{instrument}/strategies")
+async def get_instrument_strategy_checklist(instrument: str):
+    """Get step-by-step strategy checklist for a specific instrument.
+    Shows which steps of each strategy are met/failed — even when no setup is detected."""
+    from main import engine
+    from strategies.base import get_strategy_checklist
+
+    if instrument not in engine.last_scan_results:
+        raise HTTPException(404, f"No analysis data for {instrument}. Wait for next scan cycle.")
+
+    analysis = engine.last_scan_results[instrument]
+    checklist = get_strategy_checklist(analysis, engine._enabled_strategies)
+    return {
+        "instrument": instrument,
+        "score": analysis.score,
+        "htf_trend": analysis.htf_trend.value if hasattr(analysis.htf_trend, 'value') else str(analysis.htf_trend),
+        "ltf_trend": analysis.ltf_trend.value if hasattr(analysis.ltf_trend, 'value') else str(analysis.ltf_trend),
+        "strategies": checklist,
+    }
 
 
 # ── Account ──────────────────────────────────────────────────────

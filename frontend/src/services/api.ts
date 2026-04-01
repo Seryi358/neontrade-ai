@@ -214,6 +214,7 @@ export const api = {
   // Watchlist & Analysis
   getWatchlist: () => apiGet<any[]>('/api/v1/watchlist'),
   getAnalysis: (instrument: string) => apiGet<any>(`/api/v1/analysis/${instrument}`),
+  getStrategyChecklist: (instrument: string) => apiGet<any>(`/api/v1/watchlist/${instrument}/strategies`),
   getAllAnalyses: () => apiGet<any[]>('/api/v1/analysis'),
 
   // Candles & Price

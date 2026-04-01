@@ -109,6 +109,42 @@ class RiskManager:
         self._reentry_counts: Dict[str, int] = {}  # instrument -> count of consecutive stop-outs
         self._reentry_timestamps: Dict[str, str] = {}  # instrument -> last stop-out ISO timestamp
 
+    # ── Deal Size Rules (from broker API) ────────────────────────────
+
+    _deal_size_cache: Dict[str, tuple] = {}  # instrument -> (min_size, increment)
+
+    async def _get_deal_size_rules(self, instrument: str) -> tuple:
+        """Get minimum deal size and size increment from broker for an instrument.
+        Caches results to avoid repeated API calls.
+        Returns (min_size, increment) — e.g. (100, 100) for forex, (0.0001, 0.0001) for BTC."""
+        if instrument in self._deal_size_cache:
+            return self._deal_size_cache[instrument]
+
+        # Default fallback values if broker query fails
+        from strategies.base import _is_crypto_instrument
+        if _is_crypto_instrument(instrument):
+            default = (0.001, 0.001)
+        else:
+            default = (100, 100)  # Capital.com forex minimum is 100 units
+
+        try:
+            # Query broker for actual dealing rules
+            if hasattr(self.broker, '_resolve_epic') and hasattr(self.broker, '_get'):
+                epic = await self.broker._resolve_epic(instrument)
+                data = await self.broker._get(f'/api/v1/markets/{epic}')
+                rules = data.get('dealingRules', {})
+                min_val = float(rules.get('minDealSize', {}).get('value', default[0]))
+                incr_val = float(rules.get('minSizeIncrement', {}).get('value', default[1]))
+                result = (min_val, incr_val)
+                self._deal_size_cache[instrument] = result
+                logger.debug(f"Deal rules for {instrument}: min={min_val}, increment={incr_val}")
+                return result
+        except Exception as e:
+            logger.debug(f"Failed to get deal rules for {instrument}, using defaults: {e}")
+
+        self._deal_size_cache[instrument] = default
+        return default
+
     # ── Drawdown Management (ch18.7) ────────────────────────────────
 
     async def update_balance_tracking(self):
@@ -478,29 +514,33 @@ class RiskManager:
         # so we must NOT multiply by it. Direct division gives correct CFD units.
         # Example: $100 risk, 0.0050 SL distance = 20,000 units
         raw_units = risk_amount / sl_distance
-        # For forex: round to integer (standard lots). For crypto: keep fractional.
-        # Capital.com accepts fractional units for crypto CFDs.
-        units = round(raw_units, 6) if raw_units < 100 else int(raw_units)
 
-        if units <= 0 or (raw_units < 100 and units < 0.001):
-            logger.debug(f"Position size too small for {instrument}: {units} units")
-            return 0  # Cannot trade with 0, negative, or negligible units
+        # Get broker minimum deal size and increment for this instrument
+        min_units, size_increment = await self._get_deal_size_rules(instrument)
 
-        # Enforce minimum deal size per broker requirements
-        # Capital.com CFDs: forex typically requires 1000+ units (0.01 lot)
-        # Crypto CFDs: typically allow fractional (0.01+)
-        from strategies.base import _is_crypto_instrument
-        if _is_crypto_instrument(instrument):
-            min_units = 0.01  # Crypto: very small minimum
-        elif any(instrument.upper().endswith(s) for s in ("_JPY", "_CHF", "JPY", "CHF")):
-            min_units = 100  # JPY/CHF crosses: 100 units minimum on Capital.com
+        # Round to the broker's size increment
+        if size_increment > 0:
+            units = round(raw_units / size_increment) * size_increment
+            # Ensure proper decimal places based on increment
+            if size_increment >= 1:
+                units = int(units)
+            else:
+                decimals = len(str(size_increment).rstrip('0').split('.')[-1]) if '.' in str(size_increment) else 0
+                units = round(units, max(decimals, 2))
         else:
-            min_units = 1000  # Standard forex: 1000 units (0.01 lot)
+            units = round(raw_units, 6) if raw_units < 100 else int(raw_units)
 
+        if units <= 0:
+            logger.debug(f"Position size too small for {instrument}: {units} units")
+            return 0
+
+        # Enforce minimum deal size from broker
         if abs(units) < min_units:
             logger.warning(
-                f"Position size {units:.2f} below broker minimum {min_units} for {instrument}. "
-                f"Account too small for this instrument at current risk level."
+                f"Position size {units} below broker minimum {min_units} for {instrument}. "
+                f"Balance ${balance:.2f} at {risk_percent:.2%} risk (${risk_amount:.2f}) "
+                f"with SL distance {sl_distance:.5f} produces {raw_units:.2f} units. "
+                f"Need at least {min_units} units to trade this instrument."
             )
             return 0
 

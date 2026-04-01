@@ -1761,6 +1761,11 @@ class TradingEngine:
             signal.instrument, style, signal.entry_price, signal.stop_loss
         )
         if units == 0:
+            logger.warning(
+                f"Setup {signal.strategy_variant} on {signal.instrument} skipped: "
+                f"position size too small for current balance "
+                f"(entry={signal.entry_price:.5f}, sl={signal.stop_loss:.5f})"
+            )
             return None
 
         # Adjust direction sign for units

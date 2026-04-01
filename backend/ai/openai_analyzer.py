@@ -364,22 +364,21 @@ Swing Trading Black Adaptation:
 Primary use: Crypto (GREEN is the ONLY strategy for crypto markets)
 Also works on: Strong trending forex/indices when all HTFs align
 Potential R:R: Up to 10:1
-NOTE: GREEN is NOT about Elliott Waves — it follows a specific 7-step sequential process
+NOTE: GREEN is NOT about Elliott Waves — it follows a specific 6-step sequential process (Alex's exact Pasos 1-6)
 
-  7 Sequential Steps (same rules, different timeframes per style):
-  Step 1 (Trend): Directional structure on the highest timeframe
-  Step 2 (Breakout): Important S/R level breaks on the highest timeframe
-  Step 3 (Pullback): Pullback to broken level + Fibonacci confluence on the highest TF
-  Step 4 (Pattern): Correction forms a pattern (wedge/triangle/channel) on the setup timeframe
-  Step 5 (Diagonal NON-NEGOTIABLE): Find diagonal/trendline on the confirmation timeframe — "Si no hay diagonal en una hora, no hay trade"
-  Step 6 (RCC Entry): Execute on the lowest TF — Ruptura + Cierre + Confirmacion of the diagonal break
-  Step 7 (SL/TP): SL below last swing low on confirmation TF; TP at measured move or previous structure
+  6 Sequential Steps (same rules, different timeframes per style):
+  Paso 1 (Tendencia): Directional structure on the highest timeframe (Weekly for swing)
+  Paso 2 (Patron): The correction within the HTF trend forms a pattern on the setup timeframe (Daily for swing)
+  Paso 3 (Confluencia): Pattern attacks S/R levels, Fibonacci, and EMAs — confluence of levels
+  Paso 4 (Diagonal NON-NEGOTIABLE): Drop to confirmation TF (1H for swing), find diagonal/trendline at the FINAL portion — "Si no hay diagonal en una hora, no hay trade"
+  Paso 5 (RCC Entry): Copy diagonal to execution TF, execute on first Ruptura + Cierre + Confirmacion
+  Paso 6 (SL/TP): SL below last swing on confirmation TF; TP at previous high/low on setup TF
 
   GREEN Timeframe Layout per Trading Style:
   - Swing: Weekly (trend) -> Daily (pattern) -> 1H (diagonal) -> 15M (execution)
   - Day Trading: 4H (trend) -> 1H (pattern) -> 15M (diagonal) -> 2M (execution)
   - Scalping: 15M (trend) -> 5M (pattern) -> 1M (diagonal) -> 30s (execution)
-  NOTE: The 7 STEPS are identical across styles, only the TIMEFRAMES change.
+  NOTE: The 6 STEPS are identical across styles, only the TIMEFRAMES change.
 
   SL: Below/above the LAST 1H swing low/high immediately preceding the diagonal break (the tightest possible SL). NOT the full pattern structure — Alex: 'queremos cubrir lo mínimo posible, el mínimo anterior en gráfico horario, previo justo a la ruptura de esa diagonal'.
   TP1: Next structure level on the intermediate timeframe
@@ -495,11 +494,10 @@ Minimum R:R Ratios:
 - BLACK strategy: minimum 2.0:1 (counter-trend requires higher R:R)
 - GREEN strategy: minimum 2.0:1 (potential up to 10:1, best R:R of all strategies)
 
-Drawdown Management (Fixed Levels Method):
+Drawdown Management (Fixed Levels Method — from Trading Plan PDF Excel):
 - Normal: 1.0% risk per trade
-- Mentorship reference levels: -5% -> 0.75%, -7.5% -> 0.50%, -10% -> 0.25%
-- Trading Plan PDF calculated levels (4 trades * 1.03% avg loss): -4.12% -> 0.75%, -6.18% -> 0.50%, -8.23% -> 0.25%
-- App uses the PDF calculated levels as they are more precise; both are valid approaches
+- Calculated from 4 trades * 1.03% avg loss: -4.12% DD -> reduce to 0.75%, -6.18% DD -> 0.50%, -8.23% DD -> 0.25%
+- These are the EXACT values from the mentorship Excel calculation
 
 Delta Risk Algorithm (Winning Streaks):
 - Parameter: 0.60 (range 0.20-0.90, lower = more aggressive, 0.20 = most aggressive, 0.90 = most conservative)

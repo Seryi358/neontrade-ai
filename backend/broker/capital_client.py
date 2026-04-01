@@ -243,6 +243,12 @@ class CapitalClient(BaseBroker):
                             retry_after = float(retry_after_hdr)
                         except (ValueError, TypeError):
                             retry_after = None
+                # Clear session on 401 so _ensure_session re-authenticates
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 401:
+                    self._cst = None
+                    self._security_token = None
+                    self._session_time = None
+                    logger.warning(f"[_get] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 3:
                     delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 10.0)
                     logger.debug(f"[_get] {path} attempt {attempt+1}/4 failed: {e}. Retry in {delay:.1f}s")
@@ -273,6 +279,12 @@ class CapitalClient(BaseBroker):
                 return resp
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
+                # Clear session on 401 so _ensure_session re-authenticates
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 401:
+                    self._cst = None
+                    self._security_token = None
+                    self._session_time = None
+                    logger.warning(f"[_post] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
                     delay = min(0.5 * (2 ** attempt), 10.0)
                     logger.debug(f"[_post] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")

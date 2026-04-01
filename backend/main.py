@@ -192,8 +192,8 @@ async def _periodic_cleanup():
 
         # DB retention cleanup — once per day
         try:
-            from datetime import datetime
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            from datetime import datetime, timezone as tz
+            today = datetime.now(tz.utc).strftime("%Y-%m-%d")
             if db is not None and today != _last_db_cleanup_date:
                 await db.cleanup_old_data(days=90)
                 _last_db_cleanup_date = today

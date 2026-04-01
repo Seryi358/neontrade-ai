@@ -321,7 +321,7 @@ export const api = {
 
   // Profiles
   getProfiles: () => apiGet<any>('/api/v1/profiles'),
-  applyProfile: (name: string) => apiPost<any>('/api/v1/profiles/apply', { profile: name }),
+  applyProfile: (name: string) => apiPost<any>('/api/v1/profiles/apply', { profile_id: name }),
 
   // Journal
   getJournalStats: () => apiGet<any>('/api/v1/journal/stats'),

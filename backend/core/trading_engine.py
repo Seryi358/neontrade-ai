@@ -82,7 +82,7 @@ class PendingSetup:
     entry_price: float
     stop_loss: float
     take_profit: float
-    units: int
+    units: float  # float for crypto fractional lots (e.g. 0.001 BTC)
     confidence: float
     risk_reward_ratio: float
     reasoning: str  # Spanish explanation
@@ -1015,7 +1015,7 @@ class TradingEngine:
                                 pnl_dollars=pnl_dollars,
                                 entry_price=pos.entry_price,
                                 exit_price=close_price,
-                                strategy=getattr(pos, 'strategy', 'UNKNOWN'),
+                                strategy=getattr(pos, 'strategy_variant', 'UNKNOWN'),
                                 direction=pos.direction,
                             )
                         except Exception as je:
@@ -1066,8 +1066,13 @@ class TradingEngine:
             # Feed latest EMA values to position manager for trailing
             for inst in instruments:
                 if inst in self._last_scan_results:
-                    emas = self._last_scan_results[inst].ema_values
-                    self.position_manager.set_ema_values(inst, emas)
+                    result = self._last_scan_results[inst]
+                    self.position_manager.set_ema_values(inst, result.ema_values)
+                    # Feed swing data for Phase 1 structural SL movement
+                    swing_highs = getattr(result, 'swing_highs', [])
+                    swing_lows = getattr(result, 'swing_lows', [])
+                    if swing_highs or swing_lows:
+                        self.position_manager.set_swing_data(inst, swing_highs, swing_lows)
 
             prices = await self.broker.get_prices_bulk(instruments)
             await self.position_manager.update_all_positions(prices)
@@ -2353,7 +2358,8 @@ class TradingEngine:
             "open_positions": len(self.position_manager.positions),
             "total_risk": self.risk_manager.get_current_total_risk(),
             "watchlist_count": len(settings.forex_watchlist),
-            "pending_setups_count": pending_count,
+            "pending_setups": pending_count,
+            "pending_setups_count": pending_count,  # Alias for backwards compat
             "enabled_strategies": self._enabled_strategies,
             "daily_activity": {
                 "date": self._daily_counter_date,

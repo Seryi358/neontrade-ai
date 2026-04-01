@@ -109,7 +109,7 @@ const _formatHours = (config: Record<string, number>) => [
   { label: 'London + NY', value: `${String(config.trading_start_hour ?? 7).padStart(2, '0')}:00 - ${String(config.trading_end_hour ?? 21).padStart(2, '0')}:00 UTC` },
   { label: 'Cierre Viernes', value: `${String(config.close_before_friday_hour ?? 20).padStart(2, '0')}:00 UTC` },
   { label: 'Sin Nuevas (Vie)', value: `${String(config.no_new_trades_friday_hour ?? 18).padStart(2, '0')}:00 UTC` },
-  { label: 'Evitar Noticias', value: `${config.news_avoidance_minutes ?? 30} min` },
+  { label: 'Evitar Noticias', value: `${config.avoid_news_minutes_before ?? 30} min antes / ${config.avoid_news_minutes_after ?? 15} min después` },
 ];
 
 // ── Safe localStorage helper (fixes crash on native) ───

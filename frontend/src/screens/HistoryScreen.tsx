@@ -128,8 +128,8 @@ export default function HistoryScreen() {
   const renderPerformanceSummary = () => {
     if (!stats) return null;
 
-    const avgRR = stats.total_pnl !== 0 && stats.total_trades > 0
-      ? (stats.best_trade / Math.abs(stats.worst_trade)).toFixed(2)
+    const avgRR = stats.avg_risk_reward && stats.avg_risk_reward > 0
+      ? stats.avg_risk_reward.toFixed(2)
       : '---';
 
     return (

@@ -5,8 +5,10 @@ services:
     restart: always
     ports:
       - "8000:8000"
-    env_file:
-      - backend/.env
+    # EasyPanel injects env vars directly — no .env file needed in container
+    # For local dev, create backend/.env and uncomment:
+    # env_file:
+    #   - backend/.env
     volumes:
       - neontrade-data:/app/data
       - neontrade-logs:/app/logs

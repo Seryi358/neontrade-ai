@@ -212,7 +212,7 @@ export default function DashboardScreen() {
     >
       {/* ── HUD Header ─────────────────────────────────── */}
       <HUDHeader title="COMMAND CENTER // HQ" subtitle={
-        `${new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} UTC`
+        `${new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC`
       } />
 
       {/* Error banner */}

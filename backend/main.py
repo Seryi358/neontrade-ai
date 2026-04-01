@@ -404,6 +404,7 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host=settings.app_host,

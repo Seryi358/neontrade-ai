@@ -178,7 +178,8 @@ class MarketAnalyzer:
                 # Weekly DF has time in the index (set_index("time") during _candles_to_dataframe)
                 # so use the index directly for month grouping
                 if isinstance(w_copy.index, pd.DatetimeIndex):
-                    w_copy["month"] = w_copy.index.to_period("M")
+                    # Strip timezone before converting to Period to avoid pandas warning
+                    w_copy["month"] = w_copy.index.tz_localize(None).to_period("M") if w_copy.index.tz else w_copy.index.to_period("M")
                 elif "date" in w_copy.columns:
                     w_copy["month"] = pd.to_datetime(w_copy["date"]).dt.to_period("M")
                 else:

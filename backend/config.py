@@ -92,13 +92,15 @@ class Settings(BaseSettings):
     # Minimum reward:risk ratio to TP1 (ch22.1 Trading Plan)
     # Trading Plan PDF: R:R mínimo 0.80:1 con 61% win rate (Alex experimentado)
     # Mentoría ch18.3: R:R referencia ~2.5:1 con 30% win rate → breakeven con 1% riesgo
-    # Rango target: 1.5:1 a 2.5:1 (Alex: "Perfectamente puede ser un 2. Dos y medio, tres")
-    # Default 1.5:1 as balanced starting point; adjust based on win rate
+    # Trading Plan PDF: Alex uses 0.80:1 minimum to TP1 (with 61% win rate)
+    # Default 1.5:1 is more conservative for users with unknown win rate.
+    # Adjust down to 0.80 once you achieve 60%+ win rate over 100+ trades.
     min_rr_ratio: float = 1.5
     min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R (mentoría explícita)
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R (mentoría explícita)
     min_rr_blue_c: float = 2.0  # Blue C requires min 2:1 R:R (mentorship: "minimo 2 a 1, incluso 3 a 1")
-    min_confluence_points: int = 2  # Minimum positive confluence points required (mentorship doesn't specify 3)
+    min_confluence_points: int = 2  # Market orders: 2 levels. Limit orders: Trading Plan PDF says 3 (Fib+EMA+S/R)
+    min_confluence_limit_order: int = 3  # Limit order convergence: 3 levels required (Trading Plan PDF)
 
     # Reference benchmarks from ch18.3 Regla del 1%:
     # - Win rate target de referencia: 30% (con R:R 2.5:1 y 1% riesgo = ~breakeven)

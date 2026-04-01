@@ -86,6 +86,9 @@ class PendingSetup:
     confidence: float
     risk_reward_ratio: float
     reasoning: str  # Spanish explanation
+    take_profit_max: Optional[float] = None  # Extended TP for HTF "run" context
+    trailing_tp_only: bool = False  # True for crypto GREEN: use EMA 50 trailing, not hard TP1
+    strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED"
     status: str = "pending"  # "pending", "approved", "rejected", "expired"
     expires_at: str = ""
 
@@ -885,6 +888,14 @@ class TradingEngine:
                     pos = self.position_manager.positions.pop(trade_id, None)
                     if pos:
                         self.risk_manager.unregister_trade(trade_id, pos.instrument)
+                    # Record trade result for delta/reentry tracking
+                    if current and entry:
+                        direction = getattr(trade, 'direction', 'BUY')
+                        pnl_raw = (current - entry) if direction == "BUY" else (entry - current)
+                        balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
+                        self.risk_manager.record_trade_result(
+                            trade_id or "", instrument, pnl_raw / balance if balance > 0 else 0.0
+                        )
                     closed += 1
                     logger.info(f"Friday close: Closed {instrument} (near {close_reason})")
                     # Persist close to DB with PnL
@@ -892,7 +903,7 @@ class TradingEngine:
                         try:
                             direction = getattr(trade, 'direction', 'BUY')
                             pnl_val = (current - entry) if direction == "BUY" else (entry - current)
-                            units = abs(getattr(trade, 'units', 0) or getattr(pos, 'units', 0) if pos else 0)
+                            units = abs(getattr(trade, 'units', 0) or (getattr(pos, 'units', 0) if pos else 0))
                             await self._db.update_trade(trade_id, {
                                 "status": f"closed_friday_{close_reason.lower()}",
                                 "closed_at": datetime.now(timezone.utc).isoformat(),
@@ -940,6 +951,9 @@ class TradingEngine:
                     price_diff = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
                     pnl = price_diff * abs(pos.units) if pos.units != 0 else price_diff
                     self.risk_manager.record_funded_pnl(pnl)
+                    # Record trade result for delta/reentry tracking
+                    balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
+                    self.risk_manager.record_trade_result(tid, pos.instrument, pnl / balance if balance > 0 else 0.0)
 
                     if self._db:
                         await self._db.update_trade(tid, {
@@ -992,6 +1006,11 @@ class TradingEngine:
                         pnl_dollars = price_diff * abs(pos.units) if pos.units != 0 else price_diff
                     except Exception as e:
                         logger.debug(f"Failed to get close price for {tid}: {e}")
+
+                    # Record trade result for delta algorithm, win rate, and reentry tracking
+                    balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
+                    pnl_pct = pnl_dollars / balance if balance > 0 else 0.0
+                    self.risk_manager.record_trade_result(tid, pos.instrument, pnl_pct)
 
                     # Record funded PnL from externally closed position
                     if settings.funded_account_mode:
@@ -1264,11 +1283,15 @@ class TradingEngine:
                 self._latest_explanations[instrument] = explanation
                 logger.debug(f"Initial scan: {instrument} score={analysis.score:.0f}")
 
-                # Also detect setups during initial scan
-                setup = await self._detect_setup(analysis)
-                if setup:
-                    setups_found += 1
-                    await self._handle_setup(setup, analysis, explanation)
+                # Also detect setups during initial scan — but respect trading guards
+                now = datetime.now(timezone.utc)
+                market_open = self._is_market_open(now)
+                friday_block = self._is_friday_no_new_trades(now)
+                if market_open and not friday_block:
+                    setup = await self._detect_setup(analysis)
+                    if setup:
+                        setups_found += 1
+                        await self._handle_setup(setup, analysis, explanation)
 
             except Exception as e:
                 logger.warning(f"Initial scan failed for {instrument}: {e}")
@@ -1865,6 +1888,9 @@ class TradingEngine:
             confidence=setup.reward_risk_ratio * 33,  # Heuristic confidence
             risk_reward_ratio=setup.reward_risk_ratio,
             reasoning=reasoning,
+            take_profit_max=setup.take_profit_max,
+            trailing_tp_only=setup.trailing_tp_only,
+            strategy_variant=setup.strategy_variant,
             status="pending",
             expires_at=expires_at.isoformat(),
         )
@@ -2153,10 +2179,12 @@ class TradingEngine:
             units=setup.units,
             stop_loss=setup.stop_loss,
             take_profit_1=setup.take_profit,
-            take_profit_max=None,
+            take_profit_max=setup.take_profit_max,
             reward_risk_ratio=setup.risk_reward_ratio,
             entry_price=current_price,
             direction=setup.direction,
+            trailing_tp_only=setup.trailing_tp_only,
+            strategy_variant=setup.strategy_variant,
         )
 
         await self._execute_setup(trade_risk)

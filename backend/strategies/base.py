@@ -4383,16 +4383,15 @@ def _apply_elliott_wave_priority(
         return setups
 
     # Define confidence bonuses/penalties per wave
-    # GREEN removed from wave mappings: it's crypto-only, not wave-specific.
+    # Trading Plan PDF: GREEN applies in Day Trading for impulsive waves (1, 3, 5)
     # BLACK has highest score in Wave 1 (counter-trend anticipation).
     # Wave 5 primarily favors PINK (designed for Wave 4->5).
-    # WHITE added to wave mappings where appropriate.
     wave_bonuses: Dict[str, Dict[str, float]] = {
-        "1": {"BLACK": 12},
+        "1": {"BLACK": 12, "GREEN": 8},
         "2": {"BLUE": 8, "WHITE": 3},
-        "3": {"RED": 10, "BLUE": 5, "WHITE": 5},
+        "3": {"RED": 10, "BLUE": 5, "WHITE": 5, "GREEN": 8},
         "4": {"PINK": 8, "BLUE": 5, "WHITE": 3},
-        "5": {"PINK": 10, "RED": 5, "WHITE": 8},
+        "5": {"PINK": 10, "RED": 5, "WHITE": 8, "GREEN": 8},
         "A": {"BLACK": 5},
         "B": {"BLACK": 5},
         "C": {"BLACK": 5},

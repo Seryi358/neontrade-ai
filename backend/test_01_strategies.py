@@ -145,27 +145,29 @@ check("Wave 3: BLUE gets +5 bonus", blue_w3.confidence == 75, f"got {blue_w3.con
 
 # GREEN should NOT appear in any non-crypto wave bonuses
 # GREEN is crypto-only and excluded from wave mappings
-# Test: If GREEN signal goes through _apply_elliott_wave_priority, it should get penalty (not bonus)
+# Test: GREEN gets wave bonus in impulsive waves (1, 3, 5) per Trading Plan PDF
 analysis_w3_green = make_mock_analysis("3")
 signals_w3_green = [make_mock_signal(StrategyColor.GREEN, 70)]
 result_w3_green = _apply_elliott_wave_priority(analysis_w3_green, signals_w3_green)
 green_w3 = result_w3_green[0]
-# GREEN should get default penalty for wave 3 which is 0
-check("Wave 3: GREEN gets no bonus (penalty 0)", green_w3.confidence == 70, f"got {green_w3.confidence}")
+# GREEN should get +8 bonus in Wave 3 (Trading Plan PDF: "GREEN en Day Trading")
+check("Wave 3: GREEN gets +8 bonus", green_w3.confidence == 78, f"got {green_w3.confidence}")
 
-# Check GREEN is not in wave_bonuses
+# Check GREEN is in impulsive wave bonuses (1, 3, 5) but not corrective (2, 4, A, B, C)
 wave_bonuses = {
-    "1": {"BLACK": 12},
+    "1": {"BLACK": 12, "GREEN": 8},
     "2": {"BLUE": 8, "WHITE": 3},
-    "3": {"RED": 10, "BLUE": 5, "WHITE": 5},
+    "3": {"RED": 10, "BLUE": 5, "WHITE": 5, "GREEN": 8},
     "4": {"PINK": 8, "BLUE": 5, "WHITE": 3},
-    "5": {"PINK": 10, "RED": 5, "WHITE": 8},
+    "5": {"PINK": 10, "RED": 5, "WHITE": 8, "GREEN": 8},
     "A": {"BLACK": 5},
     "B": {"BLACK": 5},
     "C": {"BLACK": 5},
 }
-for wave, bonuses in wave_bonuses.items():
-    check(f"Wave {wave}: GREEN not in bonuses", "GREEN" not in bonuses)
+for wave in ("1", "3", "5"):
+    check(f"Wave {wave}: GREEN in bonuses (Trading Plan PDF)", "GREEN" in wave_bonuses[wave])
+for wave in ("2", "4", "A", "B", "C"):
+    check(f"Wave {wave}: GREEN not in bonuses", "GREEN" not in wave_bonuses[wave])
 
 print(f"\n{'=' * 60}")
 print(f"TEST 1 RESULTS: {passed} passed, {failed} failed")

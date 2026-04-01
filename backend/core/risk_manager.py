@@ -486,6 +486,24 @@ class RiskManager:
             logger.debug(f"Position size too small for {instrument}: {units} units")
             return 0  # Cannot trade with 0, negative, or negligible units
 
+        # Enforce minimum deal size per broker requirements
+        # Capital.com CFDs: forex typically requires 1000+ units (0.01 lot)
+        # Crypto CFDs: typically allow fractional (0.01+)
+        from strategies.base import _is_crypto_instrument
+        if _is_crypto_instrument(instrument):
+            min_units = 0.01  # Crypto: very small minimum
+        elif any(instrument.upper().endswith(s) for s in ("_JPY", "_CHF", "JPY", "CHF")):
+            min_units = 100  # JPY/CHF crosses: 100 units minimum on Capital.com
+        else:
+            min_units = 1000  # Standard forex: 1000 units (0.01 lot)
+
+        if abs(units) < min_units:
+            logger.warning(
+                f"Position size {units:.2f} below broker minimum {min_units} for {instrument}. "
+                f"Account too small for this instrument at current risk level."
+            )
+            return 0
+
         # Cap maximum position size to prevent broker rejections
         MAX_UNITS = 10_000_000
         if abs(units) > MAX_UNITS:

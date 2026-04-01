@@ -1341,7 +1341,6 @@ class TradingEngine:
         if consecutive_losses >= settings.cooldown_after_consecutive_losses:
             last_loss_time = getattr(self, '_last_loss_time', None)
             if last_loss_time:
-                from datetime import timezone
                 now_utc = datetime.now(timezone.utc)
                 elapsed = (now_utc - last_loss_time).total_seconds() / 60
                 if elapsed < settings.cooldown_minutes:
@@ -2253,7 +2252,7 @@ class TradingEngine:
                     trades_today=today_trades,
                     account_summary={"balance": account.balance, "currency": account.currency} if account else {},
                     scan_results={
-                        inst: {"score": r.score, "htf_trend": r.htf_trend.value}
+                        inst: {"score": r.score, "htf_trend": r.htf_trend.value if hasattr(r.htf_trend, 'value') else str(r.htf_trend)}
                         for inst, r in self._last_scan_results.items()
                     },
                     pending_setups=[],
@@ -2481,8 +2480,8 @@ class TradingEngine:
             "last_scan": {
                 inst: {
                     "score": result.score,
-                    "htf_trend": result.htf_trend.value,
-                    "ltf_trend": result.ltf_trend.value,
+                    "htf_trend": result.htf_trend.value if hasattr(result.htf_trend, 'value') else str(result.htf_trend),
+                    "ltf_trend": result.ltf_trend.value if hasattr(result.ltf_trend, 'value') else str(result.ltf_trend),
                     "convergence": result.htf_ltf_convergence,
                     "patterns": result.candlestick_patterns,
                 }

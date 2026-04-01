@@ -697,14 +697,6 @@ async def get_current_broker():
                 "implemented": True,
             },
             {
-                "id": "oanda",
-                "name": "OANDA (deprecated, out of scope)",
-                "description": "Broker regulado, popular para Forex. API robusta.",
-                "safe_in_colombia": True,
-                "demo_available": True,
-                "implemented": False,
-            },
-            {
                 "id": "icmarkets",
                 "name": "IC Markets",
                 "description": "ECN broker australiano con spreads bajos.",
@@ -727,13 +719,13 @@ async def get_current_broker():
 @router.post("/broker")
 async def set_broker(request: BrokerSelectionRequest):
     """Switch the active broker. Requires restart to take effect."""
-    supported = {"oanda", "capital", "ibkr"}
+    supported = {"capital", "ibkr"}
     if request.broker.lower() not in supported:
         raise HTTPException(
             501,
             f"Broker '{request.broker}' aún no está implementado. "
-            f"Disponibles: OANDA, Capital.com. "
-            f"TagMarkets e IC Markets estarán disponibles próximamente.",
+            f"Disponibles: Capital.com, IBKR. "
+            f"IC Markets y Pepperstone estarán disponibles próximamente.",
         )
     return {
         "broker": request.broker,

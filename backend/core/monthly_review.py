@@ -641,12 +641,12 @@ class MonthlyReviewGenerator:
         # Win rate analysis
         if report.win_rate_excl_be < 0.50:
             recs.append(
-                "Win rate below 50%. Review entry criteria and confluence requirements."
+                "Win rate por debajo del 50%. Revisa criterios de entrada y confluencias."
             )
         elif report.win_rate_excl_be >= 0.65:
             recs.append(
-                "Excellent win rate! Consider if risk can be slightly increased "
-                "via Delta algorithm."
+                "Excelente win rate! Considera si el riesgo puede aumentarse "
+                "ligeramente con el algoritmo Delta."
             )
 
         # Best / worst strategy
@@ -659,14 +659,14 @@ class MonthlyReviewGenerator:
             )
             if best[1]["pnl"] > 0:
                 recs.append(
-                    f"Best performing strategy: {best[0]} "
-                    f"(P&L: ${best[1]['pnl']:.2f}). Focus on similar setups."
+                    f"Mejor estrategia: {best[0]} "
+                    f"(P&L: ${best[1]['pnl']:.2f}). Enfócate en setups similares."
                 )
             if worst[1]["pnl"] < 0:
                 recs.append(
-                    f"Worst performing strategy: {worst[0]} "
+                    f"Peor estrategia: {worst[0]} "
                     f"(P&L: ${worst[1]['pnl']:.2f}). "
-                    f"Review if conditions are being met strictly."
+                    f"Revisa si las condiciones se están cumpliendo estrictamente."
                 )
 
         # Day analysis
@@ -676,8 +676,8 @@ class MonthlyReviewGenerator:
             )
             if worst_day[1]["pnl"] < 0:
                 recs.append(
-                    f"Worst day: {worst_day[0]}. "
-                    f"Consider reducing exposure on this day."
+                    f"Peor día: {worst_day[0]}. "
+                    f"Considera reducir la exposición en este día."
                 )
 
         # Session analysis
@@ -686,7 +686,7 @@ class MonthlyReviewGenerator:
                 report.by_session.items(), key=lambda x: x[1].get("pnl", 0)
             )
             recs.append(
-                f"Best session: {best_session[0]} "
+                f"Mejor sesión: {best_session[0]} "
                 f"({best_session[1]['trades']} trades, "
                 f"${best_session[1]['pnl']:.2f})."
             )
@@ -695,35 +695,35 @@ class MonthlyReviewGenerator:
         if report.discretionary_trades > 0 and report.systematic_trades > 0:
             if report.discretionary_win_rate < report.systematic_win_rate - 0.1:
                 recs.append(
-                    "Discretionary trades underperforming systematic ones. "
-                    "Stick more closely to the system."
+                    "Los trades discrecionales rinden menos que los sistemáticos. "
+                    "Sigue el sistema más de cerca."
                 )
             elif report.discretionary_win_rate > report.systematic_win_rate + 0.1:
                 recs.append(
-                    "Discretionary decisions adding value. "
-                    "Document the patterns for future integration."
+                    "Las decisiones discrecionales están aportando valor. "
+                    "Documenta los patrones para futura integración."
                 )
 
         # Profit factor
         if 0 < report.profit_factor < 1.2:
             recs.append(
-                "Profit factor is thin. Tighten SL or improve entry timing "
-                "to increase average win."
+                "Profit factor ajustado. Ajusta el SL o mejora el timing de entrada "
+                "para aumentar la ganancia promedio."
             )
 
         # Drawdown
         if report.max_drawdown_pct > 5.0:
             recs.append(
-                f"Max drawdown reached {report.max_drawdown_pct:.1f}%. "
-                f"Review risk sizing and consider using Fixed Levels method."
+                f"Max drawdown alcanzó {report.max_drawdown_pct:.1f}%. "
+                f"Revisa el tamaño de riesgo y considera usar el método de Niveles Fijos."
             )
 
         # Losing streak warning
         if report.max_losing_streak >= 4:
             recs.append(
-                f"Max losing streak of {report.max_losing_streak} trades. "
-                f"Ensure the DD protection protocol pauses trading after 3 "
-                f"consecutive losses as per the plan."
+                f"Racha de {report.max_losing_streak} pérdidas consecutivas. "
+                f"Asegúrate de que el protocolo de DD pause el trading después de 3 "
+                f"pérdidas consecutivas según el plan."
             )
 
         # Emotional patterns
@@ -731,8 +731,8 @@ class MonthlyReviewGenerator:
             for pattern in report.emotional_patterns:
                 if "revenge" in pattern.lower():
                     recs.append(
-                        "Eliminate revenge trading. Add a mandatory cooldown "
-                        "period after losses."
+                        "Elimina el revenge trading. Añade un período de enfriamiento "
+                        "obligatorio después de pérdidas."
                     )
                     break
 

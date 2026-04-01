@@ -10,7 +10,7 @@ import os
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    # Active broker: "ibkr", "capital", or "oanda"
+    # Active broker: "ibkr" or "capital" (OANDA removed — out of scope per PROJECT.md)
     active_broker: str = "capital"
 
     # Interactive Brokers (IBKR) - Web API OAuth 1.0a
@@ -26,11 +26,6 @@ class Settings(BaseSettings):
     capital_identifier: str = ""  # email address
     capital_environment: str = "demo"  # "demo" or "live"
     capital_account_id: str = ""  # specific account ID (empty = auto-detect real account)
-
-    # OANDA (alternative)
-    oanda_api_key: str = ""
-    oanda_account_id: str = ""
-    oanda_environment: str = "practice"  # "practice" or "live"
 
     # OpenAI
     openai_api_key: str = ""
@@ -783,23 +778,3 @@ def apply_trading_profile(profile_id: str) -> dict:
             json.dump(existing, f, indent=2)
 
     return applied
-
-
-# ── OANDA API URLs ───────────────────────────────────────────────
-OANDA_API_URL = {
-    "practice": "https://api-fxpractice.oanda.com",
-    "live": "https://api-fxtrade.oanda.com",
-}
-
-OANDA_STREAM_URL = {
-    "practice": "https://stream-fxpractice.oanda.com",
-    "live": "https://stream-fxtrade.oanda.com",
-}
-
-
-def get_oanda_url() -> str:
-    return OANDA_API_URL.get(settings.oanda_environment, OANDA_API_URL["practice"])
-
-
-def get_oanda_stream_url() -> str:
-    return OANDA_STREAM_URL.get(settings.oanda_environment, OANDA_STREAM_URL["practice"])

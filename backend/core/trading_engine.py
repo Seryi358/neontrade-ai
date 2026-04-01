@@ -979,6 +979,33 @@ class TradingEngine:
             broker_ids = {t.trade_id for t in broker_trades}
             tracked_ids = set(self.position_manager.positions.keys())
 
+            # Adopt positions that exist at the broker but aren't tracked
+            # (opened externally, or app restarted with open positions)
+            new_ids = broker_ids - tracked_ids
+            for trade in broker_trades:
+                if trade.trade_id in new_ids:
+                    from core.position_manager import ManagedPosition, PositionPhase
+                    pos = ManagedPosition(
+                        trade_id=trade.trade_id,
+                        instrument=trade.instrument,
+                        direction=trade.direction,
+                        entry_price=trade.entry_price,
+                        original_sl=trade.stop_loss or trade.entry_price,
+                        current_sl=trade.stop_loss or trade.entry_price,
+                        take_profit_1=trade.take_profit or trade.entry_price,
+                        units=trade.units or 0,
+                        style=settings.trading_style,
+                    )
+                    self.position_manager.positions[trade.trade_id] = pos
+                    self.risk_manager.register_trade(
+                        trade.trade_id, trade.instrument, settings.risk_day_trading
+                    )
+                    logger.info(
+                        f"Adopted broker position: {trade.trade_id} | "
+                        f"{trade.instrument} {trade.direction} | "
+                        f"entry={trade.entry_price} units={trade.units}"
+                    )
+
             # Remove positions that no longer exist at the broker
             closed_ids = tracked_ids - broker_ids
             for tid in closed_ids:

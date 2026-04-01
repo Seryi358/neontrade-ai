@@ -852,10 +852,7 @@ class IBKRClient(BaseBroker):
             f"trade_id={trade_id}, requested_sl={stop_loss}. "
             f"Please adjust the stop-loss manually in Trader Workstation."
         )
-        raise NotImplementedError(
-            "IBKR REST API does not support SL modification on open positions. "
-            "Use Trader Workstation or the Client Portal to adjust stop-loss orders."
-        )
+        return False
 
     async def modify_trade_tp(self, trade_id: str, take_profit: float) -> bool:
         """Modify take profit on an existing trade.
@@ -874,10 +871,7 @@ class IBKRClient(BaseBroker):
             f"trade_id={trade_id}, requested_tp={take_profit}. "
             f"Please adjust the take-profit manually in Trader Workstation."
         )
-        raise NotImplementedError(
-            "IBKR REST API does not support TP modification on open positions. "
-            "Use Trader Workstation or the Client Portal to adjust take-profit orders."
-        )
+        return False
 
     async def close_trade(self, trade_id: str) -> bool:
         """Close a specific position by placing an opposite market order."""

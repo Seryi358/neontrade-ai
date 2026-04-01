@@ -205,20 +205,17 @@ class NewsFilter:
             time_until = (event.time - now).total_seconds() / 60  # minutes
             time_since = (now - event.time).total_seconds() / 60
 
-            # Within the danger zone?
+            # Within the danger zone (before or after the event)?
             if -win_after <= time_until <= win_before:
+                # Distinguish "upcoming" vs "just happened" for clearer messaging
+                if time_until >= 0:
+                    timing = f"in {time_until:.0f}min @ {event.time.strftime('%H:%M')} UTC"
+                else:
+                    timing = f"just happened @ {event.time.strftime('%H:%M')} UTC ({time_since:.0f}min ago)"
                 reason = self._style_reason(style, event)
                 desc = (
                     f"[{style.value.upper()}] {event.currency} {event.title} "
-                    f"@ {event.time.strftime('%H:%M')} UTC — {reason}"
-                )
-                return True, desc
-
-            if 0 <= time_since <= win_after:
-                reason = self._style_reason(style, event)
-                desc = (
-                    f"[{style.value.upper()}] {event.currency} {event.title} "
-                    f"(just happened @ {event.time.strftime('%H:%M')} UTC) — {reason}"
+                    f"({timing}) — {reason}"
                 )
                 return True, desc
 

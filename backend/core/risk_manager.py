@@ -461,7 +461,7 @@ class RiskManager:
         if balance <= 0:
             return 0
 
-        risk_percent = self.get_risk_for_style(style)
+        risk_percent = self.get_risk_for_style(style, instrument)
         risk_percent = self._adjust_for_correlation(instrument, risk_percent)
 
         risk_amount = balance * risk_percent

@@ -472,7 +472,8 @@ class AlertManager:
             logger.warning("Telegram alert skipped – missing bot_token or chat_id")
             return
 
-        text = f"<b>{_strip_emoji_tags(title)}</b>\n\n{body}"
+        clean_body = _html_to_telegram(body)
+        text = f"<b>{_strip_emoji_tags(title)}</b>\n\n{clean_body}"
         url = TELEGRAM_API.format(token=token)
 
         resp = await self._get_http().post(
@@ -647,9 +648,27 @@ def _strip_emoji_tags(text: str) -> str:
     return text
 
 
+def _html_to_telegram(html: str) -> str:
+    """Strip tags unsupported by Telegram Bot API HTML mode.
+
+    Telegram only supports: <b>, <i>, <u>, <s>, <code>, <pre>, <a>, <tg-spoiler>, <blockquote>.
+    All <span> and style attributes must be stripped. Keep text content.
+    """
+    import re
+    # Remove <span ...> opening tags (keep inner text)
+    result = re.sub(r'<span[^>]*>', '', html)
+    # Remove </span> closing tags
+    result = result.replace('</span>', '')
+    return result
+
+
 def _html_to_discord_md(html: str) -> str:
     """Minimal HTML-to-Discord-Markdown conversion."""
+    import re
     md = html
+    # Strip <span> tags first (keep inner text)
+    md = re.sub(r'<span[^>]*>', '', md)
+    md = md.replace('</span>', '')
     md = md.replace("<b>", "**").replace("</b>", "**")
     md = md.replace("<i>", "*").replace("</i>", "*")
     md = md.replace("<code>", "`").replace("</code>", "`")

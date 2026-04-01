@@ -492,6 +492,7 @@ class TradeJournal:
         management_correct: Optional[bool] = None,
         would_enter_again: Optional[bool] = None,
         lessons: Optional[str] = None,
+        error_type: Optional[str] = None,  # ASR error taxonomy: PERCEPTION, TECHNICAL, ROUTINE, EMOTIONAL
     ) -> bool:
         """Fill in the ASR (Auto Self Review) checklist for a completed trade.
 
@@ -520,6 +521,8 @@ class TradeJournal:
                     trade["asr_would_enter_again"] = would_enter_again
                 if lessons is not None:
                     trade["asr_lessons"] = lessons
+                if error_type is not None:
+                    trade["asr_error_type"] = error_type
                 trade["asr_completed"] = True
 
                 # Freshness check: Alex recommends journaling "del mismo momento"
@@ -782,6 +785,7 @@ class TradeJournal:
                     trade.setdefault("asr_management_correct", None)
                     trade.setdefault("asr_would_enter_again", None)
                     trade.setdefault("asr_lessons", "")
+                    trade.setdefault("asr_error_type", None)
                 self._current_balance = data.get("current_balance", self._initial_capital)
                 self._peak_balance = data.get("peak_balance", self._initial_capital)
                 self._max_drawdown_pct = data.get("max_drawdown_pct", 0.0)

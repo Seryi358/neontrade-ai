@@ -470,10 +470,10 @@ async def get_all_analyses():
 async def get_watchlist():
     """Get watchlist with latest scan results."""
     from main import engine
-    from config import settings
+    from config import settings, get_active_watchlist
 
     watchlist = []
-    for instrument in settings.forex_watchlist:
+    for instrument in get_active_watchlist():
         entry = {
             "instrument": instrument,
             "score": 0,

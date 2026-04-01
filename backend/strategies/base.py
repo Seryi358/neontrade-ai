@@ -274,11 +274,13 @@ def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
 
     if direction == "BUY":
         step2 = close_price > ema_val  # Closed above EMA
-        step3 = confirm_current > confirm_open  # Current candle is bullish (continuing up)
+        # Step 3: confirmation candle must be bullish AND also close past the EMA
+        # Mentorship: "rompemos, cierre, y la siguiente vela CONTINUA" — must continue past the level
+        step3 = confirm_current > confirm_open and confirm_current > ema_val
         return step2 and step3
     else:
         step2 = close_price < ema_val  # Closed below EMA
-        step3 = confirm_current < confirm_open  # Current candle is bearish (continuing down)
+        step3 = confirm_current < confirm_open and confirm_current < ema_val
         return step2 and step3
 
 

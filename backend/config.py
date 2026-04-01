@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # 0.5% (NeonTrade AI default; workshop defers exact %)
-    risk_swing: float = 0.01             # 1% — NON-NEGOTIABLE per mentorship ("la regla del 1% es innegociable")
+    risk_swing: float = 0.01             # 1% default (Alex's Trading Plan uses 3% for swing; adjustable via API)
     max_total_risk: float = 0.07          # 7% max simultaneous open risk
 
     # Correlated pairs risk reduction (ch18.3)

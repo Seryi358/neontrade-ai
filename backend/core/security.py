@@ -177,7 +177,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, security_config: SecurityConfig):
         super().__init__(app)
         self.config = security_config
-        self.rate_limiter = RateLimiter()
+        self.rate_limiter = rate_limiter  # Use module-level singleton for cleanup access
 
     async def dispatch(self, request: Request, call_next):
         client_ip = self._get_client_ip(request)
@@ -264,6 +264,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 # ── Singleton ────────────────────────────────────────────────────
 
 security_config = SecurityConfig()
+
+# Module-level rate limiter instance for periodic cleanup from main.py
+rate_limiter = RateLimiter()
 
 # Auto-register API key from env (API_SECRET_KEY) if no keys exist yet
 def _bootstrap_env_key():

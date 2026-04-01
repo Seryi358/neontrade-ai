@@ -29,7 +29,7 @@ from core.explanation_engine import ExplanationEngine, StrategyExplanation
 from core.news_filter import NewsFilter
 from core.trade_journal import TradeJournal
 from strategies.base import get_best_setup, SetupSignal
-from config import settings
+from config import settings, get_active_watchlist
 from core.resilience import broker_circuit_breaker
 
 try:
@@ -521,7 +521,7 @@ class TradingEngine:
             return
 
         self._running = True
-        logger.info(f"Watching {len(settings.forex_watchlist)} pairs")
+        logger.info(f"Watching {len(get_active_watchlist())} pairs")
         logger.info(f"Scan interval: {self._scan_interval}s")
 
         # Send startup alert
@@ -531,7 +531,7 @@ class TradingEngine:
                     "STARTED",
                     f"NeonTrade AI engine started. Mode: {self.mode.value}. "
                     f"Broker: {broker_name}. Balance: {balance} {currency}. "
-                    f"Watching {len(settings.forex_watchlist)} pairs.",
+                    f"Watching {len(get_active_watchlist())} pairs.",
                 )
             except Exception:
                 pass
@@ -547,7 +547,7 @@ class TradingEngine:
         # burst API calls during the scan
         if hasattr(self.broker, 'warm_epic_cache'):
             try:
-                await self.broker.warm_epic_cache(settings.forex_watchlist)
+                await self.broker.warm_epic_cache(get_active_watchlist())
             except Exception as e:
                 logger.warning(f"Epic cache warmup failed (non-critical): {e}")
 
@@ -635,9 +635,12 @@ class TradingEngine:
                     )
                     # Continue to normal scan — swing is allowed during news
                 else:
-                    logger.info(f"News filter active: {news_desc} — skipping trade execution")
-                    # Still scan for analysis but don't execute
+                    logger.info(f"News filter active: {news_desc} — skipping new trade execution")
+                    # Still scan for analysis but don't execute new trades
                     await self._scan_analysis_only()
+                    # Mentorship: day trading during news = "poner break evens y esperar"
+                    # Continue managing open positions (set BE, trail SL) even when news blocks new trades
+                    await self._manage_open_positions()
                     return
 
             # Step 0: Sync balance for drawdown tracking (risk manager)
@@ -791,18 +794,25 @@ class TradingEngine:
             return ("SYDNEY", 0.4)
 
     def _is_market_open(self, now: datetime) -> bool:
-        """Check if forex market is open (Mon-Fri, trading hours).
+        """Check if market is open. Forex: Mon-Fri during sessions. Crypto: 24/7.
         Adjusts for DST: EST (winter) shifts session hours +1h in UTC."""
+        # If crypto is in the active watchlist, market is always open for crypto
+        # (crypto markets trade 24/7 including weekends — mentorship: "abierto 24/7")
+        has_crypto = "crypto" in settings.active_watchlist_categories
+
         # Forex is closed on weekends
         if now.weekday() >= 5:  # Saturday=5, Sunday=6
-            return False
+            return has_crypto  # Only open for crypto on weekends
 
         # Only trade during London + NY sessions (DST-adjusted)
         hour = now.hour
         offset = self._dst_offset(now)
         start = settings.trading_start_hour + offset
         end = settings.trading_end_hour + offset
-        return start <= hour < end
+        if start <= hour < end:
+            return True
+        # Outside forex hours but crypto is always open
+        return has_crypto
 
     def _should_close_friday(self, now: datetime) -> bool:
         """Check if we should close all positions (Friday rule). DST-adjusted."""
@@ -826,9 +836,18 @@ class TradingEngine:
 
         closed = 0
         kept = 0
+        from strategies.base import _is_crypto_instrument
         for trade in open_trades:
             should_close = False
             close_reason = ""
+
+            instrument = getattr(trade, 'instrument', '?')
+
+            # Crypto positions are exempt from Friday close (crypto trades 24/7)
+            if _is_crypto_instrument(instrument):
+                kept += 1
+                logger.info(f"Friday: Keeping {instrument} (crypto — markets open 24/7)")
+                continue
 
             entry = getattr(trade, 'entry_price', None)
             current = getattr(trade, 'current_price', None)
@@ -838,7 +857,7 @@ class TradingEngine:
             # If we lack price data, skip (don't close blindly)
             if entry is None or current is None:
                 kept += 1
-                logger.info(f"Friday: Keeping {getattr(trade, 'instrument', '?')} (missing price data)")
+                logger.info(f"Friday: Keeping {instrument} (missing price data)")
                 continue
 
             # Check if near SL
@@ -857,7 +876,6 @@ class TradingEngine:
                     should_close = True
                     close_reason = "TP" if not close_reason else "SL+TP"
 
-            instrument = getattr(trade, 'instrument', '?')
             trade_id = getattr(trade, 'trade_id', None)
 
             if should_close:
@@ -1202,7 +1220,7 @@ class TradingEngine:
     async def _scan_analysis_only(self):
         """Scan all watchlist pairs for analysis only (no trade execution).
         Used during off-hours and news events to keep UI data fresh."""
-        for instrument in settings.forex_watchlist:
+        for instrument in get_active_watchlist():
             try:
                 analysis = await self.market_analyzer.full_analysis(instrument)
                 self._last_scan_results[instrument] = analysis
@@ -1231,9 +1249,9 @@ class TradingEngine:
         except Exception as e:
             logger.warning(f"Initial position sync failed: {e}")
 
-        logger.info(f"Initial scan: analyzing {len(settings.forex_watchlist)} pairs...")
+        logger.info(f"Initial scan: analyzing {len(get_active_watchlist())} pairs...")
         setups_found = 0
-        for instrument in settings.forex_watchlist:
+        for instrument in get_active_watchlist():
             try:
                 analysis = await self.market_analyzer.full_analysis(instrument)
                 self._last_scan_results[instrument] = analysis
@@ -1265,7 +1283,7 @@ class TradingEngine:
                     pass
 
         logger.info(
-            f"Initial scan complete: {len(self._last_scan_results)}/{len(settings.forex_watchlist)} pairs analyzed, "
+            f"Initial scan complete: {len(self._last_scan_results)}/{len(get_active_watchlist())} pairs analyzed, "
             f"{setups_found} setups detected"
         )
 
@@ -1310,7 +1328,7 @@ class TradingEngine:
                     )
                     return
 
-        for instrument in settings.forex_watchlist:
+        for instrument in get_active_watchlist():
             try:
                 # Check if we can take more risk
                 style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
@@ -1482,7 +1500,7 @@ class TradingEngine:
             logger.warning("Scalping: DD limits reached — scalping paused")
             return
 
-        for instrument in settings.forex_watchlist:
+        for instrument in get_active_watchlist():
             try:
                 # Skip if already in a trade on this instrument
                 if any(
@@ -2330,7 +2348,7 @@ class TradingEngine:
                 f"<b>Balance:</b> {balance_str}\n"
                 f"<b>Mode:</b> {mode}\n"
                 f"<b>Open Positions:</b> {open_positions}\n"
-                f"<b>Pairs Watched:</b> {len(settings.forex_watchlist)}\n"
+                f"<b>Pairs Watched:</b> {len(get_active_watchlist())}\n"
                 f"<b>Pairs Analyzed:</b> {pairs_analyzed}\n"
                 f"<b>Strategies Active:</b> {strategies_on}/9\n"
                 f"<b>Scan Interval:</b> {self._scan_interval}s\n\n"
@@ -2389,7 +2407,7 @@ class TradingEngine:
             "mode": self.mode.value,
             "open_positions": len(self.position_manager.positions),
             "total_risk": self.risk_manager.get_current_total_risk(),
-            "watchlist_count": len(settings.forex_watchlist),
+            "watchlist_count": len(get_active_watchlist()),
             "pending_setups": pending_count,
             "pending_setups_count": pending_count,  # Alias for backwards compat
             "enabled_strategies": self._enabled_strategies,

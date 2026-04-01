@@ -556,6 +556,36 @@ def _load_risk_overrides():
 _load_risk_overrides()
 
 
+def get_active_watchlist() -> list:
+    """Build the combined watchlist from all active categories.
+
+    Returns instruments from forex_watchlist, forex_exotic_watchlist,
+    commodities_watchlist, indices_watchlist, equities_watchlist, and
+    crypto_watchlist based on which categories are enabled in
+    active_watchlist_categories.
+    """
+    category_map = {
+        "forex": settings.forex_watchlist,
+        "forex_exotic": settings.forex_exotic_watchlist,
+        "commodities": settings.commodities_watchlist,
+        "indices": settings.indices_watchlist,
+        "equities": settings.equities_watchlist,
+        "crypto": settings.crypto_watchlist,
+    }
+    combined = []
+    for cat in settings.active_watchlist_categories:
+        instruments = category_map.get(cat, [])
+        combined.extend(instruments)
+    # Deduplicate while preserving order
+    seen = set()
+    result = []
+    for inst in combined:
+        if inst not in seen:
+            seen.add(inst)
+            result.append(inst)
+    return result
+
+
 def _apply_funded_evaluation_defaults():
     """Auto-apply DD limits based on funded evaluation type.
     Workshop: Sprint/1-phase = 4% daily DD, 6% total DD (tighter than standard 5%/10%)."""

@@ -1706,9 +1706,18 @@ class TradingEngine:
                     f"Score={ai_score} Rec={ai_rec} — {ai_reason}"
                 )
                 if ai_rec == "SKIP":
-                    logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
-                    self._daily_setups_skipped_ai += 1
-                    return None
+                    if self.mode == TradingMode.AUTO:
+                        # AUTO mode: AI rejection blocks execution (safety gate)
+                        logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
+                        self._daily_setups_skipped_ai += 1
+                        return None
+                    else:
+                        # MANUAL mode: AI opinion is advisory, not blocking
+                        # The user should decide — queue the setup with AI warning
+                        logger.info(
+                            f"AI recommends SKIP for {signal.instrument} (score={ai_score}) "
+                            f"but MANUAL mode — queuing for user decision"
+                        )
                 # Apply AI-suggested SL/TP adjustments if provided
                 adjustments = ai_result.get("suggested_adjustments", {})
                 if adjustments:
@@ -1927,7 +1936,7 @@ class TradingEngine:
                     rr=setup.reward_risk_ratio,
                 )
             except Exception as ae:
-                logger.debug(f"Alert send failed (non-critical): {ae}")
+                logger.warning(f"Alert send failed: {ae}")
 
         # Broadcast via WebSocket if callback is set
         if self._ws_broadcast:

@@ -1705,6 +1705,10 @@ class TradingEngine:
                     f"AI validation for {signal.instrument}: "
                     f"Score={ai_score} Rec={ai_rec} — {ai_reason}"
                 )
+                # Unify scores: update the analysis result score with AI score
+                # so the UI shows the AI-validated score, not just the technical score
+                if signal.instrument in self._last_scan_results:
+                    self._last_scan_results[signal.instrument].score = float(ai_score)
                 if ai_rec == "SKIP":
                     if self.mode == TradingMode.AUTO:
                         # AUTO mode: AI rejection blocks execution (safety gate)

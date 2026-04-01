@@ -1061,20 +1061,30 @@ def _check_stop_entry_opportunity(
         return True, stop_price, desc
 
 
-# Crypto instrument prefixes (TradingLab: GREEN is the ONLY strategy for crypto)
-_CRYPTO_PREFIXES = (
-    "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
-    "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB",
-    "FTM", "ALGO", "XLM", "EOS", "XTZ", "VET",
-)
+# Crypto detection: check against the actual crypto_watchlist from config
+# This is more reliable than a hardcoded prefix list since new coins are
+# added to the watchlist, not to a separate prefix tuple.
+_crypto_watchlist_cache: set = set()
 
 
 def _is_crypto_instrument(instrument: str) -> bool:
     """
     Check if an instrument is a crypto pair.
     TradingLab: GREEN is the ONLY strategy valid for crypto trading.
+    Uses the crypto_watchlist from config for accurate detection.
     """
-    return any(instrument.upper().startswith(p) for p in _CRYPTO_PREFIXES)
+    global _crypto_watchlist_cache
+    if not _crypto_watchlist_cache:
+        from config import settings
+        _crypto_watchlist_cache = {s.upper() for s in settings.crypto_watchlist}
+    # Check exact match first, then prefix match for variants (e.g., BTC_USD vs BTCUSD)
+    inst_upper = instrument.upper()
+    if inst_upper in _crypto_watchlist_cache:
+        return True
+    # Fallback: check common crypto suffixes (_USD, USD, /USD)
+    # This catches instruments like "BTCUSD" when watchlist has "BTC_USD"
+    base = inst_upper.replace("_USD", "").replace("/USD", "").replace("USD", "")
+    return any(w.replace("_USD", "") == base for w in _crypto_watchlist_cache)
 
 
 def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
@@ -4101,12 +4111,7 @@ class GreenStrategy(BaseStrategy):
 
         # Crypto instruments use EMA 50 trailing, NOT fixed TP exits
         # Mentorship: "crypto should use EMA 50 trailing on weekly chart"
-        _CRYPTO_PREFIXES = (
-            "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
-            "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB",
-            "FTM", "ALGO", "XLM", "EOS", "XTZ", "VET",
-        )
-        is_crypto = any(analysis.instrument.upper().startswith(p) for p in _CRYPTO_PREFIXES)
+        is_crypto = _is_crypto_instrument(analysis.instrument)
         if is_crypto:
             met.append(
                 "CRYPTO: TP levels are REFERENCE only — position managed with EMA 50 trailing, "

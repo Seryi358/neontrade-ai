@@ -1328,7 +1328,22 @@ class TradingEngine:
                     )
                     return
 
-        for instrument in get_active_watchlist():
+        # Round-robin scanning: if watchlist is large (>50), scan a batch per tick
+        # to stay within scan interval. Each batch covers max 50 instruments.
+        full_watchlist = get_active_watchlist()
+        max_per_scan = 50
+        if len(full_watchlist) > max_per_scan:
+            batch_idx = getattr(self, '_scan_batch_idx', 0)
+            batch = full_watchlist[batch_idx:batch_idx + max_per_scan]
+            self._scan_batch_idx = (batch_idx + max_per_scan) % len(full_watchlist)
+            logger.info(
+                f"Round-robin scan: batch {batch_idx // max_per_scan + 1} "
+                f"({len(batch)}/{len(full_watchlist)} instruments)"
+            )
+        else:
+            batch = full_watchlist
+
+        for instrument in batch:
             try:
                 # Check if we can take more risk
                 style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}

@@ -676,14 +676,15 @@ class TradingEngine:
                         if should_close:
                             await self.broker.close_trade(pos.trade_id)
                             # Record trade result before removing
+                            pnl_val = 0.0
                             try:
                                 price_data = await self.broker.get_current_price(pos.instrument)
                                 cp = price_data.bid if pos.direction == "BUY" else price_data.ask
                                 pnl_val = ((cp - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - cp)) * abs(pos.units)
-                                balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
-                                self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl_val / balance)
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.warning(f"News close: could not get price for PnL ({e}), recording as $0")
+                            balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+                            self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl_val / balance)
                             self.position_manager.remove_position(pos.trade_id)
                             self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
                             logger.warning(f"News close: Closed {pos.instrument} — {reason}")
@@ -933,8 +934,8 @@ class TradingEngine:
                                 "exit_price": current,
                                 "pnl": pnl_val * units if units else pnl_val,
                             })
-                        except Exception:
-                            pass
+                        except Exception as db_err:
+                            logger.warning(f"DB update failed for Friday close {trade_id}: {db_err}")
                 except Exception as e:
                     logger.error(f"Friday close failed for {trade_id}: {e}")
             else:
@@ -1133,8 +1134,8 @@ class TradingEngine:
                                 "exit_price": close_price,
                                 "pnl": pnl_dollars,
                             })
-                        except Exception:
-                            pass
+                        except Exception as db_err:
+                            logger.warning(f"DB update failed for external close {tid}: {db_err}")
 
                     # Track consecutive losses for cooldown (Psicología Avanzada)
                     if pnl_dollars < 0:

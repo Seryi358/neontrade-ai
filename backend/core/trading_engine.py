@@ -1799,6 +1799,7 @@ class TradingEngine:
                 # so the UI shows the AI-validated score, not just the technical score
                 if signal.instrument in self._last_scan_results:
                     self._last_scan_results[signal.instrument].score = float(ai_score)
+                    self._last_scan_results[signal.instrument]._ai_validated = True
                 # Filter by AI score: >= 65 passes, < 65 blocked
                 # AI TAKE/SKIP is binary and too strict (never says TAKE in practice).
                 # Score-based filtering is more practical: 65+ are decent setups,

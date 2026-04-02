@@ -476,7 +476,7 @@ async def get_watchlist():
     for instrument in get_active_watchlist():
         entry = {
             "instrument": instrument,
-            "score": 0,
+            "score": None,  # null until AI validates — no fake technical scores
             "trend": "unknown",
             "convergence": False,
             "patterns": [],
@@ -484,7 +484,10 @@ async def get_watchlist():
         }
         if instrument in engine.last_scan_results:
             analysis = engine.last_scan_results[instrument]
-            entry["score"] = analysis.score
+            # Only show AI-validated score, not the raw technical score
+            # The score field is set to ai_score in _detect_setup when AI validates
+            ai_validated = getattr(analysis, '_ai_validated', False)
+            entry["score"] = analysis.score if ai_validated else None
             entry["trend"] = analysis.htf_trend.value
             entry["convergence"] = analysis.htf_ltf_convergence
             entry["patterns"] = analysis.candlestick_patterns

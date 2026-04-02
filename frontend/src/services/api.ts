@@ -357,11 +357,12 @@ export const STRATEGY_COLORS: Record<string, string> = {
   DETECTED: '#fdf500', // Daemon: ForegroundNeutral (253,245,0)
 };
 
-export function getScoreColor(score: number): string {
-  if (score >= 80) return '#2ed88c';  // Bitpunk green
-  if (score >= 60) return '#f3e600';  // Bitpunk yellow
-  if (score >= 40) return '#ff6b35';  // Warning orange
-  return '#ff4a57';                   // Bitpunk red
+export function getScoreColor(score: number | null): string {
+  if (score == null) return '#a1a9b1';  // Muted — no AI score yet
+  if (score >= 80) return '#2ed88c';    // Bitpunk green
+  if (score >= 60) return '#f3e600';    // Bitpunk yellow
+  if (score >= 40) return '#ff6b35';    // Warning orange
+  return '#ff4a57';                     // Bitpunk red
 }
 
 export function getTrendColor(trend: string): string {

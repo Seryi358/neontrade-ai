@@ -13,6 +13,12 @@ import {
   RefreshControl,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+
+/** Safe toFixed — handles null/undefined/NaN without crashing */
+const safe = (v: any, decimals = 2): string => {
+  if (v == null || isNaN(v)) return '---';
+  return Number(v).toFixed(decimals);
+};
 import { API_URL, authFetch, wsManager } from '../services/api';
 import {
   HUDCard,
@@ -319,7 +325,7 @@ export default function DashboardScreen() {
           <>
             <HUDStatRow
               label="DRAWDOWN"
-              value={`-${riskStatus.current_drawdown.toFixed(2)}%`}
+              value={`-${safe(riskStatus.current_drawdown)}%`}
               valueColor={ddSeverityColor(riskStatus.dd_alert_level)}
             />
             {riskStatus.dd_alert_level && (
@@ -337,7 +343,7 @@ export default function DashboardScreen() {
             )}
             <HUDStatRow
               label="MAX RISK / DIA"
-              value={maxTotalRisk != null ? `${maxRiskPct.toFixed(1)}%` : '---'}
+              value={maxTotalRisk != null ? `${safe(maxRiskPct, 1)}%` : '---'}
               valueColor={theme.colors.textMuted}
             />
           </>
@@ -372,8 +378,8 @@ export default function DashboardScreen() {
                   },
                 ]}>
                   {pos.unrealized_pnl != null
-                    ? `${pos.unrealized_pnl >= 0 ? '+' : ''}${pos.unrealized_pnl.toFixed(2)}`
-                    : `@ ${pos.entry.toFixed(5)}`}
+                    ? `${pos.unrealized_pnl >= 0 ? '+' : ''}${safe(pos.unrealized_pnl)}`
+                    : `@ ${safe(pos.entry, 5)}`}
                 </Text>
                 <Text style={styles.positionPhase}>{pos.phase.toUpperCase()}</Text>
               </View>
@@ -424,17 +430,17 @@ export default function DashboardScreen() {
           <View style={styles.recoveryHeader}>
             <HUDStatRow
               label="DD ACTUAL"
-              value={`-${riskStatus.current_drawdown.toFixed(2)}%`}
+              value={`-${safe(riskStatus.current_drawdown)}%`}
               valueColor={theme.colors.loss}
             />
             <HUDStatRow
               label="PARA RECUPERAR"
-              value={`+${riskStatus.recovery_pct_needed.toFixed(2)}%`}
+              value={`+${safe(riskStatus.recovery_pct_needed)}%`}
               valueColor={theme.colors.neonYellow}
             />
             <HUDStatRow
               label="PERDIDO"
-              value={`-$${riskStatus.loss_dollars.toFixed(0)}`}
+              value={`-$${safe(riskStatus.loss_dollars, 0)}`}
               valueColor={theme.colors.loss}
             />
           </View>
@@ -470,7 +476,7 @@ export default function DashboardScreen() {
                     },
                   ]}
                 >
-                  +{recovery.toFixed(1)}%
+                  +{safe(recovery, 1)}%
                 </Text>
               </View>
             );

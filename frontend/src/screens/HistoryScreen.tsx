@@ -15,6 +15,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+
+const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
   HUDSectionTitle,
@@ -142,12 +144,12 @@ export default function HistoryScreen() {
         />
         <HUDStatRow
           label="WIN RATE"
-          value={`${stats.win_rate.toFixed(1)}%`}
+          value={`${safe(stats.win_rate, 1)}%`}
           valueColor={stats.win_rate >= 50 ? theme.colors.profit : theme.colors.loss}
         />
         <HUDStatRow
           label="P&L TOTAL"
-          value={`$${stats.total_pnl.toFixed(2)}`}
+          value={`$${safe(stats.total_pnl)}`}
           valueColor={stats.total_pnl >= 0 ? theme.colors.profit : theme.colors.loss}
           large
         />
@@ -213,7 +215,7 @@ export default function HistoryScreen() {
         <Text style={[styles.tradePnl, {
           color: item.pnl >= 0 ? theme.colors.profit : theme.colors.loss,
         }]}>
-          {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
+          {item.pnl >= 0 ? '+' : ''}${safe(item.pnl)}
         </Text>
       </View>
 
@@ -232,7 +234,7 @@ export default function HistoryScreen() {
           />
         </View>
         <Text style={styles.tradePrices}>
-          {item.entry_price.toFixed(5)} → {item.exit_price.toFixed(5)}
+          {safe(item.entry_price, 5)} → {safe(item.exit_price, 5)}
         </Text>
       </View>
     </HUDCard>

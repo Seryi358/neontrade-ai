@@ -760,10 +760,16 @@ class PositionManager:
             if tp_max_reached:
                 try:
                     await self.broker.close_trade(pos.trade_id)
+                    pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
+                    pnl = pnl_per_unit * abs(pos.units) if pos.units else pnl_per_unit
                     logger.info(
                         f"{pos.trade_id}: TP_MAX REACHED ({pos.take_profit_max:.5f}) — "
-                        f"CLOSED remaining position at {current_price:.5f}"
+                        f"CLOSED at {current_price:.5f} | PnL=${pnl:.2f}"
                     )
+                    if self.risk_manager:
+                        self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
+                        balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+                        self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl / balance)
                     self.remove_position(pos.trade_id)
                     return
                 except Exception as e:
@@ -787,11 +793,16 @@ class PositionManager:
             if both_broken:
                 try:
                     await self.broker.close_trade(pos.trade_id)
+                    pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
+                    pnl = pnl_per_unit * abs(pos.units) if pos.units else pnl_per_unit
                     logger.warning(
                         f"{pos.trade_id}: EMERGENCY EXIT — both EMA M5 2 and EMA M5 5 broken "
-                        f"against {pos.direction} at {current_price:.5f} "
-                        f"(EMA2={ema_m5_2:.5f}, EMA5={ema_m5_5:.5f})"
+                        f"against {pos.direction} at {current_price:.5f} | PnL=${pnl:.2f}"
                     )
+                    if self.risk_manager:
+                        self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
+                        balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+                        self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl / balance)
                     self.remove_position(pos.trade_id)
                     return
                 except Exception as e:

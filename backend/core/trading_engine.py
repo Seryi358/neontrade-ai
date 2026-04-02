@@ -666,6 +666,15 @@ class TradingEngine:
                         should_close, reason = await self.news_filter.should_close_for_news(pos.instrument)
                         if should_close:
                             await self.broker.close_trade(pos.trade_id)
+                            # Record trade result before removing
+                            try:
+                                price_data = await self.broker.get_current_price(pos.instrument)
+                                cp = price_data.bid if pos.direction == "BUY" else price_data.ask
+                                pnl_val = ((cp - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - cp)) * abs(pos.units)
+                                balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+                                self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl_val / balance)
+                            except Exception:
+                                pass
                             self.position_manager.remove_position(pos.trade_id)
                             self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
                             logger.warning(f"News close: Closed {pos.instrument} — {reason}")
@@ -988,14 +997,21 @@ class TradingEngine:
             for trade in broker_trades:
                 if trade.trade_id in new_ids:
                     from core.position_manager import ManagedPosition, PositionPhase
+                    # Skip adoption if missing critical fields
+                    if not trade.stop_loss or not trade.entry_price:
+                        logger.warning(
+                            f"Skipping adoption of {trade.trade_id} ({trade.instrument}): "
+                            f"missing SL or entry price"
+                        )
+                        continue
                     pos = ManagedPosition(
                         trade_id=trade.trade_id,
                         instrument=trade.instrument,
                         direction=trade.direction,
                         entry_price=trade.entry_price,
-                        original_sl=trade.stop_loss or trade.entry_price,
-                        current_sl=trade.stop_loss or trade.entry_price,
-                        take_profit_1=trade.take_profit or trade.entry_price,
+                        original_sl=trade.stop_loss,
+                        current_sl=trade.stop_loss,
+                        take_profit_1=trade.take_profit or trade.entry_price * (1.01 if trade.direction == "BUY" else 0.99),
                         units=trade.units or 0,
                         style=settings.trading_style,
                     )
@@ -2076,11 +2092,14 @@ class TradingEngine:
                 logger.info(f"Stop order placed at {limit_price:.5f} for {setup.instrument}")
             else:
                 # Default: market order
+                # For trailing_tp_only (crypto GREEN): don't send hard TP to broker
+                # The position manager will trail with EMA 50 instead of hard TP exit
+                broker_tp = None if getattr(setup, 'trailing_tp_only', False) else setup.take_profit_1
                 result = await self.broker.place_market_order(
                     instrument=setup.instrument,
                     units=setup.units,
                     stop_loss=setup.stop_loss,
-                    take_profit=setup.take_profit_1,
+                    take_profit=broker_tp,
                 )
 
             # result is now an OrderResult dataclass
@@ -2089,6 +2108,11 @@ class TradingEngine:
                 return
 
             trade_id = result.trade_id
+            # Use actual fill price from broker if available (not scan-time price)
+            fill_price = getattr(result, 'fill_price', None) or setup.entry_price
+            if fill_price != setup.entry_price:
+                logger.info(f"Fill price {fill_price:.5f} differs from scan price {setup.entry_price:.5f} (slippage)")
+
             if not trade_id:
                 logger.error(f"Order succeeded but no trade_id returned for {setup.instrument}")
                 return
@@ -2104,15 +2128,15 @@ class TradingEngine:
                     trade_id=trade_id,
                     instrument=setup.instrument,
                     direction=setup.direction,
-                    entry_price=setup.entry_price,
+                    entry_price=fill_price,
                     original_sl=setup.stop_loss,
                     current_sl=setup.stop_loss,
                     take_profit_1=setup.take_profit_1,
                     take_profit_max=setup.take_profit_max,
                     units=setup.units,
                     style=setup.style.value if hasattr(setup.style, 'value') else str(setup.style),
-                    highest_price=setup.entry_price,
-                    lowest_price=setup.entry_price,
+                    highest_price=fill_price,
+                    lowest_price=fill_price,
                     trailing_tp_only=getattr(setup, 'trailing_tp_only', False),
                     strategy_variant=getattr(setup, 'strategy_variant', None),
                 ))

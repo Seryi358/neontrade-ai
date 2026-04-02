@@ -704,7 +704,7 @@ class PositionManager:
             else:
                 # Standard behavior: partial profit at TP1 + switch to aggressive trailing
                 if self.allow_partial_profits and pos.units != 0:
-                    partial_units = pos.units // 2  # Close half
+                    partial_units = pos.units / 2  # Close half (use true division for crypto fractional units)
                     if partial_units != 0:
                         try:
                             # Bug fix R26: use close_trade_partial (not close_trade with units=)

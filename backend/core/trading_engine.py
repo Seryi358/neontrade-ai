@@ -2448,6 +2448,7 @@ class TradingEngine:
             price_data = await self.broker.get_current_price(setup.instrument)
         except Exception as e:
             logger.error(f"Cannot get price for approved setup: {e}")
+            setup.status = "expired"
             return
 
         current_price = (
@@ -2493,7 +2494,10 @@ class TradingEngine:
             strategy_variant=setup.strategy_variant,
         )
 
-        await self._execute_setup(trade_risk)
+        result = await self._execute_setup(trade_risk)
+        if not result:
+            logger.warning(f"Approved setup {setup.id} execution failed — marking as expired")
+            setup.status = "expired"
 
     # ── Daily Summary ────────────────────────────────────────────
 

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 from enum import Enum
+from loguru import logger
 
 router = APIRouter()
 
@@ -284,32 +285,6 @@ async def get_pending_setups():
     return []
 
 
-@router.post("/pending-setups/{setup_id}/approve")
-async def approve_setup(setup_id: str):
-    """Approve a pending trade setup for execution."""
-    from main import engine
-    if hasattr(engine, 'approve_setup'):
-        success = await engine.approve_setup(setup_id)
-        if success:
-            return {"status": "approved", "setup_id": setup_id,
-                    "message": "Operación aprobada y ejecutada"}
-        raise HTTPException(404, f"Setup {setup_id} not found or expired")
-    raise HTTPException(501, "Manual mode not available")
-
-
-@router.post("/pending-setups/{setup_id}/reject")
-async def reject_setup(setup_id: str):
-    """Reject a pending trade setup."""
-    from main import engine
-    if hasattr(engine, 'reject_setup'):
-        success = engine.reject_setup(setup_id)
-        if success:
-            return {"status": "rejected", "setup_id": setup_id,
-                    "message": "Operación rechazada"}
-        raise HTTPException(404, f"Setup {setup_id} not found")
-    raise HTTPException(501, "Manual mode not available")
-
-
 @router.post("/pending-setups/approve-all")
 async def approve_all_setups():
     """Approve all pending setups at once."""
@@ -336,6 +311,32 @@ async def reject_all_setups():
                 pass
         return {"status": "rejected_all", "count": count}
     return {"status": "ok", "count": 0}
+
+
+@router.post("/pending-setups/{setup_id}/approve")
+async def approve_setup(setup_id: str):
+    """Approve a pending trade setup for execution."""
+    from main import engine
+    if hasattr(engine, 'approve_setup'):
+        success = await engine.approve_setup(setup_id)
+        if success:
+            return {"status": "approved", "setup_id": setup_id,
+                    "message": "Operación aprobada y ejecutada"}
+        raise HTTPException(404, f"Setup {setup_id} not found or expired")
+    raise HTTPException(501, "Manual mode not available")
+
+
+@router.post("/pending-setups/{setup_id}/reject")
+async def reject_setup(setup_id: str):
+    """Reject a pending trade setup."""
+    from main import engine
+    if hasattr(engine, 'reject_setup'):
+        success = engine.reject_setup(setup_id)
+        if success:
+            return {"status": "rejected", "setup_id": setup_id,
+                    "message": "Operación rechazada"}
+        raise HTTPException(404, f"Setup {setup_id} not found")
+    raise HTTPException(501, "Manual mode not available")
 
 
 # ── Positions ─────────────────────────────────────────────────────
@@ -593,18 +594,33 @@ async def emergency_close_all():
     """Emergency: close all open trades immediately."""
     from main import engine
     broker = engine.broker
-    count = await broker.close_all_trades()
+    try:
+        count = await broker.close_all_trades()
+    except Exception as e:
+        logger.error(f"Emergency close-all broker call failed: {e}")
+        raise HTTPException(503, f"Error al cerrar posiciones: {str(e)}")
+
+    # Record trade results before clearing state (CLAUDE.md Rule #4)
+    if hasattr(engine, 'risk_manager'):
+        rm = engine.risk_manager
+        for trade_id, risk_pct in list(rm._active_risks.items()):
+            parts = trade_id.split(":")
+            inst = parts[0] if len(parts) > 1 else "unknown"
+            try:
+                rm.record_trade_result(trade_id, inst, 0.0)
+            except Exception as e:
+                logger.warning(f"Failed to record emergency close for {trade_id}: {e}")
+
     # Re-sync state from broker instead of blindly clearing
     try:
         open_trades = await broker.get_open_trades()
         if not open_trades:
-            # Only clear internal state if broker confirms no open positions
             if hasattr(engine, 'position_manager'):
                 engine.position_manager.positions.clear()
             if hasattr(engine, 'risk_manager'):
                 engine.risk_manager._active_risks.clear()
-    except Exception:
-        pass  # Don't clear if we can't verify
+    except Exception as e:
+        logger.warning(f"Post-emergency state sync failed: {e}")
     return {
         "status": "all_trades_closed",
         "count": count,

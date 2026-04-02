@@ -140,7 +140,10 @@ class BacktestResult:
 
 def _pip_value(instrument: str) -> float:
     """Return the pip size for a given instrument."""
+    from strategies.base import _is_crypto_instrument
     pair = instrument.upper().replace("/", "_")
+    if _is_crypto_instrument(instrument):
+        return 1.0  # Crypto: 1 pip = $1 move (no fractional pip concept)
     if "JPY" in pair:
         return 0.01
     return 0.0001
@@ -790,6 +793,9 @@ class Backtester:
         rows = []
         for c in candles:
             if not c.complete:
+                continue
+            # CLAUDE.md Rule #9: Skip candles with all-zero OHLC (broker returns empty data)
+            if c.open == 0 and c.high == 0 and c.low == 0 and c.close == 0:
                 continue
             rows.append(
                 {

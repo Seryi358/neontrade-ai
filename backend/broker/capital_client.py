@@ -648,7 +648,7 @@ class CapitalClient(BaseBroker):
 
             # Confirm the deal
             if deal_ref:
-                return await self._confirm_deal(deal_ref, units)
+                return await self._confirm_deal(deal_ref, units, instrument)
 
             return OrderResult(
                 success=True,
@@ -714,7 +714,7 @@ class CapitalClient(BaseBroker):
             )
 
             if deal_ref:
-                return await self._confirm_deal(deal_ref, units)
+                return await self._confirm_deal(deal_ref, units, instrument)
 
             return OrderResult(
                 success=True,
@@ -785,7 +785,7 @@ class CapitalClient(BaseBroker):
             )
 
             if deal_ref:
-                return await self._confirm_deal(deal_ref, units)
+                return await self._confirm_deal(deal_ref, units, instrument)
 
             return OrderResult(
                 success=True,
@@ -803,7 +803,7 @@ class CapitalClient(BaseBroker):
             logger.error(f"Stop order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
 
-    async def _confirm_deal(self, deal_reference: str, units: float) -> OrderResult:
+    async def _confirm_deal(self, deal_reference: str, units: float, instrument: str = "") -> OrderResult:
         """Confirm a deal was executed using the dealReference."""
         await asyncio.sleep(0.5)  # Brief delay for deal processing
         try:

@@ -465,10 +465,13 @@ class RiskManager:
                 for active_inst in active_instruments:
                     if active_inst in group and active_inst != instrument:
                         # Fixed 0.75% per correlated trade (mentorship rule)
-                        adjusted = settings.correlated_risk_pct  # 0.0075 = 0.75%
+                        # But never exceed the drawdown-adjusted risk passed in
+                        corr_risk = settings.correlated_risk_pct  # 0.0075 = 0.75%
+                        adjusted = min(corr_risk, base_risk)
                         logger.info(
                             f"Correlation detected: {instrument} <-> {active_inst}. "
-                            f"Risk set to fixed {adjusted:.2%} (mentorship: 0.75% each)"
+                            f"Risk capped to {adjusted:.2%} (corr={corr_risk:.2%}, "
+                            f"base={base_risk:.2%})"
                         )
                         return adjusted
         return base_risk

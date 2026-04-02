@@ -112,9 +112,13 @@ export default function ManualModeScreen() {
       });
       if (res.ok) {
         setSetups((prev) => prev.filter((s) => s.id !== id));
+      } else {
+        const errData = await res.json().catch(() => ({ detail: res.statusText }));
+        Alert.alert('Error', errData.detail || `Error al aprobar (${res.status})`);
       }
     } catch (err) {
       console.error('Failed to approve setup:', err);
+      Alert.alert('Error', 'No se pudo conectar al servidor');
     } finally {
       setActionLoading(null);
     }
@@ -128,9 +132,13 @@ export default function ManualModeScreen() {
       });
       if (res.ok) {
         setSetups((prev) => prev.filter((s) => s.id !== id));
+      } else {
+        const errData = await res.json().catch(() => ({ detail: res.statusText }));
+        Alert.alert('Error', errData.detail || `Error al rechazar (${res.status})`);
       }
     } catch (err) {
       console.error('Failed to reject setup:', err);
+      Alert.alert('Error', 'No se pudo conectar al servidor');
     } finally {
       setActionLoading(null);
     }

@@ -1073,10 +1073,14 @@ def _is_crypto_instrument(instrument: str) -> bool:
     TradingLab: GREEN is the ONLY strategy valid for crypto trading.
     Uses the crypto_watchlist from config for accurate detection.
     """
+    if not instrument:
+        return False
     global _crypto_watchlist_cache
     if not _crypto_watchlist_cache:
         from config import settings
         _crypto_watchlist_cache = {s.upper() for s in settings.crypto_watchlist}
+    if not instrument:
+        return False
     # Check exact match first, then prefix match for variants (e.g., BTC_USD vs BTCUSD)
     inst_upper = instrument.upper()
     if inst_upper in _crypto_watchlist_cache:

@@ -268,6 +268,13 @@ class AlertManager:
         direction: str,
         entry: float,
         rr: float,
+        sl: float = 0,
+        tp: float = 0,
+        strategy: str = "",
+        ai_score: int = 0,
+        ai_recommendation: str = "",
+        ai_reasoning: str = "",
+        reasoning: str = "",
     ):
         if not self._config.notify_setup_pending:
             return
@@ -275,25 +282,50 @@ class AlertManager:
         title = f"SETUP DETECTED // {instrument}"
         dir_color = "#28c775" if direction.upper() == "BUY" else "#fb3048"
         dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
-        body = (
-            f'<span style="color:#a1a9b1;font-size:11px;letter-spacing:2px;text-transform:uppercase;">'
-            f'PENDING APPROVAL</span>\n\n'
-            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
-            f'{instrument}</span>\n'
-            f'<span style="color:{dir_color};font-size:16px;font-weight:600;">'
-            f'{dir_icon} {direction.upper()}</span>\n\n'
-            f'<span style="color:#a1a9b1;">ENTRY</span> '
-            f'<span style="color:#fcfcfc;font-weight:600;">{entry}</span>\n'
-            f'<span style="color:#a1a9b1;">R:R</span> '
-            f'<span style="color:#fdf500;font-weight:600;">{rr:.2f}:1</span>\n\n'
-            f'<span style="color:#ee00ff;font-size:11px;letter-spacing:2px;">'
-            f'OPEN APP TO APPROVE OR REJECT</span>'
-        )
+
+        # Build rich email body with strategy details and AI opinion
+        parts = [
+            f'<b>PENDING APPROVAL</b>\n',
+            f'<b>{instrument}</b>',
+            f'{dir_icon} <b>{direction.upper()}</b>\n',
+            f'<b>Estrategia:</b> {strategy}' if strategy else '',
+            f'<b>Entry:</b> {entry:.5f}',
+            f'<b>SL:</b> {sl:.5f}' if sl else '',
+            f'<b>TP:</b> {tp:.5f}' if tp else '',
+            f'<b>R:R:</b> {rr:.2f}:1\n',
+        ]
+
+        # AI opinion section
+        if ai_score or ai_reasoning:
+            ai_verdict = "TAKE" if ai_recommendation == "TAKE" else "SKIP"
+            parts.append(f'<b>--- IA OPINION ---</b>')
+            parts.append(f'<b>Score IA:</b> {ai_score}/100')
+            parts.append(f'<b>Recomendacion:</b> {ai_verdict}')
+            if ai_reasoning:
+                # Truncate to 300 chars for email
+                reason_short = ai_reasoning[:300] + ('...' if len(ai_reasoning) > 300 else '')
+                parts.append(f'<b>Razon:</b> {reason_short}')
+            parts.append('')
+
+        # Strategy checklist
+        if reasoning:
+            parts.append(f'<b>--- CHECKLIST ---</b>')
+            for line in reasoning.split('\n'):
+                if line.strip():
+                    parts.append(line.strip())
+            parts.append('')
+
+        parts.append(f'<b>OPEN APP TO APPROVE OR REJECT</b>')
+
+        body = '\n'.join(p for p in parts if p)
+
         data = {
             "instrument": instrument,
             "direction": direction,
             "entry": entry,
             "rr": rr,
+            "strategy": strategy,
+            "ai_score": ai_score,
         }
         await self.send_alert("setup_pending", title, body, data)
 

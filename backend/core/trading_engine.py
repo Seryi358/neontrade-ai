@@ -1749,6 +1749,10 @@ class TradingEngine:
                             f"AI recommends SKIP for {signal.instrument} (score={ai_score}) "
                             f"but MANUAL mode — queuing for user decision"
                         )
+                # Store AI opinion for downstream use (email, UI)
+                signal._ai_score = ai_score
+                signal._ai_recommendation = ai_rec
+                signal._ai_reasoning = ai_reason
                 # Apply AI-suggested SL/TP adjustments if provided
                 adjustments = ai_result.get("suggested_adjustments", {})
                 if adjustments:
@@ -1804,7 +1808,7 @@ class TradingEngine:
         sl_distance = abs(signal.entry_price - signal.stop_loss)
         rr = abs(signal.take_profit_1 - signal.entry_price) / max(sl_distance, 0.00001)
 
-        return TradeRisk(
+        trade_risk = TradeRisk(
             instrument=signal.instrument,
             style=style,
             risk_percent=risk_percent,
@@ -1820,6 +1824,11 @@ class TradingEngine:
             trailing_tp_only=getattr(signal, 'trailing_tp_only', False),
             strategy_variant=getattr(signal, 'strategy_variant', None),
         )
+        # Carry AI opinion from signal to setup for email/UI
+        trade_risk._ai_score = getattr(signal, '_ai_score', 0)
+        trade_risk._ai_recommendation = getattr(signal, '_ai_recommendation', '')
+        trade_risk._ai_reasoning = getattr(signal, '_ai_reasoning', '')
+        return trade_risk
 
     def _calculate_sl_tp(
         self,
@@ -1973,6 +1982,13 @@ class TradingEngine:
                     direction=setup.direction,
                     entry=setup.entry_price,
                     rr=setup.reward_risk_ratio,
+                    sl=setup.stop_loss,
+                    tp=setup.take_profit_1,
+                    strategy=setup.strategy_variant or getattr(setup, '_strategy_name', ''),
+                    ai_score=getattr(setup, '_ai_score', 0),
+                    ai_recommendation=getattr(setup, '_ai_recommendation', ''),
+                    ai_reasoning=getattr(setup, '_ai_reasoning', ''),
+                    reasoning=reasoning,
                 )
             except Exception as ae:
                 logger.warning(f"Alert send failed: {ae}")

@@ -252,8 +252,8 @@ export default function DashboardScreen() {
           valueColor={account ? pnlColor(account.unrealized_pnl) : theme.colors.textMuted}
         />
         <HUDStatRow
-          label="AVAILABLE MARGIN"
-          value={account ? formatCurrency(account.equity - (account.balance - account.equity)) : '---'}
+          label="MARGEN DISPONIBLE"
+          value={account ? formatCurrency(account.margin_available ?? account.equity) : '---'}
           valueColor={theme.colors.neonCyan}
         />
       </HUDCard>

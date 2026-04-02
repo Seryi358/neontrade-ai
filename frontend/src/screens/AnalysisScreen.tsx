@@ -317,13 +317,13 @@ export default function AnalysisScreen() {
                       {tf.key_levels?.support?.length > 0 && (
                         <Text style={styles.tfLevels}>
                           <Text style={{ color: theme.colors.neonGreen }}>SOPORTE: </Text>
-                          {tf.key_levels.support?.map((l) => l.toFixed(5)).join(', ')}
+                          {tf.key_levels.support?.map((l: any) => safe(l, 5)).join(', ')}
                         </Text>
                       )}
                       {tf.key_levels?.resistance?.length > 0 && (
                         <Text style={styles.tfLevels}>
                           <Text style={{ color: theme.colors.neonRed }}>RESISTENCIA: </Text>
-                          {tf.key_levels.resistance?.map((l) => l.toFixed(5)).join(', ')}
+                          {tf.key_levels.resistance?.map((l: any) => safe(l, 5)).join(', ')}
                         </Text>
                       )}
                     </View>
@@ -509,7 +509,7 @@ export default function AnalysisScreen() {
                   {item.instrument.replace('_', '/')}
                 </Text>
                 <Text style={[styles.pickerOptionScore, { color: getScoreColor(item.score) }]}>
-                  {item.safe(score, 0)}
+                  {safe(item.score, 0)}
                 </Text>
               </TouchableOpacity>
             ))}

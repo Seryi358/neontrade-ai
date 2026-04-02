@@ -393,6 +393,7 @@ class WebSocketManager {
 
   connect() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
+    this.reconnectAttempts = 0;  // Reset on fresh connect attempt
 
     try {
       // Include API key in WS connection for authentication

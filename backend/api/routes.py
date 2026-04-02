@@ -519,7 +519,7 @@ async def get_watchlist():
 
         watchlist.append(entry)
 
-    watchlist.sort(key=lambda x: x["score"], reverse=True)
+    watchlist.sort(key=lambda x: x["score"] if x["score"] is not None else -1, reverse=True)
     return watchlist
 
 

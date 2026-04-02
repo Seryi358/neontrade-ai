@@ -1436,6 +1436,10 @@ class BlueStrategy(BaseStrategy):
     """
     BLUE Strategy - Cambio de Tendencia en 1H (Onda Elliott 1-2)
 
+    BLUE trades the NEW direction after a trend change on 1H.
+    Direction comes from LTF (1H) trend, NOT from HTF (Daily) trend.
+    When Daily is bearish but 1H has turned bullish → BUY (reversal long).
+
     Tres variantes (confidence ranking: A > B > C):
     - Blue A: Double bottom/reversal pattern BEFORE breaking 1H EMA 50 (most effective, +10 bonus)
     - Blue B: Simple impulse-pullback with no prior reversal pattern (neutral, no bonus)
@@ -1457,6 +1461,20 @@ class BlueStrategy(BaseStrategy):
         self.name = "BLUE - Cambio de Tendencia 1H (Elliott 1-2)"
         self.min_confidence = 55.0
 
+    def _determine_direction(self, analysis: AnalysisResult) -> Optional[str]:
+        """BLUE uses LTF (1H) trend for direction, not HTF.
+        BLUE is a trend-CHANGE strategy: the 1H has already reversed."""
+        if analysis.ltf_trend == Trend.BULLISH:
+            return "BUY"
+        elif analysis.ltf_trend == Trend.BEARISH:
+            return "SELL"
+        # Fallback: check HTF condition for extreme levels
+        if analysis.htf_condition == MarketCondition.OVERSOLD:
+            return "BUY"
+        elif analysis.htf_condition == MarketCondition.OVERBOUGHT:
+            return "SELL"
+        return None
+
     def check_htf_conditions(self, analysis: AnalysisResult) -> Tuple[bool, float, List[str], List[str]]:
         score = 0.0
         met: List[str] = []
@@ -1465,14 +1483,8 @@ class BlueStrategy(BaseStrategy):
         # --- Paso 1: Nivel S/R diario ---
         direction = self._determine_direction(analysis)
         if direction is None:
-            # Para Blue, tambien podemos detectar reversal en ranging
-            if analysis.htf_condition in (MarketCondition.OVERSOLD,):
-                direction = "BUY"
-            elif analysis.htf_condition in (MarketCondition.OVERBOUGHT,):
-                direction = "SELL"
-            else:
-                failed.append("Paso 1: No hay tendencia HTF ni condicion extrema para determinar direccion")
-                return False, score, met, failed
+            failed.append("Paso 1: LTF (1H) sin tendencia clara para determinar direccion de reversal")
+            return False, score, met, failed
 
         at_level, level_val, level_desc = _is_at_key_level(analysis, direction)
         if at_level:
@@ -1508,12 +1520,7 @@ class BlueStrategy(BaseStrategy):
     def check_ltf_entry(self, analysis: AnalysisResult) -> Optional[SetupSignal]:
         direction = self._determine_direction(analysis)
         if direction is None:
-            if analysis.htf_condition == MarketCondition.OVERSOLD:
-                direction = "BUY"
-            elif analysis.htf_condition == MarketCondition.OVERBOUGHT:
-                direction = "SELL"
-            else:
-                return None
+            return None
 
         # Style-adaptive EMA keys (same as check_htf_conditions)
         setup_ema_key = _tf_ema("setup", 50)

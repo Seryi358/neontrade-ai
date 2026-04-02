@@ -296,39 +296,63 @@ class CapitalClient(BaseBroker):
         broker_circuit_breaker.record_failure()
         raise last_exc
 
-    @retry_async(max_retries=2, base_delay=0.5, exceptions=(httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException))
     async def _put(self, path: str, json_data: Optional[Dict] = None) -> httpx.Response:
-        """Authenticated PUT request with retry and circuit breaker."""
+        """Authenticated PUT request with retry, 401 re-auth, and circuit breaker."""
         if broker_circuit_breaker.is_open:
             raise ConnectionError("Circuit breaker OPEN — broker unavailable (PUT)")
         await self._ensure_session()
-        try:
-            resp = await self._client.put(
-                path, headers=self._auth_headers(), json=json_data or {},
-            )
-            resp.raise_for_status()
-            broker_circuit_breaker.record_success()
-            return resp
-        except Exception:
-            broker_circuit_breaker.record_failure()
-            raise
+        last_exc = None
+        for attempt in range(3):
+            try:
+                resp = await self._client.put(
+                    path, headers=self._auth_headers(), json=json_data or {},
+                )
+                resp.raise_for_status()
+                broker_circuit_breaker.record_success()
+                return resp
+            except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+                last_exc = e
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 401:
+                    self._cst = None
+                    self._security_token = None
+                    self._session_time = None
+                if attempt < 2:
+                    await asyncio.sleep(min(0.5 * (2 ** attempt), 5.0))
+                    await self._ensure_session()
+            except Exception as e:
+                broker_circuit_breaker.record_failure()
+                raise
+        broker_circuit_breaker.record_failure()
+        raise last_exc
 
-    @retry_async(max_retries=2, base_delay=0.5, exceptions=(httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException))
     async def _delete(self, path: str, json_data: Optional[Dict] = None) -> httpx.Response:
-        """Authenticated DELETE request with retry and circuit breaker."""
+        """Authenticated DELETE request with retry, 401 re-auth, and circuit breaker."""
         if broker_circuit_breaker.is_open:
             raise ConnectionError("Circuit breaker OPEN — broker unavailable (DELETE)")
         await self._ensure_session()
-        try:
-            resp = await self._client.request(
-                "DELETE", path, headers=self._auth_headers(), json=json_data,
-            )
-            resp.raise_for_status()
-            broker_circuit_breaker.record_success()
-            return resp
-        except Exception:
-            broker_circuit_breaker.record_failure()
-            raise
+        last_exc = None
+        for attempt in range(3):
+            try:
+                resp = await self._client.request(
+                    "DELETE", path, headers=self._auth_headers(), json=json_data,
+                )
+                resp.raise_for_status()
+                broker_circuit_breaker.record_success()
+                return resp
+            except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+                last_exc = e
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 401:
+                    self._cst = None
+                    self._security_token = None
+                    self._session_time = None
+                if attempt < 2:
+                    await asyncio.sleep(min(0.5 * (2 ** attempt), 5.0))
+                    await self._ensure_session()
+            except Exception as e:
+                broker_circuit_breaker.record_failure()
+                raise
+        broker_circuit_breaker.record_failure()
+        raise last_exc
 
     # ── Instrument Resolution ────────────────────────────────────
 

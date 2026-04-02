@@ -829,15 +829,14 @@ class OpenAIAnalyzer:
 
         except Exception as e:
             logger.error("AI validation failed for {}: {}", setup_signal.instrument, e)
+            # IMPORTANT: When AI is unavailable, let the setup THROUGH (fail-open)
+            # rather than silently blocking all trades. The technical analysis
+            # already validated the 7 steps — AI is an extra layer, not a gate.
             return {
-                "ai_score": 0,
-                "ai_recommendation": "SKIP",
-                "ai_reasoning": f"AI validation unavailable: {str(e)}",
-                "suggested_adjustments": {
-                    "suggested_sl": None,
-                    "suggested_tp1": None,
-                    "suggested_tp_max": None,
-                },
+                "ai_score": 75,
+                "ai_recommendation": "TAKE",
+                "ai_reasoning": f"AI unavailable ({str(e)[:80]}). Setup passed on technical analysis only.",
+                "suggested_adjustments": {},
             }
 
     def _build_validation_prompt(self, setup_signal, analysis_result) -> str:

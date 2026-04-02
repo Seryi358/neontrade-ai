@@ -443,11 +443,18 @@ class TradingEngine:
         return False
 
     async def approve_all_pending(self) -> int:
-        """Approve and execute all pending setups. Returns count approved."""
+        """Approve and execute all pending setups. Returns count approved.
+        Checks risk limits before each execution to avoid breaching max risk."""
         self._expire_old_setups()
         pending = [s for s in self.pending_setups if s.status == "pending"]
         count = 0
+        style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
+        current_style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
         for setup in pending:
+            # Check risk limits before approving each trade
+            if not self.risk_manager.can_take_trade(current_style, setup.instrument):
+                logger.warning(f"Skipping setup {setup.id} ({setup.instrument}): max risk limit reached")
+                continue
             setup.status = "approved"
             try:
                 await self._execute_approved_setup(setup)
@@ -606,16 +613,18 @@ class TradingEngine:
                 await self._manage_open_positions()
                 return
 
-            # Funded account: close all positions at trading_end_hour every day
+            # Funded account: close all positions at trading_end_hour every day (DST-adjusted)
             if settings.funded_account_mode and settings.funded_no_overnight:
-                if now.hour >= settings.trading_end_hour:
+                offset = self._dst_offset(now)
+                if now.hour >= settings.trading_end_hour + offset:
                     await self._sync_positions_from_broker()
                     await self._handle_funded_overnight_close()
                     return
 
-            # Funded account: close positions before weekend (Friday close)
+            # Funded account: close positions before weekend (Friday close, DST-adjusted)
             if settings.funded_account_mode and settings.funded_no_weekend:
-                if now.weekday() == 4 and now.hour >= settings.close_before_friday_hour:
+                offset = self._dst_offset(now)
+                if now.weekday() == 4 and now.hour >= settings.close_before_friday_hour + offset:
                     logger.info("Funded mode: closing all positions before weekend")
                     await self._sync_positions_from_broker()
                     await self._handle_funded_overnight_close()
@@ -904,9 +913,11 @@ class TradingEngine:
                     if current and entry:
                         direction = getattr(trade, 'direction', 'BUY')
                         pnl_raw = (current - entry) if direction == "BUY" else (entry - current)
+                        units = abs(getattr(trade, 'units', 0) or (getattr(pos, 'units', 0) if pos else 0))
+                        pnl_dollars = pnl_raw * units if units else pnl_raw
                         balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
                         self.risk_manager.record_trade_result(
-                            trade_id or "", instrument, pnl_raw / balance if balance > 0 else 0.0
+                            trade_id or "", instrument, pnl_dollars / balance if balance > 0 else 0.0
                         )
                     closed += 1
                     logger.info(f"Friday close: Closed {instrument} (near {close_reason})")
@@ -1778,18 +1789,11 @@ class TradingEngine:
                 if signal.instrument in self._last_scan_results:
                     self._last_scan_results[signal.instrument].score = float(ai_score)
                 if ai_rec == "SKIP":
-                    if self.mode == TradingMode.AUTO:
-                        # AUTO mode: AI rejection blocks execution (safety gate)
-                        logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
-                        self._daily_setups_skipped_ai += 1
-                        return None
-                    else:
-                        # MANUAL mode: AI opinion is advisory, not blocking
-                        # The user should decide — queue the setup with AI warning
-                        logger.info(
-                            f"AI recommends SKIP for {signal.instrument} (score={ai_score}) "
-                            f"but MANUAL mode — queuing for user decision"
-                        )
+                    # AI rejects — block in both AUTO and MANUAL mode
+                    # Only send setups the AI recommends 100%
+                    logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
+                    self._daily_setups_skipped_ai += 1
+                    return None
                 # Store AI opinion for downstream use (email, UI)
                 signal._ai_score = ai_score
                 signal._ai_recommendation = ai_rec

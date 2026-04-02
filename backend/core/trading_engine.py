@@ -1789,12 +1789,18 @@ class TradingEngine:
                 # so the UI shows the AI-validated score, not just the technical score
                 if signal.instrument in self._last_scan_results:
                     self._last_scan_results[signal.instrument].score = float(ai_score)
-                if ai_rec == "SKIP":
-                    # AI rejects — block in both AUTO and MANUAL mode
-                    # Only send setups the AI recommends 100%
-                    logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score})")
+                # Filter by AI score: >= 65 passes, < 65 blocked
+                # AI TAKE/SKIP is binary and too strict (never says TAKE in practice).
+                # Score-based filtering is more practical: 65+ are decent setups,
+                # < 65 have real issues (wrong Fibonacci zone, no convergence, etc.)
+                if ai_score < 65:
+                    logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score} < 65)")
                     self._daily_setups_skipped_ai += 1
                     return None
+                if ai_rec == "SKIP" and ai_score >= 65:
+                    logger.info(
+                        f"AI says SKIP but score={ai_score} >= 65 — proceeding (quality threshold met)"
+                    )
                 # Store AI opinion for downstream use (email, UI)
                 signal._ai_score = ai_score
                 signal._ai_recommendation = ai_rec

@@ -419,18 +419,22 @@ class TradingEngine:
             if s.status == "pending"
         ]
 
+    _approve_lock: asyncio.Lock = None  # Initialized lazily
+
     async def approve_setup(self, setup_id: str) -> bool:
-        """Approve and execute a pending setup by ID."""
-        self._expire_old_setups()
-        for setup in self.pending_setups:
-            if setup.id == setup_id and setup.status == "pending":
-                setup.status = "approved"
-                logger.info(f"Setup approved: {setup_id} | {setup.instrument} {setup.direction}")
-                # Execute the approved setup
-                await self._execute_approved_setup(setup)
-                return True
-        logger.warning(f"Setup not found or not pending: {setup_id}")
-        return False
+        """Approve and execute a pending setup by ID. Thread-safe against double approval."""
+        if self._approve_lock is None:
+            self._approve_lock = asyncio.Lock()
+        async with self._approve_lock:
+            self._expire_old_setups()
+            for setup in self.pending_setups:
+                if setup.id == setup_id and setup.status == "pending":
+                    setup.status = "approved"
+                    logger.info(f"Setup approved: {setup_id} | {setup.instrument} {setup.direction}")
+                    await self._execute_approved_setup(setup)
+                    return True
+            logger.warning(f"Setup not found or not pending: {setup_id}")
+            return False
 
     def reject_setup(self, setup_id: str) -> bool:
         """Reject and remove a pending setup by ID."""
@@ -1447,6 +1451,9 @@ class TradingEngine:
         max_per_scan = 50
         if len(full_watchlist) > max_per_scan:
             batch_idx = getattr(self, '_scan_batch_idx', 0)
+            # Clamp batch_idx if watchlist shrank since last scan
+            if batch_idx >= len(full_watchlist):
+                batch_idx = 0
             batch = full_watchlist[batch_idx:batch_idx + max_per_scan]
             self._scan_batch_idx = (batch_idx + max_per_scan) % len(full_watchlist)
             logger.info(

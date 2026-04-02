@@ -197,7 +197,8 @@ export default function ManualModeScreen() {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const getPipMultiplier = (instrument: string): number => {
+  const getPipMultiplier = (instrument: string | null): number => {
+    if (!instrument) return 10000;
     return instrument.toUpperCase().includes('JPY') ? 100 : 10000;
   };
 

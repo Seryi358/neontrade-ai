@@ -810,12 +810,25 @@ class CapitalClient(BaseBroker):
 
             if status == "ACCEPTED":
                 trade_id = affected[0]["dealId"] if affected else deal_id
+                if not trade_id:
+                    # Capital.com accepted but gave no trade ID — try to find from open positions
+                    logger.warning(f"Order ACCEPTED but no dealId returned for {instrument}. Searching open positions...")
+                    try:
+                        trades = await self.get_open_trades()
+                        for t in trades:
+                            if t.instrument == instrument:
+                                trade_id = t.trade_id
+                                logger.info(f"Found trade ID from open positions: {trade_id}")
+                                break
+                    except Exception:
+                        pass
                 return OrderResult(
-                    success=True,
+                    success=True if trade_id else False,
                     trade_id=trade_id,
                     fill_price=float(level) if level else None,
                     units=units,
                     raw_response=data,
+                    error="Order accepted but no trade ID found" if not trade_id else None,
                 )
             else:
                 reason = data.get("reason", "UNKNOWN")

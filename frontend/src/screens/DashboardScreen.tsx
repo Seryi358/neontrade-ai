@@ -310,8 +310,8 @@ export default function DashboardScreen() {
 
         <HUDProgressBar
           label="CURRENT RISK"
-          value={(totalRiskPct / maxRiskPct) * 100}
-          maxLabel={`${maxRiskPct.toFixed(1)}% MAX`}
+          value={maxRiskPct > 0 ? (totalRiskPct / maxRiskPct) * 100 : 0}
+          maxLabel={`${safe(maxRiskPct, 1)}% MAX`}
           color={riskColor(totalRiskPct)}
           showValue
         />

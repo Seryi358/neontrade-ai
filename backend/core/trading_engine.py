@@ -540,6 +540,10 @@ class TradingEngine:
             logger.error(f"Last error: {self._startup_error}")
             return
 
+        # Register PositionManager callback so its internal closes
+        # (TP_max, emergency exit) also persist to DB + trade journal
+        self.position_manager.set_on_trade_closed(self._on_position_closed)
+
         self._running = True
         logger.info(f"Watching {len(get_active_watchlist())} pairs")
         logger.info(f"Scan interval: {self._scan_interval}s")
@@ -697,10 +701,11 @@ class TradingEngine:
                             await self.broker.close_trade(pos.trade_id)
                             # Record trade result before removing
                             pnl_val = 0.0
+                            news_exit_price = pos.entry_price  # fallback
                             try:
                                 price_data = await self.broker.get_current_price(pos.instrument)
-                                cp = price_data.bid if pos.direction == "BUY" else price_data.ask
-                                pnl_val = ((cp - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - cp)) * abs(pos.units)
+                                news_exit_price = price_data.bid if pos.direction == "BUY" else price_data.ask
+                                pnl_val = ((news_exit_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - news_exit_price)) * abs(pos.units)
                             except Exception as e:
                                 logger.warning(f"News close: could not get price for PnL ({e}), recording as $0")
                             balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
@@ -708,12 +713,37 @@ class TradingEngine:
                             self.position_manager.remove_position(pos.trade_id)
                             self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
                             logger.warning(f"News close: Closed {pos.instrument} — {reason}")
+                            # Persist to DB
+                            if self._db:
+                                try:
+                                    await self._db.update_trade(pos.trade_id, {
+                                        "status": "closed_news",
+                                        "closed_at": datetime.now(timezone.utc).isoformat(),
+                                        "exit_price": news_exit_price,
+                                        "pnl": pnl_val,
+                                    })
+                                except Exception as db_err:
+                                    logger.warning(f"DB update failed for news close {pos.trade_id}: {db_err}")
+                            # Record in trade journal
+                            if self.trade_journal:
+                                try:
+                                    self.trade_journal.record_trade(
+                                        trade_id=pos.trade_id,
+                                        instrument=pos.instrument,
+                                        pnl_dollars=pnl_val,
+                                        entry_price=pos.entry_price,
+                                        exit_price=news_exit_price,
+                                        strategy=getattr(pos, 'strategy_variant', 'UNKNOWN'),
+                                        direction=pos.direction,
+                                    )
+                                except Exception as je:
+                                    logger.warning(f"Trade journal failed for news close {pos.trade_id}: {je}")
                             # Send alert
                             if self.alert_manager:
                                 try:
                                     await self.alert_manager.send_trade_closed(
                                         instrument=pos.instrument,
-                                        pnl=0.0,
+                                        pnl=pnl_val,
                                         pips=0.0,
                                         reason=f"Closed before news: {reason}",
                                         strategy=getattr(pos, 'strategy_variant', '') or '',
@@ -1017,6 +1047,91 @@ class TradingEngine:
             await self.broker.close_all_trades()
             self.risk_manager.unregister_all_trades()
             self.position_manager.positions.clear()
+
+    # ── Position-Manager close callback ────────────────────────
+
+    async def _on_position_closed(
+        self,
+        trade_id: str,
+        instrument: str,
+        direction: str,
+        entry_price: float,
+        exit_price: float,
+        pnl_dollars: float,
+        units: float,
+        reason: str,
+        strategy_variant: Optional[str] = None,
+    ):
+        """Called by PositionManager when it closes a trade (TP_max / emergency exit).
+
+        Mirrors the DB + journal + consecutive-loss logic already used in
+        _sync_positions_from_broker for externally-closed positions.
+        """
+        # 1. Persist to SQLite DB
+        if self._db:
+            try:
+                await self._db.update_trade(trade_id, {
+                    "status": f"closed_{reason}",
+                    "closed_at": datetime.now(timezone.utc).isoformat(),
+                    "exit_price": exit_price,
+                    "pnl": pnl_dollars,
+                })
+            except Exception as db_err:
+                logger.warning(f"DB update failed for {reason} close {trade_id}: {db_err}")
+
+        # 2. Record in trade journal
+        if self.trade_journal:
+            try:
+                self.trade_journal.record_trade(
+                    trade_id=trade_id,
+                    instrument=instrument,
+                    pnl_dollars=pnl_dollars,
+                    entry_price=entry_price,
+                    exit_price=exit_price,
+                    strategy=strategy_variant or "UNKNOWN",
+                    direction=direction,
+                )
+            except Exception as je:
+                logger.warning(f"Trade journal record failed for {trade_id}: {je}")
+
+        # 3. Track consecutive losses for cooldown (Psicologia Avanzada)
+        if pnl_dollars < 0:
+            self._consecutive_losses_today += 1
+            self._last_loss_time = datetime.now(timezone.utc)
+        else:
+            self._consecutive_losses_today = 0
+
+        # 4. Funded account PnL tracking
+        if settings.funded_account_mode:
+            self.risk_manager.record_funded_pnl(pnl_dollars)
+
+        # 5. WebSocket broadcast
+        if self._ws_broadcast:
+            try:
+                await self._ws_broadcast("trade_closed", {
+                    "trade_id": trade_id,
+                    "instrument": instrument,
+                    "reason": reason,
+                    "pnl": pnl_dollars,
+                })
+            except Exception:
+                pass
+
+        # 6. Screenshot on trade close
+        if self.screenshot_generator:
+            try:
+                pnl_pct = round((exit_price - entry_price if direction == "BUY" else entry_price - exit_price) / entry_price * 100, 2) if entry_price else 0
+                await self.screenshot_generator.capture_trade_close(
+                    trade_id=trade_id,
+                    instrument=instrument,
+                    direction=direction,
+                    entry_price=entry_price,
+                    close_price=exit_price,
+                    pnl_pct=pnl_pct,
+                    result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
+                )
+            except Exception:
+                pass
 
     # ── Position Sync ────────────────────────────────────────────
 

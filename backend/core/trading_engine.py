@@ -582,6 +582,11 @@ class TradingEngine:
                 await self._tick()
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
+                if self._ws_broadcast:
+                    try:
+                        await self._ws_broadcast("engine_error", {"error": str(e)})
+                    except Exception:
+                        pass
 
             await asyncio.sleep(self._scan_interval)
 
@@ -1007,7 +1012,7 @@ class TradingEngine:
                             "pnl": pnl,
                         })
                 except Exception as e:
-                    logger.debug(f"Failed to process funded close for {tid}: {e}")
+                    logger.warning(f"Failed to process funded close for {tid}: {e}")
 
             await self.broker.close_all_trades()
             self.risk_manager.unregister_all_trades()
@@ -1112,7 +1117,7 @@ class TradingEngine:
                             close_price = pos.current_sl
                             price_diff = (close_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - close_price)
                             pnl_dollars = price_diff * abs(pos.units) if pos.units != 0 else price_diff
-                        logger.debug(f"Failed to get close price for {tid}, using SL estimate: {e}")
+                        logger.warning(f"Failed to get close price for {tid}, using SL estimate: {e}")
 
                     # Record trade result for delta algorithm, win rate, and reentry tracking
                     balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
@@ -2233,7 +2238,7 @@ class TradingEngine:
                             "mode": self.mode.value,
                         })
                     except Exception as ws_err:
-                        logger.debug(f"WS broadcast trade_executed failed: {ws_err}")
+                        logger.warning(f"WS broadcast trade_executed failed: {ws_err}")
 
                 # Screenshot on trade open (Trading Plan rule)
                 if self.screenshot_generator:

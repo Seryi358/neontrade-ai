@@ -251,7 +251,7 @@ class CapitalClient(BaseBroker):
                     logger.warning(f"[_get] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 3:
                     delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 10.0)
-                    logger.debug(f"[_get] {path} attempt {attempt+1}/4 failed: {e}. Retry in {delay:.1f}s")
+                    logger.warning(f"[_get] {path} attempt {attempt+1}/4 failed: {e}. Retry in {delay:.1f}s")
                     await asyncio.sleep(delay)
                     # Re-check session in case it expired
                     await self._ensure_session()
@@ -287,7 +287,7 @@ class CapitalClient(BaseBroker):
                     logger.warning(f"[_post] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
                     delay = min(0.5 * (2 ** attempt), 10.0)
-                    logger.debug(f"[_post] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
+                    logger.warning(f"[_post] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
                     await asyncio.sleep(delay)
                     await self._ensure_session()
             except Exception as e:
@@ -316,8 +316,11 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    logger.warning(f"[_put] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
-                    await asyncio.sleep(min(0.5 * (2 ** attempt), 5.0))
+                    delay = min(0.5 * (2 ** attempt), 5.0)
+                    logger.warning(f"[_put] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
+                    await asyncio.sleep(delay)
                     await self._ensure_session()
             except Exception as e:
                 broker_circuit_breaker.record_failure()
@@ -345,8 +348,11 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    logger.warning(f"[_delete] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
-                    await asyncio.sleep(min(0.5 * (2 ** attempt), 5.0))
+                    delay = min(0.5 * (2 ** attempt), 5.0)
+                    logger.warning(f"[_delete] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
+                    await asyncio.sleep(delay)
                     await self._ensure_session()
             except Exception as e:
                 broker_circuit_breaker.record_failure()

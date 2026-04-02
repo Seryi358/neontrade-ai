@@ -562,8 +562,8 @@ class TradingEngine:
                     f"Broker: {broker_name}. Balance: {balance} {currency}. "
                     f"Watching {len(get_active_watchlist())} pairs.",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Startup alert failed: {e}")
 
         # Initial scan on startup — run regardless of market hours
         # so that analysis data is available immediately for the UI
@@ -594,8 +594,8 @@ class TradingEngine:
                 if self._ws_broadcast:
                     try:
                         await self._ws_broadcast("engine_error", {"error": str(e)})
-                    except Exception:
-                        pass
+                    except Exception as ws_err:
+                        logger.debug(f"WS broadcast of engine error also failed: {ws_err}")
 
             await asyncio.sleep(self._scan_interval)
 
@@ -753,8 +753,8 @@ class TradingEngine:
                                         reason=f"Closed before news: {reason}",
                                         strategy=getattr(pos, 'strategy_variant', '') or '',
                                     )
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    logger.warning(f"Trade journal write failed for {trade_id}: {e}")
                     except Exception as e:
                         logger.error(f"News close failed for {trade_id}: {e}")
 
@@ -1029,8 +1029,8 @@ class TradingEngine:
                         "FRIDAY_CLOSE",
                         f"Closed {closed} positions near SL/TP before weekend. Kept {kept} running.",
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Friday close alert failed: {e}")
         elif kept > 0:
             logger.info(f"Friday: All {kept} positions are mid-range — keeping through weekend")
 
@@ -1151,8 +1151,8 @@ class TradingEngine:
                     "reason": reason,
                     "pnl": pnl_dollars,
                 })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"WS broadcast trade_closed failed: {e}")
 
         # 6. Screenshot on trade close
         if self.screenshot_generator:
@@ -1167,8 +1167,8 @@ class TradingEngine:
                     pnl_pct=pnl_pct,
                     result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
 
     # ── Position Sync ────────────────────────────────────────────
 
@@ -1567,8 +1567,8 @@ class TradingEngine:
             if self._ws_broadcast:
                 try:
                     await self._ws_broadcast("engine_status", self.get_status())
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"WS progress broadcast failed: {e}")
 
         logger.info(
             f"Initial scan complete: {len(self._last_scan_results)}/{len(get_active_watchlist())} pairs analyzed, "

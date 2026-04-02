@@ -938,11 +938,9 @@ class IBKRClient(BaseBroker):
             return 0.1
         if pair in ("XAG_USD", "SILVER"):
             return 0.01
-        if any(pair.startswith(c) for c in (
-            "BTC", "ETH", "SOL", "ADA", "DOT", "LINK", "AVAX", "MATIC",
-            "UNI", "ATOM", "XRP", "DOGE", "LTC", "BNB", "FTM", "ALGO",
-            "XLM", "EOS", "XTZ", "VET",
-        )):
+        # CLAUDE.md Rule #1: use _is_crypto_instrument, never hardcoded prefix lists
+        from strategies.base import _is_crypto_instrument
+        if _is_crypto_instrument(pair):
             return 1.0
         if any(pair.startswith(idx) for idx in (
             "US30", "US2000", "NAS100", "SPX500", "DE30", "FR40",

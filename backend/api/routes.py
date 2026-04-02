@@ -351,6 +351,34 @@ async def get_positions():
 
 # ── Analysis & Explanations ──────────────────────────────────────
 
+# RT-12 fix: literal /analysis MUST come before parameterized /analysis/{instrument}
+@router.get("/analysis")
+async def get_all_analyses():
+    """Get latest analysis summary for all scanned instruments."""
+    from main import engine
+    results = []
+    for inst, analysis in engine.last_scan_results.items():
+        entry = {
+            "instrument": inst,
+            "score": analysis.score,
+            "htf_trend": analysis.htf_trend.value,
+            "ltf_trend": analysis.ltf_trend.value,
+            "convergence": analysis.htf_ltf_convergence,
+            "condition": analysis.htf_condition.value,
+            "patterns": analysis.candlestick_patterns,
+        }
+        # Add strategy detection if available
+        if inst in engine.latest_explanations:
+            expl = engine.latest_explanations[inst]
+            entry["strategy_detected"] = expl.strategy_detected
+            entry["confidence_level"] = expl.confidence_level
+            entry["recommendation"] = expl.recommendation
+        results.append(entry)
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
+
+
 @router.get("/analysis/{instrument}")
 async def get_analysis(instrument: str):
     """Get latest analysis for a specific instrument with full explanation."""
@@ -436,33 +464,6 @@ async def get_analysis(instrument: str):
         }
 
     return response
-
-
-@router.get("/analysis")
-async def get_all_analyses():
-    """Get latest analysis summary for all scanned instruments."""
-    from main import engine
-    results = []
-    for inst, analysis in engine.last_scan_results.items():
-        entry = {
-            "instrument": inst,
-            "score": analysis.score,
-            "htf_trend": analysis.htf_trend.value,
-            "ltf_trend": analysis.ltf_trend.value,
-            "convergence": analysis.htf_ltf_convergence,
-            "condition": analysis.htf_condition.value,
-            "patterns": analysis.candlestick_patterns,
-        }
-        # Add strategy detection if available
-        if inst in engine.latest_explanations:
-            expl = engine.latest_explanations[inst]
-            entry["strategy_detected"] = expl.strategy_detected
-            entry["confidence_level"] = expl.confidence_level
-            entry["recommendation"] = expl.recommendation
-        results.append(entry)
-
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results
 
 
 # ── Watchlist ────────────────────────────────────────────────────

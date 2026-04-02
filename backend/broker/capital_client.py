@@ -826,8 +826,8 @@ class CapitalClient(BaseBroker):
                                 trade_id = t.trade_id
                                 logger.info(f"Found trade ID from open positions: {trade_id}")
                                 break
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.error(f"Failed to search open positions for trade ID: {e}")
                 return OrderResult(
                     success=True if trade_id else False,
                     trade_id=trade_id,
@@ -946,8 +946,8 @@ class CapitalClient(BaseBroker):
             result["snapshot"] = data.get("snapshot", {})
             result["epic"] = epic
             return result
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Market detail lookup failed for {epic}, falling back to search: {e}")
         # Fallback to search
         try:
             data = await self._get("/api/v1/markets", params={
@@ -960,8 +960,8 @@ class CapitalClient(BaseBroker):
             markets = data.get("markets", [])
             if markets:
                 return markets[0]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Market search also failed for {instrument}: {e}")
         return {"epic": epic, "instrumentName": instrument}
 
     async def get_pip_value(self, instrument: str) -> float:

@@ -5,6 +5,21 @@ import os
 import copy
 import pytest
 
+# Legacy standalone scripts that call sys.exit() at module level are not
+# pytest-compatible. Exclude them from collection so they can still be run
+# directly (python3 <file>) but don't cause INTERNALERROR during pytest.
+collect_ignore = [
+    # Legacy standalone scripts that call sys.exit() at module level
+    "test_final_integration.py",
+    "test_round4_comprehensive.py",
+    "test_round10_ultimate.py",
+    # Live integration tests — require real broker credentials and network access
+    "test_live_broker.py",
+    "test_live_comprehensive.py",
+    "test_live_e2e_simulation.py",
+    "test_live_stress.py",
+]
+
 
 _RISK_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "risk_config.json")
 
@@ -57,3 +72,10 @@ def _restore_settings_and_risk_config():
                 json.dump(saved_json, f, indent=2)
         except Exception:
             pass
+
+    # Clear balance cache so tests with different mock balances don't bleed into each other
+    try:
+        from core.resilience import balance_cache
+        balance_cache.clear()
+    except Exception:
+        pass

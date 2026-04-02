@@ -366,14 +366,10 @@ class PositionManager:
         Aggressive phase uses a smaller buffer.
         """
         trade_range = abs(pos.take_profit_1 - pos.entry_price)
-        # Minimum buffer: 0.1% of entry price to always give EMA space
-        min_buffer = pos.entry_price * 0.001 if pos.entry_price > 0 else 0.0001
         if aggressive:
-            # CPA / beyond-TP1: tighter buffer but still not zero
-            return max(trade_range * 0.01, min_buffer)
+            return trade_range * 0.01  # 1% of trade range for CPA / beyond-TP1
         else:
-            # Base trailing: wider buffer to let EMA breathe
-            return max(trade_range * 0.02, min_buffer)
+            return trade_range * 0.02  # 2% of trade range for base trailing
 
     def track_position(self, position: ManagedPosition):
         """Start tracking a new position."""

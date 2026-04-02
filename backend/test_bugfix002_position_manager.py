@@ -37,14 +37,21 @@ class MockBroker:
     """Records SL modifications and trade closures for assertions."""
 
     def __init__(self):
-        self.sl_updates = []   # [(trade_id, new_sl), ...]
-        self.closed = []       # [(trade_id, units), ...]
+        self.sl_updates = []       # [(trade_id, new_sl), ...]
+        self.closed = []           # [(trade_id, units), ...]
+        self.partial_closes = []   # [(trade_id, percent), ...]
 
     async def modify_trade_sl(self, trade_id, new_sl):
         self.sl_updates.append((trade_id, new_sl))
+        return True  # real broker returns True on success
 
     async def close_trade(self, trade_id, units=None):
         self.closed.append((trade_id, units))
+        return True
+
+    async def close_trade_partial(self, trade_id, percent=50):
+        self.partial_closes.append((trade_id, percent))
+        return True
 
 
 class MockRiskManager:
@@ -383,10 +390,10 @@ class TestPartialProfits:
 
         run(pm._handle_trailing_phase(pos, 1.1105))  # TP1 reached
         assert pos.phase == PositionPhase.BEYOND_TP1
-        # Should have closed half = 10000 units
-        assert len(broker.closed) == 1
-        assert broker.closed[0][1] == 10000
-        assert pos.units == 10000
+        # Should have closed half via close_trade_partial(percent=50)
+        assert len(broker.partial_closes) == 1
+        assert broker.partial_closes[0][1] == 50  # 50% closed
+        assert pos.units == 10000  # half of 20000 remaining
 
     @patch("config.settings")
     def test_no_partial_when_disabled(self, mock_settings, pm, broker):

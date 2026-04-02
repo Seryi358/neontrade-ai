@@ -1085,10 +1085,15 @@ def _is_crypto_instrument(instrument: str) -> bool:
     inst_upper = instrument.upper()
     if inst_upper in _crypto_watchlist_cache:
         return True
-    # Fallback: check common crypto suffixes (_USD, USD, /USD)
-    # This catches instruments like "BTCUSD" when watchlist has "BTC_USD"
-    base = inst_upper.replace("_USD", "").replace("/USD", "").replace("USD", "")
-    return any(w.replace("_USD", "") == base for w in _crypto_watchlist_cache)
+    # Fallback: strip common quote-currency suffixes and compare base symbols.
+    # Order matters: strip _USDT before _USD so "ETH_USDT" → "ETH", not "ETHT".
+    base = (inst_upper
+            .replace("_USDT", "").replace("/USDT", "").replace("USDT", "")
+            .replace("_USD", "").replace("/USD", "").replace("USD", ""))
+    return any(
+        w.replace("_USDT", "").replace("_USD", "") == base
+        for w in _crypto_watchlist_cache
+    )
 
 
 def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
@@ -4449,7 +4454,7 @@ def _apply_elliott_wave_priority(
     """
     Re-score setups based on the current Elliott Wave phase.
 
-    GREEN is excluded from wave bonuses (crypto-only strategy, not wave-specific).
+    GREEN receives bonuses in impulsive waves (1, 3, 5) per Trading Plan PDF.
 
     From Trading Plan 2024 (corrected):
     - Wave 1: BLACK +12 — counter-trend anticipation (highest priority)

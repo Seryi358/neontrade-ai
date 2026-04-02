@@ -511,7 +511,7 @@ class TestBroker:
 
     def test_set_broker_valid(self, client):
         resp = client.post("/api/v1/broker",
-                           json={"broker": "oanda"})
+                           json={"broker": "capital"})
         assert resp.status_code == 200
         assert resp.json()["status"] == "pending_restart"
 

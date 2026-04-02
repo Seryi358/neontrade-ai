@@ -606,6 +606,10 @@ def test_22_funded_account():
     settings.funded_account_mode = old_mode
 
 
+import pytest as _pytest_oanda  # noqa: E402 — needed for xfail markers below
+
+
+@_pytest_oanda.mark.xfail(reason="OANDA integration removed — out of scope per PROJECT.md", strict=True)
 def test_23_oanda_urls():
     """Test 23: OANDA URL configuration."""
     section("23. OANDA URLs")
@@ -811,6 +815,7 @@ def test_35_reject_all_only_pending():
     check("s2 NOT in pending", not any(s.id == "s2" for s in pending))
 
 
+@_pytest_oanda.mark.xfail(reason="OANDA integration removed — out of scope per PROJECT.md", strict=True)
 def test_36_get_oanda_url_invalid_env():
     """Test 36: get_oanda_url handles invalid environment gracefully."""
     section("36. get_oanda_url Invalid Environment")

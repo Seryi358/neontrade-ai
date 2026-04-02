@@ -975,7 +975,7 @@ def test_h_cross_module_consistency():
     print(f"  [PASS] H3b: Trend enum values match")
 
     # Check ManagementStyle
-    expected_styles = {"lp", "cp", "cpa", "price_action"}
+    expected_styles = {"lp", "cp", "cpa", "price_action", "daily"}  # "daily" added for crypto mid-term
     actual_styles = {s.value for s in ManagementStyle}
     assert expected_styles == actual_styles
     print(f"  [PASS] H3c: ManagementStyle enum values match")

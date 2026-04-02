@@ -143,7 +143,7 @@ class TestCircuitBreaker:
 
     def test_global_broker_cb_has_correct_config(self):
         """Verify production circuit breaker config matches expectations."""
-        assert broker_circuit_breaker.failure_threshold == 50
+        assert broker_circuit_breaker.failure_threshold == 5  # 5 consecutive failures (50 was too permissive)
         assert broker_circuit_breaker.recovery_timeout == 30.0
         assert broker_circuit_breaker.name == "broker"
 

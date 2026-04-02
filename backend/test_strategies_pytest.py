@@ -40,6 +40,7 @@ def make_analysis(
     elliott_wave=None,
     elliott_wave_detail=None,
     bmsb=None,
+    last_candles=None,
 ):
     ema_values = {
         "EMA_M5_2": price_proxy,
@@ -77,6 +78,7 @@ def make_analysis(
         elliott_wave=elliott_wave,
         elliott_wave_detail=elliott_wave_detail or {},
         bmsb=bmsb,
+        last_candles=last_candles or {},
     )
 
 
@@ -154,12 +156,16 @@ class TestBlueStrategy:
         assert variant == "BLUE_B"
 
     def test_variant_c_near_ema_4h(self):
-        """Variant C triggers when price is within 0.2% of EMA 4H."""
+        """Variant C triggers when a rejection candle wicked through EMA 4H and closed above it."""
         price = 1.1000
+        ema = 1.1001
+        # A bullish rejection candle: low touched below EMA, closed above it
+        rejection_candle = {"open": 1.0998, "high": 1.1010, "low": 1.0995, "close": 1.1008}
         analysis = make_analysis(
             price_proxy=price,
-            ema_h4_50=1.1001,  # within 0.2% of price
+            ema_h4_50=ema,
             htf_trend=Trend.BULLISH,
+            last_candles={"M5": [rejection_candle, rejection_candle, rejection_candle]},
         )
         variant = _classify_blue_variant(analysis, "BUY")
         assert variant == "BLUE_C"
@@ -444,11 +450,11 @@ class TestElliottWavePriority:
         result = _apply_elliott_wave_priority(self._make_analysis_wave("5"), signals)
         assert result[0].confidence == 80
 
-    def test_green_no_wave_bonus(self):
-        """GREEN should not appear in wave bonuses."""
+    def test_green_wave_bonus(self):
+        """GREEN gets +8 bonus in impulsive waves (1, 3, 5) per Trading Plan."""
         signals = [self._make_signal(StrategyColor.GREEN, 70)]
         result = _apply_elliott_wave_priority(self._make_analysis_wave("3"), signals)
-        assert result[0].confidence == 70  # No bonus
+        assert result[0].confidence == 78  # +8 bonus for GREEN in wave 3
 
 
 # ── Section 9: Reversal pattern detection ─────────────────────────────

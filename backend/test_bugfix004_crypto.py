@@ -346,10 +346,11 @@ class TestDominanceTransition:
         assert result["altcoin_outlook"] == "rare_alts_may_fall"
 
     def test_rising_dom_btc_stable(self):
-        """BTC.D up + BTC stable = altcoins still down."""
+        """BTC.D up + BTC stable = consolidation, slightly down for altcoins."""
         result = self.analyzer.get_dominance_transition(
             self._make_cycle("rising", 0.01))
-        assert result["altcoin_outlook"] == "down"
+        # Mentorship: BTC.D rising + BTC stable = consolidation phase, not capital flight
+        assert result["altcoin_outlook"] == "stable_to_slightly_down"
 
     def test_stable_dom(self):
         """Stable dominance = neutral."""

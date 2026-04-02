@@ -482,7 +482,12 @@ class TradingEngine:
             if setup.status != "pending":
                 continue
             if setup.expires_at:
-                expires = datetime.fromisoformat(setup.expires_at)
+                try:
+                    expires = datetime.fromisoformat(setup.expires_at)
+                    if expires.tzinfo is None:
+                        expires = expires.replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    expires = now  # Force expiry on unparseable dates
                 if now >= expires:
                     setup.status = "expired"
                     logger.info(
@@ -961,11 +966,8 @@ class TradingEngine:
             if should_close:
                 try:
                     await self.broker.close_trade(trade_id)
-                    # Clean up internal tracking
-                    pos = self.position_manager.positions.pop(trade_id, None)
-                    if pos:
-                        self.risk_manager.unregister_trade(trade_id, pos.instrument)
-                    # Record trade result for delta/reentry tracking
+                    # Record trade result BEFORE cleanup (delta/reentry tracking)
+                    pos = self.position_manager.positions.get(trade_id)
                     if current and entry:
                         direction = getattr(trade, 'direction', 'BUY')
                         pnl_raw = (current - entry) if direction == "BUY" else (entry - current)
@@ -975,6 +977,10 @@ class TradingEngine:
                         self.risk_manager.record_trade_result(
                             trade_id or "", instrument, pnl_dollars / balance if balance > 0 else 0.0
                         )
+                    # Clean up internal tracking after recording
+                    self.position_manager.positions.pop(trade_id, None)
+                    if pos:
+                        self.risk_manager.unregister_trade(trade_id, pos.instrument)
                     closed += 1
                     logger.info(f"Friday close: Closed {instrument} (near {close_reason})")
                     # Persist close to DB with PnL
@@ -1763,10 +1769,15 @@ class TradingEngine:
                             setup = None
                     elif session_quality <= 0.5:
                         # SYDNEY/ASIAN sessions: reduce risk (proxy for confidence penalty of -15 pts)
+                        original_risk = setup.risk_percent
                         setup.risk_percent *= 0.85
                         raw_units = setup.units * 0.85
                         setup.units = round(raw_units, 6) if abs(raw_units) < 100 else int(raw_units) or (1 if setup.units > 0 else -1)
-                        logger.info(
+                        setup.session_warning = (
+                            f"Sesión {session_name} (calidad {session_quality:.0%}): "
+                            f"riesgo reducido de {original_risk:.2%} a {setup.risk_percent:.2%}"
+                        )
+                        logger.warning(
                             f"Reduced risk for {instrument}: {session_name} session "
                             f"(quality={session_quality:.1f}) — risk adjusted to {setup.risk_percent:.2%}"
                         )

@@ -733,6 +733,27 @@ class RiskManager:
             f"Daily total: {self._funded_daily_pnl:+.2f}"
         )
 
+    def _check_funded_phase_advancement(self, profit_target: float, profit_progress: float) -> bool:
+        """Check and apply funded account phase transitions. Separated from get_funded_status
+        so read-only API calls don't trigger state mutations (RM-11 fix)."""
+        if profit_target <= 0 or profit_progress < 100.0:
+            return False
+        if settings.funded_current_phase == 1:
+            settings.funded_current_phase = 2
+            logger.info(
+                f"FUNDED ACCOUNT: Phase 1 profit target ({profit_target:.0%}) MET! "
+                f"Auto-advancing to Phase 2."
+            )
+            return True
+        elif settings.funded_current_phase == 2:
+            settings.funded_current_phase = 3
+            logger.info(
+                f"FUNDED ACCOUNT: Phase 2 profit target ({profit_target:.0%}) MET! "
+                f"Advancing to REAL ACCOUNT (Phase 3). Congratulations!"
+            )
+            return True
+        return False
+
     def get_funded_status(self) -> Dict:
         """Get funded account status for API."""
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -766,25 +787,9 @@ class RiskManager:
             current_profit_pct = (self._current_balance - initial_balance) / initial_balance if initial_balance > 0 else 0
             profit_progress = (current_profit_pct / profit_target * 100) if profit_target > 0 else 0
 
-        # Auto-transition: check if profit target is met (Workshop de Cuentas Fondeadas)
-        # Phase 1 target met -> advance to Phase 2
-        # Phase 2 target met -> advance to real account (Phase 3)
-        phase_advanced = False
-        if profit_target > 0 and profit_progress >= 100.0:
-            if settings.funded_current_phase == 1:
-                settings.funded_current_phase = 2
-                phase_advanced = True
-                logger.info(
-                    f"FUNDED ACCOUNT: Phase 1 profit target ({profit_target:.0%}) MET! "
-                    f"Auto-advancing to Phase 2."
-                )
-            elif settings.funded_current_phase == 2:
-                settings.funded_current_phase = 3  # Real account
-                phase_advanced = True
-                logger.info(
-                    f"FUNDED ACCOUNT: Phase 2 profit target ({profit_target:.0%}) MET! "
-                    f"Advancing to REAL ACCOUNT (Phase 3). Congratulations!"
-                )
+        # Phase advancement check — separated from read-only status to avoid
+        # mutating state on every GET request (RM-11 fix).
+        phase_advanced = self._check_funded_phase_advancement(profit_target, profit_progress)
 
         can_trade, reason = self.check_funded_account_limits()
 

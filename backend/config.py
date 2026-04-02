@@ -187,7 +187,7 @@ class Settings(BaseSettings):
     # Disabled by default (beginners should use fixed 1% until profitable)
     delta_enabled: bool = False
     delta_parameter: float = 0.60     # 0.20-0.90, 0.60 recommended
-    delta_max_risk: float = 0.03      # Max risk increase cap (3%)
+    delta_max_risk: float = 0.02      # Max risk increase cap (2% per TradingLab)
 
     # Trading hours (UTC) - London + New York sessions only
     # TradingLab: London 08:00-17:00 UTC, NY 13:00-22:00 UTC (approx, shifts with DST)

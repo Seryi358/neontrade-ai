@@ -3721,21 +3721,19 @@ class BlackStrategy(BaseStrategy):
 
         if "tp1" not in result:
             # BLACK TP is ALWAYS EMA 50 4H per mentorship.
-            # If EMA is on the wrong side or unavailable, use its value anyway
-            # as a projected target but apply a confidence warning.
+            # If EMA is on the wrong side, use its value with confidence warning.
+            # If EMA is truly unavailable, skip the trade (mentorship requires it).
             if ema_4h_50 and ema_4h_50 > 0:
                 # EMA exists but is on the wrong side — still use it with warning
                 result["tp1"] = ema_4h_50
                 result["tp_warning"] = "EMA50_4H on wrong side of entry; confidence reduced"
             else:
-                # EMA truly unavailable — use a conservative 1:2 R:R projection
-                # This preserves the BLACK principle of targeting mean reversion
-                sl = analysis.key_levels.get("supports", []) if direction == "BUY" else analysis.key_levels.get("resistances", [])
-                if direction == "BUY":
-                    result["tp1"] = entry_price + abs(entry_price - entry_price * 0.985) * 2
-                else:
-                    result["tp1"] = entry_price - abs(entry_price * 1.015 - entry_price) * 2
-                result["tp_warning"] = "EMA50_4H unavailable; using 2R projection as fallback"
+                # EMA truly unavailable — cannot determine BLACK TP per mentorship
+                logger.warning(
+                    f"BLACK setup skipped for {analysis.instrument}: "
+                    f"EMA 50 4H unavailable (required for TP)"
+                )
+                return None
 
         return result
 

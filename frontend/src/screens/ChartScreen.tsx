@@ -234,8 +234,11 @@ export default function ChartScreen() {
     loadWatchlist();
   }, []);
 
+  const fetchRequestRef = useRef(0);
+
   const fetchChartData = useCallback(async () => {
     if (!selectedInstrument) return;
+    const requestId = ++fetchRequestRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -246,6 +249,9 @@ export default function ChartScreen() {
         authFetch(`${API_URL}/api/v1/price/${selectedInstrument}`),
         authFetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`),
       ]);
+
+      // Discard stale responses from previous instrument selections
+      if (requestId !== fetchRequestRef.current) return;
 
       if (candlesRes.ok) {
         const candleData = await candlesRes.json();

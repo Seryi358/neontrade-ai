@@ -5,12 +5,10 @@ Concepts from TradingLab Crypto Specialization Module 6.
 """
 
 import httpx
-import logging
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 @dataclass

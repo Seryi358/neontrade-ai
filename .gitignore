@@ -46,3 +46,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.code-workspace
+test_live_*.py
+test_trade_simulation.py
+test_live_stress.py

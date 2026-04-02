@@ -30,6 +30,7 @@ class TradeDatabase:
         self._db.row_factory = aiosqlite.Row
         await self._db.execute("PRAGMA journal_mode=WAL")
         await self._db.execute("PRAGMA foreign_keys=ON")
+        await self._db.execute("PRAGMA busy_timeout=5000")
 
         await self._create_tables()
         logger.info(f"Database initialized: {self.db_path}")

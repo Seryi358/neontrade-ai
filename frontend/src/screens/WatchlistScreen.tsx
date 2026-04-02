@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
   HUDHeader,
@@ -98,7 +99,7 @@ export default function WatchlistScreen() {
           </Text>
           <View style={styles.scoreBox}>
             <Text style={[styles.scoreNumber, { color: getScoreColor(item.score) }]}>
-              {item.score.toFixed(0)}
+              {safe(item.score, 0)}
             </Text>
             <Text style={styles.scoreLabel}>SCORE</Text>
           </View>

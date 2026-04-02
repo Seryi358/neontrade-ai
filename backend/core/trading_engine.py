@@ -609,6 +609,7 @@ class TradingEngine:
             # Funded account: close all positions at trading_end_hour every day
             if settings.funded_account_mode and settings.funded_no_overnight:
                 if now.hour >= settings.trading_end_hour:
+                    await self._sync_positions_from_broker()
                     await self._handle_funded_overnight_close()
                     return
 
@@ -616,6 +617,7 @@ class TradingEngine:
             if settings.funded_account_mode and settings.funded_no_weekend:
                 if now.weekday() == 4 and now.hour >= settings.close_before_friday_hour:
                     logger.info("Funded mode: closing all positions before weekend")
+                    await self._sync_positions_from_broker()
                     await self._handle_funded_overnight_close()
                     return
 
@@ -628,6 +630,7 @@ class TradingEngine:
                     logger.info(
                         f"Funded mode: news filter blocking ALL activity: {news_desc}"
                     )
+                    await self._sync_positions_from_broker()
                     return
                 # Swing trading: mentorship says "podemos llegar a ejecutar incluso"
                 # Don't hard-block execution for swing — just warn and continue
@@ -1016,15 +1019,32 @@ class TradingEngine:
                         f"Position {tid} ({pos.instrument}) closed externally — removed from tracking"
                     )
 
-                    # Fetch close price once for all downstream uses
+                    # Determine close price: use SL/TP as approximation since
+                    # the broker already closed the position and current price may differ.
+                    # If price moved past TP → likely TP hit. Past SL → likely SL hit.
                     close_price = pos.entry_price  # default
-                    pnl_dollars = 0.0  # default
+                    pnl_dollars = 0.0
                     try:
                         price_data = await self.broker.get_current_price(pos.instrument)
-                        close_price = (
-                            price_data.bid if pos.direction == "BUY"
-                            else price_data.ask
-                        )
+                        current = price_data.bid if pos.direction == "BUY" else price_data.ask
+
+                        # Heuristic: if current price is beyond TP, assume TP was hit
+                        # If current price is beyond SL, assume SL was hit
+                        if pos.direction == "BUY":
+                            if pos.take_profit_1 and current >= pos.take_profit_1:
+                                close_price = pos.take_profit_1  # TP hit
+                            elif current <= pos.current_sl:
+                                close_price = pos.current_sl  # SL hit
+                            else:
+                                close_price = current  # Manual close or mid-range
+                        else:  # SELL
+                            if pos.take_profit_1 and current <= pos.take_profit_1:
+                                close_price = pos.take_profit_1
+                            elif current >= pos.current_sl:
+                                close_price = pos.current_sl
+                            else:
+                                close_price = current
+
                         price_diff = (
                             (close_price - pos.entry_price)
                             if pos.direction == "BUY"
@@ -1032,7 +1052,12 @@ class TradingEngine:
                         )
                         pnl_dollars = price_diff * abs(pos.units) if pos.units != 0 else price_diff
                     except Exception as e:
-                        logger.debug(f"Failed to get close price for {tid}: {e}")
+                        # Fallback: use SL as worst-case close price
+                        if pos.current_sl and pos.current_sl != pos.entry_price:
+                            close_price = pos.current_sl
+                            price_diff = (close_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - close_price)
+                            pnl_dollars = price_diff * abs(pos.units) if pos.units != 0 else price_diff
+                        logger.debug(f"Failed to get close price for {tid}, using SL estimate: {e}")
 
                     # Record trade result for delta algorithm, win rate, and reentry tracking
                     balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0

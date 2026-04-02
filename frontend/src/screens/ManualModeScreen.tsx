@@ -16,6 +16,7 @@ import {
   Alert,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
   HUDHeader,

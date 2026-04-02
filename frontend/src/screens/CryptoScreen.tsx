@@ -13,6 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
   HUDHeader,
@@ -443,7 +444,7 @@ export default function CryptoScreen() {
           />
           <HUDStatRow
             label="GESTION"
-            value={allocation.crypto_position_mgmt_style.toUpperCase()}
+            value={(allocation.crypto_position_mgmt_style || 'cp').toUpperCase()}
             valueColor={theme.colors.textSecondary}
           />
           {allocation.memecoins_monitor_only && (

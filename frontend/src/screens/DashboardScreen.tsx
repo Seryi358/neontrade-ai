@@ -381,7 +381,7 @@ export default function DashboardScreen() {
                     ? `${pos.unrealized_pnl >= 0 ? '+' : ''}${safe(pos.unrealized_pnl)}`
                     : `@ ${safe(pos.entry, 5)}`}
                 </Text>
-                <Text style={styles.positionPhase}>{pos.phase.toUpperCase()}</Text>
+                <Text style={styles.positionPhase}>{(pos.phase || 'initial').toUpperCase()}</Text>
               </View>
             </View>
           ))

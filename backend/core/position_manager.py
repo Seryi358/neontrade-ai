@@ -489,9 +489,9 @@ class PositionManager:
                     f"{pos.trade_id}: no swing data, fallback 50% risk cut -> {new_sl:.5f}"
                 )
 
-            await self._update_sl(pos, new_sl)
-            pos.phase = PositionPhase.SL_MOVED
-            logger.info(f"{pos.trade_id}: Phase -> SL_MOVED ({new_sl:.5f})")
+            if await self._update_sl(pos, new_sl):
+                pos.phase = PositionPhase.SL_MOVED
+                logger.info(f"{pos.trade_id}: Phase -> SL_MOVED ({new_sl:.5f})")
 
     async def _handle_sl_moved_phase(self, pos: ManagedPosition, current_price: float):
         """
@@ -527,15 +527,15 @@ class PositionManager:
             if pos.direction == "BUY":
                 half_sl = pos.current_sl + (pos.entry_price - pos.current_sl) * 0.5
                 if half_sl > pos.current_sl:
-                    await self._update_sl(pos, half_sl)
-                    pos._half_risk_applied = True
-                    logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
+                    if await self._update_sl(pos, half_sl):
+                        pos._half_risk_applied = True
+                        logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
             else:
                 half_sl = pos.current_sl - (pos.current_sl - pos.entry_price) * 0.5
                 if half_sl < pos.current_sl:
-                    await self._update_sl(pos, half_sl)
-                    pos._half_risk_applied = True
-                    logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
+                    if await self._update_sl(pos, half_sl):
+                        pos._half_risk_applied = True
+                        logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
 
         # Calculate BE threshold based on configured method
         if settings.be_trigger_method == "risk_distance":
@@ -552,9 +552,9 @@ class PositionManager:
             else:
                 new_sl = pos.entry_price - spread_buffer
 
-            await self._update_sl(pos, new_sl)
-            pos.phase = PositionPhase.BREAK_EVEN
-            logger.info(f"{pos.trade_id}: Phase -> BREAK_EVEN")
+            if await self._update_sl(pos, new_sl):
+                pos.phase = PositionPhase.BREAK_EVEN
+                logger.info(f"{pos.trade_id}: Phase -> BREAK_EVEN")
             # Notify risk manager for scale-in rule
             if self.risk_manager is not None:
                 self.risk_manager.mark_position_at_be(pos.trade_id)
@@ -908,13 +908,19 @@ class PositionManager:
                 await self._update_sl(pos, new_sl)
                 logger.debug(f"{pos.trade_id}: Fallback trail SL -> {new_sl:.5f}")
 
-    async def _update_sl(self, pos: ManagedPosition, new_sl: float):
-        """Update stop loss on the broker."""
+    async def _update_sl(self, pos: ManagedPosition, new_sl: float) -> bool:
+        """Update stop loss on the broker. Returns True if successful."""
         try:
-            await self.broker.modify_trade_sl(pos.trade_id, new_sl)
-            pos.current_sl = new_sl
+            result = await self.broker.modify_trade_sl(pos.trade_id, new_sl)
+            if result:
+                pos.current_sl = new_sl
+                return True
+            else:
+                logger.warning(f"Broker rejected SL update for {pos.trade_id}: {pos.current_sl} -> {new_sl}")
+                return False
         except Exception as e:
             logger.error(f"Failed to update SL for {pos.trade_id}: {e}")
+            return False
 
     def remove_position(self, trade_id: str):
         """Stop tracking a closed position."""

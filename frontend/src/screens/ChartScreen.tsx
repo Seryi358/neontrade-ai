@@ -20,6 +20,7 @@ import {
   Platform,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDHeader,
   HUDCard,
@@ -137,7 +138,7 @@ const CHART_COLORS = {
 
 const formatPrice = (price: number, instrument: string) => {
   const isJpy = instrument?.toUpperCase().includes('JPY');
-  return price.toFixed(isJpy ? 3 : 5);
+  return safe(price, isJpy ? 3 : 5);
 };
 
 const _strategyColor = (name: string | null): string | null => {
@@ -705,7 +706,7 @@ export default function ChartScreen() {
                 {item.instrument.replace('_', '/')}
               </Text>
               <Text style={[styles.pickerOptionScore, { color: getScoreColor(item.score) }]}>
-                {item.score.toFixed(0)}
+                {safe(item.score, 0)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -911,7 +912,7 @@ export default function ChartScreen() {
           <View style={styles.bottomItem}>
             <Text style={styles.bottomLabel}>SCORE</Text>
             <Text style={[styles.bottomValue, { color: getScoreColor(analysisSummary.score) }]}>
-              {analysisSummary.score.toFixed(0)}
+              {safe(analysisSummary?.score, 0)}
             </Text>
           </View>
           <View style={styles.bottomDivider} />

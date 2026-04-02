@@ -19,6 +19,7 @@ import {
   Alert,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
   HUDSectionTitle,
@@ -328,13 +329,13 @@ export default function JournalScreen() {
           <View style={styles.statCell}>
             <Text style={styles.statCellLabel}>WIN RATE</Text>
             <Text style={[styles.statCellValue, stats.win_rate >= 50 ? styles.profit : styles.loss]}>
-              {stats.win_rate.toFixed(1)}%
+              {safe(stats.win_rate, 1)}%
             </Text>
           </View>
           <View style={styles.statCell}>
             <Text style={styles.statCellLabel}>WR (EX BE)</Text>
             <Text style={[styles.statCellValue, stats.win_rate_excl_be >= 50 ? styles.profit : styles.loss]}>
-              {stats.win_rate_excl_be.toFixed(1)}%
+              {safe(stats.win_rate_excl_be, 1)}%
             </Text>
           </View>
 
@@ -356,13 +357,13 @@ export default function JournalScreen() {
           <View style={styles.statCell}>
             <Text style={styles.statCellLabel}>PROFIT FACTOR</Text>
             <Text style={[styles.statCellValue, stats.profit_factor >= 1 ? styles.profit : styles.loss]}>
-              {stats.profit_factor.toFixed(2)}
+              {safe(stats.profit_factor)}
             </Text>
           </View>
           <View style={styles.statCell}>
             <Text style={styles.statCellLabel}>ACUMULADOR</Text>
             <Text style={[styles.statCellValue, stats.accumulator >= 0 ? styles.profit : styles.loss]}>
-              {stats.accumulator.toFixed(2)}
+              {safe(stats.accumulator)}
             </Text>
           </View>
 
@@ -370,13 +371,13 @@ export default function JournalScreen() {
           <View style={styles.statCell}>
             <Text style={styles.statCellLabel}>DD ACTUAL</Text>
             <Text style={[styles.statCellValue, styles.loss]}>
-              {stats.current_drawdown_pct.toFixed(2)}%
+              {safe(stats.current_drawdown_pct)}%
             </Text>
           </View>
           <View style={styles.statCell}>
             <Text style={styles.statCellLabel}>DD MAX</Text>
             <Text style={[styles.statCellValue, styles.loss]}>
-              {stats.max_drawdown_pct.toFixed(2)}%
+              {safe(stats.max_drawdown_pct)}%
             </Text>
           </View>
 
@@ -458,7 +459,7 @@ export default function JournalScreen() {
             />
             <HUDStatRow
               label="PROFIT FACTOR"
-              value={monthlyReport.profit_factor.toFixed(2)}
+              value={safe(monthlyReport?.profit_factor)}
               valueColor={theme.colors.textWhite}
             />
             <HUDStatRow
@@ -564,7 +565,7 @@ export default function JournalScreen() {
                 styles.tradePnl,
                 item.pnl_dollars >= 0 ? styles.profit : styles.loss,
               ]}>
-                {item.pnl_dollars >= 0 ? '+' : ''}${item.pnl_dollars.toFixed(2)}
+                {item.pnl_dollars >= 0 ? '+' : ''}${safe(item.pnl_dollars)}
               </Text>
               <Text style={[
                 styles.tradePnlPct,
@@ -581,7 +582,7 @@ export default function JournalScreen() {
               Bal: {formatCurrency(item.balance_after)}
             </Text>
             <Text style={[styles.tradeMetaText, styles.loss]}>
-              DD: {item.drawdown_pct.toFixed(2)}%
+              DD: {safe(item.drawdown_pct)}%
             </Text>
             {item.winning_streak > 0 && (
               <Text style={[styles.tradeMetaText, styles.profit]}>

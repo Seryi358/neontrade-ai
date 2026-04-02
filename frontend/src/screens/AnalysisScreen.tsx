@@ -16,6 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { theme } from '../theme/cyberpunk';
+const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
   HUDHeader,
@@ -187,7 +188,7 @@ export default function AnalysisScreen() {
       <HUDCard accentColor={color}>
         <HUDSectionTitle title="SCORE DE ANALISIS" color={theme.colors.cp2077Yellow} />
         <View style={styles.gaugeContainer}>
-          <Text style={[styles.gaugeScore, { color }]}>{score.toFixed(0)}</Text>
+          <Text style={[styles.gaugeScore, { color }]}>{safe(score, 0)}</Text>
           <Text style={styles.gaugeMax}>/100</Text>
         </View>
         <HUDProgressBar
@@ -508,7 +509,7 @@ export default function AnalysisScreen() {
                   {item.instrument.replace('_', '/')}
                 </Text>
                 <Text style={[styles.pickerOptionScore, { color: getScoreColor(item.score) }]}>
-                  {item.score.toFixed(0)}
+                  {item.safe(score, 0)}
                 </Text>
               </TouchableOpacity>
             ))}

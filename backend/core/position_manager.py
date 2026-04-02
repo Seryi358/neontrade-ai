@@ -50,7 +50,7 @@ explicitly recommends partial closes at key levels. Default is False
 Give space to the EMA — buffer slightly below/above, never place SL exactly on it.
 """
 
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Callable, Awaitable
 from dataclasses import dataclass, field
 from enum import Enum
 from loguru import logger
@@ -202,6 +202,14 @@ class PositionManager:
         # Swing high/low values for PRICE_ACTION trailing (injected by trading engine)
         self._latest_swings: Dict[str, Dict[str, List[float]]] = {}
 
+        # Callback for trade close events (DB persistence + journal recording).
+        # PositionManager doesn't own _db or trade_journal; TradingEngine registers
+        # a handler so that TP_max and emergency-exit closes are persisted identically
+        # to externally-detected closes.
+        self._on_trade_closed: Optional[
+            Callable[..., Awaitable[None]]
+        ] = None
+
         # Partial profit taking: Alex doesn't use it but the mentorship
         # teaches it as optional and CPA recommends partial closes at key levels.
         self.allow_partial_profits = allow_partial_profits
@@ -246,6 +254,58 @@ class PositionManager:
             f"crypto_cpa_ema={self._crypto_cpa_ema_key}, "
             f"partial_profits={self.allow_partial_profits}"
         )
+
+    def set_on_trade_closed(
+        self,
+        callback: Callable[..., Awaitable[None]],
+    ):
+        """Register a callback invoked whenever PositionManager closes a trade.
+
+        Signature expected by the callback:
+            async def on_trade_closed(
+                trade_id: str,
+                instrument: str,
+                direction: str,
+                entry_price: float,
+                exit_price: float,
+                pnl_dollars: float,
+                units: float,
+                reason: str,
+                strategy_variant: Optional[str] = None,
+            ) -> None
+        """
+        self._on_trade_closed = callback
+
+    async def _notify_trade_closed(
+        self,
+        pos: "ManagedPosition",
+        exit_price: float,
+        pnl_dollars: float,
+        reason: str,
+    ):
+        """Fire the on_trade_closed callback if registered.
+
+        Errors are logged as WARNING (CLAUDE.md Rule 6) but never propagate
+        — a failed DB/journal write must not prevent position cleanup.
+        """
+        if self._on_trade_closed is None:
+            return
+        try:
+            await self._on_trade_closed(
+                trade_id=pos.trade_id,
+                instrument=pos.instrument,
+                direction=pos.direction,
+                entry_price=pos.entry_price,
+                exit_price=exit_price,
+                pnl_dollars=pnl_dollars,
+                units=abs(pos.units) if pos.units else 0.0,
+                reason=reason,
+                strategy_variant=getattr(pos, "strategy_variant", None),
+            )
+        except Exception as cb_err:
+            logger.warning(
+                f"on_trade_closed callback failed for {pos.trade_id}: {cb_err}"
+            )
 
     def _is_crypto(self, instrument: str) -> bool:
         """Check if an instrument is a crypto pair.
@@ -766,6 +826,8 @@ class PositionManager:
                         self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
                         balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
                         self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl / balance)
+                    # Persist to DB + trade journal via callback
+                    await self._notify_trade_closed(pos, current_price, pnl, "tp_max")
                     self.remove_position(pos.trade_id)
                     return
                 except Exception as e:
@@ -799,6 +861,8 @@ class PositionManager:
                         self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
                         balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
                         self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl / balance)
+                    # Persist to DB + trade journal via callback
+                    await self._notify_trade_closed(pos, current_price, pnl, "emergency_exit")
                     self.remove_position(pos.trade_id)
                     return
                 except Exception as e:

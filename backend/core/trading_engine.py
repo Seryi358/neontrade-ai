@@ -2490,11 +2490,25 @@ class TradingEngine:
         }
         _style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
         _risk = self.risk_manager.get_risk_for_style(_style, setup.instrument)
+
+        # TE-02 fix: recalculate units at execution time since entry price shifted
+        # units = risk_amount / sl_distance — SL distance changed with new entry
+        units = await self.risk_manager.calculate_position_size(
+            setup.instrument, _style, current_price, setup.stop_loss
+        )
+        if units <= 0:
+            logger.warning(
+                f"Approved setup {setup.id}: recalculated units=0 at "
+                f"current price {current_price:.5f} — marking expired"
+            )
+            setup.status = "expired"
+            return
+
         trade_risk = TradeRisk(
             instrument=setup.instrument,
             style=_style,
             risk_percent=_risk,
-            units=setup.units,
+            units=units,
             stop_loss=setup.stop_loss,
             take_profit_1=setup.take_profit,
             take_profit_max=setup.take_profit_max,

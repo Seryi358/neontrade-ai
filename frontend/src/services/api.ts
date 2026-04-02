@@ -396,12 +396,15 @@ class WebSocketManager {
     this.reconnectAttempts = 0;  // Reset on fresh connect attempt
 
     try {
-      // Include API key in WS connection for authentication
-      const apiKey = getApiKey();
-      const wsUrlAuth = apiKey ? `${WS_URL}?api_key=${encodeURIComponent(apiKey)}` : WS_URL;
-      this.ws = new WebSocket(wsUrlAuth);
+      // BUG-08 fix: authenticate via first message, not URL query param
+      this.ws = new WebSocket(WS_URL);
 
       this.ws.onopen = () => {
+        // Send auth as first message (keeps API key out of URLs/logs)
+        const apiKey = getApiKey();
+        if (apiKey && this.ws) {
+          this.ws.send(JSON.stringify({ action: 'auth', api_key: apiKey }));
+        }
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.emit('connection', { connected: true });

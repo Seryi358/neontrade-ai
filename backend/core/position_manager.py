@@ -817,7 +817,7 @@ class PositionManager:
                 try:
                     await self.broker.close_trade(pos.trade_id)
                     pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
-                    pnl = pnl_per_unit * abs(pos.units) if pos.units else pnl_per_unit
+                    pnl = pnl_per_unit * abs(pos.units) if pos.units else 0.0
                     logger.info(
                         f"{pos.trade_id}: TP_MAX REACHED ({pos.take_profit_max:.5f}) — "
                         f"CLOSED at {current_price:.5f} | PnL=${pnl:.2f}"
@@ -852,7 +852,7 @@ class PositionManager:
                 try:
                     await self.broker.close_trade(pos.trade_id)
                     pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
-                    pnl = pnl_per_unit * abs(pos.units) if pos.units else pnl_per_unit
+                    pnl = pnl_per_unit * abs(pos.units) if pos.units else 0.0
                     logger.warning(
                         f"{pos.trade_id}: EMERGENCY EXIT — both EMA M5 2 and EMA M5 5 broken "
                         f"against {pos.direction} at {current_price:.5f} | PnL=${pnl:.2f}"

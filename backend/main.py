@@ -256,14 +256,26 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.warning(f"WS connection rejected: limit of {MAX_WS_CONNECTIONS} reached")
         return
 
-    # Authenticate WebSocket via query param: /ws?api_key=...
-    if security_config.auth_enabled and security_config.api_keys:
-        api_key = websocket.query_params.get("api_key", "")
-        if not security_config.validate_key(api_key):
-            await websocket.close(code=4001, reason="Invalid API key")
-            return
-
     await ws_manager.connect(websocket)
+
+    # BUG-08 fix: authenticate via first message instead of URL query param
+    # (query params leak into logs, browser history, and Referer headers)
+    if security_config.auth_enabled and security_config.api_keys:
+        # Also accept legacy query param for backward compat (deprecate later)
+        api_key = websocket.query_params.get("api_key", "")
+        if not api_key:
+            try:
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=10)
+                auth_data = json.loads(raw)
+                if auth_data.get("action") == "auth":
+                    api_key = auth_data.get("api_key", "")
+            except (asyncio.TimeoutError, json.JSONDecodeError, Exception):
+                pass
+        if not security_config.validate_key(api_key):
+            await ws_manager.send_personal(websocket, "error", {"message": "Authentication required"})
+            await websocket.close(code=4001, reason="Invalid API key")
+            ws_manager.disconnect(websocket)
+            return
 
     try:
         # Send initial status

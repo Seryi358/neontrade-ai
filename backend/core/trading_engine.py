@@ -427,8 +427,14 @@ class TradingEngine:
             self._approve_lock = asyncio.Lock()
         async with self._approve_lock:
             self._expire_old_setups()
+            style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
+            current_style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
             for setup in self.pending_setups:
                 if setup.id == setup_id and setup.status == "pending":
+                    # Check risk limits before approving
+                    if not self.risk_manager.can_take_trade(current_style, setup.instrument):
+                        logger.warning(f"Setup {setup_id} rejected: max risk limit or scale-in rule")
+                        return False
                     setup.status = "approved"
                     logger.info(f"Setup approved: {setup_id} | {setup.instrument} {setup.direction}")
                     await self._execute_approved_setup(setup)
@@ -1042,8 +1048,15 @@ class TradingEngine:
                         style=settings.trading_style,
                     )
                     self.position_manager.positions[trade.trade_id] = pos
+                    # Use correct risk for current trading style
+                    style_risk_map = {
+                        "day_trading": settings.risk_day_trading,
+                        "swing": settings.risk_swing,
+                        "scalping": settings.risk_scalping,
+                    }
+                    adopt_risk = style_risk_map.get(settings.trading_style, settings.risk_day_trading)
                     self.risk_manager.register_trade(
-                        trade.trade_id, trade.instrument, settings.risk_day_trading
+                        trade.trade_id, trade.instrument, adopt_risk
                     )
                     logger.info(
                         f"Adopted broker position: {trade.trade_id} | "
@@ -1202,7 +1215,7 @@ class TradingEngine:
                         except Exception as ae:
                             logger.warning(f"Close alert failed for {pos.instrument}: {ae}")
         except Exception as e:
-            logger.debug(f"Position sync failed (non-critical): {e}")
+            logger.warning(f"Position sync failed: {e}")
 
     # ── Position Management ──────────────────────────────────────
 

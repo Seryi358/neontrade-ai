@@ -991,6 +991,23 @@ class TradingEngine:
                             })
                         except Exception as db_err:
                             logger.warning(f"DB update failed for Friday close {trade_id}: {db_err}")
+                    # Record in trade journal
+                    if self.trade_journal and trade_id and current and entry:
+                        try:
+                            direction = getattr(trade, 'direction', 'BUY')
+                            pnl_val = (current - entry) if direction == "BUY" else (entry - current)
+                            units = abs(getattr(trade, 'units', 0) or (getattr(pos, 'units', 0) if pos else 0))
+                            self.trade_journal.record_trade(
+                                trade_id=trade_id,
+                                instrument=instrument,
+                                pnl_dollars=pnl_val * units if units else pnl_val,
+                                entry_price=entry,
+                                exit_price=current,
+                                strategy=getattr(pos, 'strategy_variant', 'UNKNOWN') if pos else 'UNKNOWN',
+                                direction=direction,
+                            )
+                        except Exception as je:
+                            logger.warning(f"Trade journal failed for Friday close {trade_id}: {je}")
                 except Exception as e:
                     logger.error(f"Friday close failed for {trade_id}: {e}")
             else:
@@ -1041,6 +1058,20 @@ class TradingEngine:
                             "exit_price": current_price,
                             "pnl": pnl,
                         })
+                    # Record in trade journal
+                    if self.trade_journal:
+                        try:
+                            self.trade_journal.record_trade(
+                                trade_id=tid,
+                                instrument=pos.instrument,
+                                pnl_dollars=pnl,
+                                entry_price=pos.entry_price,
+                                exit_price=current_price,
+                                strategy=getattr(pos, 'strategy_variant', 'UNKNOWN'),
+                                direction=pos.direction,
+                            )
+                        except Exception as je:
+                            logger.warning(f"Trade journal failed for funded close {tid}: {je}")
                 except Exception as e:
                     logger.warning(f"Failed to process funded close for {tid}: {e}")
 
@@ -1304,7 +1335,7 @@ class TradingEngine:
                                 direction=pos.direction,
                             )
                         except Exception as je:
-                            logger.debug(f"Trade journal record failed for {tid}: {je}")
+                            logger.warning(f"Trade journal record failed for {tid}: {je}")
 
                     # Screenshot on trade close
                     if self.screenshot_generator:

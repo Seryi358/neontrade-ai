@@ -28,9 +28,22 @@ class TradeDatabase:
 
         self._db = await aiosqlite.connect(self.db_path)
         self._db.row_factory = aiosqlite.Row
-        await self._db.execute("PRAGMA journal_mode=WAL")
+
+        # Enable WAL mode and verify it was applied (fails silently on network FS)
+        cursor = await self._db.execute("PRAGMA journal_mode=WAL")
+        row = await cursor.fetchone()
+        actual_mode = row[0] if row else "unknown"
+        if actual_mode != "wal":
+            logger.error(
+                f"SQLite WAL mode could not be enabled — got '{actual_mode}'. "
+                "Concurrent access safety is degraded. Check filesystem support."
+            )
+        else:
+            logger.info("SQLite WAL mode confirmed")
+
         await self._db.execute("PRAGMA foreign_keys=ON")
         await self._db.execute("PRAGMA busy_timeout=5000")
+        await self._db.execute("PRAGMA synchronous=NORMAL")  # safe with WAL, reduces fsync overhead
 
         await self._create_tables()
         logger.info(f"Database initialized: {self.db_path}")

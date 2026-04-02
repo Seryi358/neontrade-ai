@@ -576,9 +576,14 @@ class TradingEngine:
             await asyncio.sleep(self._scan_interval)
 
     async def stop(self):
-        """Stop the trading engine gracefully."""
+        """Stop the trading engine gracefully. Final sync before shutdown."""
         logger.info("Trading engine stopping...")
         self._running = False
+        # Final position sync to record any trades closed since last tick
+        try:
+            await self._sync_positions_from_broker()
+        except Exception as e:
+            logger.warning(f"Final position sync on stop failed: {e}")
 
     # ── Core Tick ────────────────────────────────────────────────
 
@@ -716,8 +721,13 @@ class TradingEngine:
                 # Step 2: Scan for new opportunities (with trade execution)
                 await self._scan_for_setups()
         else:
-            # Market closed — still scan for analysis data every 10 minutes
-            # so the UI always has fresh data
+            # Market closed — still sync and manage open positions
+            # (broker can close via SL/TP even when market is "closed" for us)
+            await self._sync_positions_from_broker()
+            if self.position_manager.positions:
+                await self._manage_open_positions()
+
+            # Scan for analysis data every 10 minutes so the UI has fresh data
             if not hasattr(self, '_last_offhours_scan'):
                 self._last_offhours_scan = datetime.min.replace(tzinfo=timezone.utc)
             if (now - self._last_offhours_scan).total_seconds() >= 600:

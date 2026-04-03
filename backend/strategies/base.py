@@ -362,7 +362,7 @@ def _check_volume_confirmation(analysis, timeframe_key: str = "H1") -> tuple[boo
     """
     vol = analysis.volume_analysis.get(timeframe_key, {})
     if not vol:
-        return False, 0.0  # No volume data = block trade (fail-safe)
+        return True, 1.0  # No volume data = neutral (volume is confluence, not hard filter)
     ratio = vol.get("volume_ratio", 1.0)
     return ratio >= 1.0, ratio
 
@@ -409,12 +409,12 @@ def _check_premium_discount_zone(analysis, direction: str) -> tuple[bool, str]:
     """
     pd_data = getattr(analysis, 'premium_discount_zone', None)
     if pd_data is None:
-        return False, "Sin datos de zona premium/discount (bloqueado por seguridad)"
+        return True, ""  # No SMC data = neutral (premium/discount is confluence, not hard filter)
 
     # premium_discount_zone is a Dict with a "zone" key (e.g. "premium", "discount")
     zone = pd_data.get("zone") if isinstance(pd_data, dict) else pd_data
     if zone is None:
-        return False, "Zona premium/discount no disponible (bloqueado por seguridad)"
+        return True, ""  # No zone data = neutral (SMC confluence only)
 
     if direction == "BUY" and zone in ("discount", "deep_discount"):
         return True, f"Precio en zona de DESCUENTO {'profundo ' if zone == 'deep_discount' else ''}(favorable para compra)"

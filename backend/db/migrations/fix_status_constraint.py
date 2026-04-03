@@ -84,6 +84,8 @@ async def run_migration(db_path: str = DEFAULT_DB_PATH):
                     new_status = "closed_tp"
                 elif pnl is not None and pnl < 0:
                     new_status = "closed_sl"
+                elif pnl is not None and pnl == 0:
+                    new_status = "closed_be"
                 else:
                     new_status = "closed_manual"
                 await db.execute(

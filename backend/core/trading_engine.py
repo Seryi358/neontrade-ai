@@ -2338,7 +2338,25 @@ class TradingEngine:
                 logger.info(f"Fill price {fill_price:.5f} differs from scan price {setup.entry_price:.5f} (slippage)")
 
             if not trade_id:
-                logger.error(f"Order succeeded but no trade_id returned for {setup.instrument}")
+                logger.critical(
+                    f"ORPHANED TRADE: Order succeeded but no trade_id for {setup.instrument}. "
+                    f"Trade is LIVE on broker but NOT tracked by risk/position manager. "
+                    f"Manual intervention required!"
+                )
+                if self.alert_manager:
+                    try:
+                        await self.alert_manager.send_alert(
+                            "engine_status",
+                            f"⚠️ ORPHANED TRADE — {setup.instrument}",
+                            f"Order succeeded but broker returned no trade_id.\n"
+                            f"Direction: {setup.direction} | Units: {setup.units}\n"
+                            f"Entry: {setup.entry_price:.5f} | SL: {setup.stop_loss:.5f}\n"
+                            f"THIS TRADE IS LIVE BUT INVISIBLE TO THE SYSTEM.\n"
+                            f"Check broker manually and close if needed.",
+                            {"instrument": setup.instrument, "direction": setup.direction},
+                        )
+                    except Exception:
+                        pass
                 return
 
             if trade_id:

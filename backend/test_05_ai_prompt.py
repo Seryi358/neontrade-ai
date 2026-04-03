@@ -1,5 +1,6 @@
 """TEST 5: AI Prompt Tests"""
 import sys
+import pytest
 sys.path.insert(0, '.')
 
 passed = 0
@@ -29,7 +30,7 @@ except ImportError:
     print(f"\n{'=' * 60}")
     print(f"TEST 5 RESULTS: 0 passed, 0 failed (skipped)")
     print("=" * 60)
-    sys.exit(0)
+    pytest.skip("openai not installed — skipping AI prompt tests", allow_module_level=True)
 
 # --- CRYPTO SPECIALIZATION section ---
 print("\n[5.1] CRYPTO SPECIALIZATION section")

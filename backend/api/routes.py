@@ -1263,6 +1263,7 @@ class AlertConfigRequest(BaseModel):
     gmail_refresh_token: Optional[str] = None
     notify_trade_executed: Optional[bool] = None
     notify_setup_pending: Optional[bool] = None
+    notify_setup_rejected: Optional[bool] = None
     notify_trade_closed: Optional[bool] = None
     notify_daily_summary: Optional[bool] = None
 

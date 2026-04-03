@@ -79,6 +79,7 @@ class AlertConfig:
     # What to notify about
     notify_trade_executed: bool = True
     notify_setup_pending: bool = True
+    notify_setup_rejected: bool = True
     notify_trade_closed: bool = True
     notify_daily_summary: bool = True
 
@@ -339,7 +340,7 @@ class AlertManager:
         ai_reasoning: str = "",
     ):
         """Notify user that a setup was found but rejected by AI validation."""
-        if not self._config.notify_setup_pending:
+        if not self._config.notify_setup_rejected:
             return
 
         dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"

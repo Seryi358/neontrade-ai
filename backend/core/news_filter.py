@@ -489,8 +489,8 @@ class NewsFilter:
                         impact="high" if importance >= 3 else "medium",
                         title=item.get("event", "Unknown"),
                     ))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to fetch news from external source: {e}")
 
         return events
 

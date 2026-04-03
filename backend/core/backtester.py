@@ -652,8 +652,9 @@ class Backtester:
                     # Friday: no new trades after 18:00 UTC
                     if _wd == 4 and _h >= 18:
                         _allow_new_trade = False
-            except Exception:
-                pass  # If bar_time parsing fails, allow trade (don't block)
+            except Exception as e:
+                logger.warning(f"Failed to parse bar time for session/Friday check: {e}. Blocking new trade as safety.")
+                _allow_new_trade = False
 
             if (
                 last_signal is not None

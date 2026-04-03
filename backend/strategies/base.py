@@ -257,11 +257,11 @@ def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
     """
     ema_val = _ema_val(analysis, ema_key)
     if ema_val is None:
-        return True  # Can't check, don't block
+        return False  # Can't validate RCC, block trade (fail-safe)
 
     m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
     if len(m5_candles) < 3:
-        return True  # Not enough data, don't block
+        return False  # Insufficient data for RCC, block trade (fail-safe)
 
     # Step 2 (CIERRE): Previous completed candle closed past the EMA
     close_candle = m5_candles[-2]
@@ -362,7 +362,7 @@ def _check_volume_confirmation(analysis, timeframe_key: str = "H1") -> tuple[boo
     """
     vol = analysis.volume_analysis.get(timeframe_key, {})
     if not vol:
-        return True, 1.0  # No volume data = pass (don't block)
+        return False, 0.0  # No volume data = block trade (fail-safe)
     ratio = vol.get("volume_ratio", 1.0)
     return ratio >= 1.0, ratio
 
@@ -391,10 +391,10 @@ def _check_weekly_ema8_filter(analysis, direction: str) -> bool:
     """
     ema_w8 = getattr(analysis, 'ema_w8', None)
     if ema_w8 is None:
-        return True  # No data = don't block
+        return False  # No weekly EMA8 data = block trade (fail-safe)
     current_price = analysis.current_price
     if not current_price:
-        return True
+        return False  # No price data = block trade (fail-safe)
     if direction == "BUY":
         return current_price >= ema_w8
     else:
@@ -409,12 +409,12 @@ def _check_premium_discount_zone(analysis, direction: str) -> tuple[bool, str]:
     """
     pd_data = getattr(analysis, 'premium_discount_zone', None)
     if pd_data is None:
-        return True, ""  # No data = don't block
+        return False, "Sin datos de zona premium/discount (bloqueado por seguridad)"
 
     # premium_discount_zone is a Dict with a "zone" key (e.g. "premium", "discount")
     zone = pd_data.get("zone") if isinstance(pd_data, dict) else pd_data
     if zone is None:
-        return True, ""
+        return False, "Zona premium/discount no disponible (bloqueado por seguridad)"
 
     if direction == "BUY" and zone in ("discount", "deep_discount"):
         return True, f"Precio en zona de DESCUENTO {'profundo ' if zone == 'deep_discount' else ''}(favorable para compra)"

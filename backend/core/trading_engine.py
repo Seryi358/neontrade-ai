@@ -2453,6 +2453,8 @@ class TradingEngine:
                     except Exception as ae:
                         logger.warning(f"Alert send failed (non-critical): {ae}")
 
+                return True
+
         except Exception as e:
             logger.error(f"Failed to execute trade: {e}")
 

@@ -3491,28 +3491,31 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append("Paso 5c: Sin divergencia RSI en 4H (añadido deseable, no obligatorio)")
 
-        # MACD Divergence on H1 — MANDATORY for BLACK
-        # TradingLab: "La divergencia MACD en 1H siempre estará presente" para BLACK setups.
-        # This is a hard requirement, not a bonus.
+        # MACD Divergence on H1 — strong bonus, NOT a hard block
+        # TradingLab Intro: "siempre va a haber esta divergencia en el MACD en
+        # gráfico de 1 hora" — Alex observes it's typically present but the 7-step
+        # BLACK rules do NOT list MACD as a numbered step. The numbered steps are:
+        # 1) Daily S/R, 2) Attack level, 3) Deceleration, 4) 4H overbought,
+        # 5) 1H reversal pattern, 6) Completion+5M entry, 7) SL/TP/R:R.
+        # MACD divergence is a frequent observation, not a gate condition.
+        # Treating it as mandatory was rejecting valid BLACK setups.
         macd_div = getattr(analysis, 'macd_divergence', None)
         if macd_div:
             expected_macd_div = "bullish" if direction == "BUY" else "bearish"
             if macd_div == expected_macd_div:
                 confidence += 10.0
-                met.append(f"Paso 5c2 [OBLIGATORIO]: MACD divergencia {macd_div} en H1 alineada con {direction}")
+                met.append(f"Paso 5c2: MACD divergencia {macd_div} en H1 alineada con {direction} (tipicamente presente)")
             else:
+                confidence -= 10.0
                 failed.append(
-                    f"Paso 5c2 [OBLIGATORIO]: MACD divergencia {macd_div} en H1 contraria a {direction} "
-                    f"— BLACK RECHAZADO (divergencia MACD en H1 siempre debe estar presente)"
+                    f"Paso 5c2: MACD divergencia {macd_div} en H1 contraria a {direction} "
+                    f"(penalizacion, no hard block)"
                 )
-                return None
         else:
-            # No MACD divergence data = cannot confirm mandatory condition = reject
             failed.append(
-                "Paso 5c2 [OBLIGATORIO]: Sin divergencia MACD en H1 — BLACK RECHAZADO "
-                "(la mentoria dice: 'la divergencia MACD en 1H siempre estará presente')"
+                "Paso 5c2: Sin divergencia MACD en H1 (tipicamente presente pero no obligatorio "
+                "per los 7 pasos numerados de la mentoria)"
             )
-            return None
 
         # Consolidacion (patron correctivo formandose)
         if "DOJI" in analysis.candlestick_patterns:
@@ -3641,11 +3644,15 @@ class BlackStrategy(BaseStrategy):
                         if c_low <= ema_1h_50 + ema_tolerance and c_close > ema_1h_50:
                             bounce_count += 1
 
-                if bounce_count >= 2:
+                if bounce_count >= 3:
+                    # TradingLab Black Day example: "los últimos tres toques rechazo
+                    # rechazo rechazo con lo cual estaríamos ejecutando una posición
+                    # donde ya no es que la media móvil de 50 de 4H sea resistencia
+                    # sino que la de una hora ya sería resistencia" — 3 touches = invalid
                     ema_role = "resistencia dinamica" if direction == "BUY" else "soporte dinamico"
                     failed.append(
                         f"EMA 50 1H actuando como {ema_role} "
-                        f"({bounce_count} rechazos recientes) — no Black"
+                        f"({bounce_count} rechazos recientes, 3+ = no Black per mentoria)"
                     )
                     return None
 

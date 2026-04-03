@@ -292,14 +292,14 @@ class TestBreakEvenPhase:
 
     @patch("config.settings")
     def test_no_transition_when_ema_unfavorable(self, mock_settings, pm, broker):
-        """After dead-zone removal: transition blocked when EMA is available but unfavorable."""
+        """Transition blocked when EMA is ABOVE current price for BUY (acting as resistance, not support)."""
         mock_settings.be_trigger_method = "risk_distance"
         pos = make_pos(direction="BUY", entry=1.1000, sl=1.0950, tp1=1.1100,
                        phase=PositionPhase.BREAK_EVEN)
-        # Provide EMA data that is ABOVE entry (unfavorable for BUY — EMA should be below)
+        # EMA ABOVE current price = unfavorable for BUY (EMA is resistance, not support)
         pm._latest_emas[pos.instrument] = {"EMA_M5_50": 1.1050}
 
-        run(pm._handle_be_phase(pos, 1.1060))
+        run(pm._handle_be_phase(pos, 1.1030))  # current price below EMA → unfavorable
         assert pos.phase == PositionPhase.BREAK_EVEN
 
 

@@ -46,6 +46,7 @@ class TradeDatabase:
         await self._db.execute("PRAGMA synchronous=NORMAL")  # safe with WAL, reduces fsync overhead
 
         await self._create_tables()
+        await self._run_migrations()
         logger.info(f"Database initialized: {self.db_path}")
 
     async def _create_tables(self):
@@ -136,6 +137,32 @@ class TradeDatabase:
             CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_approvals(status);
         """)
         await self._db.commit()
+
+    async def _run_migrations(self):
+        """Run one-time data migrations. Safe to re-run (idempotent)."""
+        # M1: Fix trades with strategy='DETECTED' from MANUAL mode bug.
+        # Use strategy_variant as source of truth (e.g. 'BLUE_A' → 'BLUE').
+        cursor = await self._db.execute(
+            "SELECT COUNT(*) FROM trades WHERE strategy = 'DETECTED'"
+        )
+        row = await cursor.fetchone()
+        count = row[0] if row else 0
+        if count > 0:
+            await self._db.execute("""
+                UPDATE trades
+                SET strategy = CASE
+                    WHEN strategy_variant LIKE 'BLUE%' THEN 'BLUE'
+                    WHEN strategy_variant LIKE 'RED%' THEN 'RED'
+                    WHEN strategy_variant LIKE 'PINK%' THEN 'PINK'
+                    WHEN strategy_variant LIKE 'BLACK%' THEN 'BLACK'
+                    WHEN strategy_variant LIKE 'GREEN%' THEN 'GREEN'
+                    WHEN strategy_variant LIKE 'WHITE%' THEN 'WHITE'
+                    ELSE strategy_variant
+                END
+                WHERE strategy = 'DETECTED' AND strategy_variant IS NOT NULL
+            """)
+            await self._db.commit()
+            logger.info(f"Migration M1: fixed {count} trades with strategy='DETECTED'")
 
     async def close(self):
         """Close the database connection."""

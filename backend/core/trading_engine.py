@@ -626,7 +626,8 @@ class TradingEngine:
         await self._maybe_send_morning_heartbeat(now)
 
         # Daily summary: send at end of trading day (22:00 UTC = trading_end_hour) once
-        if now.hour == settings.trading_end_hour and now.minute < 10:
+        offset = self._dst_offset(now)
+        if now.hour == settings.trading_end_hour + offset and now.minute < 10:
             if not hasattr(self, '_daily_summary_sent_date') or self._daily_summary_sent_date != now.date():
                 self._daily_summary_sent_date = now.date()
                 asyncio.create_task(self._send_daily_summary())
@@ -754,7 +755,7 @@ class TradingEngine:
                                         strategy=getattr(pos, 'strategy_variant', '') or '',
                                     )
                                 except Exception as e:
-                                    logger.warning(f"Trade journal write failed for {trade_id}: {e}")
+                                    logger.warning(f"Close alert failed for {trade_id}: {e}")
                     except Exception as e:
                         logger.error(f"News close failed for {trade_id}: {e}")
 
@@ -1355,8 +1356,8 @@ class TradingEngine:
                                 pnl_pct=round((close_price - pos.entry_price if pos.direction == "BUY" else pos.entry_price - close_price) / pos.entry_price * 100, 2) if pos.entry_price else 0,
                                 result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Screenshot capture failed for {tid}: {e}")
 
                     # Send close alert
                     if self.alert_manager:
@@ -1424,7 +1425,8 @@ class TradingEngine:
 
         now = _dt.datetime.now(_dt.timezone.utc)
         is_friday = now.weekday() == 4
-        friday_close_soon = is_friday and now.hour >= settings.no_new_trades_friday_hour
+        offset = self._dst_offset(now)
+        friday_close_soon = is_friday and now.hour >= settings.no_new_trades_friday_hour + offset
 
         # Check upcoming news — use cached value from last scan cycle
         # (the main scan loop already calls has_upcoming_news() asynchronously

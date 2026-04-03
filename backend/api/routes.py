@@ -307,8 +307,8 @@ async def reject_all_setups():
             try:
                 if engine.reject_setup(setup.id):
                     count += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to reject setup {setup.id}: {e}")
         return {"status": "rejected_all", "count": count}
     return {"status": "ok", "count": 0}
 

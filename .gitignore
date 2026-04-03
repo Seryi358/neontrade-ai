@@ -49,3 +49,6 @@ Thumbs.db
 test_live_*.py
 test_trade_simulation.py
 test_live_stress.py
+
+# ── TradingLab utility scripts (contain API keys) ────────────
+TradingLab_Notas/*.py

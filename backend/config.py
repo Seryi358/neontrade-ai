@@ -481,7 +481,7 @@ class Settings(BaseSettings):
         "AXY",   # Australian Dollar Index
         "SXY",   # Swiss Franc Index
         "CXY",   # Canadian Dollar Index
-        "NXY",   # New Zealand Dollar Index
+        "ZXY",   # New Zealand Dollar Index (TradingView: TVC:ZXY)
     ]
 
     # Market View — macro dashboard symbols (from mentorship course materials)

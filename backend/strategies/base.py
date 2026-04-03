@@ -2228,7 +2228,37 @@ class RedStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL debajo de EMA 50 confirm TF o minimo anterior (para BUY). Inverso para SELL."""
+        """
+        RED SL placement — style-adaptive per TradingLab mentorship:
+        - Day trading / Swing: SL debajo de EMA 50 confirm TF o minimo anterior.
+        - Scalping: SL en nivel Fibonacci 0.618 (Workshop de Scalping, Estrategia RED).
+          Alex: "stop loss en el nivel de 0.618 de Fibonacci"
+        """
+        style = _get_trading_style()
+
+        # Scalping RED: SL at Fibonacci 0.618 level (Workshop de Scalping)
+        if style == "scalping":
+            fib_618 = analysis.fibonacci_levels.get("0.618", 0.0) if analysis.fibonacci_levels else 0.0
+            buffer_pct = 0.002  # small buffer
+            if direction == "BUY":
+                if fib_618 > 0 and fib_618 < entry_price:
+                    return fib_618 * (1 - buffer_pct)
+                # Fallback: previous swing low
+                supports = analysis.key_levels.get("supports", [])
+                below = [s for s in supports if s < entry_price]
+                if below:
+                    return max(below) * (1 - buffer_pct)
+                return entry_price * 0.99
+            else:
+                if fib_618 > 0 and fib_618 > entry_price:
+                    return fib_618 * (1 + buffer_pct)
+                resistances = analysis.key_levels.get("resistances", [])
+                above = [r for r in resistances if r > entry_price]
+                if above:
+                    return min(above) * (1 + buffer_pct)
+                return entry_price * 1.01
+
+        # Day trading / Swing: SL debajo de EMA 50 confirm TF o minimo anterior
         # Style-adaptive: day=H4, swing=W, scalping=M15 (with hardcoded fallback)
         confirm_ema_key = _tf_ema("confirm", 50)
         ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")

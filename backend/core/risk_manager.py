@@ -269,13 +269,13 @@ class RiskManager:
         # Determine current level based on accumulated gains
         level = min(int(accumulated / delta_threshold), 3)
 
-        # Fixed risk levels from Excel (Delta+ sheet)
-        # Level 0 = base, Level 1 = 1.5%, Level 2 = 2.0%, Level 3 = 3.0%
+        # Fixed risk levels from TradingLab Delta+ algorithm
+        # Level 0 = base, Level 1 = 1.5%, Level 2 = 2.0%, Level 3 = max 2.0%
         level_risks = {
             0: base_risk,           # 1.0% (no bonus)
             1: 0.015,               # 1.5%
             2: 0.020,               # 2.0%
-            3: 0.030,               # 3.0%
+            3: 0.020,               # 2.0% (capped — TradingLab max is 2%)
         }
 
         target_risk = level_risks.get(level, base_risk)
@@ -402,8 +402,8 @@ class RiskManager:
                 final_risk *= reentry_mult
                 logger.info(f"Reentry risk reduction for {instrument}: {reentry_mult}x -> {final_risk:.4f}")
 
-        # Never exceed style maximum * 3 (hard cap)
-        final_risk = min(final_risk, base_risk * 3)
+        # TradingLab: never exceed 2% per trade (absolute hard cap)
+        final_risk = min(final_risk, settings.delta_max_risk)
 
         return final_risk
 

@@ -724,7 +724,7 @@ class TestDatabaseIntegrity:
             db = TradeDatabase(db_path)
             await db.initialize()
 
-            # Insert a trade
+            # Insert a trade (with closed status so get_trade_history returns it)
             trade_data = {
                 "instrument": "EUR_USD",
                 "strategy": "BLUE",
@@ -738,11 +738,12 @@ class TestDatabaseIntegrity:
                 "confidence": 75.0,
                 "risk_reward_ratio": 2.0,
                 "reasoning": "Test trade",
+                "status": "closed_tp",
             }
             trade_id = await db.record_trade(trade_data)
             assert trade_id is not None
 
-            # Query it back
+            # Query it back (get_trade_history returns closed trades only)
             history = await db.get_trade_history(limit=10)
             assert len(history) == 1
             assert history[0]["instrument"] == "EUR_USD"
@@ -829,7 +830,7 @@ class TestDatabaseIntegrity:
             trade_id = await db.record_trade({
                 "instrument": "EUR_USD", "direction": "BUY",
                 "units": 1000, "entry_price": 1.1, "stop_loss": 1.09,
-                "take_profit": 1.12,
+                "take_profit": 1.12, "status": "closed_tp",
             })
 
             # Try to update with an unauthorized column
@@ -838,7 +839,7 @@ class TestDatabaseIntegrity:
             })
             assert result is False  # Should be rejected
 
-            # Verify instrument unchanged
+            # Verify instrument unchanged (get_trade_history returns closed trades only)
             history = await db.get_trade_history()
             assert history[0]["instrument"] == "EUR_USD"
 

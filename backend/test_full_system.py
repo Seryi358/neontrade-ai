@@ -686,11 +686,12 @@ def test_e_database_models():
             "confidence": 75.0,
             "risk_reward_ratio": 2.0,
             "reasoning": "Test trade",
+            "status": "closed_tp",
         })
         assert trade_id is not None
         print(f"  [PASS] E2: Trade recorded: {trade_id}")
 
-        # E4: Query trade history
+        # E4: Query trade history (get_trade_history returns closed trades only)
         trades = await db.get_trade_history(limit=10)
         assert len(trades) >= 1
         trade = trades[0]

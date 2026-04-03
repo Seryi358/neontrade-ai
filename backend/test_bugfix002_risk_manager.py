@@ -74,6 +74,7 @@ class TestBaseRiskPerStyle:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         assert rm.get_risk_for_style(TradingStyle.DAY_TRADING) == 0.01
 
     @patch("core.risk_manager.settings")
@@ -81,6 +82,7 @@ class TestBaseRiskPerStyle:
         mock_settings.risk_scalping = 0.005
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         assert rm.get_risk_for_style(TradingStyle.SCALPING) == 0.005
 
     @patch("core.risk_manager.settings")
@@ -88,6 +90,7 @@ class TestBaseRiskPerStyle:
         mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         assert rm.get_risk_for_style(TradingStyle.SWING) == 0.01
 
 
@@ -105,6 +108,7 @@ class TestPositionSizing:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
@@ -122,6 +126,7 @@ class TestPositionSizing:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
@@ -138,6 +143,7 @@ class TestPositionSizing:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
@@ -158,6 +164,7 @@ class TestPositionSizing:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
@@ -178,6 +185,7 @@ class TestDrawdownFixed1Pct:
     def test_no_adjustment_even_at_high_dd(self, mock_settings, rm):
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
         rm._peak_balance = 10000.0
         rm._current_balance = 8500.0  # 15% DD
@@ -191,6 +199,7 @@ class TestDrawdownVariable:
     def test_at_max_dd_reduces_risk(self, mock_settings, rm):
         mock_settings.drawdown_method = "variable"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
 
         rm._peak_balance = 10000.0
@@ -207,6 +216,7 @@ class TestDrawdownVariable:
     def test_no_dd_returns_base_risk(self, mock_settings, rm):
         mock_settings.drawdown_method = "variable"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
 
         rm._peak_balance = 10000.0
@@ -222,6 +232,7 @@ class TestDrawdownVariable:
         """Even with very low win rate, minimum is 25% of base."""
         mock_settings.drawdown_method = "variable"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
 
         rm._peak_balance = 10000.0
@@ -244,6 +255,7 @@ class TestDrawdownFixedLevels:
     def test_level_1_at_5pct_dd(self, mock_settings, rm):
         mock_settings.drawdown_method = "fixed_levels"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_level_1 = 0.05
         mock_settings.drawdown_level_2 = 0.075
@@ -262,6 +274,7 @@ class TestDrawdownFixedLevels:
     def test_level_2_at_75pct_dd(self, mock_settings, rm):
         mock_settings.drawdown_method = "fixed_levels"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_level_1 = 0.05
         mock_settings.drawdown_level_2 = 0.075
@@ -280,6 +293,7 @@ class TestDrawdownFixedLevels:
     def test_level_3_at_10pct_dd(self, mock_settings, rm):
         mock_settings.drawdown_method = "fixed_levels"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_level_1 = 0.05
         mock_settings.drawdown_level_2 = 0.075
@@ -298,6 +312,7 @@ class TestDrawdownFixedLevels:
     def test_no_reduction_below_level_1(self, mock_settings, rm):
         mock_settings.drawdown_method = "fixed_levels"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_level_1 = 0.05
         mock_settings.drawdown_level_2 = 0.075
@@ -449,6 +464,7 @@ class TestCanTakeTrade:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.funded_account_mode = False
         mock_settings.scale_in_require_be = False
         mock_settings.correlation_groups = []
@@ -463,6 +479,7 @@ class TestCanTakeTrade:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.funded_account_mode = False
         mock_settings.scale_in_require_be = False
         mock_settings.correlation_groups = []
@@ -561,8 +578,8 @@ class TestDeltaAlgorithm:
         rm._delta_accumulated_gain = 0.50  # level = min(16, 3) = 3
 
         bonus = rm._get_delta_bonus(0.01)
-        # Level 3 target = 0.030, bonus = 0.030 - 0.01 = 0.02
-        assert bonus == pytest.approx(0.02)
+        # Level 3 target = 0.020 (capped per TradingLab max 2%), bonus = 0.020 - 0.01 = 0.01
+        assert bonus == pytest.approx(0.01)
 
     @patch("core.risk_manager.settings")
     def test_bonus_capped_at_max_risk(self, mock_settings, rm):
@@ -755,6 +772,7 @@ class TestRiskStatus:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.max_total_risk = 0.07
 
         status = rm.get_risk_status()
@@ -775,6 +793,7 @@ class TestRiskStatus:
         mock_settings.risk_day_trading = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
         mock_settings.max_total_risk = 0.07
 
         rm._peak_balance = 10000.0

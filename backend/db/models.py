@@ -66,7 +66,7 @@ class TradeDatabase:
                 pnl REAL,
                 pnl_pips REAL,
                 status TEXT NOT NULL DEFAULT 'open'
-                    CHECK(status IN ('open', 'closed_tp', 'closed_sl', 'closed_manual', 'closed_be', 'closed_friday_sl', 'closed_friday_tp', 'closed_friday_sl+tp', 'closed_funded_overnight')),
+                    CHECK(status IN ('open', 'closed_tp', 'closed_sl', 'closed_manual', 'closed_be', 'closed_friday_sl', 'closed_friday_tp', 'closed_friday_sl+tp', 'closed_funded_overnight', 'closed_news', 'closed_tp_max', 'closed_emergency_exit')),
                 mode TEXT NOT NULL DEFAULT 'AUTO' CHECK(mode IN ('AUTO', 'MANUAL')),
                 confidence REAL,
                 risk_reward_ratio REAL,

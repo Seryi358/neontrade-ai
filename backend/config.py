@@ -209,7 +209,7 @@ class Settings(BaseSettings):
     # high = Interest Rates, NFP/Unemployment, CPI, GDP
     # medium = PMI, Retail Sales, Trade Balance, Consumer Confidence
     # low = everything else
-    news_impact_filter: str = "high"  # "high" = only avoid high-impact, "all" = avoid all
+    news_impact_filter: str = "medium"  # "medium" = avoid high+medium (mentorship: "dos y de tres"), "high" = only high, "all" = avoid all
 
     # Timeframes — Day Trading layout (Alex's preferred style)
     # Roles: Directional=D (1D), Analysis=H4, Entry/Management=H1, Execution=M5

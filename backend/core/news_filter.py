@@ -1,6 +1,6 @@
 """
 NeonTrade AI - Economic Calendar / News Filter
-Checks for upcoming high-impact economic events to avoid trading during news.
+Checks for upcoming high/medium-impact economic events to avoid trading during news.
 
 Data sources (in priority order):
   1. FairEconomy  - Free ForexFactory calendar mirror (primary, no API key needed)
@@ -194,9 +194,10 @@ class NewsFilter:
             parts = instrument.replace("/", "_").split("_")
             currencies = set(p.upper() for p in parts if len(p) == 3)
 
-        # Check if any high-impact event is within our window
+        # Check if any high/medium-impact event is within our window
+        # Mentorship: filter "dos y de tres" (2-star and 3-star = medium + high)
         for event in self._cached_events:
-            if event.impact != "high":
+            if event.impact not in ("high", "medium"):
                 continue
 
             if currencies and event.currency not in currencies:
@@ -273,7 +274,7 @@ class NewsFilter:
         currencies = self._extract_currencies(instrument)
 
         for event in self._cached_events:
-            if event.impact != "high":
+            if event.impact not in ("high", "medium"):
                 continue
             # Check if this event affects the instrument
             if event.currency.upper() not in currencies:
@@ -281,8 +282,9 @@ class NewsFilter:
             minutes_until = (event.time - now).total_seconds() / 60
             if 0 < minutes_until <= win_before:
                 reason = self._style_reason(style, event)
+                impact_label = event.impact.title()
                 return True, (
-                    f"High-impact news: {event.title} in {int(minutes_until)}min — {reason}"
+                    f"{impact_label}-impact news: {event.title} in {int(minutes_until)}min — {reason}"
                 )
 
         return False, ""

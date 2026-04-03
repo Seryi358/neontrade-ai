@@ -712,6 +712,14 @@ class PositionManager:
                             ok = await self.broker.close_trade_partial(pos.trade_id, percent=50)
                             if ok:
                                 pos.units -= partial_units
+                                # Rule #4: record partial close PnL for delta/reentry tracking
+                                if self.risk_manager:
+                                    pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
+                                    partial_pnl = pnl_per_unit * abs(partial_units)
+                                    balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+                                    self.risk_manager.record_trade_result(
+                                        f"{pos.trade_id}_partial", pos.instrument, partial_pnl / balance
+                                    )
                                 logger.info(
                                     f"{pos.trade_id}: PARTIAL PROFIT at TP1 — closed ~50%, "
                                     f"remaining {pos.units} units"

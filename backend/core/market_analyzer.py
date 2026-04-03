@@ -546,6 +546,9 @@ class MarketAnalyzer:
         df = pd.DataFrame(rows)
         if not df.empty:
             df.set_index("time", inplace=True)
+            # Rule #9: filter out zero-OHLC candles (broker returns empty data that corrupts indicators)
+            valid = (df[['open', 'high', 'low', 'close']] != 0).all(axis=1)
+            df = df[valid]
         return df
 
     def _detect_trend(self, df: pd.DataFrame) -> Trend:
@@ -1926,51 +1929,48 @@ class MarketAnalyzer:
 
     # ── Trading Session Detection ─────────────────────────────────────
 
+    @staticmethod
+    def _dst_offset() -> int:
+        """Return DST offset: 0 during EDT (summer), 1 during EST (winter).
+        Config session hours are for EDT. Add offset during EST (winter)."""
+        try:
+            from zoneinfo import ZoneInfo
+            now = datetime.now(ZoneInfo("America/New_York"))
+            return 0 if now.dst() else 1
+        except Exception:
+            return 0
+
     def _detect_session(self) -> tuple:
         """
         Return the currently active trading session and sub-session detail.
+        Rule #10: DST-aware — adjusts all boundaries by _dst_offset().
 
-        Sessions (corrected per mentorship):
+        Sessions (EDT / summer baseline):
           ASIAN     : 00:00-08:00 UTC
-            - SYDNEY sub-session: 21:00-06:00 UTC (overlaps into ASIAN)
-            - TOKYO  sub-session: 00:00-09:00 UTC
-            - 21:00-00:00 is Sydney-only (mapped to OFF_HOURS for main session)
-            - 00:00-06:00 is Sydney+Tokyo overlap
-            - 06:00-08:00 is Tokyo-only
-          LONDON    : 08:00-16:00 UTC (full London session)
+          LONDON    : 08:00-16:00 UTC
           OVERLAP   : 13:00-17:00 UTC (London+NY overlap - highest volatility)
-          NEW_YORK  : 13:00-21:00 UTC (full NY session)
-          OFF_HOURS : 21:00-00:00 UTC (includes Sydney open)
+          NEW_YORK  : 13:00-21:00 UTC
+          OFF_HOURS : 21:00-00:00 UTC
 
-        Note: OVERLAP is a subset of both LONDON and NEW_YORK.
-        Priority: OVERLAP > LONDON > NEW_YORK (overlap has highest volatility).
-
-        Returns:
-            Tuple of (session: str, session_detail: str).
-            session_detail distinguishes TOKYO vs SYDNEY within the ASIAN block.
+        During EST (winter), boundaries shift +1h in UTC.
         """
         utc_hour = datetime.now(timezone.utc).hour
+        d = self._dst_offset()  # 0=EDT, 1=EST
 
-        if 0 <= utc_hour < 8:
+        if 0 <= utc_hour < (8 + d):
             # ASIAN block with Sydney/Tokyo distinction
-            if utc_hour < 6:
-                # 00:00-06:00: Sydney + Tokyo overlap
+            if utc_hour < (6 + d):
                 detail = "ASIAN_SYDNEY_TOKYO"
             else:
-                # 06:00-08:00: Tokyo only (Sydney closed at 06:00)
                 detail = "ASIAN_TOKYO"
             return ("ASIAN", detail)
-        elif 13 <= utc_hour < 17:
-            # Overlap takes priority (subset of both London and NY)
+        elif (13 + d) <= utc_hour < (17 + d):
             return ("OVERLAP", "LONDON_NY_OVERLAP")
-        elif 8 <= utc_hour < 13:
-            # London-only hours (before NY opens)
+        elif (8 + d) <= utc_hour < (13 + d):
             return ("LONDON", "LONDON")
-        elif 17 <= utc_hour < 21:
-            # NY-only hours (after London closes)
+        elif (17 + d) <= utc_hour < (21 + d):
             return ("NEW_YORK", "NEW_YORK")
         else:
-            # 21:00-00:00: Off-hours but Sydney is already open
             return ("OFF_HOURS", "SYDNEY_PRE_ASIAN")
 
     # ── Basic Elliott Wave Counting ───────────────────────────────────

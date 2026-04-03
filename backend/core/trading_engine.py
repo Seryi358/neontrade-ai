@@ -790,7 +790,7 @@ class TradingEngine:
         expired = [k for k, v in self._reentry_candidates.items()
                    if (datetime.now(timezone.utc) - v["tp1_time"]).total_seconds() > settings.reentry_window_seconds]
         for k in expired:
-            del self._reentry_candidates[k]
+            self._reentry_candidates.pop(k, None)
 
     # ── Equity Snapshot ─────────────────────────────────────────
 
@@ -1671,7 +1671,7 @@ class TradingEngine:
                         pass
                     else:
                         # Reentry window expired, clear candidate
-                        del self._reentry_candidates[instrument]
+                        self._reentry_candidates.pop(instrument, None)
 
                 # Run full analysis
                 analysis = await self.market_analyzer.full_analysis(instrument)

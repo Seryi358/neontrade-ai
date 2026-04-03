@@ -2561,10 +2561,11 @@ class MarketAnalyzer:
         if not isinstance(data.index, pd.DatetimeIndex):
             return {"phase": "unknown", "session": session}
 
-        # Get today's Asian session candles (00:00-08:00 UTC)
+        # Get today's Asian session candles (00:00-08:00 UTC EDT, DST-adjusted)
         now = datetime.now(timezone.utc)
+        d = self._dst_offset()  # 0=EDT, 1=EST
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        asian_end = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        asian_end = now.replace(hour=8 + d, minute=0, second=0, microsecond=0)
 
         # Filter candles to today's Asian session
         asian_candles = data[
@@ -2621,7 +2622,7 @@ class MarketAnalyzer:
         elif session == "LONDON":
             result["phase"] = "manipulation"
             # Capture the London manipulation price range as entry zone
-            london_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+            london_start = now.replace(hour=8 + d, minute=0, second=0, microsecond=0)
             london_candles = data[data.index >= london_start]
             if not london_candles.empty:
                 result["manipulation_zone_high"] = float(london_candles["high"].max())
@@ -2641,9 +2642,9 @@ class MarketAnalyzer:
         elif session in ("OVERLAP", "NEW_YORK"):
             result["phase"] = "distribution"
             # Check if price reversed from London manipulation
-            # Get London candles (08:00-12:00 UTC)
-            london_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
-            london_end = now.replace(hour=12, minute=0, second=0, microsecond=0)
+            # Get London candles (08:00-12:00 UTC EDT, DST-adjusted)
+            london_start = now.replace(hour=8 + d, minute=0, second=0, microsecond=0)
+            london_end = now.replace(hour=12 + d, minute=0, second=0, microsecond=0)
             london_candles = data[
                 (data.index >= london_start) & (data.index < london_end)
             ]
@@ -2775,14 +2776,14 @@ class MarketAnalyzer:
                 # Negative correlation: divergence = both moving same way
                 # Bearish SMT: instrument HH AND correlated also HH (should be LL)
                 if made_higher_high and corr_made_higher_high:
-                    logger.debug(
+                    logger.warning(
                         f"SMT Divergence BEARISH (neg-corr): {instrument} HH "
                         f"and {corr_inst} also HH (should diverge)"
                     )
                     return "bearish"
                 # Bullish SMT: instrument LL AND correlated also LL (should be HH)
                 if made_lower_low and corr_made_lower_low:
-                    logger.debug(
+                    logger.warning(
                         f"SMT Divergence BULLISH (neg-corr): {instrument} LL "
                         f"and {corr_inst} also LL (should diverge)"
                     )
@@ -2791,7 +2792,7 @@ class MarketAnalyzer:
                 # Positive correlation (original logic):
                 # Bearish SMT: instrument makes higher high but correlated doesn't
                 if made_higher_high and not corr_made_higher_high:
-                    logger.debug(
+                    logger.warning(
                         f"SMT Divergence BEARISH: {instrument} made HH but "
                         f"{corr_inst} did not"
                     )
@@ -2799,7 +2800,7 @@ class MarketAnalyzer:
 
                 # Bullish SMT: instrument makes lower low but correlated doesn't
                 if made_lower_low and not corr_made_lower_low:
-                    logger.debug(
+                    logger.warning(
                         f"SMT Divergence BULLISH: {instrument} made LL but "
                         f"{corr_inst} did not"
                     )
@@ -2909,11 +2910,12 @@ class MarketAnalyzer:
         if asian_low is not None:
             pools.append({"level": asian_low, "type": "asian_low", "strength": 1})
 
-        # --- London session High / Low (08:00-16:00 UTC) ---
+        # --- London session High / Low (08:00-16:00 UTC EDT, DST-adjusted) ---
         if not h1.empty and isinstance(h1.index, pd.DatetimeIndex):
             now_liq = datetime.now(timezone.utc)
-            london_start = now_liq.replace(hour=8, minute=0, second=0, microsecond=0)
-            london_end = now_liq.replace(hour=16, minute=0, second=0, microsecond=0)
+            d_liq = self._dst_offset()  # 0=EDT, 1=EST
+            london_start = now_liq.replace(hour=8 + d_liq, minute=0, second=0, microsecond=0)
+            london_end = now_liq.replace(hour=16 + d_liq, minute=0, second=0, microsecond=0)
             london_candles = h1[
                 (h1.index >= london_start) & (h1.index < london_end)
             ]
@@ -2930,11 +2932,11 @@ class MarketAnalyzer:
                 pools.append({"level": london_high, "type": "london_high", "strength": 1})
                 pools.append({"level": london_low, "type": "london_low", "strength": 1})
 
-        # --- New York session High / Low (13:00-21:00 UTC) ---
+        # --- New York session High / Low (13:00-21:00 UTC EDT, DST-adjusted) ---
         if not h1.empty and isinstance(h1.index, pd.DatetimeIndex):
             now_liq = datetime.now(timezone.utc)
-            ny_start = now_liq.replace(hour=13, minute=0, second=0, microsecond=0)
-            ny_end = now_liq.replace(hour=21, minute=0, second=0, microsecond=0)
+            ny_start = now_liq.replace(hour=13 + d_liq, minute=0, second=0, microsecond=0)
+            ny_end = now_liq.replace(hour=21 + d_liq, minute=0, second=0, microsecond=0)
             ny_candles = h1[
                 (h1.index >= ny_start) & (h1.index < ny_end)
             ]
@@ -3113,9 +3115,9 @@ class MarketAnalyzer:
 
         # Fibonacci levels relative to this impulse swing
         equilibrium = impulse_low + rng * 0.5
-        # Sweet spot: 50-75% retracement (institutional order zone)
-        # TradingLab uses 0.618 and 0.75 Fibonacci levels
-        sweet_spot_high = impulse_low + rng * 0.75
+        # Sweet spot: 50-70% retracement (institutional order zone)
+        # TradingLab SMC notes: institutions seek "50% y el 70%" zone
+        sweet_spot_high = impulse_low + rng * 0.70
         sweet_spot_low = impulse_low + rng * 0.5
 
         # Position within the swing (0.0 = swing low, 1.0 = swing high)
@@ -3126,7 +3128,7 @@ class MarketAnalyzer:
         else:
             zone = "discount"
 
-        in_sweet_spot = 0.5 <= position <= 0.75
+        in_sweet_spot = 0.5 <= position <= 0.70
 
         return {
             "zone": zone,

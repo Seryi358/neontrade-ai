@@ -191,9 +191,9 @@ class Settings(BaseSettings):
 
     # Trading hours (UTC) - London + New York sessions only
     # TradingLab: London 08:00-17:00 UTC, NY 13:00-22:00 UTC (approx, shifts with DST)
-    # We start at 07:00 to catch London pre-market and end at 22:00 for full NY session
+    # We start at 07:00 to catch London pre-market and end at 21:00 for full NY session
     trading_start_hour: int = 7    # 07:00 UTC (London pre-open)
-    trading_end_hour: int = 22     # 22:00 UTC (NY close, 5PM ET in EST)
+    trading_end_hour: int = 21     # 21:00 UTC (NY close, 5PM EDT; DST offset → 22 UTC in EST)
 
     # Days to avoid
     close_before_friday_hour: int = 20  # Close positions before Friday 20:00 UTC

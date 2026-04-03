@@ -625,7 +625,7 @@ class TradingEngine:
         # Morning heartbeat email (proof of life)
         await self._maybe_send_morning_heartbeat(now)
 
-        # Daily summary: send at end of trading day (22:00 UTC = trading_end_hour) once
+        # Daily summary: send at end of trading day (21:00 UTC EDT = trading_end_hour) once
         offset = self._dst_offset(now)
         if now.hour == settings.trading_end_hour + offset and now.minute < 10:
             if not hasattr(self, '_daily_summary_sent_date') or self._daily_summary_sent_date != now.date():
@@ -829,7 +829,8 @@ class TradingEngine:
         """Return DST offset: 0 during EDT (summer), 1 during EST (winter).
 
         During EST (Nov-Mar), US markets open/close 1 hour later in UTC.
-        Config hours are set for EDT. Add this offset to compensate.
+        Config hours are set for EDT (e.g. trading_end_hour=21 → 5PM EDT).
+        Add this offset during EST so 21+1=22 UTC → 5PM EST.
         """
         try:
             from zoneinfo import ZoneInfo
@@ -847,7 +848,7 @@ class TradingEngine:
         - SYDNEY (Australian): 5:00 PM - 2:00 AM ET → ~22:00-07:00 UTC
         - ASIAN (Tokyo):       7:00 PM - 4:00 AM ET → ~00:00-09:00 UTC
         - LONDON (European):   3:00 AM - 12:00 PM ET → ~08:00-17:00 UTC
-        - NEW_YORK:            8:00 AM - 5:00 PM ET → ~13:00-22:00 UTC
+        - NEW_YORK:            8:00 AM - 5:00 PM ET → ~13:00-21:00 UTC
         - OVERLAP (London+NY): 8:00 AM - 12:00 PM ET → ~13:00-17:00 UTC
 
         Note: ET shifts with DST (EST=UTC-5, EDT=UTC-4). These fixed UTC
@@ -869,12 +870,12 @@ class TradingEngine:
             return ("OVERLAP", 1.0)
         elif 8 <= hour < 13:
             return ("LONDON", 0.9)
-        elif 17 <= hour < 22:
+        elif 17 <= hour < 21:
             return ("NEW_YORK", 0.8)
         elif 0 <= hour < 8:
             # Crypto is active in Asian hours — higher quality score
             return ("ASIAN", 0.7 if is_crypto else 0.5)
-        elif 22 <= hour:
+        elif 21 <= hour:
             return ("SYDNEY", 0.4)
         else:
             return ("SYDNEY", 0.4)

@@ -318,7 +318,7 @@ def _check_ema_pullback(analysis: AnalysisResult, ema_key: str, direction: str) 
     SELL: precio ligeramente por debajo de la EMA.
     """
     ema_val = _ema_val(analysis, ema_key)
-    if ema_val is None:
+    if not ema_val:
         return False, f"EMA {ema_key} no disponible"
 
     price = _ema_val(analysis, "EMA_M5_5")
@@ -4214,8 +4214,8 @@ class GreenStrategy(BaseStrategy):
         sl_mode = "advanced"
         try:
             sl_mode = settings.green_sl_mode
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"GREEN SL mode config read failed, using default 'advanced': {e}")
 
         # Use swing_lows/swing_highs which come from 1H analysis (not daily S/R)
         swing_lows = getattr(analysis, 'swing_lows', [])

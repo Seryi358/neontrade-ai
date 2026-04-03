@@ -2075,7 +2075,8 @@ class TradingEngine:
             trailing_tp_only=getattr(signal, 'trailing_tp_only', False),
             strategy_variant=getattr(signal, 'strategy_variant', None),
         )
-        # Carry AI opinion from signal to setup for email/UI
+        # Carry strategy confidence and AI opinion from signal to setup for email/UI
+        trade_risk._strategy_confidence = getattr(signal, 'confidence', 0.0)
         trade_risk._ai_score = getattr(signal, '_ai_score', 0)
         trade_risk._ai_recommendation = getattr(signal, '_ai_recommendation', '')
         trade_risk._ai_reasoning = getattr(signal, '_ai_reasoning', '')
@@ -2193,7 +2194,7 @@ class TradingEngine:
             stop_loss=setup.stop_loss,
             take_profit=setup.take_profit_1,
             units=setup.units,
-            confidence=setup.reward_risk_ratio * 33,  # Heuristic confidence
+            confidence=getattr(setup, '_strategy_confidence', 0.0) or min(setup.reward_risk_ratio * 33, 100.0),
             risk_reward_ratio=setup.reward_risk_ratio,
             reasoning=reasoning,
             take_profit_max=setup.take_profit_max,
@@ -2365,7 +2366,7 @@ class TradingEngine:
                             "stop_loss": setup.stop_loss,
                             "take_profit": setup.take_profit_1,
                             "mode": self.mode.value,
-                            "confidence": setup.reward_risk_ratio * 33,
+                            "confidence": getattr(setup, '_strategy_confidence', 0.0) or min(setup.reward_risk_ratio * 33, 100.0),
                             "risk_reward_ratio": setup.reward_risk_ratio,
                             "reasoning": getattr(setup, '_reasoning', None) or f"R:R {setup.reward_risk_ratio:.2f} | Risk {setup.risk_percent:.2%}",
                         })
@@ -2421,7 +2422,7 @@ class TradingEngine:
                             tp1=setup.take_profit_1,
                             tp_max=setup.take_profit_max,
                             strategy=getattr(setup, '_strategy_name', 'DETECTED'),
-                            confidence=min(setup.reward_risk_ratio * 33 / 100, 1.0),
+                            confidence=(getattr(setup, '_strategy_confidence', 0.0) or min(setup.reward_risk_ratio * 33, 100.0)) / 100.0,
                             candles=candles,
                             ema_values=ema_vals,
                         )

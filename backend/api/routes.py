@@ -647,6 +647,8 @@ async def get_trade_history(
             limit=limit, offset=offset,
             instrument=instrument, strategy=strategy,
         )
+        for t in trades:
+            t["strategy_color"] = t.get("strategy", "")
         return trades
     except Exception as e:
         raise HTTPException(500, f"Error al obtener historial: {str(e)}")

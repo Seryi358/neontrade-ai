@@ -2518,6 +2518,8 @@ class TradingEngine:
             trailing_tp_only=setup.trailing_tp_only,
             strategy_variant=setup.strategy_variant,
         )
+        # Preserve strategy name from PendingSetup so DB records the correct color
+        trade_risk._strategy_name = setup.strategy
 
         result = await self._execute_setup(trade_risk)
         if not result:

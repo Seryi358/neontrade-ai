@@ -227,8 +227,8 @@ class TradeDatabase:
         instrument: Optional[str] = None,
         strategy: Optional[str] = None,
     ) -> List[dict]:
-        """Query trade history with optional filters."""
-        query = "SELECT * FROM trades WHERE 1=1"
+        """Query trade history with optional filters (closed trades only)."""
+        query = "SELECT * FROM trades WHERE status != 'open'"
         params = []
 
         if instrument:
@@ -238,7 +238,7 @@ class TradeDatabase:
             query += " AND strategy = ?"
             params.append(strategy)
 
-        query += " ORDER BY opened_at DESC LIMIT ? OFFSET ?"
+        query += " ORDER BY closed_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         cursor = await self._db.execute(query, params)

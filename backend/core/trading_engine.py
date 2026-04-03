@@ -2012,7 +2012,9 @@ class TradingEngine:
                     if new_tp and isinstance(new_tp, (int, float)) and new_tp > 0:
                         signal.take_profit_1 = float(new_tp)
             except Exception as e:
-                logger.warning(f"AI validation failed (proceeding without): {e}")
+                logger.warning(f"AI validation failed — BLOCKING (cannot validate = cannot proceed): {e}")
+                self._daily_setups_skipped_ai += 1
+                return None
 
         # Validate risk management (strategy-specific R:R minimums)
         if not self.risk_manager.validate_reward_risk(

@@ -828,14 +828,14 @@ class OpenAIAnalyzer:
             return validated
 
         except Exception as e:
-            logger.error("AI validation failed for {}: {}", setup_signal.instrument, e)
-            # IMPORTANT: When AI is unavailable, let the setup THROUGH (fail-open)
-            # rather than silently blocking all trades. The technical analysis
-            # already validated the 7 steps — AI is an extra layer, not a gate.
+            logger.warning("AI validation failed for {} — BLOCKING (cannot validate = cannot proceed): {}", setup_signal.instrument, e)
+            # TradingLab rule: AI validation is BLOCKING — only TAKE setups proceed.
+            # If AI is unavailable, we cannot validate → must reject.
+            # The trading_engine.py also blocks on exceptions as a safety net.
             return {
-                "ai_score": 75,
-                "ai_recommendation": "TAKE",
-                "ai_reasoning": f"AI unavailable ({str(e)[:80]}). Setup passed on technical analysis only.",
+                "ai_score": 0,
+                "ai_recommendation": "SKIP",
+                "ai_reasoning": f"AI unavailable ({str(e)[:80]}). Cannot validate — BLOCKED per TradingLab rules.",
                 "suggested_adjustments": {},
             }
 

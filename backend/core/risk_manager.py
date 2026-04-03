@@ -685,12 +685,17 @@ class RiskManager:
                 )
 
         # Check total DD: overall drawdown vs funded max total DD
+        # Phase 2 may have a tighter DD limit (e.g. BitFunded: 10% → 8%)
         total_dd = self.get_current_drawdown()
-        if total_dd >= settings.funded_max_total_dd:
+        effective_total_dd = settings.funded_max_total_dd
+        if (settings.funded_current_phase == 2
+                and getattr(settings, 'funded_max_total_dd_phase2', 0) > 0):
+            effective_total_dd = settings.funded_max_total_dd_phase2
+        if total_dd >= effective_total_dd:
             return (
                 False,
                 f"Funded: total DD limit reached "
-                f"({total_dd:.2%} >= {settings.funded_max_total_dd:.2%})",
+                f"({total_dd:.2%} >= {effective_total_dd:.2%})",
             )
 
         # Enforce funded account restrictions (normal accounts only)
@@ -809,7 +814,12 @@ class RiskManager:
             "daily_dd_limit_amount": round(daily_dd_limit, 2),
             "start_of_day_balance": round(sod_balance, 2),
             "total_dd_pct": round(total_dd * 100, 2),
-            "total_dd_limit": round(settings.funded_max_total_dd * 100, 2),
+            "total_dd_limit": round(
+                (settings.funded_max_total_dd_phase2
+                 if settings.funded_current_phase == 2
+                 and getattr(settings, 'funded_max_total_dd_phase2', 0) > 0
+                 else settings.funded_max_total_dd) * 100, 2
+            ),
             "profit_target_pct": round(profit_target * 100, 2),
             "profit_progress_pct": round(profit_progress, 2),
             "no_overnight": settings.funded_no_overnight,

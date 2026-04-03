@@ -650,9 +650,13 @@ class PositionManager:
             return
 
         # EMA 50 must be favorable: acting as support (BUY) or resistance (SELL)
+        # Check against CURRENT price, not entry: a BUY with EMA between entry
+        # and current_price means EMA is acting as support — that's favorable.
+        # Using entry_price caused positions to get stuck in BE when the EMA
+        # naturally rose above entry in a profitable BUY trade.
         ema_favorable = (
-            (ema_value >= pos.entry_price) if pos.direction == "SELL"
-            else (ema_value <= pos.entry_price)
+            (ema_value >= current_price) if pos.direction == "SELL"
+            else (ema_value <= current_price)
         )
         if ema_favorable:
             pos.phase = PositionPhase.TRAILING_TO_TP1

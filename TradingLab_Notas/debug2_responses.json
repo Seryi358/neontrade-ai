@@ -1,0 +1,1794 @@
+[
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:51BaDe5m/auth/trade-token?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjZmNjU3ZGRiYWJmYmZkOTVhNGVkNjZjMjMyNDExZWFhNjE5OGQ4NGMxYmJkOGEyYTI5M2I4MTVmYjRhOTlhYjEifQ.eyJpZCI6Im1lbV9jbWh0YWZjNWowNHB5MHNvbGducGY1NTh6IiwidHlwZSI6Im1lbWJlciIsImlhdCI6MTc3NDU0Mzk0MiwiZXhwIjoxNzc1NzUzNTQyLCJhdWQiOiJhcHBfY2w4c3c5MXB2MDA0NDB3Z3M3aGx3Z2d2ZiIsImlzcyI6Imh0dHBzOi8vYXBpLm1lbWJlcnN0YWNrLmNvbSJ9.DJWphLdZcGt-VUzNUc87w5Ni2iP9ry-RxuSD93u7qBVDO1F1IO73zIkFWnQwtUdjR2gHGh05SBiOCqrU4gEmJ6U0rEqnzdrf89FWjG2QFE652OLv2_1c-aXrEMkc2LvVnVjDXbpjOyj74lU5SYsLwvCfQ5S6OEQ8BQEXJL5wiVG6ae73Y-Vpyu4TWRxGvOC-ZpqEFLEngtYL1YyKSt5XKa3-8EZg1dcNe_70FDMPVT09mgj6x9QCdb22uAZodjcSBPYo-WCNydahKE5OsCKeE7-8wsmM4dZ8N2rypnb60kQ5epwQUPlolQ3oYHmZ59VZMWe1gG7ylr2o3JBi49gNTQ",
+    "body": "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwiemlwIjoiREVGIn0.O9HhJLGNxR1WUrddOKdN37AQJcy8v4ql8ZCuGJo4IpckleFlXwcRsEu9N6V4p6YkbS4idfgZgTJ_0O9GkdQ9zWvIGoxi0sG5.-lsucD9GDc0oxE1QY3RHgw.I3L_Ov5HlwpNQhIGQIklAWD5_Z4HMUFwop0s9RL9w6dNUIsPhL7YLGrlfxGjGK6xBi0AnJNDW0R2C6srxMnN2es-NcX6jpAAUp1nM6PMc4l40sMSRPA0vLQFFjpKOtcWQwbQd6dqjtN8TJ8TfYwu9Q.0Muxtkoq24mC1wXMPWCvD6ZTmloU7mjyDRhlASKkQb0"
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:Y6LAF_wZ/auth/me",
+    "body": {
+      "id": 4704,
+      "name": "",
+      "first_name": "",
+      "surname": "",
+      "email": "scastellanos@phinodia.com",
+      "status": "active",
+      "role": [
+        "user"
+      ],
+      "plans": [
+        15,
+        7,
+        2,
+        13,
+        41
+      ],
+      "discord": "serg358",
+      "memberstack_member_id": "mem_cmhtafc5j04py0solgnpf558z",
+      "created_at": 1762787941135
+    }
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:sFhFHmqG/dashboard",
+    "body": {
+      "courses": [
+        {
+          "id": 2,
+          "created_at": 1718093954000,
+          "name": "Trading Mastery",
+          "status": "active",
+          "featured": true,
+          "has_user_live": false,
+          "type": "full",
+          "category": "Course",
+          "academy_id": 1,
+          "plans": [
+            23,
+            7,
+            17,
+            19,
+            20,
+            21,
+            32,
+            33,
+            25,
+            5
+          ],
+          "community_plans": [
+            2,
+            18
+          ],
+          "content_id": "comunidad-trading-mastery",
+          "max_progress_percentage": 75,
+          "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+          "live": true,
+          "quiz": false,
+          "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+          "bg_color": "#381717",
+          "accent_color": "#ff4d00",
+          "checkout_link": "",
+          "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+          "order": 0,
+          "settings": {},
+          "live_thumbnail": {
+            "access": "public",
+            "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+            "name": "Course_id_01 (1).jpg",
+            "type": "image",
+            "size": 104583,
+            "mime": "image/jpeg",
+            "meta": {
+              "width": 960,
+              "height": 540
+            },
+            "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+          },
+          "image": null,
+          "_tot_lesson": 116,
+          "_tot_completed_user_lesson": 116,
+          "_tot_lesson_quiz": {
+            "tot_lesson_with_quiz": 88
+          },
+          "_tot_module_with_quiz": 3,
+          "_tot_user_module_quiz_completed": 3,
+          "_tot_user_lesson_quiz_completed": 88,
+          "_sections": [
+            {
+              "id": 17,
+              "created_at": 1761558250969,
+              "name": "Iniciación",
+              "order": 1,
+              "code": "N1",
+              "code_description": "Iniciación",
+              "course_id": 2,
+              "status": "active",
+              "plans": [],
+              "block_by": [],
+              "_tot_lesson": 28,
+              "_tot_completed_user_lesson": 28,
+              "_tot_module_with_file_upload": 0,
+              "_tot_user_module_file_upload_sent": 0,
+              "_tot_module_with_quiz": 1,
+              "_tot_user_module_quiz_completed": 1
+            },
+            {
+              "id": 18,
+              "created_at": 1761558251866,
+              "name": "Básico",
+              "order": 2,
+              "code": "N2",
+              "code_description": "Básico",
+              "course_id": 2,
+              "status": "active",
+              "plans": [],
+              "block_by": [],
+              "_tot_lesson": 23,
+              "_tot_completed_user_lesson": 23,
+              "_tot_module_with_file_upload": 0,
+              "_tot_user_module_file_upload_sent": 0,
+              "_tot_module_with_quiz": 1,
+              "_tot_user_module_quiz_completed": 1
+            },
+            {
+              "id": 19,
+              "created_at": 1761558252563,
+              "name": "Intermedio",
+              "order": 3,
+              "code": "N3",
+              "code_description": "Intermedio",
+              "course_id": 2,
+              "status": "active",
+              "plans": [],
+              "block_by": [],
+              "_tot_lesson": 46,
+              "_tot_completed_user_lesson": 46,
+              "_tot_module_with_file_upload": 0,
+              "_tot_user_module_file_upload_sent": 0,
+              "_tot_module_with_quiz": 1,
+              "_tot_user_module_quiz_completed": 1
+            },
+            {
+              "id": 20,
+              "created_at": 1761558253305,
+              "name": "Avanzado",
+              "order": 4,
+              "code": "N4",
+              "code_description": "Avanzado",
+              "course_id": 2,
+              "status": "active",
+              "plans": [],
+              "block_by": [],
+              "_tot_lesson": 19,
+              "_tot_completed_user_lesson": 19,
+              "_tot_module_with_file_upload": 0,
+              "_tot_user_module_file_upload_sent": 0,
+              "_tot_module_with_quiz": 0,
+              "_tot_user_module_quiz_completed": 0
+            }
+          ]
+        }
+      ],
+      "lives": [
+        {
+          "id": 831,
+          "created_at": 1774523978211,
+          "name": "Análisis técnico (Intermedio) - Trading Plan 25/03/2026",
+          "description": "",
+          "date": "2026-03-25",
+          "course_id": 2,
+          "live_category_id": 2,
+          "duration": "2:18:20",
+          "video_url": "https://player.vimeo.com/video/1177270864?h=bd393906ab",
+          "host_id": 1,
+          "host": "pau calvache",
+          "live_difficulty_id": 3,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 19,
+          "thumbnail": null,
+          "_course": {
+            "id": 2,
+            "created_at": 1718093954000,
+            "name": "Trading Mastery",
+            "status": "active",
+            "featured": true,
+            "has_user_live": false,
+            "type": "full",
+            "category": "Course",
+            "academy_id": 1,
+            "plans": [
+              23,
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              5
+            ],
+            "community_plans": [
+              2,
+              18
+            ],
+            "content_id": "comunidad-trading-mastery",
+            "max_progress_percentage": 75,
+            "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+            "live": true,
+            "quiz": false,
+            "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "",
+            "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 1,
+            "created_at": 1748446915146,
+            "name": "Pau",
+            "surname": "Calvache",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/_xBT8U2mhkq61FETOgikI5BtDv0/BTbqJg../Live_Host_04.png",
+              "name": "Live_Host_04.png",
+              "type": "image",
+              "size": 397434,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/_xBT8U2mhkq61FETOgikI5BtDv0/BTbqJg../Live_Host_04.png"
+            }
+          },
+          "_category": {
+            "id": 2,
+            "created_at": 1741794541484,
+            "name": "Análisis técnico",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png",
+              "name": "Analisis.png",
+              "type": "image",
+              "size": 237502,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png"
+            }
+          }
+        },
+        {
+          "id": 828,
+          "created_at": 1774442948355,
+          "name": "Esp. Criptomonedas - Directo análisis básico (Green) 24/03/2026 copy",
+          "description": "",
+          "date": "2026-03-24",
+          "course_id": 3,
+          "live_category_id": 2,
+          "duration": "2:06:36",
+          "video_url": "https://player.vimeo.com/video/1176914205?h=33940969b3",
+          "host_id": 1,
+          "host": "pau calvache",
+          "live_difficulty_id": 2,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 0,
+          "thumbnail": null,
+          "_course": {
+            "id": 3,
+            "created_at": 1718093954000,
+            "name": "Esp. Criptomonedas",
+            "status": "active",
+            "featured": false,
+            "has_user_live": false,
+            "type": "",
+            "category": "Workshop",
+            "academy_id": 1,
+            "plans": [
+              25,
+              20,
+              32,
+              19,
+              33,
+              13,
+              26,
+              1,
+              10,
+              5
+            ],
+            "community_plans": [
+              39,
+              41
+            ],
+            "content_id": "comunidad-criptomonedas",
+            "max_progress_percentage": 100,
+            "description": "Esta especialización en Criptomonedas está diseñada para poder comprender y aplicar los conceptos y estrategias de trading en el mercado concreto de las criptomonedas, tanto para movimientos a corto plazo, como para inversiones más medio y largo placistas.\n",
+            "live": true,
+            "quiz": null,
+            "logo_svg": "",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "https://pay.hotmart.com/X92447484G?off=4dtj5rcy",
+            "short_description": "Aprende a aplicar estrategias de trading en el mercado crypto.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/GvuRhzWJXPFZtDjRmBKL_tD1RQ4/CbT5uA../Course_id_02.jpg",
+              "name": "Course_id_02.jpg",
+              "type": "image",
+              "size": 39857,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/GvuRhzWJXPFZtDjRmBKL_tD1RQ4/CbT5uA../Course_id_02.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 1,
+            "created_at": 1748446915146,
+            "name": "Pau",
+            "surname": "Calvache",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/_xBT8U2mhkq61FETOgikI5BtDv0/BTbqJg../Live_Host_04.png",
+              "name": "Live_Host_04.png",
+              "type": "image",
+              "size": 397434,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/_xBT8U2mhkq61FETOgikI5BtDv0/BTbqJg../Live_Host_04.png"
+            }
+          },
+          "_category": {
+            "id": 2,
+            "created_at": 1741794541484,
+            "name": "Análisis técnico",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png",
+              "name": "Analisis.png",
+              "type": "image",
+              "size": 237502,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png"
+            }
+          }
+        },
+        {
+          "id": 829,
+          "created_at": 1774450228707,
+          "name": "Análisis Técnico (Básico) - Patrones 24/03/2026",
+          "description": "",
+          "date": "2026-03-24",
+          "course_id": 2,
+          "live_category_id": 2,
+          "duration": "1:34:03",
+          "video_url": "https://player.vimeo.com/video/1176918772?h=1bcd5eea42",
+          "host_id": 7,
+          "host": "juan pavón",
+          "live_difficulty_id": 2,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 18,
+          "thumbnail": null,
+          "_course": {
+            "id": 2,
+            "created_at": 1718093954000,
+            "name": "Trading Mastery",
+            "status": "active",
+            "featured": true,
+            "has_user_live": false,
+            "type": "full",
+            "category": "Course",
+            "academy_id": 1,
+            "plans": [
+              23,
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              5
+            ],
+            "community_plans": [
+              2,
+              18
+            ],
+            "content_id": "comunidad-trading-mastery",
+            "max_progress_percentage": 75,
+            "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+            "live": true,
+            "quiz": false,
+            "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "",
+            "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 7,
+            "created_at": 1760088390823,
+            "name": "Juan",
+            "surname": "Pavón",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/Pyz_qWwA4flKsiw61yxNAKIkJYM/pwIcbw../Live_Host_07.png",
+              "name": "Live_Host_07.png",
+              "type": "image",
+              "size": 363945,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/Pyz_qWwA4flKsiw61yxNAKIkJYM/pwIcbw../Live_Host_07.png"
+            }
+          },
+          "_category": {
+            "id": 2,
+            "created_at": 1741794541484,
+            "name": "Análisis técnico",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png",
+              "name": "Analisis.png",
+              "type": "image",
+              "size": 237502,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png"
+            }
+          }
+        },
+        {
+          "id": 825,
+          "created_at": 1774350092525,
+          "name": "Sesión de Trading - Análisis de mercado & Watchlist",
+          "description": "",
+          "date": "2026-03-23",
+          "course_id": 2,
+          "live_category_id": 1,
+          "duration": "1:06:50",
+          "video_url": "https://player.vimeo.com/video/1176475364?h=ba574d67bb",
+          "host_id": 10,
+          "host": "alex ruiz",
+          "live_difficulty_id": 1,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 20,
+          "thumbnail": null,
+          "_course": {
+            "id": 2,
+            "created_at": 1718093954000,
+            "name": "Trading Mastery",
+            "status": "active",
+            "featured": true,
+            "has_user_live": false,
+            "type": "full",
+            "category": "Course",
+            "academy_id": 1,
+            "plans": [
+              23,
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              5
+            ],
+            "community_plans": [
+              2,
+              18
+            ],
+            "content_id": "comunidad-trading-mastery",
+            "max_progress_percentage": 75,
+            "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+            "live": true,
+            "quiz": false,
+            "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "",
+            "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 10,
+            "created_at": 1765290449793,
+            "name": "Alex",
+            "surname": "Ruiz",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/sOc6yMCPISWG6s82QjMJZ8D7hMo/9ojlIA../Host-2.png",
+              "name": "Host-2.png",
+              "type": "image",
+              "size": 234442,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/sOc6yMCPISWG6s82QjMJZ8D7hMo/9ojlIA../Host-2.png"
+            }
+          },
+          "_category": {
+            "id": 1,
+            "created_at": 1741794528389,
+            "name": "Sesión de trading",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/FzRnSa8qLZdQf5WRaQR3c_oAevY/QpFTqw../Sesi%C3%B3n_Trading.png",
+              "name": "Sesión_Trading.png",
+              "type": "image",
+              "size": 261644,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/FzRnSa8qLZdQf5WRaQR3c_oAevY/QpFTqw../Sesi%C3%B3n_Trading.png"
+            }
+          }
+        },
+        {
+          "id": 824,
+          "created_at": 1774090827013,
+          "name": "Trade Review - Revisión en vivo",
+          "description": "",
+          "date": "2026-03-21",
+          "course_id": 2,
+          "live_category_id": 3,
+          "duration": "32:53",
+          "video_url": "https://player.vimeo.com/video/1175553730?h=41284090e5",
+          "host_id": 6,
+          "host": "michael gallego",
+          "live_difficulty_id": 4,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 20,
+          "thumbnail": null,
+          "_course": {
+            "id": 2,
+            "created_at": 1718093954000,
+            "name": "Trading Mastery",
+            "status": "active",
+            "featured": true,
+            "has_user_live": false,
+            "type": "full",
+            "category": "Course",
+            "academy_id": 1,
+            "plans": [
+              23,
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              5
+            ],
+            "community_plans": [
+              2,
+              18
+            ],
+            "content_id": "comunidad-trading-mastery",
+            "max_progress_percentage": 75,
+            "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+            "live": true,
+            "quiz": false,
+            "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "",
+            "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 6,
+            "created_at": 1760088385747,
+            "name": "Michael",
+            "surname": "Gallego",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/DVXRmB6R2Vuct86C6_p1Cl9HpNQ/X3QIkg../Live_Host_05.png",
+              "name": "Live_Host_05.png",
+              "type": "image",
+              "size": 352247,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/DVXRmB6R2Vuct86C6_p1Cl9HpNQ/X3QIkg../Live_Host_05.png"
+            }
+          },
+          "_category": {
+            "id": 3,
+            "created_at": 1741794547799,
+            "name": "Corrección de trades",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/rmwII1I8tPe98hqsnT1M1vr-v8c/RA55YA../Correcci%C3%B3n.png",
+              "name": "Corrección.png",
+              "type": "image",
+              "size": 242007,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/rmwII1I8tPe98hqsnT1M1vr-v8c/RA55YA../Correcci%C3%B3n.png"
+            }
+          }
+        },
+        {
+          "id": 826,
+          "created_at": 1774354942008,
+          "name": "Sesión de Backtesting en Vivo",
+          "description": "",
+          "date": "2026-03-20",
+          "course_id": 2,
+          "live_category_id": 5,
+          "duration": "1:54:51",
+          "video_url": "https://player.vimeo.com/video/1176517779?h=597612a712",
+          "host_id": 6,
+          "host": "michael gallego",
+          "live_difficulty_id": 4,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 20,
+          "thumbnail": null,
+          "_course": {
+            "id": 2,
+            "created_at": 1718093954000,
+            "name": "Trading Mastery",
+            "status": "active",
+            "featured": true,
+            "has_user_live": false,
+            "type": "full",
+            "category": "Course",
+            "academy_id": 1,
+            "plans": [
+              23,
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              5
+            ],
+            "community_plans": [
+              2,
+              18
+            ],
+            "content_id": "comunidad-trading-mastery",
+            "max_progress_percentage": 75,
+            "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+            "live": true,
+            "quiz": false,
+            "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "",
+            "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 6,
+            "created_at": 1760088385747,
+            "name": "Michael",
+            "surname": "Gallego",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/DVXRmB6R2Vuct86C6_p1Cl9HpNQ/X3QIkg../Live_Host_05.png",
+              "name": "Live_Host_05.png",
+              "type": "image",
+              "size": 352247,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/DVXRmB6R2Vuct86C6_p1Cl9HpNQ/X3QIkg../Live_Host_05.png"
+            }
+          },
+          "_category": {
+            "id": 5,
+            "created_at": 1741794556400,
+            "name": "Sesión de backtesting",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/PdTU_Q9StN_yZz0OAMc8qfYYJI4/GvMbrg../Backtesting.png",
+              "name": "Backtesting.png",
+              "type": "image",
+              "size": 228840,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/PdTU_Q9StN_yZz0OAMc8qfYYJI4/GvMbrg../Backtesting.png"
+            }
+          }
+        },
+        {
+          "id": 823,
+          "created_at": 1774011070856,
+          "name": "Psicotrading - Confiar en el conocimiento mientras cometes errores emocionales",
+          "description": "",
+          "date": "2026-03-19",
+          "course_id": 2,
+          "live_category_id": 1,
+          "duration": "1:21:53",
+          "video_url": "https://player.vimeo.com/video/1175447684?h=60efabb955",
+          "host_id": 3,
+          "host": "sergio ramírez",
+          "live_difficulty_id": 4,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 20,
+          "thumbnail": null,
+          "_course": {
+            "id": 2,
+            "created_at": 1718093954000,
+            "name": "Trading Mastery",
+            "status": "active",
+            "featured": true,
+            "has_user_live": false,
+            "type": "full",
+            "category": "Course",
+            "academy_id": 1,
+            "plans": [
+              23,
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              5
+            ],
+            "community_plans": [
+              2,
+              18
+            ],
+            "content_id": "comunidad-trading-mastery",
+            "max_progress_percentage": 75,
+            "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+            "live": true,
+            "quiz": false,
+            "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "",
+            "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 3,
+            "created_at": 1760088361252,
+            "name": "Sergio",
+            "surname": "Ramírez",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/d-RsOuH6uU0l-i7shCjePZ-ShoE/uDkbjA../Live_Host_02.png",
+              "name": "Live_Host_02.png",
+              "type": "image",
+              "size": 342585,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/d-RsOuH6uU0l-i7shCjePZ-ShoE/uDkbjA../Live_Host_02.png"
+            }
+          },
+          "_category": {
+            "id": 1,
+            "created_at": 1741794528389,
+            "name": "Sesión de trading",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/FzRnSa8qLZdQf5WRaQR3c_oAevY/QpFTqw../Sesi%C3%B3n_Trading.png",
+              "name": "Sesión_Trading.png",
+              "type": "image",
+              "size": 261644,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/FzRnSa8qLZdQf5WRaQR3c_oAevY/QpFTqw../Sesi%C3%B3n_Trading.png"
+            }
+          }
+        },
+        {
+          "id": 822,
+          "created_at": 1773920148587,
+          "name": "Sesión de Trading - Analizar el gráfico desde 0 18/03/2026",
+          "description": "",
+          "date": "2026-03-18",
+          "course_id": 2,
+          "live_category_id": 2,
+          "duration": "1:51:12",
+          "video_url": "https://player.vimeo.com/video/1175111176?h=8bf8a338b4",
+          "host_id": 1,
+          "host": "pau calvache",
+          "live_difficulty_id": 3,
+          "public": false,
+          "specific_plan_id": false,
+          "plan_id": [
+            0
+          ],
+          "section_id": 19,
+          "thumbnail": null,
+          "_course": {
+            "id": 2,
+            "created_at": 1718093954000,
+            "name": "Trading Mastery",
+            "status": "active",
+            "featured": true,
+            "has_user_live": false,
+            "type": "full",
+            "category": "Course",
+            "academy_id": 1,
+            "plans": [
+              23,
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              5
+            ],
+            "community_plans": [
+              2,
+              18
+            ],
+            "content_id": "comunidad-trading-mastery",
+            "max_progress_percentage": 75,
+            "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+            "live": true,
+            "quiz": false,
+            "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+            "bg_color": "#381717",
+            "accent_color": "#ff4d00",
+            "checkout_link": "",
+            "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+            },
+            "image": null
+          },
+          "_host": {
+            "id": 1,
+            "created_at": 1748446915146,
+            "name": "Pau",
+            "surname": "Calvache",
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/_xBT8U2mhkq61FETOgikI5BtDv0/BTbqJg../Live_Host_04.png",
+              "name": "Live_Host_04.png",
+              "type": "image",
+              "size": 397434,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/_xBT8U2mhkq61FETOgikI5BtDv0/BTbqJg../Live_Host_04.png"
+            }
+          },
+          "_category": {
+            "id": 2,
+            "created_at": 1741794541484,
+            "name": "Análisis técnico",
+            "academy_id": 1,
+            "course_id": [],
+            "image": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png",
+              "name": "Analisis.png",
+              "type": "image",
+              "size": 237502,
+              "mime": "image/png",
+              "meta": {
+                "width": 480,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/ZlajM0A-9JPOg1AOBHjUw6xBtNw/bJNCDg../Analisis.png"
+            }
+          }
+        }
+      ],
+      "workshops": [
+        {
+          "id": 4,
+          "created_at": 1721728949428,
+          "name": "Workshop de Cuentas Fondeadas",
+          "status": "active",
+          "featured": false,
+          "has_user_live": false,
+          "type": "",
+          "category": "Workshop",
+          "academy_id": 1,
+          "plans": [
+            7,
+            17,
+            19,
+            20,
+            21,
+            32,
+            33,
+            25,
+            35,
+            37,
+            5
+          ],
+          "community_plans": [],
+          "content_id": "",
+          "max_progress_percentage": 100,
+          "description": "Bienvenidos al workshop de cuentas de fondeo, donde aprenderás qué son estas cuentas, cómo funcionan y cómo puedes beneficiarte de ellas.\n",
+          "live": false,
+          "quiz": null,
+          "logo_svg": "",
+          "bg_color": "",
+          "accent_color": "",
+          "checkout_link": "https://pay.hotmart.com/B83313629Q?off=5880b4n3",
+          "short_description": "Conoce qué son, cómo funcionan y cómo aprovecharlas.",
+          "order": 0,
+          "settings": {},
+          "live_thumbnail": {
+            "access": "public",
+            "path": "/vault/kto6XZjD/e0-AtI1pE4Ww-2cs7wdHVAAjKqc/bRC7Ng../Course_id_01+%281%29.jpg",
+            "name": "Course_id_01 (1).jpg",
+            "type": "image",
+            "size": 104583,
+            "mime": "image/jpeg",
+            "meta": {
+              "width": 960,
+              "height": 540
+            },
+            "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/e0-AtI1pE4Ww-2cs7wdHVAAjKqc/bRC7Ng../Course_id_01+%281%29.jpg"
+          },
+          "image": null,
+          "_tot_lesson": 7,
+          "_tot_completed_user_lesson": 3,
+          "_tot_module_with_quiz": 0,
+          "_tot_user_module_quiz_completed": 0,
+          "_tot_user_lesson_quiz_completed": 0
+        },
+        {
+          "id": 5,
+          "created_at": 1721728951547,
+          "name": "Workshop de Scalping",
+          "status": "active",
+          "featured": null,
+          "has_user_live": false,
+          "type": "",
+          "category": "Workshop",
+          "academy_id": 1,
+          "plans": [
+            7,
+            17,
+            19,
+            20,
+            21,
+            32,
+            33,
+            25,
+            35,
+            37,
+            5
+          ],
+          "community_plans": [],
+          "content_id": "",
+          "max_progress_percentage": 100,
+          "description": "Bienvenidos al workshop de estrategias de scalping, donde aprenderás a adaptar las técnicas y herramientas de Trading Lab para operar en temporalidades cortas y maximizar tus oportunidades de trading. Puntos Clave\nDefinición de Scalping: Estrategia de trading que se basa en temporalidades cortas, desde segundos hasta minutos, maximizando las oportunidades de mercado rápidamente.",
+          "live": false,
+          "quiz": null,
+          "logo_svg": "",
+          "bg_color": "",
+          "accent_color": "",
+          "checkout_link": "https://pay.hotmart.com/B83313629Q?off=5880b4n3",
+          "short_description": "Técnicas de Trading Lab para operar en temporalidades cortas.",
+          "order": 0,
+          "settings": {},
+          "live_thumbnail": {
+            "access": "public",
+            "path": "/vault/kto6XZjD/jwE8cg1kNQ4aBxH5Dg8i34fUVr0/BCqVjQ../Course_id_01+%281%29.jpg",
+            "name": "Course_id_01 (1).jpg",
+            "type": "image",
+            "size": 104583,
+            "mime": "image/jpeg",
+            "meta": {
+              "width": 960,
+              "height": 540
+            },
+            "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/jwE8cg1kNQ4aBxH5Dg8i34fUVr0/BCqVjQ../Course_id_01+%281%29.jpg"
+          },
+          "image": null,
+          "_tot_lesson": 6,
+          "_tot_completed_user_lesson": 0,
+          "_tot_module_with_quiz": 0,
+          "_tot_user_module_quiz_completed": 0,
+          "_tot_user_lesson_quiz_completed": 0
+        },
+        {
+          "id": 7,
+          "created_at": 1732797016808,
+          "name": "Workshop de Smart Money Concepts",
+          "status": "active",
+          "featured": false,
+          "has_user_live": false,
+          "type": "",
+          "category": "Workshop",
+          "academy_id": 1,
+          "plans": [
+            7,
+            17,
+            19,
+            20,
+            21,
+            32,
+            33,
+            25,
+            35,
+            23,
+            37,
+            5
+          ],
+          "community_plans": [],
+          "content_id": "",
+          "max_progress_percentage": 100,
+          "description": "Bienvenidos al módulo de Smart Money Concepts, un enfoque introductorio e informativo diseñado para comprender cómo operan las instituciones financieras y cómo sus movimientos influyen en el mercado.\n\nEste módulo es una introducción esencial para explorar cómo las grandes instituciones mueven los mercados y cómo interpretar sus huellas.",
+          "live": false,
+          "quiz": false,
+          "logo_svg": "",
+          "bg_color": "",
+          "accent_color": "",
+          "checkout_link": "",
+          "short_description": "Cómo operan las instituciones financieras y cómo interpretar su impacto.",
+          "order": 0,
+          "settings": {},
+          "live_thumbnail": {
+            "access": "public",
+            "path": "/vault/kto6XZjD/ehMjkmCQN-QSatztVu3BKdGLFcs/uISBBA../Course_id_01+%281%29.jpg",
+            "name": "Course_id_01 (1).jpg",
+            "type": "image",
+            "size": 104583,
+            "mime": "image/jpeg",
+            "meta": {
+              "width": 960,
+              "height": 540
+            },
+            "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/ehMjkmCQN-QSatztVu3BKdGLFcs/uISBBA../Course_id_01+%281%29.jpg"
+          },
+          "image": null,
+          "_tot_lesson": 11,
+          "_tot_completed_user_lesson": 0,
+          "_tot_module_with_quiz": 0,
+          "_tot_user_module_quiz_completed": 0,
+          "_tot_user_lesson_quiz_completed": 0
+        },
+        {
+          "id": 3,
+          "created_at": 1718093954000,
+          "name": "Esp. Criptomonedas",
+          "status": "active",
+          "featured": false,
+          "has_user_live": false,
+          "type": "",
+          "category": "Workshop",
+          "academy_id": 1,
+          "plans": [
+            25,
+            20,
+            32,
+            19,
+            33,
+            13,
+            26,
+            1,
+            10,
+            5
+          ],
+          "community_plans": [
+            39,
+            41
+          ],
+          "content_id": "comunidad-criptomonedas",
+          "max_progress_percentage": 100,
+          "description": "Esta especialización en Criptomonedas está diseñada para poder comprender y aplicar los conceptos y estrategias de trading en el mercado concreto de las criptomonedas, tanto para movimientos a corto plazo, como para inversiones más medio y largo placistas.\n",
+          "live": true,
+          "quiz": null,
+          "logo_svg": "",
+          "bg_color": "#381717",
+          "accent_color": "#ff4d00",
+          "checkout_link": "https://pay.hotmart.com/X92447484G?off=4dtj5rcy",
+          "short_description": "Aprende a aplicar estrategias de trading en el mercado crypto.",
+          "order": 0,
+          "settings": {},
+          "live_thumbnail": {
+            "access": "public",
+            "path": "/vault/kto6XZjD/GvuRhzWJXPFZtDjRmBKL_tD1RQ4/CbT5uA../Course_id_02.jpg",
+            "name": "Course_id_02.jpg",
+            "type": "image",
+            "size": 39857,
+            "mime": "image/jpeg",
+            "meta": {
+              "width": 960,
+              "height": 540
+            },
+            "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/GvuRhzWJXPFZtDjRmBKL_tD1RQ4/CbT5uA../Course_id_02.jpg"
+          },
+          "image": null,
+          "_tot_lesson": 61,
+          "_tot_completed_user_lesson": 0,
+          "_tot_lesson_quiz": {
+            "tot_lesson_with_quiz": 39
+          },
+          "_tot_module_with_quiz": 0,
+          "_tot_user_module_quiz_completed": 0,
+          "_tot_user_lesson_quiz_completed": 0
+        }
+      ]
+    }
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:51BaDe5m/auth/trade-token?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjZmNjU3ZGRiYWJmYmZkOTVhNGVkNjZjMjMyNDExZWFhNjE5OGQ4NGMxYmJkOGEyYTI5M2I4MTVmYjRhOTlhYjEifQ.eyJpZCI6Im1lbV9jbWh0YWZjNWowNHB5MHNvbGducGY1NTh6IiwidHlwZSI6Im1lbWJlciIsImlhdCI6MTc3NDU0Mzk0MiwiZXhwIjoxNzc1NzUzNTQyLCJhdWQiOiJhcHBfY2w4c3c5MXB2MDA0NDB3Z3M3aGx3Z2d2ZiIsImlzcyI6Imh0dHBzOi8vYXBpLm1lbWJlcnN0YWNrLmNvbSJ9.DJWphLdZcGt-VUzNUc87w5Ni2iP9ry-RxuSD93u7qBVDO1F1IO73zIkFWnQwtUdjR2gHGh05SBiOCqrU4gEmJ6U0rEqnzdrf89FWjG2QFE652OLv2_1c-aXrEMkc2LvVnVjDXbpjOyj74lU5SYsLwvCfQ5S6OEQ8BQEXJL5wiVG6ae73Y-Vpyu4TWRxGvOC-ZpqEFLEngtYL1YyKSt5XKa3-8EZg1dcNe_70FDMPVT09mgj6x9QCdb22uAZodjcSBPYo-WCNydahKE5OsCKeE7-8wsmM4dZ8N2rypnb60kQ5epwQUPlolQ3oYHmZ59VZMWe1gG7ylr2o3JBi49gNTQ",
+    "body": "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwiemlwIjoiREVGIn0.ShROvl_CQrRQG6-kdu_-QLkDN-KeA5uf9U1WOJYu2ChMc8tboKgctvw5xSLqXV7pvObbniZBmm3D5n1314EwzM7qdCcAfmeC.vgQ-xV44MqUIJZn-88H1sw.rIK6jwmUnxcfvw0Kx-G6zeS_PkHSEwifMhChhP9BO8uyZRQAgirD5QVDd_KUc1vSQs-DqedGzLWWfp5WV5Np_W38OR67UxM_paXWhZWei9M5JFgtKifHr6Ves5uviYi42p0IiTf7in3eYYYJAE3LQQ.9g1PfEfjeCX3VxKoWl7O6M_rr85mp0dTHX2rx8U6YvU"
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:Y6LAF_wZ/auth/me",
+    "body": {
+      "id": 4704,
+      "name": "",
+      "first_name": "",
+      "surname": "",
+      "email": "scastellanos@phinodia.com",
+      "status": "active",
+      "role": [
+        "user"
+      ],
+      "plans": [
+        15,
+        7,
+        2,
+        13,
+        41
+      ],
+      "discord": "serg358",
+      "memberstack_member_id": "mem_cmhtafc5j04py0solgnpf558z",
+      "created_at": 1762787941135
+    }
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:Y6LAF_wZ/courses?course_id=2",
+    "body": [
+      {
+        "id": 2,
+        "created_at": 1718093954000,
+        "name": "Trading Mastery",
+        "status": "active",
+        "featured": true,
+        "has_user_live": false,
+        "type": "full",
+        "category": "Course",
+        "academy_id": 1,
+        "plans": [
+          23,
+          7,
+          17,
+          19,
+          20,
+          21,
+          32,
+          33,
+          25,
+          5
+        ],
+        "community_plans": [
+          2,
+          18
+        ],
+        "content_id": "comunidad-trading-mastery",
+        "max_progress_percentage": 75,
+        "description": "\"Trading Mastery\" es una formación diseñada para desarrollar habilidades y conocimientos necesarios para convertirte en un trader exitoso. A través de un enfoque en tres pilares esenciales: Contexto Profesional, Conocimientos y Habilidades, y Ser Trader, esta formación te proporcionará las herramientas necesarias para operar con confianza y consistencia en los mercados financieros.\n",
+        "live": true,
+        "quiz": false,
+        "logo_svg": "<svg width=\" 100%\" height=\" 100%\" viewBox=\"0 0 17 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M1.91406 0.436523V12.5317C1.91406 14.0079 3.11079 15.2047 4.58703 15.2047H16.6822\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M9.26123 2.39355L2.24636 14.5437\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n<path d=\"M14.667 7.78418L2.51689 14.799\" stroke=\"currentColor\" stroke-width=\"2.41217\"/>\n</svg>",
+        "bg_color": "#381717",
+        "accent_color": "#ff4d00",
+        "checkout_link": "",
+        "short_description": "Trading Mastery\" te forma en los pilares clave del trading para operar con confianza y consistencia.",
+        "order": 0,
+        "settings": {},
+        "live_thumbnail": {
+          "access": "public",
+          "path": "/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg",
+          "name": "Course_id_01 (1).jpg",
+          "type": "image",
+          "size": 104583,
+          "mime": "image/jpeg",
+          "meta": {
+            "width": 960,
+            "height": 540
+          },
+          "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/fhikArqjy-F-m6aCfIGdrdwxCKI/ONV7IA../Course_id_01+%281%29.jpg"
+        },
+        "image": null,
+        "_tot_module": 23,
+        "_tot_lesson": 116,
+        "_tot_completed_user_lesson": 116,
+        "_user_course_progress": null,
+        "_tot_module_with_quiz": 3,
+        "_tot_user_module_quiz_completed": 3
+      }
+    ]
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:Y6LAF_wZ/sections?course_id=2",
+    "body": [
+      {
+        "id": 17,
+        "created_at": 1761558250969,
+        "name": "Iniciación",
+        "order": 1,
+        "code": "N1",
+        "code_description": "Iniciación",
+        "course_id": 2,
+        "status": "active",
+        "plans": [],
+        "block_by": [],
+        "_tot_module": 6,
+        "_tot_module_with_file_upload": 0,
+        "_tot_user_module_file_upload_sent": 0,
+        "_tot_lesson": 28,
+        "_tot_completed_user_lesson": 28,
+        "is_locked": false
+      },
+      {
+        "id": 18,
+        "created_at": 1761558251866,
+        "name": "Básico",
+        "order": 2,
+        "code": "N2",
+        "code_description": "Básico",
+        "course_id": 2,
+        "status": "active",
+        "plans": [],
+        "block_by": [],
+        "_tot_module": 6,
+        "_tot_module_with_file_upload": 0,
+        "_tot_user_module_file_upload_sent": 0,
+        "_tot_lesson": 23,
+        "_tot_completed_user_lesson": 23,
+        "is_locked": false
+      },
+      {
+        "id": 19,
+        "created_at": 1761558252563,
+        "name": "Intermedio",
+        "order": 3,
+        "code": "N3",
+        "code_description": "Intermedio",
+        "course_id": 2,
+        "status": "active",
+        "plans": [],
+        "block_by": [],
+        "_tot_module": 7,
+        "_tot_module_with_file_upload": 0,
+        "_tot_user_module_file_upload_sent": 0,
+        "_tot_lesson": 46,
+        "_tot_completed_user_lesson": 46,
+        "is_locked": false
+      },
+      {
+        "id": 20,
+        "created_at": 1761558253305,
+        "name": "Avanzado",
+        "order": 4,
+        "code": "N4",
+        "code_description": "Avanzado",
+        "course_id": 2,
+        "status": "active",
+        "plans": [],
+        "block_by": [],
+        "_tot_module": 4,
+        "_tot_module_with_file_upload": 0,
+        "_tot_user_module_file_upload_sent": 0,
+        "_tot_lesson": 19,
+        "_tot_completed_user_lesson": 19,
+        "is_locked": false
+      }
+    ]
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:Y6LAF_wZ/modules?section_id=17",
+    "body": [
+      {
+        "id": 15,
+        "created_at": 1721155848005,
+        "name": "Introducción a Trading Mastery",
+        "description": "",
+        "order": 1,
+        "code": "M1",
+        "show_quiz": false,
+        "show_file_upload": false,
+        "section_id": 17,
+        "course_id": 2,
+        "status": "active",
+        "tag": "",
+        "classmarker": {
+          "test_id": 0,
+          "quiz_id": ""
+        },
+        "settings": {
+          "show_classmarker_quiz": false
+        },
+        "_tot_lessons": 4,
+        "_completed_lessons": 4
+      },
+      {
+        "id": 16,
+        "created_at": 1721155848005,
+        "name": "Introducción al nivel iniciación",
+        "description": "",
+        "order": 2,
+        "code": "M2",
+        "show_quiz": false,
+        "show_file_upload": false,
+        "section_id": 17,
+        "course_id": 2,
+        "status": "active",
+        "tag": "",
+        "classmarker": {
+          "test_id": 0,
+          "quiz_id": ""
+        },
+        "settings": {
+          "show_classmarker_quiz": false
+        },
+        "_tot_lessons": 1,
+        "_completed_lessons": 1
+      },
+      {
+        "id": 17,
+        "created_at": 1721155848005,
+        "name": "Introducción al trading",
+        "description": "",
+        "order": 3,
+        "code": "M3",
+        "show_quiz": false,
+        "show_file_upload": false,
+        "section_id": 17,
+        "course_id": 2,
+        "status": "active",
+        "tag": "",
+        "classmarker": {
+          "test_id": 0,
+          "quiz_id": ""
+        },
+        "settings": {
+          "show_classmarker_quiz": false
+        },
+        "_tot_lessons": 9,
+        "_completed_lessons": 9
+      },
+      {
+        "id": 18,
+        "created_at": 1721155848005,
+        "name": "Cómo encontrar tu broker",
+        "description": "",
+        "order": 4,
+        "code": "M4",
+        "show_quiz": false,
+        "show_file_upload": false,
+        "section_id": 17,
+        "course_id": 2,
+        "status": "active",
+        "tag": "",
+        "classmarker": {
+          "test_id": 0,
+          "quiz_id": ""
+        },
+        "settings": {
+          "show_classmarker_quiz": false
+        },
+        "_tot_lessons": 4,
+        "_completed_lessons": 4
+      },
+      {
+        "id": 19,
+        "created_at": 1721155848005,
+        "name": "Calendario económico",
+        "description": "",
+        "order": 5,
+        "code": "M5",
+        "show_quiz": false,
+        "show_file_upload": false,
+        "section_id": 17,
+        "course_id": 2,
+        "status": "active",
+        "tag": "",
+        "classmarker": {
+          "test_id": 0,
+          "quiz_id": ""
+        },
+        "settings": {
+          "show_classmarker_quiz": false
+        },
+        "_tot_lessons": 4,
+        "_completed_lessons": 4
+      },
+      {
+        "id": 20,
+        "created_at": 1721155848005,
+        "name": "TradingView",
+        "description": "",
+        "order": 6,
+        "code": "M6",
+        "show_quiz": true,
+        "show_file_upload": false,
+        "section_id": 17,
+        "course_id": 2,
+        "status": "active",
+        "tag": "",
+        "classmarker": {
+          "test_id": 2410358,
+          "quiz_id": "r9p690caba4d772c"
+        },
+        "settings": {
+          "show_classmarker_quiz": true
+        },
+        "_tot_lessons": 6,
+        "_quiz_result": {
+          "id": 147025,
+          "created_at": 1763178280890,
+          "total_questions": 20,
+          "correct_answers": 16,
+          "grade": "Superado",
+          "user_id": 4704,
+          "lesson_id": 0,
+          "module_id": 20,
+          "passed": true,
+          "classmarker": {
+            "results_url": "",
+            "link_result_id": 105489801
+          }
+        },
+        "_completed_lessons": 6
+      }
+    ]
+  },
+  {
+    "url": "https://xrsz-kaax-uh7f.n7d.xano.io/api:Y6LAF_wZ/lessons?module_id=15",
+    "body": [
+      {
+        "id": 227,
+        "name": "Qué es Trading Mastery y por qué nació",
+        "code": "1.1",
+        "order": 1,
+        "module_id": 15,
+        "course_id": 2,
+        "status": "active",
+        "url": "https://player.vimeo.com/video/1003559437?h=4231eeb869",
+        "description": "En este video, exploramos el origen de Trading Mastery, una formación completa y estructurada que nació del reconocimiento de la falta de profesionalidad en el sector del trading.\r\n\r\nPuntos Clave:\r\n\r\n- Motivación para Crear Trading Mastery: La formación surge como respuesta a la falta de calidad, acompañamiento y empatía en las formaciones tradicionales de trading.\r\n- Formación Integral: No se trata solo de adquirir conocimientos, sino de un acompañamiento constante, con mentorías grupales, directos, y una comunidad activa.\r\n- Adaptación Personalizada: En Trading Mastery, aprenderás a adaptar los conocimientos y estrategias a tu personalidad y contexto de vida, asegurando que tu enfoque de trading sea auténtico y efectivo.\r\n- Enfoque en la Comunidad: El aprendizaje colaborativo es clave, donde los compañeros de la comunidad se apoyan mutuamente para alcanzar la rentabilidad en trading.\r\n\r\nEste video te dará una visión clara del propósito detrás de Trading Mastery y cómo esta formación está diseñada para ofrecer una experiencia educativa completa y personalizada en el mundo del trading.",
+        "duration": "4:04",
+        "created_at": 1722926091201,
+        "thumbnail": {
+          "access": "public",
+          "path": "/vault/kto6XZjD/7HPCATjrMTTMVZw9S4kROvrwMv4/Lt2GyA../M1_01.jpg",
+          "name": "M1_01.jpg",
+          "type": "image",
+          "size": 241504,
+          "mime": "image/jpeg",
+          "meta": {
+            "width": 960,
+            "height": 540
+          },
+          "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/7HPCATjrMTTMVZw9S4kROvrwMv4/Lt2GyA../M1_01.jpg"
+        },
+        "thum": null,
+        "_user_progress": {
+          "id": 218340,
+          "user_id": 4704,
+          "lesson_id": 227,
+          "live_id": 0,
+          "percentage": 100,
+          "status": "completed",
+          "updated_at": 1773836530548,
+          "created_at": 1762824528953,
+          "manual_status_modified": false
+        }
+      },
+      {
+        "id": 228,
+        "name": "Qué vas a encontrar en Trading Mastery",
+        "code": "1.2",
+        "order": 2,
+        "module_id": 15,
+        "course_id": 2,
+        "status": "active",
+        "url": "https://player.vimeo.com/video/1111677347?h=0e9a2e3248",
+        "description": "En este video, te explicamos qué encontrarás en Trading Mastery, una formación estructurada para adaptarse a los cambios del mercado y a tu evolución personal como trader.\r\n\r\nPuntos Clave:\r\n\r\n- Formación en constante evolución: La formación se actualiza continuamente para reflejar los cambios en el mercado y en la metodología del trading, garantizando siempre contenido relevante y actualizado.\r\n- Cuatro niveles: La formación se basa en cuatro niveles: iniciación, básico, intermedio y avanzado, cubriendo desde la teoría básica hasta la adaptación personal del trading.\r\n- Evaluación continua: Incluye exámenes y autoevaluaciones para asegurarte de que estás asimilando correctamente los conceptos y prepararte para operar con cuentas de fondeo.\r\n- Compromiso con tu éxito: El enfoque en la mejora continua y la personalización demuestra nuestro compromiso inquebrantable con tu éxito como trader.\r\n\r\nEste video te proporcionará una visión clara de la estructura y los objetivos de Trading Mastery, asegurando que estés preparado para sacar el máximo provecho de la formación.",
+        "duration": "3:58",
+        "created_at": 1722926176443,
+        "thumbnail": {
+          "access": "public",
+          "path": "/vault/kto6XZjD/zL46k6o4Vw8wldByE89R00_3Aus/03yRNA../M1_02.jpg",
+          "name": "M1_02.jpg",
+          "type": "image",
+          "size": 60965,
+          "mime": "image/jpeg",
+          "meta": {
+            "width": 960,
+            "height": 540
+          },
+          "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/zL46k6o4Vw8wldByE89R00_3Aus/03yRNA../M1_02.jpg"
+        },
+        "thum": null,
+        "_user_progress": {
+          "id": 218344,
+          "user_id": 4704,
+          "lesson_id": 228,
+          "live_id": 0,
+          "percentage": 100,
+          "status": "completed",
+          "updated_at": 1773836540759,
+          "created_at": 1762824983327,
+          "manual_status_modified": false
+        }
+      },
+      {
+        "id": 229,
+        "name": "Cómo optimizar la formación",
+        "code": "1.3",
+        "order": 3,
+        "module_id": 15,
+        "course_id": 2,
+        "status": "active",
+        "url": "https://player.vimeo.com/video/1003561055?h=b6b632161f",
+        "description": "En este video, se ofrece una guía sobre cómo maximizar el aprovechamiento de la formación en Trading Mastery, destacando la importancia de un enfoque personal y comprometido.\r\n\r\nPuntos Clave:\r\n\r\n- Enfoque Personalizado: Cada persona tiene su propio proceso de aprendizaje, por lo que es esencial que adaptes la formación a tu estilo personal, ya sea visual, escrito, o una combinación de ambos.\r\n- Repetición y Práctica: La repetición es clave para el aprendizaje, incluyendo ver varias veces los videos de formación y realizar backtesting para practicar los conceptos.\r\n- Elaboración Activa: Tomar notas, resumir y poner en tus propias palabras lo aprendido refuerza la comprensión y facilita la retención del conocimiento.\r\n- Interacción y Comunidad: Participar en la comunidad, compartir experiencias y ampliar perspectivas a través del intercambio con otros traders enriquece el aprendizaje y acelera el progreso.\r\n\r\nEste video te ayudará a crear un plan de estudio efectivo, adaptado a tus necesidades, para optimizar al máximo tu proceso de formación en trading.",
+        "duration": "9:47",
+        "created_at": 1722926176448,
+        "thumbnail": {
+          "access": "public",
+          "path": "/vault/kto6XZjD/wsSZ9WjtxwODcWPBV7GMnTfzwYk/CXKLag../M1_03-1.jpg",
+          "name": "M1_03-1.jpg",
+          "type": "image",
+          "size": 75612,
+          "mime": "image/jpeg",
+          "meta": {
+            "width": 960,
+            "height": 540
+          },
+          "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/wsSZ9WjtxwODcWPBV7GMnTfzwYk/CXKLag../M1_03-1.jpg"
+        },
+        "thum": null,
+        "_user_progress": {
+          "id": 218350,
+          "user_id": 4704,
+          "lesson_id": 229,
+          "live_id": 0,
+          "percentage": 100,
+          "status": "completed",
+          "updated_at": 1773836550788,
+          "created_at": 1762825385747,
+          "manual_status_modified": false
+        }
+      },
+      {
+        "id": 230,
+        "name": "Vídeos de YT vs vídeos formación Trading Mastery",
+        "code": "1.4",
+        "order": 4,
+        "module_id": 15,
+        "course_id": 2,
+        "status": "active",
+        "url": "https://player.vimeo.com/video/1003550437?h=2068bfb0a5",
+        "description": "En este video, aclaramos las diferencias entre los vídeos educativos disponibles en YouTube y los vídeos estructurados de la formación Trading Mastery.\r\n\r\nPuntos Clave:\r\n\r\n- Propósito Diferente: Los vídeos en YouTube están diseñados para ayudar de manera gratuita y alcanzar a un público amplio, mientras que los vídeos de Trading Mastery son parte de una formación estructurada y profesional.\r\n- Calidad y Estructura: Aunque los vídeos de YouTube son de alta calidad, no están diseñados para ofrecer la profundidad, estructura y continuidad que se encuentra en Trading Mastery.\r\n- Aplicación Práctica: En Trading Mastery, los conceptos y estrategias se filtran y dirigen específicamente a mejorar la rentabilidad del trader, adaptados a su personalidad y estilo.\r\n- Evitar Confusión: Es importante no mezclar los conceptos de los vídeos de YouTube con los de la formación, ya que podrían perturbar el aprendizaje y generar dudas innecesarias.\r\n\r\nEste video te ayudará a entender cómo utilizar los recursos de manera efectiva, diferenciando claramente entre el contenido educativo gratuito y la formación profesional estructurada.",
+        "duration": "7:51",
+        "created_at": 1722926176454,
+        "thumbnail": {
+          "access": "public",
+          "path": "/vault/kto6XZjD/3Jqj7H8xNIvs1QbCTrPfN7ZTHcs/ysnMUQ../M1_04.jpg",
+          "name": "M1_04.jpg",
+          "type": "image",
+          "size": 52204,
+          "mime": "image/jpeg",
+          "meta": {
+            "width": 960,
+            "height": 540
+          },
+          "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/3Jqj7H8xNIvs1QbCTrPfN7ZTHcs/ysnMUQ../M1_04.jpg"
+        },
+        "thum": null,
+        "_user_progress": {
+          "id": 218356,
+          "user_id": 4704,
+          "lesson_id": 230,
+          "live_id": 0,
+          "percentage": 100,
+          "status": "completed",
+          "updated_at": 1773836560205,
+          "created_at": 1762826245590,
+          "manual_status_modified": false
+        }
+      }
+    ]
+  }
+]

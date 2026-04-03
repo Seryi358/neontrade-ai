@@ -1,0 +1,1594 @@
+{
+  "data": {
+    "c": {},
+    "f": {},
+    "i": {},
+    "n": {
+      "href": "https://academia.tradinglab.es/app/training?courseId=7",
+      "path": "/app/training",
+      "parameter": {
+        "moduleId": "53",
+        "livesFilterPage": null,
+        "sectionId": null,
+        "liveId": null,
+        "livesFilterSearch": null,
+        "quiz": null,
+        "cm_user_id": null,
+        "livesFilterSection": null,
+        "livesFilterCourse": null,
+        "lessonId": null,
+        "livesFilterDifficulty": null,
+        "livesFilterSort": null,
+        "courseId": "7",
+        "livesFilterCategory": null
+      }
+    },
+    "r": {
+      "get_dashboard": {
+        "name": "get_dashboard",
+        "number": 20,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "trade_ms_token": {
+        "name": "trade_ms_token",
+        "number": 1,
+        "data": "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwiemlwIjoiREVGIn0.TEX6QKkSAWBrUwibR9lbvFLXzu6WkO_AxUdlwRrlMvde5x-hqBpPc46oSTp5h8s2enpoaiQmfHqc5BM6LYWWfrB-OFDGqkQ5.UhxdIkI3SlYU-u_J22DbFQ.bxzeG_s-G6Qty00wKYHqxGQtTlycSDotOjSg0CZV-ctkQadTTrW6oYG_q1CZbCoGmlC-tVsNOFWja_zhyI504EyDV6cSKm5CKU8N0buACjGsQ5vZJBP0mq65hSy4QpskUCrupkxIDvzY04Ka1AT71w.T7KWsg_FFojNvbtJX7MRkUMS7TvrXXyRBlexpaLLdbU",
+        "headers": {
+          "cache-control": "private, no-cache, no-store, must-revalidate",
+          "content-type": "application/json; charset=UTF-8",
+          "expires": "Mon, 28 Mar 2016 16:46:27 GMT",
+          "pragma": "no-cache"
+        },
+        "isRequesting": false,
+        "hasRequested": true,
+        "statusText": "Success",
+        "status": 200,
+        "ok": true,
+        "props": {}
+      },
+      "get_course": {
+        "name": "get_course",
+        "number": 2,
+        "data": [
+          {
+            "id": 7,
+            "created_at": 1732797016808,
+            "name": "Workshop de Smart Money Concepts",
+            "status": "active",
+            "featured": false,
+            "has_user_live": false,
+            "type": "",
+            "category": "Workshop",
+            "academy_id": 1,
+            "plans": [
+              7,
+              17,
+              19,
+              20,
+              21,
+              32,
+              33,
+              25,
+              35,
+              23,
+              37,
+              5
+            ],
+            "community_plans": [],
+            "content_id": "",
+            "max_progress_percentage": 100,
+            "description": "Bienvenidos al módulo de Smart Money Concepts, un enfoque introductorio e informativo diseñado para comprender cómo operan las instituciones financieras y cómo sus movimientos influyen en el mercado.\n\nEste módulo es una introducción esencial para explorar cómo las grandes instituciones mueven los mercados y cómo interpretar sus huellas.",
+            "live": false,
+            "quiz": false,
+            "logo_svg": "",
+            "bg_color": "",
+            "accent_color": "",
+            "checkout_link": "",
+            "short_description": "Cómo operan las instituciones financieras y cómo interpretar su impacto.",
+            "order": 0,
+            "settings": {},
+            "live_thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/ehMjkmCQN-QSatztVu3BKdGLFcs/uISBBA../Course_id_01+%281%29.jpg",
+              "name": "Course_id_01 (1).jpg",
+              "type": "image",
+              "size": 104583,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/ehMjkmCQN-QSatztVu3BKdGLFcs/uISBBA../Course_id_01+%281%29.jpg"
+            },
+            "image": null,
+            "_tot_module": 1,
+            "_tot_lesson": 11,
+            "_tot_completed_user_lesson": 0,
+            "_user_course_progress": null,
+            "_tot_module_with_quiz": 0,
+            "_tot_user_module_quiz_completed": 0
+          }
+        ],
+        "headers": {
+          "cache-control": "private, no-cache, no-store, must-revalidate",
+          "content-type": "application/json; charset=UTF-8",
+          "expires": "Mon, 28 Mar 2016 16:46:27 GMT",
+          "pragma": "no-cache"
+        },
+        "isRequesting": false,
+        "hasRequested": true,
+        "statusText": "Success",
+        "status": 200,
+        "ok": true,
+        "props": {}
+      },
+      "get_modules": {
+        "name": "get_modules",
+        "number": 3,
+        "data": [
+          {
+            "id": 53,
+            "created_at": 1732868990816,
+            "name": "Contenido Workshop",
+            "description": "",
+            "order": 1,
+            "code": "M1",
+            "show_quiz": false,
+            "show_file_upload": false,
+            "section_id": 0,
+            "course_id": 7,
+            "status": "active",
+            "tag": "",
+            "classmarker": {
+              "test_id": 0,
+              "quiz_id": ""
+            },
+            "settings": {
+              "show_classmarker_quiz": false
+            },
+            "_tot_lessons": 11,
+            "_completed_lessons": 0
+          }
+        ],
+        "headers": {
+          "cache-control": "private, no-cache, no-store, must-revalidate",
+          "content-type": "application/json; charset=UTF-8",
+          "expires": "Mon, 28 Mar 2016 16:46:28 GMT",
+          "pragma": "no-cache"
+        },
+        "isRequesting": false,
+        "hasRequested": true,
+        "statusText": "Success",
+        "status": 200,
+        "ok": true,
+        "props": {}
+      },
+      "get_live": {
+        "name": "get_live",
+        "number": 18,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_module_quiz": {
+        "name": "get_module_quiz",
+        "number": 9,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_course_con_id": {
+        "name": "get_course_con_id",
+        "number": 17,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "update_quiz_result": {
+        "name": "update_quiz_result",
+        "number": 12,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_module": {
+        "name": "get_module",
+        "number": 11,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "save_quiz_result": {
+        "name": "save_quiz_result",
+        "number": 10,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_lesson_references": {
+        "name": "get_lesson_references",
+        "number": 13,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_sections": {
+        "name": "get_sections",
+        "number": 8,
+        "data": [],
+        "headers": {
+          "cache-control": "private, no-cache, no-store, must-revalidate",
+          "content-type": "application/json; charset=UTF-8",
+          "expires": "Mon, 28 Mar 2016 16:46:28 GMT",
+          "pragma": "no-cache"
+        },
+        "isRequesting": false,
+        "hasRequested": true,
+        "statusText": "Success",
+        "status": 200,
+        "ok": true,
+        "props": {}
+      },
+      "save_progress": {
+        "name": "save_progress",
+        "number": 7,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_lessons": {
+        "name": "get_lessons",
+        "number": 4,
+        "data": [
+          {
+            "id": 409,
+            "name": "Introducción",
+            "code": "1.1",
+            "order": 1,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014263664?h=a5191814c8",
+            "description": "En este video, te damos la bienvenida al módulo de Smart Money Concepts, donde exploraremos un estilo de trading que ha ganado popularidad en los últimos años.\n\nPuntos Clave:\n\n- Qué es Smart Money Concepts: Un enfoque de trading basado en identificar los movimientos del dinero institucional en los mercados.\n- Objetivo del Módulo: Introducir los conceptos clave de este estilo sin abrumarte con información innecesaria.\n- Popularidad Reciente: Este enfoque ha captado la atención por su efectividad en entender la lógica detrás de los movimientos del mercado.\n- Selección de Conceptos: Nos centraremos en los conceptos más importantes para ayudarte a comprender la base de este estilo operativo.\n\nEste video marca el inicio del módulo y te prepara para adentrarte en los fundamentos de Smart Money Concepts, un enfoque que podría transformar tu manera de operar en los mercados.",
+            "duration": "0:26",
+            "created_at": 1732797205289,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/5AWxGwWmyz43Uf-vxpVziyWxIaY/_v0U0Q../Smart_Money_01.jpg",
+              "name": "Smart_Money_01.jpg",
+              "type": "image",
+              "size": 301788,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/5AWxGwWmyz43Uf-vxpVziyWxIaY/_v0U0Q../Smart_Money_01.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 410,
+            "name": "Disclaimer",
+            "code": "1.2",
+            "order": 2,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1017945533?h=4d7b5c523c",
+            "description": "En este video, aclaramos cómo encajan los conceptos de Smart Money en el enfoque general de TradingLab y su relación con nuestras estrategias actuales.\n\nPuntos Clave:\n\n- Propósito del Módulo: Este módulo tiene como objetivo introducirte a los conceptos de Smart Money, sin mezclarlo con las estrategias actuales de TradingLab.\n- Actualización Constante: Los mercados evolucionan, y en TradingLab buscamos estar al día con nuevas tendencias y estilos operativos para compartirlos contigo.\n- Backtesting en Proceso: El equipo está realizando pruebas exhaustivas para identificar qué conceptos pueden integrarse de manera efectiva en nuestras estrategias.\n- Futuro Desarrollo: Una vez finalizado el backtesting, se planea desarrollar un módulo específico que incorpore los conceptos de Smart Money en las estrategias de TradingLab.\n\nEste video establece las bases para explorar Smart Money Concepts como una herramienta educativa y de actualización en el mundo del trading.",
+            "duration": "1:11",
+            "created_at": 1732797215159,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/WOMyJyzuV0kF0r-WyeCXpPBA2AA/Z2YT9Q../Smart_Money_02.jpg",
+              "name": "Smart_Money_02.jpg",
+              "type": "image",
+              "size": 297230,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/WOMyJyzuV0kF0r-WyeCXpPBA2AA/Z2YT9Q../Smart_Money_02.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 412,
+            "name": "Liquidez",
+            "code": "1.4",
+            "order": 4,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014266314?h=cc8d0f8c24",
+            "description": "En este video exploraremos el concepto clave de liquidez dentro de los Smart Money Concepts, una pieza fundamental para comprender cómo operan las grandes instituciones y el algoritmo interbancario.\nPuntos clave:\n- Qué es la liquidez: La liquidez se traduce en dinero en el mercado. Las grandes instituciones persiguen esta liquidez, que muchas veces se encuentra en los puntos donde los traders retail colocan sus stop-loss.\n- Máximos y mínimos como zonas clave: Los máximos y mínimos son áreas fundamentales donde el precio suele buscar liquidez, generando reacciones significativas al absorber estos niveles.\n- Relevancia de los soportes, resistencias y líneas de tendencia: Estas zonas albergan la liquidez de los stop-loss y son objetivos clave para el algoritmo del mercado.\n- La importancia del análisis de sesiones y temporalidades: La liquidez no solo se encuentra en los gráficos semanales o diarios, sino también en los máximos y mínimos de las sesiones, especialmente útiles para estrategias de scalping.\n\nEste video refuerza la importancia de identificar y entender cómo las grandes instituciones manipulan el mercado en busca de liquidez, para tomar decisiones estratégicas basadas en estos movimientos.",
+            "duration": "19:45",
+            "created_at": 1732797215183,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/iJKUnXMkQzNb-xhkkboTLCY05DU/LxJmIA../Smart_Money_03.jpg",
+              "name": "Smart_Money_03.jpg",
+              "type": "image",
+              "size": 194811,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/iJKUnXMkQzNb-xhkkboTLCY05DU/LxJmIA../Smart_Money_03.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 413,
+            "name": "BOS & CHOCH",
+            "code": "1.5",
+            "order": 5,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014266729?h=a983dcb279",
+            "description": "En este video aprenderás a identificar y comprender los conceptos de BOS (Break of Structure) y CHOCH (Change of Character), esenciales para analizar cambios y continuaciones de tendencias en los mercados financieros.\n\nPuntos Clave:\n\n-Qué son BOS y CHOCH: BOS indica la ruptura de estructuras en una tendencia definida, mientras que CHOCH señala un cambio en la dirección de la tendencia.\n- Aplicación en diferentes mercados: Estos conceptos son aplicables a cualquier activo y temporalidad, ya sea forex, criptomonedas, acciones o índices.\n- Identificación de zonas clave: Reconoce máximos y mínimos crecientes o decrecientes para determinar continuaciones o cambios en la estructura del mercado.\n- Importancia de entender la terminología: Conocer estos términos te ayudará a interpretar gráficos de otros traders y a mejorar tu análisis técnico.\n\nEste video te equipa con herramientas prácticas para identificar movimientos clave del mercado y aplicarlos en tus estrategias de trading.",
+            "duration": "5:15",
+            "created_at": 1732797215196,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/MPJPzCfS-WrzxCMq07UKRz7GQyM/IkhaWg../Smart_Money_04.jpg",
+              "name": "Smart_Money_04.jpg",
+              "type": "image",
+              "size": 156157,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/MPJPzCfS-WrzxCMq07UKRz7GQyM/IkhaWg../Smart_Money_04.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 414,
+            "name": "Premium & Discount",
+            "code": "1.6",
+            "order": 6,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014266805?h=63947fbff3",
+            "description": "En este video, aprenderás el concepto de Premium & Discount, una herramienta sencilla pero poderosa que te ayudará a identificar zonas óptimas de precio basadas en descuentos.\n\nPuntos Clave:\n\n- Concepto de Premium & Discount: Las zonas Premium representan precios altos y las zonas Discount, precios bajos; ideales para buscar entradas en los mercados.\n- Uso del Fibonacci: Se utiliza la herramienta Fibonacci para calcular las áreas de descuento en tendencias alcistas o bajistas.\n- Estrategias de Instituciones: Las grandes instituciones buscan ejecutar órdenes en niveles de descuento, especialmente entre el 50% y el 70% del retroceso.\n- Aplicación Práctica: Identificar estas zonas optimiza tus entradas al mercado y complementa el uso de Fibonacci en TradingLab.\n\nEste video refuerza la importancia de entender cómo calcular y aprovechar las zonas de Premium & Discount para mejorar tu precisión al operar. ",
+            "duration": "4:08",
+            "created_at": 1732797215208,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/-u5V2mAm0YiX99CaRZpVImyOc0I/vLx2fw../Smart_Money_05.jpg",
+              "name": "Smart_Money_05.jpg",
+              "type": "image",
+              "size": 165832,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/-u5V2mAm0YiX99CaRZpVImyOc0I/vLx2fw../Smart_Money_05.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 415,
+            "name": "FVG",
+            "code": "1.7",
+            "order": 7,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014275412?h=81d3b7d866",
+            "description": "En este vídeo, exploramos el concepto de Fair Value Gap (FVG), también conocido como ineficiencia, dentro del marco de los Smart Money Concepts. Este es un pilar esencial para entender cómo los mercados buscan equilibrarse y reaccionar a zonas específicas. Además, aprenderás a identificar estas áreas y su relevancia para el trading institucional.\n\nPuntos clave:\n- Definición de FVG: Es una ineficiencia en el mercado que se identifica como un espacio entre tres velas consecutivas donde el precio no ha estado presente, evidenciando un desequilibrio entre compradores y vendedores.\n- Reacción del precio: El mercado tiende a llenar estas ineficiencias para alcanzar la eficiencia, regresando a estas zonas antes de continuar con la tendencia.\n- Zonas sensibles: Las áreas clave dentro de un FVG incluyen el inicio, el 50% y el relleno total, donde el precio puede reaccionar.\n- Uso práctico en trading: Los FVG pueden actuar como soportes o resistencias, sirviendo como puntos estratégicos para entradas o salidas basadas en la teoría del equilibrio del mercado.\n\nEste conocimiento te permitirá identificar oportunidades clave en los gráficos y entender el comportamiento del mercado de manera más profunda.",
+            "duration": "17:39",
+            "created_at": 1732797215220,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/K5IoJIi7nvCYmtn6g61C_doL5Lg/ziz0lw../Smart_Money_06.jpg",
+              "name": "Smart_Money_06.jpg",
+              "type": "image",
+              "size": 168960,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/K5IoJIi7nvCYmtn6g61C_doL5Lg/ziz0lw../Smart_Money_06.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 416,
+            "name": "Order Block",
+            "code": "1.8",
+            "order": 8,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1017945396?h=15664671e7",
+            "description": "En este vídeo se introduce el concepto de los Order Blocks, fundamentales en el enfoque Smart Money. Aprenderás cómo identificarlos, interpretarlos y aplicarlos en tu análisis técnico.\n\nPuntos clave:\n- Definición y tipos: Los Order Blocks son velas o conjuntos de velas opuestas al movimiento impulsivo previo, donde las instituciones acumulan órdenes clave.\n- Identificación práctica: Aprende a localizar la última vela contraria antes de un movimiento impulsivo para marcar y extender el Order Block en el gráfico.\n- Comportamiento del precio: Explora cómo el precio tiende a retroceder y reaccionar en los Order Blocks, confirmando zonas de alta relevancia.\n- Importancia estratégica: Los Order Blocks son herramientas cruciales para anticipar reacciones del mercado y mejorar tus entradas.\n\nEste vídeo te prepara para reconocer y aprovechar los Order Blocks en tus operaciones de trading con confianza y precisión.",
+            "duration": "7:48",
+            "created_at": 1732797215232,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/yrMzniDqpsMjruKdWiM8MX400l8/jaRMTQ../Smart_Money_07.jpg",
+              "name": "Smart_Money_07.jpg",
+              "type": "image",
+              "size": 150485,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/yrMzniDqpsMjruKdWiM8MX400l8/jaRMTQ../Smart_Money_07.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 417,
+            "name": "Breaker Block",
+            "code": "1.9",
+            "order": 9,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014275241?h=ebfb6e6dbc",
+            "description": "En este video exploramos el concepto de Breaker Blocks, una variación de los Order Blocks, que ocurre cuando el precio no respeta una zona clave y rompe estructuras importantes.\n\nPuntos Clave:\n\n- Qué es un Breaker Block: Se genera cuando el precio rompe un Order Block previamente identificado, transformándolo de soporte a resistencia, o viceversa.\n- Identificación en el gráfico: Busca zonas donde el precio inicialmente respeta un Order Block pero termina rompiéndolo con cuerpo de vela.\n- Aplicación práctica: Los Breaker Blocks actúan como niveles clave de soporte o resistencia para entradas y salidas estratégicas.\n- Diferencia con Order Blocks regulares: Aunque más complejos, los Breaker Blocks ofrecen valiosa información sobre cambios de intención en el mercado.\n\nEste video te ayudará a identificar y aplicar Breaker Blocks en tu operativa, permitiéndote ajustar estrategias según los movimientos del mercado.",
+            "duration": "4:35",
+            "created_at": 1732797215244,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/rgrzCCmcu05hHcgDGHxT80EIHwE/sGZDdA../Smart_Money_08.jpg",
+              "name": "Smart_Money_08.jpg",
+              "type": "image",
+              "size": 159347,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/rgrzCCmcu05hHcgDGHxT80EIHwE/sGZDdA../Smart_Money_08.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 418,
+            "name": "Mitigation Block",
+            "code": "1.10",
+            "order": 10,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014275179?h=85dfa24b47",
+            "description": "En este video se introduce y explica el concepto del Mitigation Block, el tercer tipo de order block dentro del trading con Smart Money Concepts. Este elemento es clave para entender cómo los mercados reaccionan a ciertos niveles técnicos y cómo aprovechar estas reacciones para operar con mayor efectividad.\n\nPuntos clave:\n\n- Definición y diferencias: Un mitigation block es un bloque de órdenes similar a un order block estándar, pero no toma liquidez de los máximos o mínimos anteriores antes de romper, diferenciándose del breaker block.\n\n- Patrón y estructura: Los mitigation blocks forman máximos o mínimos decrecientes, y el precio reacciona al nivel con fuerza, convirtiéndolo en soporte o resistencia según la dirección.\n\n- Reconocimiento en gráficos: Identificar un mitigation block requiere entrenar el ojo para distinguirlos de otros bloques de órdenes. Se destacan ejemplos prácticos para facilitar su localización.\n\n- Práctica y aprendizaje: Detectar estos patrones puede ser un desafío incluso para traders experimentados, pero la práctica constante y el análisis de gráficos ayudan a mejorar su identificación.\n\nEste video te equipa con herramientas prácticas para localizar y operar en base a Mitigation Blocks, mejorando tu análisis.",
+            "duration": "7:17",
+            "created_at": 1732797215256,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/rtbBnoZhDgttYu5Zj23-D1ajbhw/Zj6QVg../Smart_Money_09.jpg",
+              "name": "Smart_Money_09.jpg",
+              "type": "image",
+              "size": 150459,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/rtbBnoZhDgttYu5Zj23-D1ajbhw/Zj6QVg../Smart_Money_09.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 419,
+            "name": "Power of Three & AMD",
+            "code": "1.11",
+            "order": 11,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014278368?h=7615ba9658",
+            "description": "El concepto Power of Three (AMD) es fundamental para entender cómo el precio se mueve y forma las velas diarias. Exploraremos cómo la acumulación, manipulación y distribución se combinan para crear oportunidades de trading precisas.\n\nPuntos clave:\n- Estructura de las velas: Comprender las mechas, el cuerpo, la apertura y el cierre permite analizar la acción del precio a detalle.\n- Acumulación, manipulación y distribución (AMD): Identificar estas fases en el mercado es clave para anticipar movimientos.\n- Relación con las sesiones de mercado: La sesión de Asia acumula, Londres manipula y Estados Unidos distribuye, lo que ofrece puntos de entrada claros.\n- Capitalización de movimientos: Detectar zonas de manipulación para ejecutar órdenes estratégicas y aprovechar la distribución posterior.\n\nEste video te ayudará a aplicar estos conceptos en tu operativa diaria para maximizar tus resultados.",
+            "duration": "10:46",
+            "created_at": 1732797215268,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/7ppadRt04QTAqw7RwxbedezFIU0/DKSldg../Smart_Money_10.jpg",
+              "name": "Smart_Money_10.jpg",
+              "type": "image",
+              "size": 152219,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/7ppadRt04QTAqw7RwxbedezFIU0/DKSldg../Smart_Money_10.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 420,
+            "name": "SMT",
+            "code": "1.12",
+            "order": 12,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014278247?h=505a0960e0",
+            "description": "En este vídeo, exploramos la técnica SMT (Smart Money Technique), una herramienta clave para identificar divergencias en mercados financieros al comparar activos correlacionados. Este concepto es un complemento útil para el análisis basado en liquidez y otros elementos del Smart Money.\n\nPuntos clave:\n- Definición y concepto: SMT utiliza la comparación entre pares de activos correlacionados (positiva o negativamente) para detectar divergencias, indicando fortalezas o debilidades relativas.\n- Correlación entre activos: Se analiza cómo activos como EUR/USD y DXY, Bitcoin y Ethereum, o Oro y Plata interactúan, y cómo estas relaciones pueden usarse para prever movimientos de mercado.\n- Identificación de divergencias: Las divergencias indican la debilidad o fortaleza de un activo, proporcionando señales para potenciales operaciones a favor de la tendencia dominante.\n- Aplicación práctica: La visualización de estas relaciones en gráficos y su integración con otros conceptos (liquidez, bloques de órdenes, etc.) permite una toma de decisiones más informada y precisa.",
+            "duration": "10:30",
+            "created_at": 1732797215280,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/yOCJ5FdV0nRoJ66UbysUOcGIHoo/IZ9LYA../Smart_Money_11.jpg",
+              "name": "Smart_Money_11.jpg",
+              "type": "image",
+              "size": 175853,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/yOCJ5FdV0nRoJ66UbysUOcGIHoo/IZ9LYA../Smart_Money_11.jpg"
+            },
+            "thum": null
+          }
+        ],
+        "headers": {
+          "cache-control": "private, no-cache, no-store, must-revalidate",
+          "content-type": "application/json; charset=UTF-8",
+          "expires": "Mon, 28 Mar 2016 16:46:28 GMT",
+          "pragma": "no-cache"
+        },
+        "isRequesting": false,
+        "hasRequested": true,
+        "statusText": "Success",
+        "status": 200,
+        "ok": true,
+        "props": {}
+      },
+      "get_lesson_quiz": {
+        "name": "get_lesson_quiz",
+        "number": 6,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_lesson": {
+        "name": "get_lesson",
+        "number": 5,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_logged_user": {
+        "name": "get_logged_user",
+        "number": 16,
+        "data": {
+          "id": 4704,
+          "name": "",
+          "first_name": "",
+          "surname": "",
+          "email": "scastellanos@phinodia.com",
+          "status": "active",
+          "role": [
+            "user"
+          ],
+          "plans": [
+            15,
+            7,
+            2,
+            13,
+            41
+          ],
+          "discord": "serg358",
+          "memberstack_member_id": "mem_cmhtafc5j04py0solgnpf558z",
+          "created_at": 1762787941135
+        },
+        "headers": {
+          "cache-control": "private, no-cache, no-store, must-revalidate",
+          "content-type": "application/json; charset=UTF-8",
+          "expires": "Mon, 28 Mar 2016 16:46:27 GMT",
+          "pragma": "no-cache"
+        },
+        "isRequesting": false,
+        "hasRequested": true,
+        "statusText": "Success",
+        "status": 200,
+        "ok": true,
+        "props": {}
+      },
+      "get_lives": {
+        "name": "get_lives",
+        "number": 19,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_lesson_navigation": {
+        "name": "get_lesson_navigation",
+        "number": 14,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_lives_recommended": {
+        "name": "get_lives_recommended",
+        "number": 22,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      },
+      "get_lives_filters": {
+        "name": "get_lives_filters",
+        "number": 21,
+        "data": null,
+        "headers": null,
+        "isRequesting": false,
+        "hasRequested": false,
+        "statusText": null,
+        "status": null,
+        "ok": null,
+        "props": {}
+      }
+    },
+    "v": {
+      "quizOptionListIndex": 0,
+      "quizStepsIndex": 0,
+      "lesson": null,
+      "webflowAnimationReset": null,
+      "hidePageLoader": true,
+      "trainingMoludeIndex": 0,
+      "course": {
+        "id": null,
+        "data": {
+          "id": 7,
+          "created_at": 1732797016808,
+          "name": "Workshop de Smart Money Concepts",
+          "status": "active",
+          "featured": false,
+          "has_user_live": false,
+          "type": "",
+          "category": "Workshop",
+          "academy_id": 1,
+          "plans": [
+            7,
+            17,
+            19,
+            20,
+            21,
+            32,
+            33,
+            25,
+            35,
+            23,
+            37,
+            5
+          ],
+          "community_plans": [],
+          "content_id": "",
+          "max_progress_percentage": 100,
+          "description": "Bienvenidos al módulo de Smart Money Concepts, un enfoque introductorio e informativo diseñado para comprender cómo operan las instituciones financieras y cómo sus movimientos influyen en el mercado.\n\nEste módulo es una introducción esencial para explorar cómo las grandes instituciones mueven los mercados y cómo interpretar sus huellas.",
+          "live": false,
+          "quiz": false,
+          "logo_svg": "",
+          "bg_color": "",
+          "accent_color": "",
+          "checkout_link": "",
+          "short_description": "Cómo operan las instituciones financieras y cómo interpretar su impacto.",
+          "order": 0,
+          "settings": {},
+          "live_thumbnail": {
+            "access": "public",
+            "path": "/vault/kto6XZjD/ehMjkmCQN-QSatztVu3BKdGLFcs/uISBBA../Course_id_01+%281%29.jpg",
+            "name": "Course_id_01 (1).jpg",
+            "type": "image",
+            "size": 104583,
+            "mime": "image/jpeg",
+            "meta": {
+              "width": 960,
+              "height": 540
+            },
+            "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/ehMjkmCQN-QSatztVu3BKdGLFcs/uISBBA../Course_id_01+%281%29.jpg"
+          },
+          "image": null,
+          "_tot_module": 1,
+          "_tot_lesson": 11,
+          "_tot_completed_user_lesson": 0,
+          "_user_course_progress": null,
+          "_tot_module_with_quiz": 0,
+          "_tot_user_module_quiz_completed": 0
+        },
+        "description": null,
+        "selectedModuleId": 53,
+        "selectedModule": {
+          "id": 53,
+          "created_at": 1732868990816,
+          "name": "Contenido Workshop",
+          "description": "",
+          "order": 1,
+          "code": "M1",
+          "show_quiz": false,
+          "show_file_upload": false,
+          "section_id": 0,
+          "course_id": 7,
+          "status": "active",
+          "tag": "",
+          "classmarker": {
+            "test_id": 0,
+            "quiz_id": ""
+          },
+          "settings": {
+            "show_classmarker_quiz": false
+          },
+          "_tot_lessons": 11,
+          "_completed_lessons": 0
+        },
+        "selectedSectionId": null,
+        "sections": [],
+        "modules": [
+          {
+            "id": 53,
+            "created_at": 1732868990816,
+            "name": "Contenido Workshop",
+            "description": "",
+            "order": 1,
+            "code": "M1",
+            "show_quiz": false,
+            "show_file_upload": false,
+            "section_id": 0,
+            "course_id": 7,
+            "status": "active",
+            "tag": "",
+            "classmarker": {
+              "test_id": 0,
+              "quiz_id": ""
+            },
+            "settings": {
+              "show_classmarker_quiz": false
+            },
+            "_tot_lessons": 11,
+            "_completed_lessons": 0
+          }
+        ],
+        "lessons": [
+          {
+            "id": 409,
+            "name": "Introducción",
+            "code": "1.1",
+            "order": 1,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014263664?h=a5191814c8",
+            "description": "En este video, te damos la bienvenida al módulo de Smart Money Concepts, donde exploraremos un estilo de trading que ha ganado popularidad en los últimos años.\n\nPuntos Clave:\n\n- Qué es Smart Money Concepts: Un enfoque de trading basado en identificar los movimientos del dinero institucional en los mercados.\n- Objetivo del Módulo: Introducir los conceptos clave de este estilo sin abrumarte con información innecesaria.\n- Popularidad Reciente: Este enfoque ha captado la atención por su efectividad en entender la lógica detrás de los movimientos del mercado.\n- Selección de Conceptos: Nos centraremos en los conceptos más importantes para ayudarte a comprender la base de este estilo operativo.\n\nEste video marca el inicio del módulo y te prepara para adentrarte en los fundamentos de Smart Money Concepts, un enfoque que podría transformar tu manera de operar en los mercados.",
+            "duration": "0:26",
+            "created_at": 1732797205289,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/5AWxGwWmyz43Uf-vxpVziyWxIaY/_v0U0Q../Smart_Money_01.jpg",
+              "name": "Smart_Money_01.jpg",
+              "type": "image",
+              "size": 301788,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/5AWxGwWmyz43Uf-vxpVziyWxIaY/_v0U0Q../Smart_Money_01.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 410,
+            "name": "Disclaimer",
+            "code": "1.2",
+            "order": 2,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1017945533?h=4d7b5c523c",
+            "description": "En este video, aclaramos cómo encajan los conceptos de Smart Money en el enfoque general de TradingLab y su relación con nuestras estrategias actuales.\n\nPuntos Clave:\n\n- Propósito del Módulo: Este módulo tiene como objetivo introducirte a los conceptos de Smart Money, sin mezclarlo con las estrategias actuales de TradingLab.\n- Actualización Constante: Los mercados evolucionan, y en TradingLab buscamos estar al día con nuevas tendencias y estilos operativos para compartirlos contigo.\n- Backtesting en Proceso: El equipo está realizando pruebas exhaustivas para identificar qué conceptos pueden integrarse de manera efectiva en nuestras estrategias.\n- Futuro Desarrollo: Una vez finalizado el backtesting, se planea desarrollar un módulo específico que incorpore los conceptos de Smart Money en las estrategias de TradingLab.\n\nEste video establece las bases para explorar Smart Money Concepts como una herramienta educativa y de actualización en el mundo del trading.",
+            "duration": "1:11",
+            "created_at": 1732797215159,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/WOMyJyzuV0kF0r-WyeCXpPBA2AA/Z2YT9Q../Smart_Money_02.jpg",
+              "name": "Smart_Money_02.jpg",
+              "type": "image",
+              "size": 297230,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/WOMyJyzuV0kF0r-WyeCXpPBA2AA/Z2YT9Q../Smart_Money_02.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 412,
+            "name": "Liquidez",
+            "code": "1.4",
+            "order": 4,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014266314?h=cc8d0f8c24",
+            "description": "En este video exploraremos el concepto clave de liquidez dentro de los Smart Money Concepts, una pieza fundamental para comprender cómo operan las grandes instituciones y el algoritmo interbancario.\nPuntos clave:\n- Qué es la liquidez: La liquidez se traduce en dinero en el mercado. Las grandes instituciones persiguen esta liquidez, que muchas veces se encuentra en los puntos donde los traders retail colocan sus stop-loss.\n- Máximos y mínimos como zonas clave: Los máximos y mínimos son áreas fundamentales donde el precio suele buscar liquidez, generando reacciones significativas al absorber estos niveles.\n- Relevancia de los soportes, resistencias y líneas de tendencia: Estas zonas albergan la liquidez de los stop-loss y son objetivos clave para el algoritmo del mercado.\n- La importancia del análisis de sesiones y temporalidades: La liquidez no solo se encuentra en los gráficos semanales o diarios, sino también en los máximos y mínimos de las sesiones, especialmente útiles para estrategias de scalping.\n\nEste video refuerza la importancia de identificar y entender cómo las grandes instituciones manipulan el mercado en busca de liquidez, para tomar decisiones estratégicas basadas en estos movimientos.",
+            "duration": "19:45",
+            "created_at": 1732797215183,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/iJKUnXMkQzNb-xhkkboTLCY05DU/LxJmIA../Smart_Money_03.jpg",
+              "name": "Smart_Money_03.jpg",
+              "type": "image",
+              "size": 194811,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/iJKUnXMkQzNb-xhkkboTLCY05DU/LxJmIA../Smart_Money_03.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 413,
+            "name": "BOS & CHOCH",
+            "code": "1.5",
+            "order": 5,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014266729?h=a983dcb279",
+            "description": "En este video aprenderás a identificar y comprender los conceptos de BOS (Break of Structure) y CHOCH (Change of Character), esenciales para analizar cambios y continuaciones de tendencias en los mercados financieros.\n\nPuntos Clave:\n\n-Qué son BOS y CHOCH: BOS indica la ruptura de estructuras en una tendencia definida, mientras que CHOCH señala un cambio en la dirección de la tendencia.\n- Aplicación en diferentes mercados: Estos conceptos son aplicables a cualquier activo y temporalidad, ya sea forex, criptomonedas, acciones o índices.\n- Identificación de zonas clave: Reconoce máximos y mínimos crecientes o decrecientes para determinar continuaciones o cambios en la estructura del mercado.\n- Importancia de entender la terminología: Conocer estos términos te ayudará a interpretar gráficos de otros traders y a mejorar tu análisis técnico.\n\nEste video te equipa con herramientas prácticas para identificar movimientos clave del mercado y aplicarlos en tus estrategias de trading.",
+            "duration": "5:15",
+            "created_at": 1732797215196,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/MPJPzCfS-WrzxCMq07UKRz7GQyM/IkhaWg../Smart_Money_04.jpg",
+              "name": "Smart_Money_04.jpg",
+              "type": "image",
+              "size": 156157,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/MPJPzCfS-WrzxCMq07UKRz7GQyM/IkhaWg../Smart_Money_04.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 414,
+            "name": "Premium & Discount",
+            "code": "1.6",
+            "order": 6,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014266805?h=63947fbff3",
+            "description": "En este video, aprenderás el concepto de Premium & Discount, una herramienta sencilla pero poderosa que te ayudará a identificar zonas óptimas de precio basadas en descuentos.\n\nPuntos Clave:\n\n- Concepto de Premium & Discount: Las zonas Premium representan precios altos y las zonas Discount, precios bajos; ideales para buscar entradas en los mercados.\n- Uso del Fibonacci: Se utiliza la herramienta Fibonacci para calcular las áreas de descuento en tendencias alcistas o bajistas.\n- Estrategias de Instituciones: Las grandes instituciones buscan ejecutar órdenes en niveles de descuento, especialmente entre el 50% y el 70% del retroceso.\n- Aplicación Práctica: Identificar estas zonas optimiza tus entradas al mercado y complementa el uso de Fibonacci en TradingLab.\n\nEste video refuerza la importancia de entender cómo calcular y aprovechar las zonas de Premium & Discount para mejorar tu precisión al operar. ",
+            "duration": "4:08",
+            "created_at": 1732797215208,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/-u5V2mAm0YiX99CaRZpVImyOc0I/vLx2fw../Smart_Money_05.jpg",
+              "name": "Smart_Money_05.jpg",
+              "type": "image",
+              "size": 165832,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/-u5V2mAm0YiX99CaRZpVImyOc0I/vLx2fw../Smart_Money_05.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 415,
+            "name": "FVG",
+            "code": "1.7",
+            "order": 7,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014275412?h=81d3b7d866",
+            "description": "En este vídeo, exploramos el concepto de Fair Value Gap (FVG), también conocido como ineficiencia, dentro del marco de los Smart Money Concepts. Este es un pilar esencial para entender cómo los mercados buscan equilibrarse y reaccionar a zonas específicas. Además, aprenderás a identificar estas áreas y su relevancia para el trading institucional.\n\nPuntos clave:\n- Definición de FVG: Es una ineficiencia en el mercado que se identifica como un espacio entre tres velas consecutivas donde el precio no ha estado presente, evidenciando un desequilibrio entre compradores y vendedores.\n- Reacción del precio: El mercado tiende a llenar estas ineficiencias para alcanzar la eficiencia, regresando a estas zonas antes de continuar con la tendencia.\n- Zonas sensibles: Las áreas clave dentro de un FVG incluyen el inicio, el 50% y el relleno total, donde el precio puede reaccionar.\n- Uso práctico en trading: Los FVG pueden actuar como soportes o resistencias, sirviendo como puntos estratégicos para entradas o salidas basadas en la teoría del equilibrio del mercado.\n\nEste conocimiento te permitirá identificar oportunidades clave en los gráficos y entender el comportamiento del mercado de manera más profunda.",
+            "duration": "17:39",
+            "created_at": 1732797215220,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/K5IoJIi7nvCYmtn6g61C_doL5Lg/ziz0lw../Smart_Money_06.jpg",
+              "name": "Smart_Money_06.jpg",
+              "type": "image",
+              "size": 168960,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/K5IoJIi7nvCYmtn6g61C_doL5Lg/ziz0lw../Smart_Money_06.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 416,
+            "name": "Order Block",
+            "code": "1.8",
+            "order": 8,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1017945396?h=15664671e7",
+            "description": "En este vídeo se introduce el concepto de los Order Blocks, fundamentales en el enfoque Smart Money. Aprenderás cómo identificarlos, interpretarlos y aplicarlos en tu análisis técnico.\n\nPuntos clave:\n- Definición y tipos: Los Order Blocks son velas o conjuntos de velas opuestas al movimiento impulsivo previo, donde las instituciones acumulan órdenes clave.\n- Identificación práctica: Aprende a localizar la última vela contraria antes de un movimiento impulsivo para marcar y extender el Order Block en el gráfico.\n- Comportamiento del precio: Explora cómo el precio tiende a retroceder y reaccionar en los Order Blocks, confirmando zonas de alta relevancia.\n- Importancia estratégica: Los Order Blocks son herramientas cruciales para anticipar reacciones del mercado y mejorar tus entradas.\n\nEste vídeo te prepara para reconocer y aprovechar los Order Blocks en tus operaciones de trading con confianza y precisión.",
+            "duration": "7:48",
+            "created_at": 1732797215232,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/yrMzniDqpsMjruKdWiM8MX400l8/jaRMTQ../Smart_Money_07.jpg",
+              "name": "Smart_Money_07.jpg",
+              "type": "image",
+              "size": 150485,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/yrMzniDqpsMjruKdWiM8MX400l8/jaRMTQ../Smart_Money_07.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 417,
+            "name": "Breaker Block",
+            "code": "1.9",
+            "order": 9,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014275241?h=ebfb6e6dbc",
+            "description": "En este video exploramos el concepto de Breaker Blocks, una variación de los Order Blocks, que ocurre cuando el precio no respeta una zona clave y rompe estructuras importantes.\n\nPuntos Clave:\n\n- Qué es un Breaker Block: Se genera cuando el precio rompe un Order Block previamente identificado, transformándolo de soporte a resistencia, o viceversa.\n- Identificación en el gráfico: Busca zonas donde el precio inicialmente respeta un Order Block pero termina rompiéndolo con cuerpo de vela.\n- Aplicación práctica: Los Breaker Blocks actúan como niveles clave de soporte o resistencia para entradas y salidas estratégicas.\n- Diferencia con Order Blocks regulares: Aunque más complejos, los Breaker Blocks ofrecen valiosa información sobre cambios de intención en el mercado.\n\nEste video te ayudará a identificar y aplicar Breaker Blocks en tu operativa, permitiéndote ajustar estrategias según los movimientos del mercado.",
+            "duration": "4:35",
+            "created_at": 1732797215244,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/rgrzCCmcu05hHcgDGHxT80EIHwE/sGZDdA../Smart_Money_08.jpg",
+              "name": "Smart_Money_08.jpg",
+              "type": "image",
+              "size": 159347,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/rgrzCCmcu05hHcgDGHxT80EIHwE/sGZDdA../Smart_Money_08.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 418,
+            "name": "Mitigation Block",
+            "code": "1.10",
+            "order": 10,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014275179?h=85dfa24b47",
+            "description": "En este video se introduce y explica el concepto del Mitigation Block, el tercer tipo de order block dentro del trading con Smart Money Concepts. Este elemento es clave para entender cómo los mercados reaccionan a ciertos niveles técnicos y cómo aprovechar estas reacciones para operar con mayor efectividad.\n\nPuntos clave:\n\n- Definición y diferencias: Un mitigation block es un bloque de órdenes similar a un order block estándar, pero no toma liquidez de los máximos o mínimos anteriores antes de romper, diferenciándose del breaker block.\n\n- Patrón y estructura: Los mitigation blocks forman máximos o mínimos decrecientes, y el precio reacciona al nivel con fuerza, convirtiéndolo en soporte o resistencia según la dirección.\n\n- Reconocimiento en gráficos: Identificar un mitigation block requiere entrenar el ojo para distinguirlos de otros bloques de órdenes. Se destacan ejemplos prácticos para facilitar su localización.\n\n- Práctica y aprendizaje: Detectar estos patrones puede ser un desafío incluso para traders experimentados, pero la práctica constante y el análisis de gráficos ayudan a mejorar su identificación.\n\nEste video te equipa con herramientas prácticas para localizar y operar en base a Mitigation Blocks, mejorando tu análisis.",
+            "duration": "7:17",
+            "created_at": 1732797215256,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/rtbBnoZhDgttYu5Zj23-D1ajbhw/Zj6QVg../Smart_Money_09.jpg",
+              "name": "Smart_Money_09.jpg",
+              "type": "image",
+              "size": 150459,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/rtbBnoZhDgttYu5Zj23-D1ajbhw/Zj6QVg../Smart_Money_09.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 419,
+            "name": "Power of Three & AMD",
+            "code": "1.11",
+            "order": 11,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014278368?h=7615ba9658",
+            "description": "El concepto Power of Three (AMD) es fundamental para entender cómo el precio se mueve y forma las velas diarias. Exploraremos cómo la acumulación, manipulación y distribución se combinan para crear oportunidades de trading precisas.\n\nPuntos clave:\n- Estructura de las velas: Comprender las mechas, el cuerpo, la apertura y el cierre permite analizar la acción del precio a detalle.\n- Acumulación, manipulación y distribución (AMD): Identificar estas fases en el mercado es clave para anticipar movimientos.\n- Relación con las sesiones de mercado: La sesión de Asia acumula, Londres manipula y Estados Unidos distribuye, lo que ofrece puntos de entrada claros.\n- Capitalización de movimientos: Detectar zonas de manipulación para ejecutar órdenes estratégicas y aprovechar la distribución posterior.\n\nEste video te ayudará a aplicar estos conceptos en tu operativa diaria para maximizar tus resultados.",
+            "duration": "10:46",
+            "created_at": 1732797215268,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/7ppadRt04QTAqw7RwxbedezFIU0/DKSldg../Smart_Money_10.jpg",
+              "name": "Smart_Money_10.jpg",
+              "type": "image",
+              "size": 152219,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/7ppadRt04QTAqw7RwxbedezFIU0/DKSldg../Smart_Money_10.jpg"
+            },
+            "thum": null
+          },
+          {
+            "id": 420,
+            "name": "SMT",
+            "code": "1.12",
+            "order": 12,
+            "module_id": 53,
+            "course_id": 7,
+            "status": "active",
+            "url": "https://player.vimeo.com/video/1014278247?h=505a0960e0",
+            "description": "En este vídeo, exploramos la técnica SMT (Smart Money Technique), una herramienta clave para identificar divergencias en mercados financieros al comparar activos correlacionados. Este concepto es un complemento útil para el análisis basado en liquidez y otros elementos del Smart Money.\n\nPuntos clave:\n- Definición y concepto: SMT utiliza la comparación entre pares de activos correlacionados (positiva o negativamente) para detectar divergencias, indicando fortalezas o debilidades relativas.\n- Correlación entre activos: Se analiza cómo activos como EUR/USD y DXY, Bitcoin y Ethereum, o Oro y Plata interactúan, y cómo estas relaciones pueden usarse para prever movimientos de mercado.\n- Identificación de divergencias: Las divergencias indican la debilidad o fortaleza de un activo, proporcionando señales para potenciales operaciones a favor de la tendencia dominante.\n- Aplicación práctica: La visualización de estas relaciones en gráficos y su integración con otros conceptos (liquidez, bloques de órdenes, etc.) permite una toma de decisiones más informada y precisa.",
+            "duration": "10:30",
+            "created_at": 1732797215280,
+            "thumbnail": {
+              "access": "public",
+              "path": "/vault/kto6XZjD/yOCJ5FdV0nRoJ66UbysUOcGIHoo/IZ9LYA../Smart_Money_11.jpg",
+              "name": "Smart_Money_11.jpg",
+              "type": "image",
+              "size": 175853,
+              "mime": "image/jpeg",
+              "meta": {
+                "width": 960,
+                "height": 540
+              },
+              "url": "https://xrsz-kaax-uh7f.n7d.xano.io/vault/kto6XZjD/yOCJ5FdV0nRoJ66UbysUOcGIHoo/IZ9LYA../Smart_Money_11.jpg"
+            },
+            "thum": null
+          }
+        ]
+      },
+      "live": {
+        "data": null
+      },
+      "trainingSplide": {
+        "obj": {
+          "event": {
+            "bind": null,
+            "unbind": null,
+            "dispatch": null,
+            "destroy": null,
+            "bus": "ref: <Node>",
+            "on": null,
+            "off": null,
+            "emit": null
+          },
+          "Components": {
+            "Media": {
+              "setup": null,
+              "destroy": null,
+              "reduce": null,
+              "set": null
+            },
+            "Direction": {
+              "resolve": null,
+              "orient": null
+            },
+            "Elements": {
+              "setup": null,
+              "mount": null,
+              "destroy": null,
+              "arrows": null,
+              "pagination": null,
+              "prev": null,
+              "next": null,
+              "bar": null,
+              "toggle": null,
+              "root": "ref: <Node>",
+              "track": "ref: <Node>",
+              "list": "ref: <Node>",
+              "slides": [
+                "ref: <Node>"
+              ]
+            },
+            "Slides": {
+              "mount": null,
+              "destroy": null,
+              "update": null,
+              "register": null,
+              "get": null,
+              "getIn": null,
+              "getAt": null,
+              "add": null,
+              "remove": null,
+              "forEach": null,
+              "filter": null,
+              "style": null,
+              "getLength": null,
+              "isEnough": null
+            },
+            "Layout": {
+              "mount": null,
+              "resize": null,
+              "listSize": null,
+              "slideSize": null,
+              "sliderSize": null,
+              "totalSize": null,
+              "getPadding": null,
+              "isOverflow": null
+            },
+            "Clones": {
+              "mount": null,
+              "destroy": null
+            },
+            "Move": {
+              "mount": null,
+              "move": null,
+              "jump": null,
+              "translate": null,
+              "shift": null,
+              "cancel": null,
+              "toIndex": null,
+              "toPosition": null,
+              "getPosition": null,
+              "getLimit": null,
+              "exceededLimit": null,
+              "reposition": null
+            },
+            "Controller": {
+              "mount": null,
+              "go": null,
+              "scroll": null,
+              "getNext": null,
+              "getPrev": null,
+              "getAdjacent": null,
+              "getEnd": null,
+              "setIndex": null,
+              "getIndex": null,
+              "toIndex": null,
+              "toPage": null,
+              "toDest": null,
+              "hasFocus": null,
+              "isBusy": null
+            },
+            "Arrows": {
+              "arrows": {
+                "prev": "ref: <Node>",
+                "next": "ref: <Node>"
+              },
+              "mount": null,
+              "destroy": null,
+              "update": null
+            },
+            "Autoplay": {
+              "mount": null,
+              "destroy": null,
+              "play": null,
+              "pause": null,
+              "isPaused": null
+            },
+            "Cover": {
+              "mount": null,
+              "destroy": null
+            },
+            "Scroll": {
+              "mount": null,
+              "destroy": null,
+              "scroll": null,
+              "cancel": null
+            },
+            "Drag": {
+              "mount": null,
+              "disable": null,
+              "isDragging": null
+            },
+            "Keyboard": {
+              "mount": null,
+              "destroy": null,
+              "disable": null
+            },
+            "LazyLoad": {
+              "mount": null,
+              "destroy": null,
+              "check": null
+            },
+            "Pagination": {
+              "items": [],
+              "mount": null,
+              "destroy": null,
+              "getAt": null,
+              "update": null
+            },
+            "Sync": {
+              "setup": null,
+              "mount": null,
+              "destroy": null,
+              "remount": null
+            },
+            "Wheel": {
+              "mount": null
+            },
+            "Live": {
+              "mount": null,
+              "disable": null,
+              "destroy": null
+            },
+            "Transition": {
+              "mount": null,
+              "start": null,
+              "cancel": null
+            }
+          },
+          "state": {
+            "set": null,
+            "is": null
+          },
+          "splides": [],
+          "_o": {
+            "slideFocus": null
+          },
+          "_E": {},
+          "root": "ref: <Node>",
+          "_C": {
+            "Media": {
+              "setup": null,
+              "destroy": null,
+              "reduce": null,
+              "set": null
+            },
+            "Direction": {
+              "resolve": null,
+              "orient": null
+            },
+            "Elements": {
+              "setup": null,
+              "mount": null,
+              "destroy": null,
+              "arrows": null,
+              "pagination": null,
+              "prev": null,
+              "next": null,
+              "bar": null,
+              "toggle": null,
+              "root": "ref: <Node>",
+              "track": "ref: <Node>",
+              "list": "ref: <Node>",
+              "slides": [
+                "ref: <Node>"
+              ]
+            },
+            "Slides": {
+              "mount": null,
+              "destroy": null,
+              "update": null,
+              "register": null,
+              "get": null,
+              "getIn": null,
+              "getAt": null,
+              "add": null,
+              "remove": null,
+              "forEach": null,
+              "filter": null,
+              "style": null,
+              "getLength": null,
+              "isEnough": null
+            },
+            "Layout": {
+              "mount": null,
+              "resize": null,
+              "listSize": null,
+              "slideSize": null,
+              "sliderSize": null,
+              "totalSize": null,
+              "getPadding": null,
+              "isOverflow": null
+            },
+            "Clones": {
+              "mount": null,
+              "destroy": null
+            },
+            "Move": {
+              "mount": null,
+              "move": null,
+              "jump": null,
+              "translate": null,
+              "shift": null,
+              "cancel": null,
+              "toIndex": null,
+              "toPosition": null,
+              "getPosition": null,
+              "getLimit": null,
+              "exceededLimit": null,
+              "reposition": null
+            },
+            "Controller": {
+              "mount": null,
+              "go": null,
+              "scroll": null,
+              "getNext": null,
+              "getPrev": null,
+              "getAdjacent": null,
+              "getEnd": null,
+              "setIndex": null,
+              "getIndex": null,
+              "toIndex": null,
+              "toPage": null,
+              "toDest": null,
+              "hasFocus": null,
+              "isBusy": null
+            },
+            "Arrows": {
+              "arrows": {
+                "prev": "ref: <Node>",
+                "next": "ref: <Node>"
+              },
+              "mount": null,
+              "destroy": null,
+              "update": null
+            },
+            "Autoplay": {
+              "mount": null,
+              "destroy": null,
+              "play": null,
+              "pause": null,
+              "isPaused": null
+            },
+            "Cover": {
+              "mount": null,
+              "destroy": null
+            },
+            "Scroll": {
+              "mount": null,
+              "destroy": null,
+              "scroll": null,
+              "cancel": null
+            },
+            "Drag": {
+              "mount": null,
+              "disable": null,
+              "isDragging": null
+            },
+            "Keyboard": {
+              "mount": null,
+              "destroy": null,
+              "disable": null
+            },
+            "LazyLoad": {
+              "mount": null,
+              "destroy": null,
+              "check": null
+            },
+            "Pagination": {
+              "items": [],
+              "mount": null,
+              "destroy": null,
+              "getAt": null,
+              "update": null
+            },
+            "Sync": {
+              "setup": null,
+              "mount": null,
+              "destroy": null,
+              "remount": null
+            },
+            "Wheel": {
+              "mount": null
+            },
+            "Live": {
+              "mount": null,
+              "disable": null,
+              "destroy": null
+            },
+            "Transition": {
+              "mount": null,
+              "start": null,
+              "cancel": null
+            }
+          },
+          "_T": null
+        },
+        "reset": null,
+        "init": null
+      },
+      "formFilterDifficultyBreadIndex": 0,
+      "quizListIndex": 0,
+      "livesFilterDifficultyIndex": 0,
+      "livesListIndex": 0,
+      "lives": {
+        "list": null,
+        "searchTimeout": null,
+        "filterOptions": {
+          "sort": [
+            {
+              "label": "Alfabético A-Z",
+              "value": "name.asc"
+            },
+            {
+              "label": "Alfabético Z-A",
+              "value": "name.desc"
+            },
+            {
+              "label": "Menos recientes",
+              "value": "date.asc"
+            },
+            {
+              "label": "Más recientes",
+              "value": "date.desc"
+            }
+          ],
+          "courses": null,
+          "difficulties": null,
+          "categories": null,
+          "sections": null
+        },
+        "dropdownUI": {
+          "difficulty": [],
+          "course": [],
+          "category": [],
+          "sort": null,
+          "sections": []
+        },
+        "filters": {
+          "section": [],
+          "difficulty": [],
+          "course": [],
+          "category": [],
+          "sort": null,
+          "search": "",
+          "page": 1
+        }
+      },
+      "module": null,
+      "lesson_references_list": [],
+      "formFilterCourseBreadIndex": 0,
+      "lesson_navigation_index": 0,
+      "app": {
+        "isXanoDataSourceTest": false,
+        "isXanoBranchTest": false,
+        "_isTestEnv": null,
+        "getXanoDataSource": null,
+        "getXanoBranch": null
+      },
+      "quizFormResult": null,
+      "lessonProgressPercentage": 0,
+      "lesson_references_index": 0,
+      "loadScript": null,
+      "arrayIndex": 0,
+      "livesFilterCourseIndex": 0,
+      "dashboardMasteryListIndex": 0,
+      "formFilterCategoryBreadIndex": 0,
+      "livesFilterCategoryIndex": 0,
+      "trainingLessonIndex": 0,
+      "auth": {
+        "token": "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwiemlwIjoiREVGIn0.TEX6QKkSAWBrUwibR9lbvFLXzu6WkO_AxUdlwRrlMvde5x-hqBpPc46oSTp5h8s2enpoaiQmfHqc5BM6LYWWfrB-OFDGqkQ5.UhxdIkI3SlYU-u_J22DbFQ.bxzeG_s-G6Qty00wKYHqxGQtTlycSDotOjSg0CZV-ctkQadTTrW6oYG_q1CZbCoGmlC-tVsNOFWja_zhyI504EyDV6cSKm5CKU8N0buACjGsQ5vZJBP0mq65hSy4QpskUCrupkxIDvzY04Ka1AT71w.T7KWsg_FFojNvbtJX7MRkUMS7TvrXXyRBlexpaLLdbU",
+        "user": {
+          "id": 4704,
+          "name": "",
+          "first_name": "",
+          "surname": "",
+          "email": "scastellanos@phinodia.com",
+          "status": "active",
+          "role": [
+            "user"
+          ],
+          "plans": [
+            15,
+            7,
+            2,
+            13,
+            41
+          ],
+          "discord": "serg358",
+          "memberstack_member_id": "mem_cmhtafc5j04py0solgnpf558z",
+          "created_at": 1762787941135
+        },
+        "msToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjZmNjU3ZGRiYWJmYmZkOTVhNGVkNjZjMjMyNDExZWFhNjE5OGQ4NGMxYmJkOGEyYTI5M2I4MTVmYjRhOTlhYjEifQ.eyJpZCI6Im1lbV9jbWh0YWZjNWowNHB5MHNvbGducGY1NTh6IiwidHlwZSI6Im1lbWJlciIsImlhdCI6MTc3NDU0MzUxNSwiZXhwIjoxNzc1NzUzMTE1LCJhdWQiOiJhcHBfY2w4c3c5MXB2MDA0NDB3Z3M3aGx3Z2d2ZiIsImlzcyI6Imh0dHBzOi8vYXBpLm1lbWJlcnN0YWNrLmNvbSJ9.NLBVXAW6gNMW-MDSMPIa8l-k2Bq8tBzXDfGUfDzGc0CZT6OXga8_IyWMbd-e1p-2JWvX-mQcFx-HdV6AAuSp6wHq1uW93J7aKY4V0WPBzU0XXm8FdiVtPQxIGX_cOD60y7Q9VXzmRZLsjxzc_vB86Hdvn3Bv2IBfYf4zX8-hQNwbySlJsDIC2o-0C6k0aHmIdP2RV79u6_w40yC4jPMRbfDYW2Moa5t4nBO-fsi3p3huWu77LAiSn3q_T5gxA_hzj-LUSI_bFkUKpwBbm5IOo31Q7gubxzeJEkIB3dIr0CsDTfhQoFUI8U52xtCdPZjJzxfNliX9jiw_UF44CyOC4Q",
+        "getMsToken": null
+      },
+      "moduleQuizList": [],
+      "trainingSectionIndex": 0,
+      "formUi": {},
+      "lessonQuizList": [],
+      "lesson_navigation": null,
+      "dashboard": {
+        "lives": null,
+        "course": null,
+        "workshop": null
+      },
+      "lesson_readmore": {
+        "isOpen": true,
+        "isActive": false,
+        "maxHeight": 53
+      },
+      "academy_id": 1,
+      "formStatus": null,
+      "livesFilterSortIndex": 0
+    },
+    "s": {},
+    "w": {}
+  },
+  "requests": [
+    "execute",
+    "waitFor",
+    "getClient"
+  ]
+}

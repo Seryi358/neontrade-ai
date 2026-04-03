@@ -1,0 +1,30 @@
+# Introducción al nivel avanzado
+
+---
+
+## Clase 1: Introducción al nivel avanzado
+
+**Duración:** 1:52
+
+### Descripción
+
+En este video, damos inicio al nivel avanzado de la formación, una etapa enfocada en consolidar la profesionalización del trader. Ya no se trata de aprender estrategias o técnicas básicas, sino de integrar hábitos, herramientas y estructuras propias de un trader profesional.
+
+El enfoque cambia completamente: aquí se trabaja sobre gestión, documentación, psicología, disciplina y responsabilidad personal en la operativa.
+
+Puntos Clave:
+
+- Este nivel no aborda estrategias ni backtesting, sino la profesionalización del oficio
+- Se introducen conceptos como el journaling, el trade plan y el uso de documentación operativa
+- Se comienza a trabajar en profundidad la psicología del trading, elemento clave para la consistencia
+- Se fomenta una mentalidad de trader como negocio individual, donde tú eres el responsable de todo
+
+Este vídeo marca el comienzo de una etapa donde el trading se transforma en una actividad profesional con estructura, enfoque mental y compromiso a largo plazo.
+
+### Transcripción
+
+Bienvenido al último nivel de todos, el nivel avanzado. El hecho de estar aquí ya es un gran avance en todo tu aprendizaje, más aún si has ido siguiendo los tiempos y las recomendaciones que vamos haciendo durante toda la formación y que ves en la comunidad, en los directos, en las quedadas presenciales, etcétera, etcétera. Estamos en un punto en el cual vamos a tratar no demasiados temas, pero todos importantísimos y trascendentales, no serán más difíciles de comprender. Simplemente se dan en una situación o en una etapa mucho más avanzada del desarrollo de cada uno. Por eso no hablaremos de estrategias, no hablaremos de cómo hacer backtesting, no hablaremos de contenido tan práctico, sino que lo derivaremos en la profesionalización de la profesión. Hablaremos de journaling, hablaremos de ASR, hablaremos de trading plan, hablaremos de un montón de documentos, de prácticas y de labores que como trader profesional, como propietario de tu propio negocio en el cual te encuentras tú solo, tienes que llevar a cabo. Evidentemente se trata de un módulo o de un nivel en el cual los módulos pueden ir incrementando. Iremos añadiendo cosas de fiscalidad, iremos añadiendo cosas de psicología avanzada, iremos añadiendo cosas en definitiva, como hacemos siempre con todas las formaciones y con todos los niveles y todos los módulos. Y evidentemente al estar ya en este punto y al haber visto todo lo que contiene la formación, pues te recomendamos que si tienes intención de sugerir algún tipo de mejora, a través de la comunidad de Discord podéis abrir o puedes abrir un ticket, puedes abrir un chat de soporte y hacernos llegar tus sugerencias, ya que a raíz de recibir sugerencias y recomendaciones de todos los alumnos, vamos mejorando paulatinamente la formación. Dicho esto, finalizo por aquí la introducción y te dejo ya con el primer módulo.
+
+
+---
+

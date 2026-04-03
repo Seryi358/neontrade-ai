@@ -595,9 +595,6 @@ class Backtester:
             if newly_closed:
                 cooldown_remaining = config.cooldown_bars
 
-            if cooldown_remaining > 0:
-                cooldown_remaining -= 1
-
             # ── 3b. Run analysis periodically ────────────────────────
             run_analysis = (step % analysis_interval == 0)
             if run_analysis:
@@ -672,6 +669,11 @@ class Backtester:
                 if new_pos is not None:
                     open_positions.append(new_pos)
                     last_signal = None  # consume the signal
+
+            # Decrement cooldown AFTER entry check so cooldown_bars=2
+            # actually blocks the next 2 bars (fix off-by-one).
+            if cooldown_remaining > 0:
+                cooldown_remaining -= 1
 
             # ── 3d. Equity curve ─────────────────────────────────────
             unrealised = 0.0
@@ -763,7 +765,7 @@ class Backtester:
             # Request enough data to cover the backtest period PLUS
             # a warm-up window equal to the default lookback count.
             try:
-                count = min(default_count + 1000, 1000)  # API max 1000
+                count = 1000  # API max; covers lookback + simulation window
                 raw_candles = await self.broker.get_candles(
                     config.instrument, tf, count
                 )
@@ -1120,7 +1122,9 @@ class Backtester:
     def _calc_sharpe(trades: List[BacktestTrade], risk_free_rate: float = 0.0) -> float:
         """
         Annualised Sharpe ratio based on per-trade returns.
-        Assumes ~252 trading days, ~6 trades/day avg -> rough annualisation.
+        Annualisation uses 252 trading days (standard convention).
+        Trades-per-day is estimated from the actual backtest data span,
+        so the ratio does not inflate as total trade count grows.
         """
         if len(trades) < 2:
             return 0.0
@@ -1132,10 +1136,16 @@ class Backtester:
         if std_ret == 0:
             return 0.0
 
-        # Annualise: sqrt(number_of_trades) is a simple approach when
-        # trades are irregularly spaced.
-        n = len(returns)
-        sharpe = (mean_ret - risk_free_rate) / std_ret * math.sqrt(n)
+        # Estimate trades per year from actual data span
+        try:
+            first_entry = pd.Timestamp(trades[0].entry_time)
+            last_entry = pd.Timestamp(trades[-1].entry_time)
+            span_days = max((last_entry - first_entry).total_seconds() / 86400, 1)
+            trades_per_year = len(returns) / span_days * 252
+        except Exception:
+            trades_per_year = 252  # fallback: ~1 trade/day
+
+        sharpe = (mean_ret - risk_free_rate) / std_ret * math.sqrt(trades_per_year)
         return float(sharpe)
 
     @staticmethod
@@ -1155,8 +1165,16 @@ class Backtester:
         if downside_std == 0:
             return 0.0
 
-        n = len(returns)
-        sortino = (mean_ret - risk_free_rate) / downside_std * math.sqrt(n)
+        # Same time-based annualization as Sharpe
+        try:
+            first_entry = pd.Timestamp(trades[0].entry_time)
+            last_entry = pd.Timestamp(trades[-1].entry_time)
+            span_days = max((last_entry - first_entry).total_seconds() / 86400, 1)
+            trades_per_year = len(returns) / span_days * 252
+        except Exception:
+            trades_per_year = 252
+
+        sortino = (mean_ret - risk_free_rate) / downside_std * math.sqrt(trades_per_year)
         return float(sortino)
 
     @staticmethod

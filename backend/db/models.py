@@ -164,6 +164,56 @@ class TradeDatabase:
             await self._db.commit()
             logger.info(f"Migration M1: fixed {count} trades with strategy='DETECTED'")
 
+        # M2: Expand status CHECK constraint to include closed_news, closed_tp_max, closed_emergency_exit.
+        # SQLite doesn't allow ALTER CHECK, so recreate the table if constraint is outdated.
+        # Detect by checking if 'closed_news' is in the table schema.
+        cursor = await self._db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='trades'"
+        )
+        row = await cursor.fetchone()
+        table_sql = row[0] if row else ""
+        if "closed_news" not in table_sql:
+            logger.info("Migration M2: expanding trades.status CHECK constraint...")
+            # Fix stuck trades first (have exit_price but status='open')
+            cursor = await self._db.execute(
+                "SELECT id, pnl FROM trades WHERE status = 'open' AND exit_price IS NOT NULL AND exit_price > 0"
+            )
+            stuck = await cursor.fetchall()
+            for trade_id, pnl in stuck:
+                new_status = "closed_tp" if (pnl and pnl > 0) else "closed_sl" if (pnl and pnl < 0) else "closed_manual"
+                await self._db.execute("UPDATE trades SET status = ? WHERE id = ?", (new_status, trade_id))
+                logger.info(f"  M2: fixed stuck trade {trade_id} -> {new_status}")
+
+            valid = (
+                "'open','closed_tp','closed_sl','closed_manual','closed_be',"
+                "'closed_friday_sl','closed_friday_tp','closed_friday_sl+tp',"
+                "'closed_funded_overnight','closed_news','closed_tp_max','closed_emergency_exit'"
+            )
+            await self._db.execute(f"""
+                CREATE TABLE IF NOT EXISTS trades_new (
+                    id TEXT PRIMARY KEY, instrument TEXT NOT NULL, strategy TEXT,
+                    strategy_variant TEXT, direction TEXT NOT NULL CHECK(direction IN ('BUY','SELL')),
+                    units REAL NOT NULL, entry_price REAL NOT NULL, exit_price REAL,
+                    stop_loss REAL NOT NULL, take_profit REAL NOT NULL, pnl REAL, pnl_pips REAL,
+                    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ({valid})),
+                    mode TEXT NOT NULL DEFAULT 'AUTO' CHECK(mode IN ('AUTO','MANUAL')),
+                    confidence REAL, risk_reward_ratio REAL, reasoning TEXT,
+                    opened_at TEXT NOT NULL, closed_at TEXT, notes TEXT, ai_analysis TEXT
+                )
+            """)
+            await self._db.execute("""
+                INSERT INTO trades_new SELECT id, instrument, strategy, strategy_variant,
+                    direction, units, entry_price, exit_price, stop_loss, take_profit,
+                    pnl, pnl_pips, status, mode, confidence, risk_reward_ratio,
+                    reasoning, opened_at, closed_at, notes, ai_analysis FROM trades
+            """)
+            await self._db.execute("DROP TABLE trades")
+            await self._db.execute("ALTER TABLE trades_new RENAME TO trades")
+            await self._db.commit()
+            cursor = await self._db.execute("SELECT COUNT(*) FROM trades")
+            total = (await cursor.fetchone())[0]
+            logger.info(f"Migration M2: complete. {total} trades in updated table. {len(stuck)} stuck trades fixed.")
+
     async def close(self):
         """Close the database connection."""
         if self._db:

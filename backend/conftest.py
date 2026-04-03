@@ -14,6 +14,7 @@ collect_ignore = [
     "test_round4_comprehensive.py",
     "test_round10_ultimate.py",
     # Live integration tests — require real broker credentials and network access
+    "test_broker_connection.py",
     "test_live_broker.py",
     "test_live_comprehensive.py",
     "test_live_e2e_simulation.py",

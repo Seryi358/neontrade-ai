@@ -1038,7 +1038,8 @@ class Backtester:
             start = pd.Timestamp(config.start_date)
             end = pd.Timestamp(config.end_date)
             duration = (end - start).days
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to parse backtest date range ({config.start_date} - {config.end_date}): {e}. Duration set to 0.")
             duration = 0
 
         # ── Warnings (mentorship validation) ────────────────────────────

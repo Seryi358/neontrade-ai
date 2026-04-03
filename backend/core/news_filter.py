@@ -353,7 +353,7 @@ class NewsFilter:
                 logger.info(f"Loaded {len(events)} news events from FairEconomy for today")
                 return
         except Exception as e:
-            logger.debug(f"FairEconomy calendar fetch failed: {e}")
+            logger.warning(f"FairEconomy calendar fetch failed: {e}")
 
         # 2) SECONDARY: Trading Economics
         try:
@@ -363,7 +363,7 @@ class NewsFilter:
                 logger.info(f"Loaded {len(events)} news events from Trading Economics for today")
                 return
         except Exception as e:
-            logger.debug(f"Trading Economics calendar fetch failed: {e}")
+            logger.warning(f"Trading Economics calendar fetch failed: {e}")
 
         # 3) FINAL FALLBACK: known recurring high-impact schedule
         self._cached_events = self._generate_known_events(now)
@@ -446,7 +446,7 @@ class NewsFilter:
                     ))
 
             except Exception as e:
-                logger.debug(f"FairEconomy fetch error for {url}: {e}")
+                logger.warning(f"FairEconomy fetch error for {url}: {e}")
                 continue
 
         return events

@@ -595,7 +595,7 @@ class TradingEngine:
                     try:
                         await self._ws_broadcast("engine_error", {"error": str(e)})
                     except Exception as ws_err:
-                        logger.debug(f"WS broadcast of engine error also failed: {ws_err}")
+                        logger.warning(f"WS broadcast of engine error also failed: {ws_err}")
 
             await asyncio.sleep(self._scan_interval)
 
@@ -820,7 +820,7 @@ class TradingEngine:
             )
             self._last_equity_snapshot = now
         except Exception as e:
-            logger.debug(f"Equity snapshot failed (non-critical): {e}")
+            logger.warning(f"Equity snapshot failed (non-critical): {e}")
 
     # ── Market Hours ─────────────────────────────────────────────
 
@@ -1363,7 +1363,7 @@ class TradingEngine:
                                 result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
                             )
                         except Exception as e:
-                            logger.debug(f"Screenshot capture failed for {tid}: {e}")
+                            logger.warning(f"Screenshot capture failed for {tid}: {e}")
 
                     # Send close alert
                     if self.alert_manager:
@@ -1997,6 +1997,19 @@ class TradingEngine:
                 if ai_rec != "TAKE":
                     logger.info(f"AI says {ai_rec} for {signal.instrument} (score={ai_score}) — blocked (only TAKE proceeds)")
                     self._daily_setups_skipped_ai += 1
+                    # Notify user so they know a setup was found but rejected
+                    if self.alert_manager:
+                        try:
+                            await self.alert_manager.send_setup_rejected(
+                                instrument=signal.instrument,
+                                direction=signal.direction,
+                                strategy=signal.strategy_variant or '',
+                                ai_score=ai_score,
+                                ai_recommendation=ai_rec,
+                                ai_reasoning=ai_reason,
+                            )
+                        except Exception as ae:
+                            logger.warning(f"AI rejection alert failed: {ae}")
                     return None
                 # Store AI opinion for downstream use (email, UI)
                 signal._ai_score = ai_score
@@ -2427,7 +2440,7 @@ class TradingEngine:
                             ema_values=ema_vals,
                         )
                     except Exception as ss_err:
-                        logger.debug(f"Screenshot capture failed (non-critical): {ss_err}")
+                        logger.warning(f"Screenshot capture failed (non-critical): {ss_err}")
 
                 # TradingLab: Track reentry count
                 if setup.instrument in self._reentry_candidates:

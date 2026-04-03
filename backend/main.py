@@ -172,7 +172,7 @@ async def _status_broadcast_loop():
                 status = engine.get_status()
                 await ws_manager.broadcast("engine_status", status)
         except Exception as e:
-            logger.debug(f"Status broadcast error: {e}")
+            logger.warning(f"Status broadcast error: {e}")
         await asyncio.sleep(3)
 
 
@@ -199,7 +199,7 @@ async def _periodic_cleanup():
                 _last_db_cleanup_date = today
                 logger.info("DB retention cleanup completed (90-day policy)")
         except Exception as e:
-            logger.debug(f"DB cleanup error: {e}")
+            logger.warning(f"DB cleanup error: {e}")
 
 
 # ── FastAPI App ──────────────────────────────────────────────────

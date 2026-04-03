@@ -255,7 +255,7 @@ class MarketAnalyzer:
                 for p in detected
             ]
         except Exception as e:
-            logger.debug(f"Chart pattern detection failed for {instrument}: {e}")
+            logger.warning(f"Chart pattern detection failed for {instrument}: {e}")
 
         # Step 8: MACD (H1, M15 + Daily from TradingLab)
         # M5 MACD removed: mentorship says "en cinco minutos no utilizo MACD ni

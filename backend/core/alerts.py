@@ -329,6 +329,40 @@ class AlertManager:
         }
         await self.send_alert("setup_pending", title, body, data)
 
+    async def send_setup_rejected(
+        self,
+        instrument: str,
+        direction: str,
+        strategy: str = "",
+        ai_score: int = 0,
+        ai_recommendation: str = "",
+        ai_reasoning: str = "",
+    ):
+        """Notify user that a setup was found but rejected by AI validation."""
+        if not self._config.notify_setup_pending:
+            return
+
+        dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
+        title = f"SETUP REJECTED BY AI // {instrument}"
+        body = (
+            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
+            f'{instrument}</span>\n'
+            f'<span style="color:#a1a9b1;">{dir_icon} {direction.upper()}</span> '
+            f'<span style="color:#a1a9b1;">// {strategy}</span>\n\n'
+            f'<span style="color:#fb3048;font-weight:600;">AI: {ai_recommendation}</span> '
+            f'<span style="color:#a1a9b1;">Score:</span> '
+            f'<span style="color:#fdf500;font-weight:600;">{ai_score}/100</span>\n'
+            f'<span style="color:#a1a9b1;">{ai_reasoning}</span>'
+        )
+        data = {
+            "instrument": instrument,
+            "direction": direction,
+            "strategy": strategy,
+            "ai_score": ai_score,
+            "ai_recommendation": ai_recommendation,
+        }
+        await self.send_alert("setup_rejected", title, body, data)
+
     async def send_trade_closed(
         self,
         instrument: str,
@@ -521,7 +555,7 @@ class AlertManager:
             raise RuntimeError(
                 f"Telegram API returned {resp.status_code}: {resp.text}"
             )
-        logger.warning("Telegram alert sent: {}", title)
+        logger.info("Telegram alert sent: {}", title)
 
     # ── Discord ──────────────────────────────────────────────────
 
@@ -561,7 +595,7 @@ class AlertManager:
             raise RuntimeError(
                 f"Discord webhook returned {resp.status_code}: {resp.text}"
             )
-        logger.warning("Discord alert sent: {}", title)
+        logger.info("Discord alert sent: {}", title)
 
     @staticmethod
     def _discord_colour_for_type(alert_type: str) -> int:
@@ -595,7 +629,7 @@ class AlertManager:
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._smtp_send, msg)
-        logger.warning("Email alert sent: {}", plain_title)
+        logger.info("Email alert sent: {}", plain_title)
 
     def _smtp_send(self, msg: MIMEMultipart):
         """Blocking SMTP send – intended to be called from run_in_executor."""
@@ -643,7 +677,7 @@ class AlertManager:
             raise RuntimeError(
                 f"Gmail API returned {resp.status_code}: {resp.text}"
             )
-        logger.warning("Gmail alert sent: {}", plain_title)
+        logger.info("Gmail alert sent: {}", plain_title)
 
     async def _get_gmail_access_token(self) -> Optional[str]:
         """Return a cached access token, refreshing only when expired."""
@@ -664,7 +698,7 @@ class AlertManager:
         if resp.status_code == 200:
             self._gmail_access_token = resp.json().get("access_token")
             self._gmail_token_expires_at = time.time() + 3500  # cache for ~58 min
-            logger.debug("Gmail access token refreshed, expires in 3500s")
+            logger.info("Gmail access token refreshed, expires in 3500s")
             return self._gmail_access_token
 
         logger.error("Gmail token refresh failed: {} {}", resp.status_code, resp.text)

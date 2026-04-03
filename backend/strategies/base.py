@@ -4077,12 +4077,14 @@ class GreenStrategy(BaseStrategy):
 
         # GREEN entry is diagonal-ONLY per the mentorship: "copiar la diagonal
         # de 1H a 15M y ejecutar en rompimiento+cierre+confirmacion de ese nivel"
-        # NO EMA fallback — if no diagonal exists, no trade.
+        # NO EMA fallback — if no diagonal breakout, no trade.
+        # TradingLab: "si no hay ruptura, fuera. No hay trade." — MANDATORY
         if not diagonal_breakout_detected:
             failed.append(
-                "Paso 5: Sin rompimiento de diagonal en M15/M5 - GREEN requiere "
-                "diagonal (NO fallback a EMAs per mentorship)"
+                "Paso 5 [OBLIGATORIO]: Sin rompimiento de diagonal en M15/M5 - GREEN requiere "
+                "diagonal breakout (NO fallback a EMAs per mentorship)"
             )
+            return None
 
         # --- Paso 6: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)

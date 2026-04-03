@@ -205,7 +205,7 @@ class AlertManager:
             ))
 
         if not tasks:
-            logger.debug("No alert channels enabled – skipping '{}'", alert_type)
+            logger.warning("No alert channels enabled – skipping '{}'", alert_type)
             return
 
         # Await all but swallow individual failures
@@ -521,7 +521,7 @@ class AlertManager:
             raise RuntimeError(
                 f"Telegram API returned {resp.status_code}: {resp.text}"
             )
-        logger.debug("Telegram alert sent: {}", title)
+        logger.warning("Telegram alert sent: {}", title)
 
     # ── Discord ──────────────────────────────────────────────────
 
@@ -561,7 +561,7 @@ class AlertManager:
             raise RuntimeError(
                 f"Discord webhook returned {resp.status_code}: {resp.text}"
             )
-        logger.debug("Discord alert sent: {}", title)
+        logger.warning("Discord alert sent: {}", title)
 
     @staticmethod
     def _discord_colour_for_type(alert_type: str) -> int:
@@ -595,7 +595,7 @@ class AlertManager:
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._smtp_send, msg)
-        logger.debug("Email alert sent: {}", plain_title)
+        logger.warning("Email alert sent: {}", plain_title)
 
     def _smtp_send(self, msg: MIMEMultipart):
         """Blocking SMTP send – intended to be called from run_in_executor."""
@@ -643,7 +643,7 @@ class AlertManager:
             raise RuntimeError(
                 f"Gmail API returned {resp.status_code}: {resp.text}"
             )
-        logger.debug("Gmail alert sent: {}", plain_title)
+        logger.warning("Gmail alert sent: {}", plain_title)
 
     async def _get_gmail_access_token(self) -> Optional[str]:
         """Return a cached access token, refreshing only when expired."""

@@ -2447,7 +2447,7 @@ class TradingEngine:
                             strategy=getattr(setup, '_strategy_name', 'DETECTED'),
                         )
                     except Exception as ae:
-                        logger.debug(f"Alert send failed (non-critical): {ae}")
+                        logger.warning(f"Alert send failed (non-critical): {ae}")
 
         except Exception as e:
             logger.error(f"Failed to execute trade: {e}")

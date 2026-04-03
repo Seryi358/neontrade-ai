@@ -1139,11 +1139,16 @@ class TradingEngine:
         else:
             self._consecutive_losses_today = 0
 
-        # 4. Funded account PnL tracking
+        # 4. Record trade result for delta/reentry tracking
+        balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+        pnl_pct = pnl_dollars / balance if balance > 0 else 0.0
+        self.risk_manager.record_trade_result(trade_id, instrument, pnl_pct)
+
+        # 5. Funded account PnL tracking
         if settings.funded_account_mode:
             self.risk_manager.record_funded_pnl(pnl_dollars)
 
-        # 5. WebSocket broadcast
+        # 6. WebSocket broadcast
         if self._ws_broadcast:
             try:
                 await self._ws_broadcast("trade_closed", {
@@ -1155,7 +1160,7 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"WS broadcast trade_closed failed: {e}")
 
-        # 6. Screenshot on trade close
+        # 7. Screenshot on trade close
         if self.screenshot_generator:
             try:
                 pnl_pct = round((exit_price - entry_price if direction == "BUY" else entry_price - exit_price) / entry_price * 100, 2) if entry_price else 0
@@ -1988,14 +1993,10 @@ class TradingEngine:
                 # AI TAKE/SKIP is binary and too strict (never says TAKE in practice).
                 # Score-based filtering is more practical: 65+ are decent setups,
                 # < 65 have real issues (wrong Fibonacci zone, no convergence, etc.)
-                if ai_score < 65:
-                    logger.info(f"AI rejected setup for {signal.instrument} (score={ai_score} < 65)")
+                if ai_rec != "TAKE":
+                    logger.info(f"AI says {ai_rec} for {signal.instrument} (score={ai_score}) — blocked (only TAKE proceeds)")
                     self._daily_setups_skipped_ai += 1
                     return None
-                if ai_rec == "SKIP" and ai_score >= 65:
-                    logger.info(
-                        f"AI says SKIP but score={ai_score} >= 65 — proceeding (quality threshold met)"
-                    )
                 # Store AI opinion for downstream use (email, UI)
                 signal._ai_score = ai_score
                 signal._ai_recommendation = ai_rec

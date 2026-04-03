@@ -2178,8 +2178,9 @@ async def get_crypto_cycle():
         # Get latest scan results for BMSB/Pi Cycle data
         bmsb_data = None
         pi_cycle_data = None
+        from strategies.base import _is_crypto_instrument
         for inst, result in engine.last_scan_results.items():
-            if "BTC" in inst:
+            if _is_crypto_instrument(inst):
                 bmsb_data = getattr(result, 'bmsb', None)
                 pi_cycle_data = getattr(result, 'pi_cycle', None)
                 break
@@ -2244,8 +2245,9 @@ async def get_crypto_indicators():
     }
 
     # Search scan results for BTC data
+    from strategies.base import _is_crypto_instrument
     for inst, result in engine.last_scan_results.items():
-        if "BTC" in inst:
+        if _is_crypto_instrument(inst):
             indicators["bmsb"] = getattr(result, 'bmsb', None)
             indicators["pi_cycle"] = getattr(result, 'pi_cycle', None)
             indicators["ema8_weekly"] = getattr(result, 'ema_w8', None)

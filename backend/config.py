@@ -741,6 +741,27 @@ FUNDED_ACCOUNT_PRESETS = {
             "funded_profit_target_phase2": 0.0,
         },
     },
+    "5rf_sprint": {
+        "name": "5RF Sprint (1-Phase)",
+        "description": "5RF Sprint evaluation: tighter DD (4%/6%), single phase, 10% profit target",
+        "settings": {
+            "funded_evaluation_type": "1phase",
+            "funded_max_daily_dd": 0.04,
+            "funded_max_total_dd": 0.06,
+            "funded_profit_target_phase1": 0.10,
+        },
+    },
+    "5rf_dual": {
+        "name": "5RF Dual (2-Phase)",
+        "description": "5RF Dual evaluation: Phase 1=8%, Phase 2=5%, DD 5%/10%",
+        "settings": {
+            "funded_evaluation_type": "2phase",
+            "funded_max_daily_dd": 0.05,
+            "funded_max_total_dd": 0.10,
+            "funded_profit_target_phase1": 0.08,
+            "funded_profit_target_phase2": 0.05,
+        },
+    },
     "bitfunded": {
         "name": "Bitfunded (Crypto)",
         "description": "Bitfunded crypto prop firm: Stage 1=8%, Stage 2=5%, DD 5%/10%→8%, 80% profit share, max 5x leverage",

@@ -24,8 +24,8 @@ class CryptoMarketCycle:
     halving_phase: str = "unknown"  # pre_halving, post_halving, expansion, distribution
     halving_phase_description: str = ""  # Human-readable phase description
     halving_sentiment: str = "neutral"  # very_bullish, bullish, bearish, neutral
-    btc_rsi_14_daily: Optional[float] = None  # RSI 14 on BTC daily (primary — mentorship: "RSI 14 días")
-    btc_rsi_14: Optional[float] = None  # RSI 14 on BTC weekly (secondary — cycle-level supplementary check)
+    btc_rsi_14_daily: Optional[float] = None  # RSI 14 on BTC daily (secondary — short-term momentum)
+    btc_rsi_14: Optional[float] = None  # RSI 14 on BTC weekly (primary — mentorship: "dos semanas o 14 días" for cycle analysis)
     ema8_weekly_broken: bool = False  # True if BTC weekly close < EMA 8
     bmsb_status: Optional[str] = None  # "bullish", "bearish", or None
     bmsb_consecutive_bearish_closes: int = 0  # Weekly closes below BMSB (need 2+ for confirmed bearish)
@@ -343,10 +343,11 @@ class CryptoCycleAnalyzer:
     async def _analyze_rsi(self, cycle: CryptoMarketCycle):
         """RSI 14 on BTC for cycle top/bottom detection.
 
-        From the mentorship (Alex): "lo que me gusta mas es para 14 semanas,
-        perdon 14 semanas no, dos semanas o 14 dias". The mentorship says
-        "RSI 14 días" — RSI 14 on the DAILY chart is the primary signal.
-        Weekly RSI 14 is kept as a secondary/supplementary cycle-level check.
+        From the mentorship (Alex): "lo que me gusta más es para 14 semanas,
+        poner, perdón 14 semanas no, dos semanas o 14 días". Alex explicitly
+        specifies the 2-WEEK (14-day) chart timeframe for cycle analysis.
+        Weekly RSI 14 is the best available proxy (most brokers don't offer 2W
+        candles). Daily RSI 14 is kept as a secondary short-term supplement.
 
         Diagonal analysis note: RSI on the weekly timeframe can also be used to
         draw diagonal trendlines on the RSI itself. A break of a rising RSI
@@ -356,26 +357,30 @@ class CryptoCycleAnalyzer:
         if not self.broker:
             return
         try:
-            # PRIMARY: Daily RSI 14 (mentorship: "RSI 14 días")
+            # PRIMARY: Weekly RSI 14 (mentorship: "dos semanas o 14 días" — cycle-level)
+            # Weekly approximates 2W; most brokers don't provide 2W candles directly.
+            candles = await self.broker.get_candles("BTC_USD", granularity="W", count=30)
+            if candles and len(candles) >= 15:
+                closes = [c.close for c in candles]
+                weekly_rsi = self._compute_rsi_14(closes)
+                if weekly_rsi is not None:
+                    cycle.btc_rsi_14 = weekly_rsi
+                    logger.info(f"BTC Weekly RSI 14 (primary — cycle): {weekly_rsi:.1f}")
+
+            # SECONDARY: Daily RSI 14 (short-term momentum supplement)
             daily_candles = await self.broker.get_candles("BTC_USD", granularity="D", count=30)
             if daily_candles and len(daily_candles) >= 15:
                 daily_closes = [c.close for c in daily_candles]
                 daily_rsi = self._compute_rsi_14(daily_closes)
                 if daily_rsi is not None:
                     cycle.btc_rsi_14_daily = daily_rsi
-                    logger.info(f"BTC Daily RSI 14 (primary): {daily_rsi:.1f}")
 
-            # SECONDARY: Weekly RSI 14 (supplementary cycle-level check)
-            candles = await self.broker.get_candles("BTC_USD", granularity="W", count=30)
             if not candles or len(candles) < 15:
                 return
             closes = [c.close for c in candles]
-            weekly_rsi = self._compute_rsi_14(closes)
-            if weekly_rsi is not None:
-                cycle.btc_rsi_14 = weekly_rsi
 
-            # Use daily RSI as primary for market phase decisions, fall back to weekly
-            rsi = cycle.btc_rsi_14_daily if cycle.btc_rsi_14_daily is not None else cycle.btc_rsi_14
+            # Use weekly RSI as primary for market phase decisions, fall back to daily
+            rsi = cycle.btc_rsi_14 if cycle.btc_rsi_14 is not None else cycle.btc_rsi_14_daily
 
             # RSI Diagonal Trendline Analysis (Esp. Criptomonedas Section 8)
             # Alex: "ha sido capaz de enlazar de forma muy clara diferentes

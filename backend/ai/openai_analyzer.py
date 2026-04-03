@@ -599,7 +599,7 @@ GREEN is the ONLY valid strategy for crypto:
   5. Draw diagonal/trendline on the pattern
   6. RCC execution: Ruptura (break), Cierre (close beyond), Confirmacion (next candle confirms)
   7. Set SL below pattern low / TP at measured move or Fibonacci extension
-- NOTE: In the app implementation, GREEN uses a FIXED layout (Weekly->Daily->1H->15M) regardless of trading style, per the mentorship principle that Green does not differentiate day/swing.
+- NOTE: GREEN uses DIFFERENT timeframe layouts per trading style (mentorship): Swing: W->D->H1->M15, Day: H4->H1->M15->M2, Scalping: M15->M5->M1->30s. For crypto, the same layouts apply per CRYPTO_TIMEFRAMES in the strategy code.
 
 BMSB - Bull Market Support Band (Crypto Module 8):
 - SMA 20 + EMA 21 on the WEEKLY chart

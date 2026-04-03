@@ -92,7 +92,7 @@ check("funded_no_overnight default False", settings.funded_no_overnight is False
 print("\n[7.10] EMA settings")
 check("ema_1h default 50", settings.ema_1h == 50)
 check("ema_4h default 50", settings.ema_4h == 50)
-check("ema_daily default 20", settings.ema_daily == 20)
+check("ema_daily default 50", settings.ema_daily == 50)
 check("sma_daily default 200", settings.sma_daily == 200)
 
 # --- Discretion ---

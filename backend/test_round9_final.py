@@ -787,7 +787,7 @@ def test_block_7_config():
     check("ema_slow 5", settings.ema_slow == 5)
     check("ema_1h 50", settings.ema_1h == 50)
     check("ema_4h 50", settings.ema_4h == 50)
-    check("ema_daily 20", settings.ema_daily == 20)
+    check("ema_daily 50", settings.ema_daily == 50)
     check("sma_daily 200", settings.sma_daily == 200)
 
     # Trading hours

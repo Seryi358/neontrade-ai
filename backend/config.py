@@ -226,7 +226,7 @@ class Settings(BaseSettings):
     # Key structural EMAs (used by all strategies)
     ema_1h: int = 50     # EMA 50 on 1H — BLUE pullback zone
     ema_4h: int = 50     # EMA 50 on 4H — RED pullback zone, BLUE TP
-    ema_daily: int = 20  # EMA 20 on Daily — trend filter
+    ema_daily: int = 50  # EMA 50 on Daily — trend filter (TradingLab: EMA 50 on ALL timeframes)
     sma_daily: int = 200 # SMA 200 on Daily — long-term trend filter
 
     # Scalping module (Workshop de Scalping)

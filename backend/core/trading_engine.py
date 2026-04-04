@@ -320,7 +320,7 @@ class TradingEngine:
         # Trim old notifications
         if len(self._notifications) > self._max_notifications:
             self._notifications = self._notifications[-self._max_notifications:]
-        logger.info(f"Notification: [{notif_type}] {title} — {body}")
+        logger.warning(f"Notification: [{notif_type}] {title} — {body}")
 
     def get_unread_notifications(self) -> List[Dict]:
         """Get and mark as read all unread notifications."""
@@ -2286,15 +2286,15 @@ class TradingEngine:
 
         self.pending_setups.append(pending)
 
-        logger.info("=" * 50)
-        logger.info(f"SETUP QUEUED (MANUAL MODE): {setup.direction} {setup.instrument}")
-        logger.info(f"  Entry: {setup.entry_price:.5f}")
-        logger.info(f"  SL: {setup.stop_loss:.5f}")
-        logger.info(f"  TP: {setup.take_profit_1:.5f}")
-        logger.info(f"  R:R: {setup.reward_risk_ratio:.2f}")
-        logger.info(f"  Expires: {expires_at.isoformat()}")
-        logger.info(f"  ID: {pending.id}")
-        logger.info("=" * 50)
+        logger.warning("=" * 50)
+        logger.warning(f"SETUP QUEUED (MANUAL MODE): {setup.direction} {setup.instrument}")
+        logger.warning(f"  Entry: {setup.entry_price:.5f}")
+        logger.warning(f"  SL: {setup.stop_loss:.5f}")
+        logger.warning(f"  TP: {setup.take_profit_1:.5f}")
+        logger.warning(f"  R:R: {setup.reward_risk_ratio:.2f}")
+        logger.warning(f"  Expires: {expires_at.isoformat()}")
+        logger.warning(f"  ID: {pending.id}")
+        logger.warning("=" * 50)
 
         # Push native notification
         dir_text = 'COMPRA' if setup.direction == 'BUY' else 'VENTA'

@@ -3627,7 +3627,7 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append(
                 "Paso 5c2: Sin divergencia MACD en H1 (tipicamente presente pero no obligatorio "
-                "per los 7 pasos numerados de la mentoria)"
+                "per los 6 pasos numerados de la mentoria)"
             )
 
         # Consolidacion (patron correctivo formandose)

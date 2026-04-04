@@ -42,7 +42,7 @@ def ok(test_name: str, condition: bool, detail: str = ""):
 # ===========================================================================
 print("\n=== SECTION 1: CONFIG ===")
 
-from config import Settings, settings, get_oanda_url, get_oanda_stream_url
+from config import Settings, settings
 
 s = Settings()
 
@@ -137,9 +137,7 @@ ok("cfg_allocation_investment_pct", s.allocation_investment_pct == 0.20)
 ok("cfg_indices_correlation_groups", len(s.indices_correlation_groups) >= 2)
 ok("cfg_crypto_correlation_groups", len(s.crypto_correlation_groups) >= 2)
 
-# OANDA URLs
-ok("cfg_oanda_url_practice", "fxpractice" in get_oanda_url())
-ok("cfg_oanda_stream_practice", "fxpractice" in get_oanda_stream_url())
+# OANDA URLs (removed — OANDA out of scope per PROJECT.md)
 
 # Allocation: forex+other+crypto=1.0 within trading, trading+investment+crypto_longterm=1.0 of total
 trading_sum = s.allocation_forex_pct + s.allocation_other_pct + s.allocation_crypto_pct

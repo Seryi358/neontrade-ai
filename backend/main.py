@@ -64,10 +64,16 @@ class ConnectionManager:
     def is_full(self) -> bool:
         return len(self.active_connections) >= MAX_WS_CONNECTIONS
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> bool:
+        """Accept and register a WebSocket. Returns False if limit reached."""
+        if len(self.active_connections) >= MAX_WS_CONNECTIONS:
+            await websocket.close(code=4003, reason="Connection limit reached")
+            logger.warning(f"WS connection rejected: limit of {MAX_WS_CONNECTIONS} reached")
+            return False
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info(f"WS client connected. Total: {len(self.active_connections)}")
+        return True
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
@@ -81,7 +87,8 @@ class ConnectionManager:
         for connection in list(self.active_connections):
             try:
                 await connection.send_json(message)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"WS broadcast failed for a client ({e!r}), removing dead connection")
                 disconnected.append(connection)
         for conn in disconnected:
             self.disconnect(conn)
@@ -253,13 +260,9 @@ async def websocket_endpoint(websocket: WebSocket):
     - {"action": "set_mode", "mode": "AUTO"|"MANUAL"}
     - {"action": "subscribe", "instruments": ["EUR_USD", ...]}
     """
-    # Reject if connection limit reached
-    if ws_manager.is_full:
-        await websocket.close(code=4003, reason="Connection limit reached")
-        logger.warning(f"WS connection rejected: limit of {MAX_WS_CONNECTIONS} reached")
+    # Atomic check-and-accept to prevent TOCTOU race on connection limit
+    if not await ws_manager.connect(websocket):
         return
-
-    await ws_manager.connect(websocket)
 
     # BUG-08 fix: authenticate via first message instead of URL query param
     # (query params leak into logs, browser history, and Referer headers)

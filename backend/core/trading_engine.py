@@ -1854,6 +1854,7 @@ class TradingEngine:
                     # (skip _detect_setup which runs day-trading strategies)
                     style = TradingStyle.SCALPING
                     risk_percent = self.risk_manager.get_risk_for_style(style, signal.instrument)
+                    risk_percent = self.risk_manager._adjust_for_correlation(signal.instrument, risk_percent)
                     units = await self.risk_manager.calculate_position_size(
                         signal.instrument, style, signal.entry_price, signal.stop_loss
                     )
@@ -2072,6 +2073,7 @@ class TradingEngine:
             units = -abs(units)
 
         risk_percent = self.risk_manager.get_risk_for_style(style, signal.instrument)
+        risk_percent = self.risk_manager._adjust_for_correlation(signal.instrument, risk_percent)
         sl_distance = abs(signal.entry_price - signal.stop_loss)
         rr = abs(signal.take_profit_1 - signal.entry_price) / max(sl_distance, 0.00001)
 
@@ -2533,6 +2535,7 @@ class TradingEngine:
         }
         _style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
         _risk = self.risk_manager.get_risk_for_style(_style, setup.instrument)
+        _risk = self.risk_manager._adjust_for_correlation(setup.instrument, _risk)
 
         # TE-02 fix: recalculate units at execution time since entry price shifted
         # units = risk_amount / sl_distance — SL distance changed with new entry

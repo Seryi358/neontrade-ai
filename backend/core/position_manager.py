@@ -611,9 +611,9 @@ class PositionManager:
             if await self._update_sl(pos, new_sl):
                 pos.phase = PositionPhase.BREAK_EVEN
                 logger.info(f"{pos.trade_id}: Phase -> BREAK_EVEN")
-            # Notify risk manager for scale-in rule
-            if self.risk_manager is not None:
-                self.risk_manager.mark_position_at_be(pos.trade_id)
+                # Notify risk manager for scale-in rule
+                if self.risk_manager is not None:
+                    self.risk_manager.mark_position_at_be(pos.trade_id)
 
     async def _handle_be_phase(self, pos: ManagedPosition, current_price: float):
         """

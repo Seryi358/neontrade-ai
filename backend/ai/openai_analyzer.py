@@ -241,7 +241,7 @@ BLUE A (Doble suelo/techo):
   Step 5: Entry on 5m/2m with reversal candle pattern at the key zone
   SL: Below/above the 1H swing that created the new structure
   TP1: EMA 50 4H level
-  TP_max: Previous 4H swing high/low
+  TP_max: Fibonacci 1.272 or 1.618 extension (Blue A targets Wave 3 — Alex: "buscar la máxima extensión 1,618 o el nivel óptimo 1,272")
 
 BLUE B (Estandar):
   Step 1: Same HTF deceleration as Blue A

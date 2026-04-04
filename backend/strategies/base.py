@@ -2287,7 +2287,7 @@ class RedStrategy(BaseStrategy):
                 candidates.append(ema_4h_50 * 0.998)
             below = [s for s in supports if s < entry_price]
             if below:
-                candidates.append(max(below))
+                candidates.append(max(below) * 0.998)  # buffer — "dandole espacio"
             if not candidates:
                 return entry_price * 0.985
             return min(candidates)
@@ -2297,7 +2297,7 @@ class RedStrategy(BaseStrategy):
                 candidates.append(ema_4h_50 * 1.002)
             above = [r for r in resistances if r > entry_price]
             if above:
-                candidates.append(min(above))
+                candidates.append(min(above) * 1.002)  # buffer — "dandole espacio"
             if not candidates:
                 return entry_price * 1.015
             return max(candidates)
@@ -2829,20 +2829,35 @@ class PinkStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL debajo del minimo anterior (proteger el patron). Previous swing extreme only, NO Fibonacci."""
+        """PINK SL: below the PREVIOUS swing extreme, NOT the nearest/tightest.
+
+        TradingLab PINK Day (Alex): "stop loss por encima del máximo anterior,
+        no este máximo último y tampoco ceñido, sino el máximo anterior y
+        dándole espacio al máximo anterior."
+        Translation: NOT the most recent swing extreme but the one BEFORE it,
+        with buffer. The corrective pattern creates a recent extreme that is
+        too close/tight — using it gets you stopped out by pattern volatility.
+        """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        buffer_pct = 0.002  # 0.2% buffer — "dandole espacio"
 
         if direction == "BUY":
-            below = [s for s in supports if s < entry_price]
-            if below:
-                return max(below)  # Nearest support below entry (tightest SL)
-            return entry_price * 0.99
+            below = sorted([s for s in supports if s < entry_price], reverse=True)
+            if len(below) >= 2:
+                # Skip nearest (pattern extreme), use second nearest per mentorship
+                return below[1] * (1 - buffer_pct)
+            elif len(below) == 1:
+                return below[0] * (1 - buffer_pct)
+            return entry_price * 0.985  # 1.5% fallback
         else:
-            above = [r for r in resistances if r > entry_price]
-            if above:
-                return min(above)  # Nearest resistance above entry (tightest SL)
-            return entry_price * 1.01
+            above = sorted([r for r in resistances if r > entry_price])
+            if len(above) >= 2:
+                # Skip nearest (pattern extreme), use second nearest per mentorship
+                return above[1] * (1 + buffer_pct)
+            elif len(above) == 1:
+                return above[0] * (1 + buffer_pct)
+            return entry_price * 1.015  # 1.5% fallback
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
         """
@@ -3238,19 +3253,24 @@ class WhiteStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Previous swing extreme only, NO Fibonacci."""
+        """WHITE SL: nearest swing extreme + buffer (Blue-like, NOT second-nearest like PINK).
+
+        TradingLab: WHITE is Blue-like continuation after PINK, so SL uses
+        nearest previous extreme with "dandole espacio" buffer (same as BLUE).
+        """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        buffer_pct = 0.002  # 0.2% buffer — "dandole espacio"
 
         if direction == "BUY":
             below = [s for s in supports if s < entry_price]
             if below:
-                return max(below)  # Nearest support below entry (tightest SL)
+                return max(below) * (1 - buffer_pct)
             return entry_price * 0.99
         else:
             above = [r for r in resistances if r > entry_price]
             if above:
-                return min(above)  # Nearest resistance above entry (tightest SL)
+                return min(above) * (1 + buffer_pct)
             return entry_price * 1.01
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
@@ -3789,19 +3809,23 @@ class BlackStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """SL encima del maximo anterior (SELL) o debajo del minimo anterior (BUY). Previous swing extreme only."""
+        """BLACK SL: nearest swing extreme + buffer. Counter-trend so tighter than PINK.
+
+        TradingLab: "dandole espacio" — 0.2% buffer on all SL placements.
+        """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
+        buffer_pct = 0.002  # 0.2% buffer — "dandole espacio"
 
         if direction == "BUY":
             below = [s for s in supports if s < entry_price]
             if below:
-                return max(below)  # Nearest support below entry (tightest SL)
+                return max(below) * (1 - buffer_pct)
             return entry_price * 0.985  # 1.5% fallback (tight for counter-trend)
         else:
             above = [r for r in resistances if r > entry_price]
             if above:
-                return min(above)  # Nearest resistance above entry (tightest SL)
+                return min(above) * (1 + buffer_pct)
             return entry_price * 1.015
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:

@@ -108,10 +108,9 @@ class RiskManager:
         #   - Maximum ~3 reentries per setup/move
         self._reentry_counts: Dict[str, int] = {}  # instrument -> count of consecutive stop-outs
         self._reentry_timestamps: Dict[str, str] = {}  # instrument -> last stop-out ISO timestamp
+        self._deal_size_cache: Dict[str, tuple] = {}  # instrument -> (min_size, increment)
 
     # ── Deal Size Rules (from broker API) ────────────────────────────
-
-    _deal_size_cache: Dict[str, tuple] = {}  # instrument -> (min_size, increment)
 
     async def _get_deal_size_rules(self, instrument: str) -> tuple:
         """Get minimum deal size and size increment from broker for an instrument.
@@ -216,27 +215,29 @@ class RiskManager:
             else:  # No significant DD
                 return base_risk
 
-            # Minimum 25% of base risk
-            return max(adjusted, base_risk * 0.25)
+            # Apply configured minimum risk floor, then 25% of base as fallback
+            min_risk = settings.drawdown_min_risk if isinstance(settings.drawdown_min_risk, (int, float)) else 0.0
+            return max(adjusted, base_risk * 0.25, min_risk)
 
         if method == "fixed_levels":
             # Fixed levels from Trading Plan spreadsheet
+            min_risk = settings.drawdown_min_risk if isinstance(settings.drawdown_min_risk, (int, float)) else 0.0
             if dd >= settings.drawdown_level_3:
-                adjusted = settings.drawdown_risk_3
+                adjusted = max(settings.drawdown_risk_3, min_risk) if min_risk > 0 else settings.drawdown_risk_3
                 logger.warning(
                     f"Drawdown {dd:.2%} >= Level 3 ({settings.drawdown_level_3:.2%}). "
                     f"Risk reduced to {adjusted:.2%}"
                 )
                 return adjusted
             elif dd >= settings.drawdown_level_2:
-                adjusted = settings.drawdown_risk_2
+                adjusted = max(settings.drawdown_risk_2, min_risk) if min_risk > 0 else settings.drawdown_risk_2
                 logger.warning(
                     f"Drawdown {dd:.2%} >= Level 2 ({settings.drawdown_level_2:.2%}). "
                     f"Risk reduced to {adjusted:.2%}"
                 )
                 return adjusted
             elif dd >= settings.drawdown_level_1:
-                adjusted = settings.drawdown_risk_1
+                adjusted = max(settings.drawdown_risk_1, min_risk) if min_risk > 0 else settings.drawdown_risk_1
                 logger.info(
                     f"Drawdown {dd:.2%} >= Level 1 ({settings.drawdown_level_1:.2%}). "
                     f"Risk reduced to {adjusted:.2%}"
@@ -363,18 +364,20 @@ class RiskManager:
         """Get risk multiplier for reentries on this instrument.
         From Esp. Criptomonedas - Reentradas Efectivas:
         - 1st entry: 1.0x (full risk)
-        - 1st reentry: 0.5x (half risk)
-        - 2nd reentry: 0.25x (quarter risk)
-        - 3rd+ reentry: BLOCKED (returns 0.0)"""
+        - Subsequent: reads from settings.reentry_risk_N
+        - Beyond max_reentries_per_setup: BLOCKED (returns 0.0)"""
         count = self.get_reentry_count(instrument)
+        max_reentries = settings.max_reentries_per_setup
         if count == 0:
             return 1.0
+        elif count >= max_reentries:
+            return 0.0  # Blocked: max reentries exceeded
         elif count == 1:
-            return 0.5
+            return settings.reentry_risk_1
         elif count == 2:
-            return 0.25
+            return settings.reentry_risk_2
         else:
-            return 0.0  # Blocked: max 3 reentries exceeded
+            return settings.reentry_risk_3
 
     def get_risk_for_style(self, style: TradingStyle, instrument: str = "") -> float:
         """Get the risk percentage for a trading style, adjusted for drawdown, delta, and reentries."""

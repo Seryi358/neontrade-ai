@@ -661,7 +661,8 @@ async def get_performance_stats(days: int = Query(30, ge=1, le=365)):
     if db is None:
         return {
             "total_trades": 0, "winning_trades": 0, "losing_trades": 0,
-            "win_rate": 0, "total_pnl": 0, "avg_rr": 0,
+            "win_rate": 0, "total_pnl": 0, "avg_risk_reward": 0,
+            "best_trade": 0, "worst_trade": 0,
         }
     try:
         return await db.get_performance_summary(days=days)
@@ -1601,6 +1602,8 @@ async def get_journal_stats():
             "profit_factor": 0.0,
             "monthly_returns": {},
             "pnl_accumulated_pct": 0.0,
+            "accumulator": 1.0,
+            "dd_by_year": {},
             "message": "Trade journal not initialized - engine must be started first",
         }
     return engine.trade_journal.get_stats()

@@ -1561,4 +1561,9 @@ class ScalpingAnalyzer:
         df = pd.DataFrame(rows)
         if "time" in df.columns:
             df.set_index("time", inplace=True)
+        # Filter out zero-OHLC candles (broker returns empty data that corrupts indicators)
+        # Same check as market_analyzer._candles_to_dataframe Rule #9
+        if not df.empty:
+            valid = (df[['open', 'high', 'low', 'close']] != 0).all(axis=1)
+            df = df[valid]
         return df

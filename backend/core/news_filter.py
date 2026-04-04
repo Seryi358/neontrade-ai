@@ -184,9 +184,15 @@ class NewsFilter:
             await self._refresh_calendar(now)
             self._cache_date = today
 
-        # Resolve which window to use
+        # Resolve which window to use.
+        # If the caller passes an explicit style override, use its default window.
+        # Otherwise, use the instance's configured windows (which may be custom
+        # overrides from the constructor, not just the style defaults).
         style = trading_style or self.trading_style
-        win_before, win_after = NEWS_WINDOWS[style]
+        if trading_style is not None:
+            win_before, win_after = NEWS_WINDOWS[style]
+        else:
+            win_before, win_after = self.minutes_before, self.minutes_after
 
         # Filter by instrument currencies if provided
         currencies = WATCHED_CURRENCIES
@@ -269,7 +275,10 @@ class NewsFilter:
             self._cache_date = today
 
         style = trading_style or self.trading_style
-        win_before, _win_after = NEWS_WINDOWS[style]
+        if trading_style is not None:
+            win_before, _win_after = NEWS_WINDOWS[style]
+        else:
+            win_before, _win_after = self.minutes_before, self.minutes_after
 
         currencies = self._extract_currencies(instrument)
 

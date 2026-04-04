@@ -177,9 +177,13 @@ class _SimulatedPosition:
         self,
         trade: BacktestTrade,
         instrument: str,
+        slippage_pips: float = 0.0,
+        spread_pips: float = 0.0,
     ):
         self.trade = trade
         self.instrument = instrument
+        self.slippage_pips = slippage_pips
+        self.spread_pips = spread_pips
         self.phase = PositionPhase.INITIAL
         self.current_sl = trade.stop_loss
         self.highest_price = trade.entry_price
@@ -337,8 +341,22 @@ class _SimulatedPosition:
                 self.current_sl = new_sl
 
     def _close(self, exit_price: float, reason: str):
-        """Fill exit fields on the trade record."""
+        """Fill exit fields on the trade record.
+
+        SL hits and force-closes are market orders — apply slippage.
+        TP hits are limit orders — fill at exact limit price (no slippage).
+        """
         self.closed = True
+
+        # Apply exit slippage for market-type exits (SL hit, end-of-data)
+        if reason != "TP_HIT" and (self.slippage_pips > 0 or self.spread_pips > 0):
+            slip = _price_from_pips(self.instrument, self.slippage_pips)
+            spread = _price_from_pips(self.instrument, self.spread_pips)
+            if self.trade.direction == "BUY":
+                exit_price = exit_price - slip - spread / 2
+            else:
+                exit_price = exit_price + slip + spread / 2
+
         self.trade.exit_price = exit_price
         self.trade.exit_reason = reason
         self.trade.bars_held = self.bars_elapsed
@@ -1008,7 +1026,11 @@ class Backtester:
             confidence=signal.confidence,
         )
 
-        return _SimulatedPosition(trade, config.instrument)
+        return _SimulatedPosition(
+            trade, config.instrument,
+            slippage_pips=config.slippage_pips,
+            spread_pips=config.spread_pips,
+        )
 
     # ------------------------------------------------------------------
     # Metrics computation

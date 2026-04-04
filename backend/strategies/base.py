@@ -3442,26 +3442,28 @@ class BlackStrategy(BaseStrategy):
             failed.append("Paso 3: Sin senales de desaceleracion en diario")
 
         # --- Paso 4: Confirm-TF sobrecomprado + precio lejos de EMA 50 confirm-TF ---
+        # TradingLab: "sobrecompra clara e INNEGOCIABLE en gráfico de 4 horas"
+        # This is a HARD REQUIREMENT — not just a bonus.
         confirm_ema_key = _tf_ema("confirm", 50)
         ema_4h_50 = _ema_val(analysis, confirm_ema_key)
         price = _get_current_price_proxy(analysis)
 
         if ema_4h_50 and price:
             distance_pct = abs(price - ema_4h_50) / ema_4h_50 * 100
-            # TradingLab: "strong separation" from EMA 4H requires at least 1.5%
-            # (previously 0.5% was too permissive for what the mentorship describes)
             if distance_pct > 1.5:
                 score += 10.0
-                met.append(f"Paso 4: Precio lejos de EMA 50 4H ({distance_pct:.2f}%) - separacion fuerte")
+                met.append(f"Paso 4 [INNEGOCIABLE]: Precio lejos de EMA 50 4H ({distance_pct:.2f}%) - separacion fuerte")
             elif distance_pct > 0.8:
                 score += 5.0
-                met.append(f"Paso 4: Precio moderadamente lejos de EMA 50 4H ({distance_pct:.2f}%) - separacion parcial")
+                met.append(f"Paso 4 [INNEGOCIABLE]: Precio moderadamente lejos de EMA 50 4H ({distance_pct:.2f}%) - separacion parcial")
             else:
-                failed.append(f"Paso 4: Precio cerca de EMA 50 4H ({distance_pct:.2f}%) - no sobreextendido (necesita >1.5%)")
+                failed.append(f"Paso 4 [INNEGOCIABLE FALLIDO]: Precio cerca de EMA 50 4H ({distance_pct:.2f}%) - no sobreextendido (necesita >0.8%)")
+                return False, score, met, failed
         else:
-            failed.append("Paso 4: No se puede evaluar distancia a EMA 50 4H")
+            failed.append("Paso 4 [INNEGOCIABLE FALLIDO]: No se puede evaluar distancia a EMA 50 4H")
+            return False, score, met, failed
 
-        passed = score >= 20.0  # Minimo: Paso 1 cumplido
+        passed = score >= 25.0  # Minimo: Paso 1 + Paso 4 cumplidos
         return passed, score, met, failed
 
     def check_ltf_entry(self, analysis: AnalysisResult) -> Optional[SetupSignal]:
@@ -3538,7 +3540,7 @@ class BlackStrategy(BaseStrategy):
             for cp in chart_patterns:
                 cp_name = ""
                 if isinstance(cp, dict):
-                    cp_name = cp.get("pattern", "").lower()
+                    cp_name = cp.get("type", cp.get("pattern", "")).lower()
                 elif isinstance(cp, str):
                     cp_name = cp.lower()
                 if "channel" in cp_name:

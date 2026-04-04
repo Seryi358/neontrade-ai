@@ -171,6 +171,12 @@ class MonthlyReviewGenerator:
         # ── Main iteration over trades ────────────────────────────────────
         report.total_trades = len(trades)
 
+        # Seed best/worst from first trade so the comparison works correctly
+        # even when all trades are positive or all negative.
+        first_pnl = trades[0].get("pnl_dollars", trades[0].get("pnl", 0.0)) or 0.0
+        report.best_trade_pnl = first_pnl
+        report.worst_trade_pnl = first_pnl
+
         for trade in trades:
             pnl = trade.get("pnl_dollars", trade.get("pnl", 0.0)) or 0.0
             pnl_pct = trade.get("pnl_pct", 0.0) or 0.0

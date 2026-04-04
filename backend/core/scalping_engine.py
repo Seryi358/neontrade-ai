@@ -729,10 +729,10 @@ class ScalpingAnalyzer:
                 if len(recent_highs) >= 3:
                     # Simple linear regression on highs to detect descending trendline
                     x = np.arange(len(recent_highs))
-                    slope = np.polyfit(x, recent_highs, 1)[0] if len(x) > 1 else 0
-                    if slope < 0:  # Descending trendline exists
-                        # Project trendline to current candle
-                        projected = recent_highs[-1] + slope
+                    coeffs = np.polyfit(x, recent_highs, 1) if len(x) > 1 else [0, recent_highs[-1]]
+                    if coeffs[0] < 0:  # Descending trendline exists
+                        # Project trendline to current candle (next index after fitted data)
+                        projected = np.polyval(coeffs, len(x))
                         if closes[-1] > projected:  # Current close breaks above trendline
                             m1_diagonal_breakout = True
                             result["reasons"].append(
@@ -743,9 +743,10 @@ class ScalpingAnalyzer:
                 recent_lows = lows[-lookback:-1]
                 if len(recent_lows) >= 3:
                     x = np.arange(len(recent_lows))
-                    slope = np.polyfit(x, recent_lows, 1)[0] if len(x) > 1 else 0
-                    if slope > 0:  # Ascending trendline exists
-                        projected = recent_lows[-1] + slope
+                    coeffs = np.polyfit(x, recent_lows, 1) if len(x) > 1 else [0, recent_lows[-1]]
+                    if coeffs[0] > 0:  # Ascending trendline exists
+                        # Project trendline to current candle (next index after fitted data)
+                        projected = np.polyval(coeffs, len(x))
                         if closes[-1] < projected:  # Current close breaks below trendline
                             m1_diagonal_breakout = True
                             result["reasons"].append(

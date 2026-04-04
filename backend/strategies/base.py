@@ -1817,7 +1817,8 @@ class BlueStrategy(BaseStrategy):
         """
         BLUE TP levels — variant-specific per TradingLab mentorship:
         - BLUE_A: TP1 = confirm-TF EMA50, TP_max = Fib 1.272 or 1.618 extension
-        - BLUE_B/C: TP1 = confirm-TF EMA50 only (no Fib extensions)
+        - BLUE_B: TP1 = confirm-TF EMA50, TP_max = EMA 4H or next S/R
+        - BLUE_C: TP1 = Previous swing high/low (NOT EMA50 — entry is AT the EMA rejection)
         Swing adaptation: TP1 = EMA 50 Weekly (not 4H) per mentorship.
         """
         # Use style-adaptive confirm-timeframe EMA (4H for day, Weekly for swing, M15 for scalping)
@@ -1825,14 +1826,37 @@ class BlueStrategy(BaseStrategy):
         ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
         resistances = analysis.key_levels.get("resistances", [])
         supports = analysis.key_levels.get("supports", [])
+        swing_highs = getattr(analysis, 'swing_highs', [])
+        swing_lows = getattr(analysis, 'swing_lows', [])
 
         result: Dict[str, float] = {}
-        if ema_4h_50 and ema_4h_50 > 0:
-            # Only use EMA as TP if it's on the correct side of entry
-            if direction == "BUY" and ema_4h_50 > entry_price:
-                result["tp1"] = ema_4h_50
-            elif direction == "SELL" and ema_4h_50 < entry_price:
-                result["tp1"] = ema_4h_50
+
+        if variant == "BLUE_C":
+            # BLUE C: entry is a rejection AT the EMA 50 — using EMA as TP would be
+            # near entry. Use previous swing high/low instead (per AI prompt / mentorship).
+            if direction == "BUY":
+                valid_highs = [sh for sh in swing_highs if sh > entry_price]
+                if valid_highs:
+                    result["tp1"] = min(valid_highs)
+                else:
+                    above = [r for r in resistances if r > entry_price]
+                    if above:
+                        result["tp1"] = min(above)
+            else:
+                valid_lows = [sl for sl in swing_lows if sl < entry_price]
+                if valid_lows:
+                    result["tp1"] = max(valid_lows)
+                else:
+                    below = [s for s in supports if s < entry_price]
+                    if below:
+                        result["tp1"] = max(below)
+        else:
+            # BLUE A/B: TP1 = confirm-TF EMA 50
+            if ema_4h_50 and ema_4h_50 > 0:
+                if direction == "BUY" and ema_4h_50 > entry_price:
+                    result["tp1"] = ema_4h_50
+                elif direction == "SELL" and ema_4h_50 < entry_price:
+                    result["tp1"] = ema_4h_50
 
         if "tp1" not in result:
             # Fallback: resistencia/soporte mas cercano

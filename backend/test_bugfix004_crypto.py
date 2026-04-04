@@ -713,7 +713,7 @@ class TestRSI14Weekly:
 
     @pytest.mark.asyncio
     async def test_rsi_extreme_triggers_phase(self):
-        """RSI > 80 = distribution, RSI < 25 = accumulation."""
+        """RSI > 80 adds a bear vote in _determine_market_phase voting."""
         broker = MockBroker()
         # Very strong uptrend for high RSI
         closes = [20000 + i * 2000 for i in range(30)]
@@ -723,6 +723,10 @@ class TestRSI14Weekly:
         cycle = CryptoMarketCycle()
         await analyzer._analyze_rsi(cycle)
         if cycle.btc_rsi_14 and cycle.btc_rsi_14 > 80:
+            # RSI is stored on cycle; voting happens in _determine_market_phase.
+            # With only RSI > 80 (1 bear vote) and no other signals,
+            # bear_votes < 2.0 so phase falls to "distribution" (else branch).
+            analyzer._determine_market_phase(cycle)
             assert cycle.market_phase == "distribution"
 
     @pytest.mark.asyncio

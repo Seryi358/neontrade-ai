@@ -476,10 +476,12 @@ Extension Levels (Take Profit / Wave Targets):
 - 1.272: minor extension (conservative TP for Wave 3)
 - 1.618: golden extension (standard Wave 3 target, TP_max for most strategies)
 
-Confluence Rule: an entry level must have AT LEAST 2 of these:
+Confluence Rule for LIMIT entries: must have AT LEAST 3 of these (Alex: "necesitas más zonas, no es suficiente con Fibonacci y media móvil, necesitas una zona más por lo menos"):
 - Fibonacci retracement level (0.382, 0.5, 0.618, 0.750, 1.000)
 - EMA 50 (1H or 4H)
 - S/R level, FVG, or Order Block
+- Pivot Point level
+- Diagonal / trendline
 
 ═══════════════════════════════════════════════════════════════════
                   RISK MANAGEMENT RULES

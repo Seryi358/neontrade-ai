@@ -92,16 +92,18 @@ class TradingStyle(Enum):
 #   Scalping:    M15    -> M5    -> M1   -> 30s/M1
 # LP = second box (PRIMARY), CP = third box, CPA = fourth box
 _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
-    # LP (Long-term): Swing=Daily, Day=H1, Scalp=M15
+    # LP (Long-term): Swing=Daily, Day=H1, Scalp=M5
+    # Workshop de Scalping, Gestión: "¿Cuál sería el largo plazo? El gráfico de cinco minutos."
+    # Grid: Scalping M15->M5->M1->M1, LP = second box = M5
     (ManagementStyle.LP, TradingStyle.SWING): "EMA_D_50",
     (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_H1_50",
-    (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M15_50",
+    (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M5_50",
     # DAILY (mid-term): Daily EMA 50 only appropriate for swing.
     # For day_trading and scalping, fall back to LP-equivalent timeframes
     # since Daily EMA 50 is too wide for intraday styles.
     (ManagementStyle.DAILY, TradingStyle.SWING): "EMA_D_50",
     (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_H1_50",
-    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_M15_50",
+    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_M5_50",
     # CP (Short-term): Swing=H1, Day=M5, Scalp=M1
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
     (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",

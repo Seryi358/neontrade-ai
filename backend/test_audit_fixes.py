@@ -3,11 +3,12 @@ import pytest
 
 
 def test_position_manager_forex_lp_grid():
-    """LP Swing should be Daily (EMA_D_50), LP Day should be H1 (EMA_H1_50)."""
+    """LP Swing=Daily, LP Day=H1, LP Scalp=M5 (Workshop Scalping: 'largo plazo = M5')."""
     from core.position_manager import _EMA_TIMEFRAME_GRID, ManagementStyle, TradingStyle
     assert _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_D_50"
     assert _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.DAY_TRADING)] == "EMA_H1_50"
-    assert _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SCALPING)] == "EMA_M15_50"
+    # Workshop de Scalping, Gestión: "¿Cuál sería el largo plazo? El gráfico de cinco minutos."
+    assert _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SCALPING)] == "EMA_M5_50"
 
 
 def test_position_manager_forex_cp_grid():

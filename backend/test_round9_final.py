@@ -548,7 +548,7 @@ def test_block_4_position_manager():
     # Forex grid values (NOT crypto — crypto uses _EMA_TIMEFRAME_GRID_CRYPTO)
     check("LP+swing -> EMA_D_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SWING)] == "EMA_D_50")
     check("LP+daytrading -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.DAY_TRADING)] == "EMA_H1_50")
-    check("LP+scalping -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SCALPING)] == "EMA_M15_50")
+    check("LP+scalping -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SCALPING)] == "EMA_M5_50")
     check("CP+swing -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SWING)] == "EMA_H1_50")
     check("CP+daytrading -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M5_50")
     check("CP+scalping -> EMA_M1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SCALPING)] == "EMA_M1_50")

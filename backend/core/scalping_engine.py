@@ -611,12 +611,13 @@ class ScalpingAnalyzer:
         Hard requirements (reject if failed):
         1. M15 EMA 50 break confirms structure (price on correct side)
         3. M1 EMA 50 break confirms execution timing
-        4. Volume on M5 above average (confirmation)
+        5. Deceleration on H1 and M5 (Workshop Steps 3 and 6)
 
         Soft/optional indicators (reduce confidence, do not reject):
         2. M5 MACD agreement — the mentor says "I don't usually use MACD
            on M5" and it's "not obligatory." Disagreement reduces confidence
            by 10-15 points instead of rejecting.
+        4. Volume on M5 — important but not a hard gate per workshop.
 
         Returns:
             Dict with:
@@ -1510,10 +1511,10 @@ class ScalpingAnalyzer:
         if df.empty or len(df) < slow + signal:
             return None
 
-        ema_fast = df["close"].ewm(span=fast).mean()
-        ema_slow = df["close"].ewm(span=slow).mean()
+        ema_fast = df["close"].ewm(span=fast, adjust=False).mean()
+        ema_slow = df["close"].ewm(span=slow, adjust=False).mean()
         macd_line = ema_fast - ema_slow
-        signal_line = macd_line.ewm(span=signal).mean()
+        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
         histogram = macd_line - signal_line
 
         return {

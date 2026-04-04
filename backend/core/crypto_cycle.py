@@ -87,19 +87,32 @@ class CryptoCycleAnalyzer:
 
         cycle = CryptoMarketCycle()
 
-        # BTC Dominance via broker price data (BTC market cap / total crypto market cap)
-        # We approximate using BTC vs major alts price action
-        await self._analyze_dominance(cycle)
+        # BTC/ETH analysis FIRST — sets eth_outperforming_btc which
+        # _analyze_dominance needs for altcoin season detection.
         await self._analyze_btc_eth(cycle)
+
+        # BTC Dominance via broker price data (BTC market cap / total crypto market cap)
+        # We approximate using BTC vs major alts price action.
+        # Must run AFTER _analyze_btc_eth so eth_outperforming_btc is available.
+        await self._analyze_dominance(cycle)
+
+        # Estimate USDT.D direction from BTC+ETH combined performance
+        # (uses _btc_perf_7d/_eth_perf_7d set by _analyze_dominance)
+        self._estimate_usdt_dominance(cycle)
+
+        # Re-apply USDT.D filter to altcoin_season now that estimation is done.
+        # _analyze_dominance couldn't check this because USDT.D wasn't computed yet.
+        if cycle.usdt_dominance_rising is True and cycle.altcoin_season:
+            cycle.altcoin_season = False
+            logger.info(
+                "Altcoin season overridden: USDT.D rising — "
+                "money flowing to stablecoins, not alts"
+            )
+
         self._analyze_halving_phase(cycle)
         await self._analyze_rsi(cycle)
         await self._check_ema8_weekly(cycle)
         await self._check_sma200_daily(cycle)
-
-        # Estimate USDT.D direction from BTC+ETH combined performance
-        # If both BTC and ETH are falling simultaneously, money is likely flowing to stablecoins (USDT.D rising)
-        # If both are rising, money is leaving stablecoins (USDT.D falling)
-        self._estimate_usdt_dominance(cycle)
 
         # Incorporate BMSB and Pi Cycle from market_analyzer AnalysisResult
         self._apply_bmsb(cycle, bmsb)
@@ -436,12 +449,9 @@ class CryptoCycleAnalyzer:
                         else:
                             cycle.rsi_diagonal_bullish = False
 
-            # Fixed threshold analysis (NeonTrade AI defaults, not mentorship)
-            # Alex focuses on diagonal trendlines, not fixed levels.
-            if rsi > 80:
-                cycle.market_phase = "distribution"  # Potential cycle top
-            elif rsi < 25:
-                cycle.market_phase = "accumulation"  # Potential cycle bottom
+            # NOTE: RSI extreme levels are factored into _determine_market_phase()
+            # via the voting system (btc_rsi_14 field). No need to set market_phase
+            # here — it would be overwritten by _determine_market_phase() anyway.
         except Exception as e:
             logger.debug(f"RSI analysis failed: {e}")
 
@@ -637,6 +647,14 @@ class CryptoCycleAnalyzer:
             bull_votes += 1.0
         elif cycle.sma_d200_position == "below":
             bear_votes += 1.0
+
+        # RSI 14 weekly: primary cycle indicator (mentorship: "most reliable")
+        # Extreme RSI values signal cycle tops/bottoms.
+        if cycle.btc_rsi_14 is not None:
+            if cycle.btc_rsi_14 > 80:
+                bear_votes += 1.0  # Overbought — distribution / cycle top risk
+            elif cycle.btc_rsi_14 < 30:
+                bull_votes += 1.0  # Oversold — accumulation / cycle bottom opportunity
 
         # Integrate dominance transition analysis (BTC.D trend + BTC price trend)
         transition = self.get_dominance_transition(cycle)

@@ -657,13 +657,14 @@ class CapitalClient(BaseBroker):
                 raw_response=raw,
             )
 
-        except httpx.HTTPStatusError as e:
+        except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
             error_msg = str(e)
-            try:
-                error_body = e.response.json()
-                error_msg = error_body.get("errorCode", error_msg)
-            except Exception:
-                pass
+            if isinstance(e, httpx.HTTPStatusError):
+                try:
+                    error_body = e.response.json()
+                    error_msg = error_body.get("errorCode", error_msg)
+                except Exception:
+                    pass
             logger.error(f"Market order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
 
@@ -723,12 +724,13 @@ class CapitalClient(BaseBroker):
                 raw_response=raw,
             )
 
-        except httpx.HTTPStatusError as e:
+        except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
             error_msg = str(e)
-            try:
-                error_msg = e.response.json().get("errorCode", error_msg)
-            except Exception:
-                pass
+            if isinstance(e, httpx.HTTPStatusError):
+                try:
+                    error_msg = e.response.json().get("errorCode", error_msg)
+                except Exception:
+                    pass
             logger.error(f"Limit order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
 
@@ -794,12 +796,13 @@ class CapitalClient(BaseBroker):
                 raw_response=raw,
             )
 
-        except httpx.HTTPStatusError as e:
+        except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
             error_msg = str(e)
-            try:
-                error_msg = e.response.json().get("errorCode", error_msg)
-            except Exception:
-                pass
+            if isinstance(e, httpx.HTTPStatusError):
+                try:
+                    error_msg = e.response.json().get("errorCode", error_msg)
+                except Exception:
+                    pass
             logger.error(f"Stop order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
 

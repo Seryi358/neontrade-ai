@@ -2078,7 +2078,18 @@ class TradingEngine:
                                 f"entry {signal.entry_price} — ignoring (wrong side)"
                             )
                     if new_tp_max and isinstance(new_tp_max, (int, float)) and new_tp_max > 0:
-                        signal.take_profit_max = float(new_tp_max)
+                        # Validate TP_max is on the correct side of entry
+                        tp_max_valid = (
+                            (signal.direction == "BUY" and new_tp_max > signal.entry_price) or
+                            (signal.direction == "SELL" and new_tp_max < signal.entry_price)
+                        )
+                        if tp_max_valid:
+                            signal.take_profit_max = float(new_tp_max)
+                        else:
+                            logger.warning(
+                                f"AI suggested invalid TP_max {new_tp_max} for {signal.direction} "
+                                f"entry {signal.entry_price} — ignoring (wrong side)"
+                            )
             except Exception as e:
                 logger.warning(f"AI validation failed — BLOCKING (cannot validate = cannot proceed): {e}")
                 self._daily_setups_skipped_ai += 1

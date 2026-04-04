@@ -664,7 +664,7 @@ class IBKRClient(BaseBroker):
 
             return OrderResult(success=False, units=units, error=str(data))
 
-        except httpx.HTTPStatusError as e:
+        except Exception as e:
             error_msg = e.response.text if hasattr(e, 'response') else str(e)
             logger.error(f"IBKR order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
@@ -750,7 +750,7 @@ class IBKRClient(BaseBroker):
 
             return OrderResult(success=False, units=units, error=str(data))
 
-        except httpx.HTTPStatusError as e:
+        except Exception as e:
             error_msg = e.response.text if hasattr(e, 'response') else str(e)
             logger.error(f"IBKR limit order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)
@@ -839,7 +839,7 @@ class IBKRClient(BaseBroker):
 
             return OrderResult(success=False, units=units, error=str(data))
 
-        except httpx.HTTPStatusError as e:
+        except Exception as e:
             error_msg = e.response.text if hasattr(e, 'response') else str(e)
             logger.error(f"IBKR stop order failed: {error_msg}")
             return OrderResult(success=False, units=units, error=error_msg)

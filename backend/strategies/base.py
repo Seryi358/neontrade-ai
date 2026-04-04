@@ -259,16 +259,23 @@ def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
     if ema_val is None:
         return False  # Can't validate RCC, block trade (fail-safe)
 
-    m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
-    if len(m5_candles) < 3:
+    # Extract timeframe from ema_key (e.g. "EMA_H1_50" → "H1")
+    # RCC must use candles from the SAME timeframe as the EMA being checked
+    parts = ema_key.split("_")
+    candle_tf = parts[1] if len(parts) >= 3 else "M5"
+    candles = getattr(analysis, 'last_candles', {}).get(candle_tf, [])
+    # Fallback to M5 if the requested timeframe has no candles
+    if len(candles) < 3:
+        candles = getattr(analysis, 'last_candles', {}).get("M5", [])
+    if len(candles) < 3:
         return False  # Insufficient data for RCC, block trade (fail-safe)
 
     # Step 2 (CIERRE): Previous completed candle closed past the EMA
-    close_candle = m5_candles[-2]
+    close_candle = candles[-2]
     close_price = close_candle["close"]
 
     # Step 3 (CONFIRMACIÓN): Current candle continues in the direction
-    confirm_candle = m5_candles[-1]
+    confirm_candle = candles[-1]
     confirm_open = confirm_candle["open"]
     confirm_current = confirm_candle["close"]  # Current price of forming candle
 

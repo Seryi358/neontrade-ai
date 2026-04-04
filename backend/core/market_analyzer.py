@@ -593,8 +593,8 @@ class MarketAnalyzer:
                 structure_trend = Trend.BEARISH
 
         # ── Step 2: EMA 20/50 confirmation ──
-        ema_20 = df["close"].ewm(span=20).mean()
-        ema_50 = df["close"].ewm(span=50).mean()
+        ema_20 = df["close"].ewm(span=20, adjust=False).mean()
+        ema_50 = df["close"].ewm(span=50, adjust=False).mean()
         current_price = float(df["close"].iloc[-1])
         ema20_val = float(ema_20.iloc[-1])
         ema50_val = float(ema_50.iloc[-1])
@@ -681,7 +681,7 @@ class MarketAnalyzer:
         avg_prev_body = float(prev_bodies.mean())
 
         # Metric 2: Distance from EMA 50 (expanding = accel, contracting = decel)
-        ema_50 = df["close"].ewm(span=50).mean()
+        ema_50 = df["close"].ewm(span=50, adjust=False).mean()
         recent_dist = float((df["close"].iloc[-5:] - ema_50.iloc[-5:]).abs().mean())
         prev_dist = float((df["close"].iloc[-10:-5] - ema_50.iloc[-10:-5]).abs().mean())
 
@@ -1145,7 +1145,7 @@ class MarketAnalyzer:
                 continue
             for period in periods:
                 key = f"EMA_{tf}_{period}"
-                ema = df["close"].ewm(span=period).mean()
+                ema = df["close"].ewm(span=period, adjust=False).mean()
                 if not ema.empty:
                     ema_value = ema.iloc[-1]
                     if pd.isna(ema_value):

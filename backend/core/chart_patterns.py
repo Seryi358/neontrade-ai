@@ -616,8 +616,8 @@ def _detect_symmetrical_triangle(
         return None
 
     # Determine likely breakout direction from prior trend
-    ema_20 = data["close"].ewm(span=20).mean()
-    ema_50 = data["close"].ewm(span=50).mean()
+    ema_20 = data["close"].ewm(span=20, adjust=False).mean()
+    ema_50 = data["close"].ewm(span=50, adjust=False).mean()
     start_idx = min(recent_highs[0][0], recent_lows[0][0])
 
     if start_idx > 0:

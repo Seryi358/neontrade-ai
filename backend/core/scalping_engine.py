@@ -125,7 +125,7 @@ class ScalpingAnalyzer:
                          ("M5", "ema50_m5"), ("M1", "ema50_m1")]:
             df = candles.get(tf, pd.DataFrame())
             if not df.empty and len(df) >= 50:
-                ema = df["close"].ewm(span=50).mean()
+                ema = df["close"].ewm(span=50, adjust=False).mean()
                 setattr(data, attr, float(ema.iloc[-1]))
 
         # ── MACD on H1, M5, M1 ──
@@ -1450,10 +1450,10 @@ class ScalpingAnalyzer:
             return None
 
         # Recompute full histogram series for swing detection
-        ema_fast = df["close"].ewm(span=12).mean()
-        ema_slow = df["close"].ewm(span=26).mean()
+        ema_fast = df["close"].ewm(span=12, adjust=False).mean()
+        ema_slow = df["close"].ewm(span=26, adjust=False).mean()
         macd_line = ema_fast - ema_slow
-        signal_line = macd_line.ewm(span=9).mean()
+        signal_line = macd_line.ewm(span=9, adjust=False).mean()
         histogram = macd_line - signal_line
 
         # Work on the last `lookback` candles

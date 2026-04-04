@@ -397,14 +397,14 @@ Scalping Indicators (M5/M1):
   (TradingLab: use DEFAULT config, hide histogram and signal line, keep MACD line ONLY)
 - SMA 200 on H1: dynamic S/R level; price above = bullish bias, below = bearish bias
 - Volume: above-average volume confirms moves, low volume = suspect breakouts
-- MACD divergence on M5 = potential reversal signal for quick scalps
+- MACD divergence on H1 = strong reversal signal (Workshop: "en gráfico horario sí que son muy evidentes")
 
 Scalping Rules:
 - Risk: 0.5% per scalp trade (NeonTrade AI default; workshop defers exact %)
 - Must be within London or NY session hours
-- Quick management: move to BE at first sign of stalling
-- TP at next M15 level or MACD signal reversal
-- Scalp ONLY in the direction of the H1 trend (SMA 200 slope)
+- Trailing SL: gradual behind EMA 50 with buffer — do NOT rush to breakeven (Workshop: "no rushear el precio", "dar espacio siempre a la media móvil")
+- TP methods: (1) Fixed TP at recent swing highs/lows (safest), (2) Fast exit when M1 EMA 50 breaks, (3) Slow exit when M5 EMA 50 breaks
+- Scalp ONLY in the direction of the H1 trend (MACD + EMA 50 + SMA 200 on H1, not just SMA 200)
 
 Scalping RED Strategy Steps (7-Step Process):
 1. Identify S/R level on H1 chart

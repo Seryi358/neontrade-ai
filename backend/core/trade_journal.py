@@ -655,9 +655,20 @@ class TradeJournal:
     def _save_missed_trades(self):
         """Persist missed trades to a separate JSON file."""
         try:
-            os.makedirs(os.path.dirname(self._missed_trades_path), exist_ok=True)
-            with open(self._missed_trades_path, "w") as f:
-                json.dump(self._missed_trades, f, indent=2)
+            dir_name = os.path.dirname(self._missed_trades_path)
+            os.makedirs(dir_name, exist_ok=True)
+            import tempfile
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(self._missed_trades, f, indent=2)
+                os.replace(tmp_path, self._missed_trades_path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
         except Exception as e:
             logger.error(f"Missed trades save failed: {e}")
 
@@ -724,9 +735,10 @@ class TradeJournal:
     # ── Persistence ───────────────────────────────────────────────
 
     def _save(self):
-        """Persist journal to JSON file."""
+        """Persist journal to JSON file (atomic write to prevent corruption)."""
         try:
-            os.makedirs(os.path.dirname(self._data_path), exist_ok=True)
+            dir_name = os.path.dirname(self._data_path)
+            os.makedirs(dir_name, exist_ok=True)
             data = {
                 "initial_capital": self._initial_capital,
                 "current_balance": self._current_balance,
@@ -746,8 +758,18 @@ class TradeJournal:
                 "dd_by_year": self._dd_by_year,
                 "trades": self._trades,
             }
-            with open(self._data_path, "w") as f:
-                json.dump(data, f, indent=2)
+            import tempfile
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(data, f, indent=2)
+                os.replace(tmp_path, self._data_path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
         except Exception as e:
             logger.error(f"Trade journal save failed: {e}")
 

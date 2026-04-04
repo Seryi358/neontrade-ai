@@ -1945,11 +1945,11 @@ class MarketAnalyzer:
         Return the currently active trading session and sub-session detail.
         Rule #10: DST-aware — adjusts all boundaries by _dst_offset().
 
-        Sessions (EDT / summer baseline):
-          ASIAN     : 00:00-08:00 UTC
-          LONDON    : 08:00-16:00 UTC
-          OVERLAP   : 13:00-17:00 UTC (London+NY overlap - highest volatility)
-          NEW_YORK  : 13:00-21:00 UTC
+        Sessions (EDT / summer baseline — matches TradingLab mentorship):
+          ASIAN     : 00:00-07:00 UTC  (7 PM - 3 AM ET)
+          LONDON    : 07:00-16:00 UTC  (3 AM - 12 PM ET)
+          OVERLAP   : 12:00-16:00 UTC  (8 AM - 12 PM ET, London+NY)
+          NEW_YORK  : 12:00-21:00 UTC  (8 AM - 5 PM ET)
           OFF_HOURS : 21:00-00:00 UTC
 
         During EST (winter), boundaries shift +1h in UTC.
@@ -1957,18 +1957,18 @@ class MarketAnalyzer:
         utc_hour = datetime.now(timezone.utc).hour
         d = self._dst_offset()  # 0=EDT, 1=EST
 
-        if 0 <= utc_hour < (8 + d):
+        if 0 <= utc_hour < (7 + d):
             # ASIAN block with Sydney/Tokyo distinction
-            if utc_hour < (6 + d):
+            if utc_hour < (5 + d):
                 detail = "ASIAN_SYDNEY_TOKYO"
             else:
                 detail = "ASIAN_TOKYO"
             return ("ASIAN", detail)
-        elif (13 + d) <= utc_hour < (17 + d):
+        elif (12 + d) <= utc_hour < (16 + d):
             return ("OVERLAP", "LONDON_NY_OVERLAP")
-        elif (8 + d) <= utc_hour < (13 + d):
+        elif (7 + d) <= utc_hour < (12 + d):
             return ("LONDON", "LONDON")
-        elif (17 + d) <= utc_hour < (21 + d):
+        elif (16 + d) <= utc_hour < (21 + d):
             return ("NEW_YORK", "NEW_YORK")
         else:
             return ("OFF_HOURS", "SYDNEY_PRE_ASIAN")
@@ -2539,9 +2539,9 @@ class MarketAnalyzer:
     ) -> Dict[str, Any]:
         """
         Detect Power of Three (AMD) session phases:
-        - ASIAN (00:00-08:00 UTC) = Accumulation (lateral, low volatility)
-        - LONDON (08:00-12:00 UTC) = Manipulation (strong impulse, often fake)
-        - NY (12:00-21:00 UTC) = Distribution (real move direction)
+        - ASIAN (00:00-07:00 UTC EDT) = Accumulation (lateral, low volatility)
+        - LONDON (07:00-12:00 UTC EDT) = Manipulation (strong impulse, often fake)
+        - NY (12:00-21:00 UTC EDT) = Distribution (real move direction)
 
         Nota: los horarios son aproximaciones para el patrón AMD.
         Las sesiones reales varían con DST (EST/EDT):
@@ -2561,11 +2561,11 @@ class MarketAnalyzer:
         if not isinstance(data.index, pd.DatetimeIndex):
             return {"phase": "unknown", "session": session}
 
-        # Get today's Asian session candles (00:00-08:00 UTC EDT, DST-adjusted)
+        # Get today's Asian session candles (00:00-07:00 UTC EDT, DST-adjusted)
         now = datetime.now(timezone.utc)
         d = self._dst_offset()  # 0=EDT, 1=EST
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        asian_end = now.replace(hour=8 + d, minute=0, second=0, microsecond=0)
+        asian_end = now.replace(hour=7 + d, minute=0, second=0, microsecond=0)
 
         # Filter candles to today's Asian session
         asian_candles = data[
@@ -2622,7 +2622,7 @@ class MarketAnalyzer:
         elif session == "LONDON":
             result["phase"] = "manipulation"
             # Capture the London manipulation price range as entry zone
-            london_start = now.replace(hour=8 + d, minute=0, second=0, microsecond=0)
+            london_start = now.replace(hour=7 + d, minute=0, second=0, microsecond=0)
             london_candles = data[data.index >= london_start]
             if not london_candles.empty:
                 result["manipulation_zone_high"] = float(london_candles["high"].max())
@@ -2642,8 +2642,8 @@ class MarketAnalyzer:
         elif session in ("OVERLAP", "NEW_YORK"):
             result["phase"] = "distribution"
             # Check if price reversed from London manipulation
-            # Get London candles (08:00-12:00 UTC EDT, DST-adjusted)
-            london_start = now.replace(hour=8 + d, minute=0, second=0, microsecond=0)
+            # Get London candles (07:00-12:00 UTC EDT, DST-adjusted)
+            london_start = now.replace(hour=7 + d, minute=0, second=0, microsecond=0)
             london_end = now.replace(hour=12 + d, minute=0, second=0, microsecond=0)
             london_candles = data[
                 (data.index >= london_start) & (data.index < london_end)
@@ -2910,11 +2910,11 @@ class MarketAnalyzer:
         if asian_low is not None:
             pools.append({"level": asian_low, "type": "asian_low", "strength": 1})
 
-        # --- London session High / Low (08:00-16:00 UTC EDT, DST-adjusted) ---
+        # --- London session High / Low (07:00-16:00 UTC EDT, DST-adjusted) ---
         if not h1.empty and isinstance(h1.index, pd.DatetimeIndex):
             now_liq = datetime.now(timezone.utc)
             d_liq = self._dst_offset()  # 0=EDT, 1=EST
-            london_start = now_liq.replace(hour=8 + d_liq, minute=0, second=0, microsecond=0)
+            london_start = now_liq.replace(hour=7 + d_liq, minute=0, second=0, microsecond=0)
             london_end = now_liq.replace(hour=16 + d_liq, minute=0, second=0, microsecond=0)
             london_candles = h1[
                 (h1.index >= london_start) & (h1.index < london_end)
@@ -2932,10 +2932,10 @@ class MarketAnalyzer:
                 pools.append({"level": london_high, "type": "london_high", "strength": 1})
                 pools.append({"level": london_low, "type": "london_low", "strength": 1})
 
-        # --- New York session High / Low (13:00-21:00 UTC EDT, DST-adjusted) ---
+        # --- New York session High / Low (12:00-21:00 UTC EDT, DST-adjusted) ---
         if not h1.empty and isinstance(h1.index, pd.DatetimeIndex):
             now_liq = datetime.now(timezone.utc)
-            ny_start = now_liq.replace(hour=13 + d_liq, minute=0, second=0, microsecond=0)
+            ny_start = now_liq.replace(hour=12 + d_liq, minute=0, second=0, microsecond=0)
             ny_end = now_liq.replace(hour=21 + d_liq, minute=0, second=0, microsecond=0)
             ny_candles = h1[
                 (h1.index >= ny_start) & (h1.index < ny_end)

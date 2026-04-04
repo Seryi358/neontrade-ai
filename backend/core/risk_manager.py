@@ -99,6 +99,9 @@ class RiskManager:
         # Start-of-day balance for funded account DD calculation
         # Most prop firms calculate daily DD from start-of-day equity (or highest equity of day)
         self._funded_start_of_day_balance: float = 0.0
+        # Initial funded account balance — set once on first balance update when funded mode is active.
+        # Used for accurate profit target calculation instead of deriving from peak/DD.
+        self._funded_initial_balance: float = 0.0
         # Reentry tracking (Esp. Criptomonedas - Reentradas Efectivas)
         # Track stop-outs per instrument to reduce risk on reentries
         # Rules from mentorship:
@@ -156,6 +159,13 @@ class RiskManager:
 
         if self._current_balance > self._peak_balance:
             self._peak_balance = self._current_balance
+
+        # Set funded initial balance once (first valid balance when funded mode is on)
+        if (self._funded_initial_balance == 0.0
+                and self._current_balance > 0
+                and settings.funded_account_mode):
+            self._funded_initial_balance = self._current_balance
+            logger.info(f"Funded initial balance set: ${self._current_balance:.2f}")
 
         # Track historical max drawdown for variable DD and delta algorithms
         current_dd = self.get_current_drawdown()
@@ -747,10 +757,8 @@ class RiskManager:
                 profit_target = settings.funded_profit_target_phase1
             elif settings.funded_current_phase == 2:
                 profit_target = settings.funded_profit_target_phase2
-            if profit_target > 0:
-                total_dd = self.get_current_drawdown()
-                initial_balance = self._peak_balance / (1 + total_dd) if total_dd < 1 else self._peak_balance
-                current_profit_pct = (self._current_balance - initial_balance) / initial_balance if initial_balance > 0 else 0
+            if profit_target > 0 and self._funded_initial_balance > 0:
+                current_profit_pct = (self._current_balance - self._funded_initial_balance) / self._funded_initial_balance
                 profit_progress = (current_profit_pct / profit_target * 100) if profit_target > 0 else 0
                 self._check_funded_phase_advancement(profit_target, profit_progress)
 
@@ -801,11 +809,10 @@ class RiskManager:
         elif settings.funded_current_phase == 2:
             profit_target = settings.funded_profit_target_phase2
 
-        # Calculate profit progress
+        # Calculate profit progress using tracked initial balance
         profit_progress = 0.0
-        if self._peak_balance > 0 and profit_target > 0:
-            initial_balance = self._peak_balance / (1 + total_dd) if total_dd < 1 else self._peak_balance
-            current_profit_pct = (self._current_balance - initial_balance) / initial_balance if initial_balance > 0 else 0
+        if self._funded_initial_balance > 0 and profit_target > 0:
+            current_profit_pct = (self._current_balance - self._funded_initial_balance) / self._funded_initial_balance
             profit_progress = (current_profit_pct / profit_target * 100) if profit_target > 0 else 0
 
         # Phase advancement now happens in record_funded_pnl (on trade close),

@@ -2564,11 +2564,13 @@ class PinkStrategy(BaseStrategy):
             failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
         # --- Paso 4: Verificar que correccion se esta completando ---
-        # Pink concept: HTF already confirmed EMA 50 1H break (correction).
+        # Pink concept: HTF already confirmed setup EMA 50 break (correction).
         # LTF should check for corrective pattern completion (price returning),
         # NOT re-check EMA direction (which would conflict with HTF check).
+        # Style-adaptive: day=H1, swing=D, scalping=M5
         price = _get_current_price_proxy(analysis)
-        ema_1h = _ema_val(analysis, "EMA_H1_50")
+        setup_ema_key = _tf_ema("setup", 50)
+        ema_1h = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
         if price and ema_1h:
             dist = abs(price - ema_1h) / ema_1h * 100
             if dist < 0.5:

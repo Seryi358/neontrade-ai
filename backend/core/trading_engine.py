@@ -2360,8 +2360,8 @@ class TradingEngine:
                             f"Check broker manually and close if needed.",
                             {"instrument": setup.instrument, "direction": setup.direction},
                         )
-                    except Exception:
-                        pass
+                    except Exception as ae:
+                        logger.error(f"CRITICAL: Orphaned trade alert ALSO failed to send: {ae}")
                 return
 
             if trade_id:

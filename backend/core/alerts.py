@@ -655,6 +655,9 @@ class AlertManager:
         if not cfg.gmail_refresh_token or not cfg.gmail_client_id:
             logger.warning("Gmail alert skipped – missing OAuth2 credentials")
             return
+        if not cfg.gmail_sender or not cfg.gmail_recipient:
+            logger.warning("Gmail alert skipped – missing gmail_sender or gmail_recipient")
+            return
 
         plain_title = _strip_emoji_tags(title)
         html_body = _build_email_html(plain_title, body)
@@ -702,7 +705,13 @@ class AlertManager:
             },
         )
         if resp.status_code == 200:
-            self._gmail_access_token = resp.json().get("access_token")
+            try:
+                self._gmail_access_token = resp.json().get("access_token")
+            except (ValueError, KeyError) as e:
+                logger.error(f"Gmail token refresh returned 200 but malformed JSON: {e}")
+                self._gmail_access_token = None
+                self._gmail_token_expires_at = 0.0
+                return None
             self._gmail_token_expires_at = time.time() + 3500  # cache for ~58 min
             logger.info("Gmail access token refreshed, expires in 3500s")
             return self._gmail_access_token

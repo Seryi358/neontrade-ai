@@ -375,6 +375,8 @@ NOTE: GREEN is NOT about Elliott Waves — it follows a specific 6-step sequenti
   Paso 6 (SL/TP): SL below last swing on confirmation TF; TP at previous high/low on setup TF
 
   GREEN Timeframe Layout per Trading Style:
+  FOREX/GENERAL (all styles): Weekly -> Daily -> 1H -> 15M (FIXED — per Trading Mastery)
+  CRYPTO timeframes adapt per style:
   - Swing: Weekly (trend) -> Daily (pattern) -> 1H (diagonal) -> 15M (execution)
   - Day Trading: 4H (trend) -> 1H (pattern) -> 15M (diagonal) -> 2M (execution)
   - Scalping: 15M (trend) -> 5M (pattern) -> 1M (diagonal) -> 30s (execution)

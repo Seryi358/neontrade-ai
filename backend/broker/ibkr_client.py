@@ -511,6 +511,18 @@ class IBKRClient(BaseBroker):
         if len(result) > count:
             result = result[-count:]
 
+        # Mark last candle as incomplete (currently forming).
+        # IBKR history endpoint returns the in-progress bar as the last entry.
+        # market_analyzer filters out incomplete candles to avoid oscillating
+        # indicator values — same approach as the Capital.com client.
+        if result:
+            last = result[-1]
+            result[-1] = CandleData(
+                time=last.time, open=last.open, high=last.high,
+                low=last.low, close=last.close, volume=last.volume,
+                complete=False,
+            )
+
         return result
 
     async def get_current_price(self, instrument: str) -> PriceData:

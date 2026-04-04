@@ -504,7 +504,7 @@ Drawdown Management (Fixed Levels Method — from Trading Plan PDF Excel):
 Delta Risk Algorithm (Winning Streaks):
 - Parameter: 0.60 (range 0.20-0.90, lower = more aggressive, 0.20 = most aggressive, 0.90 = most conservative)
 - Delta 0.20: only need 1.85% gain to level up. Delta 0.60 (recommended): need 5.56% gain to level up.
-- After consecutive wins, risk can increase: 1% → 1.5% → 2% → up to 3% max
+- After consecutive wins, risk can increase: 1% → 1.5% → 2% max (hard cap at 2%)
 - One loss resets delta back to base risk
 - DISABLED by default (conservative mode)
 

@@ -643,8 +643,10 @@ class Backtester:
                 if _bar_dt:
                     _h = _bar_dt.hour
                     _wd = _bar_dt.weekday()  # 0=Mon, 4=Fri
-                    # Trading hours: 07:00-22:00 UTC (London+NY)
-                    if _h < 7 or _h >= 22:
+                    # Trading hours: London open through NY close (08:00-21:00 UTC)
+                    # Per TradingLab sessions: London 08-16, Overlap 13-17, NY 13-21
+                    # Block Asian (00-08) and off-hours (21-24) for new entries
+                    if _h < 8 or _h >= 21:
                         _allow_new_trade = False
                     # Friday: no new trades after 18:00 UTC
                     if _wd == 4 and _h >= 18:

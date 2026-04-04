@@ -1502,10 +1502,10 @@ class MarketAnalyzer:
         if df.empty or len(df) < slow + signal:
             return None
 
-        ema_fast = df["close"].ewm(span=fast).mean()
-        ema_slow = df["close"].ewm(span=slow).mean()
+        ema_fast = df["close"].ewm(span=fast, adjust=False).mean()
+        ema_slow = df["close"].ewm(span=slow, adjust=False).mean()
         macd_line = ema_fast - ema_slow
-        signal_line = macd_line.ewm(span=signal).mean()
+        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
         histogram = macd_line - signal_line
 
         return {

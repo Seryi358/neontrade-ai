@@ -3769,6 +3769,9 @@ class BlackStrategy(BaseStrategy):
         # --- Paso 7: SL y TP ---
         sl = self.get_sl_placement(analysis, direction, entry_price)
         tp_levels = self.get_tp_levels(analysis, direction, entry_price)
+        if tp_levels is None:
+            failed.append("Paso 7: EMA 50 4H no disponible — no se puede calcular TP para BLACK")
+            return None
         tp1 = tp_levels.get("tp1", 0.0)
 
         if sl == 0.0 or tp1 == 0.0:

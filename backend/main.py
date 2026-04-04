@@ -306,6 +306,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         ws_manager.disconnect(websocket)
+        try:
+            await websocket.close(code=1011, reason="Internal error")
+        except Exception:
+            pass
 
 
 async def _handle_ws_command(websocket: WebSocket, data: dict):
@@ -315,11 +319,17 @@ async def _handle_ws_command(websocket: WebSocket, data: dict):
     if action == "approve":
         setup_id = data.get("setup_id")
         if setup_id and hasattr(engine, 'approve_setup'):
-            success = await engine.approve_setup(setup_id)
-            await ws_manager.send_personal(websocket, "setup_response", {
-                "setup_id": setup_id,
-                "approved": success,
-            })
+            try:
+                success = await engine.approve_setup(setup_id)
+                await ws_manager.send_personal(websocket, "setup_response", {
+                    "setup_id": setup_id,
+                    "approved": success,
+                })
+            except Exception as e:
+                logger.error(f"WS approve_setup failed for {setup_id}: {e}")
+                await ws_manager.send_personal(websocket, "error", {
+                    "message": f"Approve failed: {e}",
+                })
 
     elif action == "reject":
         setup_id = data.get("setup_id")
@@ -332,7 +342,11 @@ async def _handle_ws_command(websocket: WebSocket, data: dict):
 
     elif action == "set_mode":
         mode = data.get("mode", "AUTO").upper()
-        if hasattr(engine, 'set_mode'):
+        if mode not in ("AUTO", "MANUAL"):
+            await ws_manager.send_personal(websocket, "error", {
+                "message": f"Invalid mode: {mode}. Must be AUTO or MANUAL.",
+            })
+        elif hasattr(engine, 'set_mode'):
             engine.set_mode(mode)
             await ws_manager.broadcast("mode_changed", {"mode": mode})
 

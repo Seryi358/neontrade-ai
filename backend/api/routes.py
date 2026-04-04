@@ -1141,13 +1141,14 @@ async def get_risk_status():
     """Get live risk status including drawdown and delta algorithm state."""
     from main import engine
     if engine is None:
-        return {"error": "Engine not initialized"}
+        raise HTTPException(status_code=503, detail="Engine not initialized")
     try:
         risk_mgr = engine.risk_manager
         await risk_mgr.update_balance_tracking()
         return risk_mgr.get_risk_status()
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Risk status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/risk-config")
@@ -1570,13 +1571,14 @@ async def get_funded_status():
     from main import engine
     from config import settings as _settings
     if engine is None:
-        return {"error": "Engine not initialized"}
+        raise HTTPException(status_code=503, detail="Engine not initialized")
     try:
         risk_mgr = engine.risk_manager
         await risk_mgr.update_balance_tracking()
         return risk_mgr.get_funded_status()
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Funded status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Trade Journal ──────────────────────────────────────────────────

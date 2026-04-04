@@ -775,9 +775,10 @@ class Backtester:
                 {"date": bar_time, "balance": round(balance, 2), "equity": round(equity, 2)}
             )
 
-            # Drawdown tracking
-            if equity > peak_balance:
-                peak_balance = equity
+            # Drawdown tracking — use closed-trade balance (not equity with unrealised)
+            # so DD risk reduction thresholds are consistent with line 1053 comparison
+            if balance > peak_balance:
+                peak_balance = balance
 
             # Progress logging
             if step % log_every == 0:

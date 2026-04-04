@@ -827,7 +827,7 @@ class IBKRClient(BaseBroker):
                 trade_id=str(conid),
                 instrument=instrument,
                 direction="BUY" if pos_qty > 0 else "SELL",
-                units=int(pos_qty),
+                units=abs(pos_qty),
                 entry_price=float(p.get("avgCost", 0)),
                 current_price=float(p.get("mktPrice", 0)),
                 unrealized_pnl=float(p.get("unrealizedPnl", 0)),

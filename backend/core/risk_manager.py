@@ -743,6 +743,8 @@ class RiskManager:
         if self._funded_daily_pnl_date != today:
             self._funded_daily_pnl = 0.0
             self._funded_daily_pnl_date = today
+            # Snapshot start-of-day balance — must match check_funded_account_limits
+            self._funded_start_of_day_balance = self._current_balance
 
         self._funded_daily_pnl += pnl_amount
         logger.info(

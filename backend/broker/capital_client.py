@@ -910,7 +910,7 @@ class CapitalClient(BaseBroker):
             })
             logger.info(f"Position {trade_id} SL moved to {stop_loss}")
             return True
-        except httpx.HTTPStatusError as e:
+        except Exception as e:
             logger.error(f"Failed to modify SL for {trade_id}: {e}")
             return False
 
@@ -921,7 +921,7 @@ class CapitalClient(BaseBroker):
                 "profitLevel": take_profit,
             })
             return True
-        except httpx.HTTPStatusError as e:
+        except Exception as e:
             logger.error(f"Failed to modify TP for {trade_id}: {e}")
             return False
 
@@ -931,7 +931,7 @@ class CapitalClient(BaseBroker):
             await self._delete(f"/api/v1/positions/{trade_id}")
             logger.info(f"Position {trade_id} closed")
             return True
-        except httpx.HTTPStatusError as e:
+        except Exception as e:
             logger.error(f"Failed to close position {trade_id}: {e}")
             return False
 

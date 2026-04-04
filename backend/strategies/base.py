@@ -1590,32 +1590,38 @@ class BlueStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 5: {rev_desc}")
 
-        # --- Paso 6: Entrada en 5M (RCC: Ruptura + Cierre + Confirmación) ---
-        # TradingLab execution priority: "5min MA50 > diagonal > 2min MA/diagonal"
-        # 1. Check EMA M5 50 break (HIGHEST priority)
-        # 2. If not, check diagonal on 5min
-        # 3. If not, check EMA M2 50 (2min, approximated by M5 EMA 20)
-        # 4. If not, check diagonal on 2min
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
-        # M2 not available from broker API; use M5 EMA 20 as approximation
-        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+        # --- Paso 6: Entrada en exec TF (RCC: Ruptura + Cierre + Confirmación) ---
+        # TradingLab execution priority (style-adaptive):
+        #   day: M5 MA50 > M5 diagonal > M2 MA50 > M2 diagonal
+        #   swing: H1 MA50 > H1 diagonal (Alex: "bajamos a gráfico de una hora")
+        #   scalping: M1 MA50 > M1 diagonal (Alex: "ruptura en un minuto")
+        exec_ema_key = _tf_ema("exec", 50)
+        style = _get_trading_style()
+        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        sec_ema_key = _sec_ema_map.get(style)
+        _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
+        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        exec_tf = _exec_tf_map.get(style, "M5")
+        sec_tf = _sec_tf_map.get(style)
+
+        ema_exec_break, ema_exec_desc = _check_ema_break(analysis, exec_ema_key, direction)
+        ema_sec_break, ema_sec_desc = False, ""
+        if sec_ema_key:
+            ema_sec_break, ema_sec_desc = _check_ema_break(analysis, sec_ema_key, direction)
 
         entry_found = False
 
-        # Priority 1: EMA M5 50 break (highest priority per mentorship)
-        if ema_5m_break:
-            # TradingLab RCC: verify previous candle confirmed the breakout
-            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
+        # Priority 1: Exec TF EMA 50 break (highest priority per mentorship)
+        if ema_exec_break:
+            if _check_rcc_confirmation(analysis, exec_ema_key, direction):
                 confidence += 12.0
-                met.append(f"Paso 6: RCC confirmado en EMA 5M 50 (prioridad maxima) - {ema_5m_desc}")
+                met.append(f"Paso 6: RCC confirmado en EMA {exec_tf} 50 (prioridad maxima) - {ema_exec_desc}")
             else:
-                # RCC failure = REJECT entry (mentorship: "NEVER enter on break alone")
-                failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada")
+                failed.append(f"Paso 6: EMA {exec_tf} rota pero sin confirmacion RCC - entrada rechazada")
                 return None
             entry_found = True
 
-        # Priority 2: Diagonal breakout on 5min
+        # Priority 2: Diagonal breakout on exec TF
         if not entry_found and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
@@ -1623,44 +1629,43 @@ class BlueStrategy(BaseStrategy):
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf in ("M5", ""):
+                    if ptf in (exec_tf, ""):
                         confidence += 10.0
-                        met.append(f"Paso 6: Rompimiento de diagonal en 5M ({ptype})")
+                        met.append(f"Paso 6: Rompimiento de diagonal en {exec_tf} ({ptype})")
                         entry_found = True
                         break
 
-        # Priority 3: EMA M2 50 break (2min timeframe)
-        if not entry_found and ema_2m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+        # Priority 3: Secondary EMA break (day trading only — M2 via M5 EMA 20 proxy)
+        if not entry_found and ema_sec_break and sec_ema_key:
+            if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
-                met.append(f"Paso 6: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
+                met.append(f"Paso 6: RCC confirmado en EMA {sec_tf} ({sec_ema_key} proxy) - {ema_sec_desc}")
             else:
-                # RCC failure = REJECT entry
-                failed.append(f"Paso 6: EMA 2M rota pero sin confirmacion RCC - entrada rechazada")
+                failed.append(f"Paso 6: EMA {sec_tf} rota pero sin confirmacion RCC - entrada rechazada")
                 return None
             entry_found = True
 
-        # Priority 4: Diagonal breakout on 2min
-        if not entry_found and hasattr(analysis, 'chart_patterns'):
+        # Priority 4: Diagonal breakout on secondary TF (day trading only)
+        if not entry_found and sec_tf and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf == "M2":
+                    if ptf == sec_tf:
                         confidence += 6.0
-                        met.append(f"Paso 6: Rompimiento de diagonal en 2M ({ptype})")
+                        met.append(f"Paso 6: Rompimiento de diagonal en {sec_tf} ({ptype})")
                         entry_found = True
                         break
 
         if not entry_found:
-            failed.append(f"Paso 6: Sin entrada valida (ni EMA 5M/2M ni diagonal) - {ema_5m_desc}")
+            failed.append(f"Paso 6: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
 
-        # Additional confirmation: EMA 2M break adds confluence if not already the primary entry
-        if entry_found and ema_2m_break and ema_5m_break:
+        # Additional confirmation: secondary EMA break adds confluence
+        if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
             confidence += 5.0
-            met.append(f"Paso 6b: Confirmacion EMA 2M - {ema_2m_desc}")
+            met.append(f"Paso 6b: Confirmacion EMA {sec_tf} - {ema_sec_desc}")
 
         # Clasificar variante
         variant = _classify_blue_variant(analysis, direction)
@@ -2084,30 +2089,40 @@ class RedStrategy(BaseStrategy):
             confidence += 10.0
             met.append(f"Paso 5b: {rev_desc}")
 
-        # --- Paso 6: Entrada en 5M (RCC) ---
-        # TradingLab execution priority: "5min MA50 > diagonal > 2min MA/diagonal"
-        # 1. Check EMA M5 50 break (HIGHEST priority)
-        # 2. If not, check diagonal on 5min
-        # 3. If not, check EMA M2 50 (2min, approximated by M5 EMA 20)
-        # 4. If not, check diagonal on 2min
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
-        # M2 not available from broker API; use M5 EMA 20 as approximation
-        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+        # --- Paso 6: Entrada en exec TF (RCC) ---
+        # TradingLab execution priority (style-adaptive):
+        #   day: M5 MA50 > M5 diagonal > M2 MA50 > M2 diagonal
+        #   swing: H1 MA50 > H1 diagonal (Alex: "bajamos a gráfico de una hora y ejecutamos")
+        #   scalping: M1 MA50 > M1 diagonal (Alex: "ruptura en un minuto")
+        exec_ema_key = _tf_ema("exec", 50)
+        style = _get_trading_style()
+        # Secondary EMA: day uses M2≈M5_EMA20, swing/scalping have no secondary per mentorship
+        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        sec_ema_key = _sec_ema_map.get(style)
+        # Timeframe labels for chart-pattern matching
+        _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
+        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        exec_tf = _exec_tf_map.get(style, "M5")
+        sec_tf = _sec_tf_map.get(style)
+
+        ema_exec_break, ema_exec_desc = _check_ema_break(analysis, exec_ema_key, direction)
+        ema_sec_break, ema_sec_desc = False, ""
+        if sec_ema_key:
+            ema_sec_break, ema_sec_desc = _check_ema_break(analysis, sec_ema_key, direction)
 
         entry_found = False
 
-        # Priority 1: EMA M5 50 break (highest priority per mentorship)
-        if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
+        # Priority 1: Exec TF EMA 50 break (highest priority per mentorship)
+        if ema_exec_break:
+            if _check_rcc_confirmation(analysis, exec_ema_key, direction):
                 confidence += 12.0
-                met.append(f"Paso 6: RCC confirmado en EMA 5M 50 (prioridad maxima) - {ema_5m_desc}")
+                met.append(f"Paso 6: RCC confirmado en EMA {exec_tf} 50 (prioridad maxima) - {ema_exec_desc}")
             else:
-                failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                failed.append(f"Paso 6: EMA {exec_tf} rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
             entry_found = True
 
-        # Priority 2: Diagonal breakout on 5min
+        # Priority 2: Diagonal breakout on exec TF
         if not entry_found and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
@@ -2115,43 +2130,43 @@ class RedStrategy(BaseStrategy):
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf in ("M5", ""):
+                    if ptf in (exec_tf, ""):
                         confidence += 10.0
-                        met.append(f"Paso 6: Rompimiento de diagonal en 5M ({ptype})")
+                        met.append(f"Paso 6: Rompimiento de diagonal en {exec_tf} ({ptype})")
                         entry_found = True
                         break
 
-        # Priority 3: EMA M2 50 break (2min timeframe)
-        if not entry_found and ema_2m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+        # Priority 3: Secondary EMA break (day trading only — M2 via M5 EMA 20 proxy)
+        if not entry_found and ema_sec_break and sec_ema_key:
+            if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
-                met.append(f"Paso 6: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
+                met.append(f"Paso 6: RCC confirmado en EMA {sec_tf} ({sec_ema_key} proxy) - {ema_sec_desc}")
             else:
-                failed.append(f"Paso 6: EMA 2M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                failed.append(f"Paso 6: EMA {sec_tf} rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
             entry_found = True
 
-        # Priority 4: Diagonal breakout on 2min
-        if not entry_found and hasattr(analysis, 'chart_patterns'):
+        # Priority 4: Diagonal breakout on secondary TF (day trading only)
+        if not entry_found and sec_tf and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf == "M2":
+                    if ptf == sec_tf:
                         confidence += 6.0
-                        met.append(f"Paso 6: Rompimiento de diagonal en 2M ({ptype})")
+                        met.append(f"Paso 6: Rompimiento de diagonal en {sec_tf} ({ptype})")
                         entry_found = True
                         break
 
         if not entry_found:
-            failed.append(f"Paso 6: Sin entrada valida (ni EMA 5M/2M ni diagonal) - {ema_5m_desc}")
+            failed.append(f"Paso 6: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
 
-        # Additional confirmation: EMA 2M break adds confluence if not already the primary entry
-        if entry_found and ema_2m_break and ema_5m_break:
+        # Additional confirmation: secondary EMA break adds confluence if not already the primary entry
+        if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
             confidence += 5.0
-            met.append(f"Paso 6b: Confirmacion EMA 2M - {ema_2m_desc}")
+            met.append(f"Paso 6b: Confirmacion EMA {sec_tf} - {ema_sec_desc}")
 
         # TradingLab: RSI divergence bonus
         has_div, div_bonus = _check_rsi_divergence(analysis, direction)
@@ -2337,6 +2352,8 @@ class RedStrategy(BaseStrategy):
         fib_100 = analysis.fibonacci_levels.get("ext_1.0")
 
         # Wave 3 with strong daily setup: aggressive TP, target 1.618 extension
+        # Alex: "le añado un último condicional, y es que si entre el punto de entrada
+        # y el punto máximo hay un nivel de resistencia importante, me salgo antes"
         if wave_count == "3":
             # Check if daily setup is strong (HTF overbought/oversold or deceleration)
             daily_strong = (
@@ -2346,7 +2363,17 @@ class RedStrategy(BaseStrategy):
             if daily_strong and fib_1618_dir and tp1:
                 valid = (fib_1618_dir > tp1) if direction == "BUY" else (fib_1618_dir < tp1)
                 if valid:
-                    result["tp_max"] = fib_1618_dir
+                    # Check for important intermediate resistance between tp1 and 1.618
+                    # Alex: if there's a key daily resistance in between, exit there instead
+                    intermediate_levels = []
+                    if direction == "BUY":
+                        intermediate_levels = sorted([r for r in resistances if tp1 < r < fib_1618_dir])
+                    else:
+                        intermediate_levels = sorted([s for s in supports if fib_1618_dir < s < tp1], reverse=True)
+                    if intermediate_levels:
+                        result["tp_max"] = intermediate_levels[0]
+                    else:
+                        result["tp_max"] = fib_1618_dir
             # Fallback to 1.272 for Wave 3 without strong daily
             if "tp_max" not in result and fib_1272_dir and tp1:
                 valid = (fib_1272_dir > tp1) if direction == "BUY" else (fib_1272_dir < tp1)
@@ -2639,31 +2666,43 @@ class PinkStrategy(BaseStrategy):
                     "(PINK entra al COMPLETAR el patron, no al inicio)"
                 )
 
-        # --- Paso 5: Ejecutar al final del patron en 5M (RCC) ---
+        # --- Paso 5: Ejecutar al final del patron en exec TF (RCC) ---
         # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
-        # 4-tier execution cascade (like Blue/Red/Black):
-        # NOTE: Per mentorship, the 5M EMA will NOT be respected throughout the
+        # Style-adaptive execution cascade:
+        #   day: M5 > diagonal M5 > M2 > diagonal M2
+        #   swing: H1 > diagonal H1
+        #   scalping: M1 > diagonal M1
+        # NOTE: Per mentorship, the exec EMA will NOT be respected throughout the
         # Pink pattern due to volatility. Diagonal check is MORE likely to be
         # the valid entry for PINK, so diagonal gets equal/higher confidence.
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
-        # M2 not available from broker API; use M5 EMA 20 as approximation
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+        exec_ema_key = _tf_ema("exec", 50)
+        style = _get_trading_style()
+        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        sec_ema_key = _sec_ema_map.get(style)
+        _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
+        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        exec_tf = _exec_tf_map.get(style, "M5")
+        sec_tf = _sec_tf_map.get(style)
+
+        ema_exec_break, ema_exec_desc = _check_ema_break(analysis, exec_ema_key, direction)
+        ema_sec_break, ema_sec_desc = False, ""
+        if sec_ema_key:
+            ema_sec_break, ema_sec_desc = _check_ema_break(analysis, sec_ema_key, direction)
 
         entry_found = False
 
-        # Priority 1: EMA M5 50 break + RCC (+12)
-        # (Lower than Blue's +12 since 5M EMA is less reliable for PINK)
-        if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
+        # Priority 1: Exec TF EMA 50 break + RCC (+12)
+        if ema_exec_break:
+            if _check_rcc_confirmation(analysis, exec_ema_key, direction):
                 confidence += 12.0
-                met.append(f"Paso 5: RCC confirmado en EMA 5M 50 - {ema_5m_desc}")
+                met.append(f"Paso 5: RCC confirmado en EMA {exec_tf} 50 - {ema_exec_desc}")
             else:
-                failed.append(f"Paso 5: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                failed.append(f"Paso 5: EMA {exec_tf} rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
             entry_found = True
 
-        # Priority 2: Diagonal breakout on 5min (+12)
-        # PINK-specific: diagonal gets EQUAL confidence to EMA because 5M EMA
+        # Priority 2: Diagonal breakout on exec TF (+12)
+        # PINK-specific: diagonal gets EQUAL confidence to EMA because exec EMA
         # is often not respected during the corrective pattern volatility.
         if not entry_found and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
@@ -2672,44 +2711,43 @@ class PinkStrategy(BaseStrategy):
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf in ("M5", ""):
+                    if ptf in (exec_tf, ""):
                         confidence += 12.0
-                        met.append(f"Paso 5: Rompimiento de diagonal en 5M ({ptype}) - entrada PINK preferida")
+                        met.append(f"Paso 5: Rompimiento de diagonal en {exec_tf} ({ptype}) - entrada PINK preferida")
                         entry_found = True
                         break
 
-        # Priority 3: EMA M2 50 break + RCC (+8)
-        if not entry_found and ema_2m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+        # Priority 3: Secondary EMA break + RCC (day trading only)
+        if not entry_found and ema_sec_break and sec_ema_key:
+            if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
-                met.append(f"Paso 5: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
+                met.append(f"Paso 5: RCC confirmado en EMA {sec_tf} ({sec_ema_key} proxy) - {ema_sec_desc}")
             else:
-                failed.append(f"Paso 5: EMA 2M rota pero sin confirmacion RCC - entrada rechazada")
+                failed.append(f"Paso 5: EMA {sec_tf} rota pero sin confirmacion RCC - entrada rechazada")
                 return None
             entry_found = True
 
-        # Priority 4: Diagonal breakout on 2min (+8)
-        # Higher than Blue's +6 for PINK since diagonals are more reliable here
-        if not entry_found and hasattr(analysis, 'chart_patterns'):
+        # Priority 4: Diagonal breakout on secondary TF (day trading only, +8)
+        if not entry_found and sec_tf and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf == "M2":
+                    if ptf == sec_tf:
                         confidence += 8.0
-                        met.append(f"Paso 5: Rompimiento de diagonal en 2M ({ptype})")
+                        met.append(f"Paso 5: Rompimiento de diagonal en {sec_tf} ({ptype})")
                         entry_found = True
                         break
 
         if not entry_found:
-            failed.append(f"Paso 5: Sin entrada valida (ni EMA 5M/2M ni diagonal) - {ema_5m_desc}")
+            failed.append(f"Paso 5: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
 
         # Additional confluence: both EMA levels confirm
-        if entry_found and ema_2m_break and ema_5m_break:
+        if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
             confidence += 5.0
-            met.append(f"Paso 5b: Confluencia EMA 2M + 5M - {ema_2m_desc}")
+            met.append(f"Paso 5b: Confluencia EMA {sec_tf} + {exec_tf} - {ema_sec_desc}")
 
         has_reversal, rev_desc = _has_reversal_pattern(analysis, direction)
         if has_reversal:
@@ -3048,27 +3086,36 @@ class WhiteStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 4: {rev_desc}")
 
-        # --- Paso 5: Entrada en 5M (RCC) ---
+        # --- Paso 5: Entrada en exec TF (RCC) ---
         # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
-        # 4-tier execution cascade (same as Blue — WHITE is a Blue after Pink)
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
-        # M2 not available from broker API; use M5 EMA 20 as approximation
-        # (EMA 50 on M2 ≈ EMA 20 on M5 since M5 is 2.5x the M2 timeframe)
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+        # Style-adaptive execution cascade (same as Blue — WHITE is a Blue after Pink)
+        exec_ema_key = _tf_ema("exec", 50)
+        style = _get_trading_style()
+        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        sec_ema_key = _sec_ema_map.get(style)
+        _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
+        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        exec_tf = _exec_tf_map.get(style, "M5")
+        sec_tf = _sec_tf_map.get(style)
+
+        ema_exec_break, ema_exec_desc = _check_ema_break(analysis, exec_ema_key, direction)
+        ema_sec_break, ema_sec_desc = False, ""
+        if sec_ema_key:
+            ema_sec_break, ema_sec_desc = _check_ema_break(analysis, sec_ema_key, direction)
 
         entry_found = False
 
-        # Priority 1: EMA M5 50 break + RCC (+12, same as Blue)
-        if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
+        # Priority 1: Exec TF EMA 50 break + RCC (+12)
+        if ema_exec_break:
+            if _check_rcc_confirmation(analysis, exec_ema_key, direction):
                 confidence += 12.0
-                met.append(f"Paso 5: RCC confirmado en EMA 5M 50 (prioridad maxima) - {ema_5m_desc}")
+                met.append(f"Paso 5: RCC confirmado en EMA {exec_tf} 50 (prioridad maxima) - {ema_exec_desc}")
             else:
-                failed.append(f"Paso 5: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                failed.append(f"Paso 5: EMA {exec_tf} rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
             entry_found = True
 
-        # Priority 2: Diagonal breakout on 5min (+10, same as Blue)
+        # Priority 2: Diagonal breakout on exec TF (+10)
         if not entry_found and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
@@ -3076,43 +3123,43 @@ class WhiteStrategy(BaseStrategy):
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf in ("M5", ""):
+                    if ptf in (exec_tf, ""):
                         confidence += 10.0
-                        met.append(f"Paso 5: Rompimiento de diagonal en 5M ({ptype})")
+                        met.append(f"Paso 5: Rompimiento de diagonal en {exec_tf} ({ptype})")
                         entry_found = True
                         break
 
-        # Priority 3: EMA M2 50 break + RCC (+8, same as Blue)
-        if not entry_found and ema_2m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+        # Priority 3: Secondary EMA break + RCC (day trading only, +8)
+        if not entry_found and ema_sec_break and sec_ema_key:
+            if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
-                met.append(f"Paso 5: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
+                met.append(f"Paso 5: RCC confirmado en EMA {sec_tf} ({sec_ema_key} proxy) - {ema_sec_desc}")
             else:
-                failed.append(f"Paso 5: EMA 2M rota pero sin confirmacion RCC - entrada rechazada")
+                failed.append(f"Paso 5: EMA {sec_tf} rota pero sin confirmacion RCC - entrada rechazada")
                 return None
             entry_found = True
 
-        # Priority 4: Diagonal breakout on 2min (+6, same as Blue)
-        if not entry_found and hasattr(analysis, 'chart_patterns'):
+        # Priority 4: Diagonal breakout on secondary TF (day trading only, +6)
+        if not entry_found and sec_tf and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break")):
-                    if ptf == "M2":
+                    if ptf == sec_tf:
                         confidence += 6.0
-                        met.append(f"Paso 5: Rompimiento de diagonal en 2M ({ptype})")
+                        met.append(f"Paso 5: Rompimiento de diagonal en {sec_tf} ({ptype})")
                         entry_found = True
                         break
 
         if not entry_found:
-            failed.append(f"Paso 5: Sin entrada valida (ni EMA 5M/2M ni diagonal) - {ema_5m_desc}")
+            failed.append(f"Paso 5: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
 
         # Additional confluence: both EMA levels confirm
-        if entry_found and ema_2m_break and ema_5m_break:
+        if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
             confidence += 5.0
-            met.append(f"Paso 5b: Confluencia EMA 2M + 5M - {ema_2m_desc}")
+            met.append(f"Paso 5b: Confluencia EMA {sec_tf} + {exec_tf} - {ema_sec_desc}")
 
         # TradingLab: RSI divergence bonus
         has_div, div_bonus = _check_rsi_divergence(analysis, direction)
@@ -3555,27 +3602,39 @@ class BlackStrategy(BaseStrategy):
                 )
                 return None  # No 1H candle pattern = no Black entry
 
-        # --- Paso 6: Ejecutar en rompimiento 5M (RCC) ---
-        # TradingLab execution priority for BLACK:
-        # "5min MA50 > diagonal 5min > 2min MA50"
+        # --- Paso 6: Ejecutar en rompimiento exec TF (RCC) ---
+        # TradingLab execution priority for BLACK (style-adaptive):
+        #   day: M5 MA50 > diagonal M5 > M2 MA50
+        #   swing: H1 MA50 > diagonal H1
+        #   scalping: M1 MA50 > diagonal M1
         # Diagonal is especially important for BLACK (triangle/wedge patterns)
-        ema_5m_break, ema_5m_desc = _check_ema_break(analysis, "EMA_M5_50", direction)
-        # M2 approximation via M5 EMA 20
-        ema_2m_break, ema_2m_desc = _check_ema_break(analysis, "EMA_M5_20", direction)
+        exec_ema_key = _tf_ema("exec", 50)
+        style = _get_trading_style()
+        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        sec_ema_key = _sec_ema_map.get(style)
+        _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
+        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        exec_tf = _exec_tf_map.get(style, "M5")
+        sec_tf = _sec_tf_map.get(style)
+
+        ema_exec_break, ema_exec_desc = _check_ema_break(analysis, exec_ema_key, direction)
+        ema_sec_break, ema_sec_desc = False, ""
+        if sec_ema_key:
+            ema_sec_break, ema_sec_desc = _check_ema_break(analysis, sec_ema_key, direction)
 
         entry_found = False
 
-        # Priority 1: EMA M5 50 break + RCC (highest priority)
-        if ema_5m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_50", direction):
+        # Priority 1: Exec TF EMA 50 break + RCC (highest priority)
+        if ema_exec_break:
+            if _check_rcc_confirmation(analysis, exec_ema_key, direction):
                 confidence += 12.0
-                met.append(f"Paso 6: RCC confirmado en EMA 5M 50 (prioridad maxima) - {ema_5m_desc}")
+                met.append(f"Paso 6: RCC confirmado en EMA {exec_tf} 50 (prioridad maxima) - {ema_exec_desc}")
             else:
-                failed.append(f"Paso 6: EMA 5M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                failed.append(f"Paso 6: EMA {exec_tf} rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
             entry_found = True
 
-        # Priority 2: Diagonal breakout on 5min (especially important for BLACK triangle patterns)
+        # Priority 2: Diagonal breakout on exec TF (especially important for BLACK triangle patterns)
         if not entry_found and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
@@ -3583,24 +3642,24 @@ class BlackStrategy(BaseStrategy):
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break", "triangle_break")):
-                    if ptf in ("M5", ""):
+                    if ptf in (exec_tf, ""):
                         confidence += 10.0
-                        met.append(f"Paso 6: Rompimiento de diagonal/triangulo en 5M ({ptype}) - clave para BLACK")
+                        met.append(f"Paso 6: Rompimiento de diagonal/triangulo en {exec_tf} ({ptype}) - clave para BLACK")
                         entry_found = True
                         break
 
-        # Priority 3: EMA M2 50 break + RCC (2min timeframe)
-        if not entry_found and ema_2m_break:
-            if _check_rcc_confirmation(analysis, "EMA_M5_20", direction):
+        # Priority 3: Secondary EMA break + RCC (day trading only)
+        if not entry_found and ema_sec_break and sec_ema_key:
+            if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
-                met.append(f"Paso 6: RCC confirmado en EMA 2M (M5 proxy) - {ema_2m_desc}")
+                met.append(f"Paso 6: RCC confirmado en EMA {sec_tf} ({sec_ema_key} proxy) - {ema_sec_desc}")
             else:
-                failed.append(f"Paso 6: EMA 2M rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
+                failed.append(f"Paso 6: EMA {sec_tf} rota pero sin confirmacion RCC - entrada rechazada (NEVER enter on break alone)")
                 return None
             entry_found = True
 
         if not entry_found:
-            failed.append(f"Paso 6: Sin rompimiento 5M ni diagonal - {ema_5m_desc}")
+            failed.append(f"Paso 6: Sin rompimiento {exec_tf} ni diagonal - {ema_exec_desc}")
 
         # NOTE: RSI divergence already checked above (Paso 5c) with BLACK-specific
         # logic (+15/-10). Do NOT call _check_rsi_divergence() here to avoid double-counting.

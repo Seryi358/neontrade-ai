@@ -360,15 +360,13 @@ class PositionManager:
         if pos is None:
             return
 
-        # Only trigger CPA on positions already past BE (not too early)
+        # Only trigger CPA on positions in BE or trailing-to-TP1 phase
+        # (INITIAL/SL_MOVED = too early, BEYOND_TP1 = already aggressive)
         if pos.phase not in (PositionPhase.BREAK_EVEN, PositionPhase.TRAILING_TO_TP1):
+            reason_str = "already aggressive" if pos.phase == PositionPhase.BEYOND_TP1 else "too early"
             logger.debug(
-                f"{trade_id}: CPA trigger '{reason}' ignored — phase {pos.phase.value} too early"
+                f"{trade_id}: CPA trigger '{reason}' ignored — phase {pos.phase.value} ({reason_str})"
             )
-            return
-
-        # Don't re-trigger temporary CPA if already in aggressive phase
-        if pos.phase == PositionPhase.BEYOND_TP1:
             return
 
         cpa_key = self._get_cpa_ema_key(pos.instrument)
@@ -995,7 +993,20 @@ class PositionManager:
                 logger.debug(f"{pos.trade_id}: Fallback trail SL -> {new_sl:.5f}")
 
     async def _update_sl(self, pos: ManagedPosition, new_sl: float) -> bool:
-        """Update stop loss on the broker. Returns True if successful."""
+        """Update stop loss on the broker. Returns True if successful.
+        Safety: rejects SL moves in the wrong direction (BUY: down, SELL: up)."""
+        # Direction guard — SL must only move favorably (reduce risk)
+        if pos.current_sl and pos.current_sl != 0:
+            if pos.direction == "BUY" and new_sl < pos.current_sl:
+                logger.warning(
+                    f"{pos.trade_id}: Blocked SL move DOWN for BUY: {pos.current_sl:.5f} -> {new_sl:.5f}"
+                )
+                return False
+            if pos.direction == "SELL" and new_sl > pos.current_sl:
+                logger.warning(
+                    f"{pos.trade_id}: Blocked SL move UP for SELL: {pos.current_sl:.5f} -> {new_sl:.5f}"
+                )
+                return False
         try:
             result = await self.broker.modify_trade_sl(pos.trade_id, new_sl)
             if result:

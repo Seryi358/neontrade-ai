@@ -1064,14 +1064,14 @@ async def test_database():
         })
         results["trade_insert"] = trade_id is not None and len(trade_id) > 0
 
-        # Query trade
-        history = await db.get_trade_history(limit=10)
-        results["trade_query"] = len(history) == 1
-        results["trade_data"] = history[0]["instrument"] == "EUR_USD"
-
-        # Update trade
+        # Update trade to closed so get_trade_history (which filters status != 'open') returns it
         updated = await db.update_trade(trade_id, {"exit_price": 1.115, "pnl": 15.0, "status": "closed_tp"})
         results["trade_update"] = updated is True
+
+        # Query trade (must be after closing — get_trade_history excludes open trades)
+        history = await db.get_trade_history(limit=10)
+        results["trade_query"] = len(history) == 1
+        results["trade_data"] = len(history) > 0 and history[0]["instrument"] == "EUR_USD"
 
         # Daily stats
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

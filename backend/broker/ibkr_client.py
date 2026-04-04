@@ -576,7 +576,7 @@ class IBKRClient(BaseBroker):
     async def place_market_order(
         self,
         instrument: str,
-        units: int,
+        units: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
     ) -> OrderResult:
@@ -660,7 +660,7 @@ class IBKRClient(BaseBroker):
     async def place_limit_order(
         self,
         instrument: str,
-        units: int,
+        units: float,
         price: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,

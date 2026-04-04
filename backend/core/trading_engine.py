@@ -2052,9 +2052,31 @@ class TradingEngine:
                     new_tp = adjustments.get("suggested_tp1")
                     new_tp_max = adjustments.get("suggested_tp_max")
                     if new_sl and isinstance(new_sl, (int, float)) and new_sl > 0:
-                        signal.stop_loss = float(new_sl)
+                        # Validate SL is on the correct side of entry
+                        sl_valid = (
+                            (signal.direction == "BUY" and new_sl < signal.entry_price) or
+                            (signal.direction == "SELL" and new_sl > signal.entry_price)
+                        )
+                        if sl_valid:
+                            signal.stop_loss = float(new_sl)
+                        else:
+                            logger.warning(
+                                f"AI suggested invalid SL {new_sl} for {signal.direction} "
+                                f"entry {signal.entry_price} — ignoring (wrong side)"
+                            )
                     if new_tp and isinstance(new_tp, (int, float)) and new_tp > 0:
-                        signal.take_profit_1 = float(new_tp)
+                        # Validate TP is on the correct side of entry
+                        tp_valid = (
+                            (signal.direction == "BUY" and new_tp > signal.entry_price) or
+                            (signal.direction == "SELL" and new_tp < signal.entry_price)
+                        )
+                        if tp_valid:
+                            signal.take_profit_1 = float(new_tp)
+                        else:
+                            logger.warning(
+                                f"AI suggested invalid TP1 {new_tp} for {signal.direction} "
+                                f"entry {signal.entry_price} — ignoring (wrong side)"
+                            )
                     if new_tp_max and isinstance(new_tp_max, (int, float)) and new_tp_max > 0:
                         signal.take_profit_max = float(new_tp_max)
             except Exception as e:

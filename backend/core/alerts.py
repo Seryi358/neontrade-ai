@@ -603,8 +603,13 @@ class AlertManager:
         colours = {
             "trade_executed": 0x00FF9D,   # green
             "setup_pending": 0xFFD700,    # gold
+            "setup_rejected": 0xFB3048,   # red
             "trade_closed": 0x3498DB,     # blue
             "daily_summary": 0x9B59B6,    # purple
+            "position_update": 0x9B59B6,  # purple
+            "risk_alert": 0xFF6B6B,       # red/orange warning
+            "engine_status": 0x3498DB,    # blue
+            "orphaned_trade": 0xFF6B6B,   # red warning
             "test": 0x00FF9D,             # green
         }
         return colours.get(alert_type, DISCORD_EMBED_COLOUR)

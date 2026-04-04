@@ -649,6 +649,17 @@ class Backtester:
                     # Friday: no new trades after 18:00 UTC
                     if _wd == 4 and _h >= 18:
                         _allow_new_trade = False
+                    # Friday EOD: force-close all open positions at 22:00 UTC
+                    # TradingLab: no weekend exposure — close everything before market close
+                    if _wd == 4 and _h >= 22 and open_positions:
+                        for pos in list(open_positions):
+                            pos.force_close(bar_close, "FRIDAY_CLOSE")
+                            pos.trade.exit_time = bar_time
+                            balance += pos.trade.pnl
+                            trades.append(pos.trade)
+                            cooldown_remaining = config.cooldown_bars
+                        open_positions.clear()
+                        logger.debug(f"[Backtest] Friday EOD close at {bar_time}")
             except Exception as e:
                 logger.warning(f"Failed to parse bar time for session/Friday check: {e}. Blocking new trade as safety.")
                 _allow_new_trade = False

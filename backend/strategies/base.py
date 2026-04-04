@@ -421,7 +421,7 @@ def _check_premium_discount_zone(analysis, direction: str) -> tuple[bool, str]:
     elif direction == "SELL" and zone == "premium":
         return True, "Precio en zona PREMIUM (favorable para venta)"
     elif zone == "equilibrium":
-        return True, "Precio en zona de equilibrio (neutral)"
+        return True, ""  # Equilibrium = neutral, no positive or negative point
     else:
         return False, f"Precio en zona {zone} ({direction} desfavorable)"
 

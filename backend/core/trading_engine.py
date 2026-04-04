@@ -2020,10 +2020,13 @@ class TradingEngine:
                 if adjustments:
                     new_sl = adjustments.get("suggested_sl")
                     new_tp = adjustments.get("suggested_tp1")
+                    new_tp_max = adjustments.get("suggested_tp_max")
                     if new_sl and isinstance(new_sl, (int, float)) and new_sl > 0:
                         signal.stop_loss = float(new_sl)
                     if new_tp and isinstance(new_tp, (int, float)) and new_tp > 0:
                         signal.take_profit_1 = float(new_tp)
+                    if new_tp_max and isinstance(new_tp_max, (int, float)) and new_tp_max > 0:
+                        signal.take_profit_max = float(new_tp_max)
             except Exception as e:
                 logger.warning(f"AI validation failed — BLOCKING (cannot validate = cannot proceed): {e}")
                 self._daily_setups_skipped_ai += 1

@@ -68,6 +68,19 @@ class BacktestConfig:
     max_concurrent_positions: int = 3
     # Cooldown bars after a trade closes before another can open
     cooldown_bars: int = 2
+    # Maximum trades per day (0 = unlimited). Matches live engine Gate 2.
+    max_trades_per_day: int = 0
+    # Drawdown-based risk reduction (matches live engine risk_manager).
+    # When current drawdown from peak exceeds these thresholds, risk_per_trade
+    # is temporarily reduced.  Set to 0 to disable.
+    dd_level_1: float = 0.0412   # -4.12% DD → risk drops to dd_risk_1
+    dd_risk_1: float = 0.0075    # 0.75%
+    dd_level_2: float = 0.0618   # -6.18% DD → risk drops to dd_risk_2
+    dd_risk_2: float = 0.005     # 0.50%
+    dd_level_3: float = 0.0823   # -8.23% DD → risk drops to dd_risk_3
+    dd_risk_3: float = 0.0025    # 0.25%
+    # Scale-in rule: require existing positions at BE before opening new ones
+    scale_in_require_be: bool = True
 
 
 class TradeOutcome(Enum):
@@ -582,6 +595,8 @@ class Backtester:
         open_positions: List[_SimulatedPosition] = []
         cooldown_remaining = 0
         peak_balance = balance
+        daily_trade_count = 0
+        current_trade_day: Optional[str] = None
 
         # Analysis frequency: run the full analyzer every N H1 bars to
         # keep the backtest tractable.  4 bars = every 4 hours.
@@ -688,11 +703,42 @@ class Backtester:
                 logger.warning(f"Failed to parse bar time for session/Friday check: {e}. Blocking new trade as safety.")
                 _allow_new_trade = False
 
+            # Gate 2: Daily trade limit (matches live engine max_trades_per_day)
+            try:
+                trade_day = bar_time[:10]
+                if trade_day != current_trade_day:
+                    current_trade_day = trade_day
+                    daily_trade_count = 0
+            except Exception:
+                pass
+
+            # Gate 5: Per-instrument duplicate check (live engine blocks same-instrument)
+            _instrument_already_open = any(
+                pos.trade.instrument == config.instrument for pos in open_positions
+            )
+
+            # Gate 10: Scale-in BE enforcement (live engine requires BE on existing)
+            _scale_in_blocked = False
+            if config.scale_in_require_be and open_positions:
+                for pos in open_positions:
+                    if pos.phase.value < PositionPhase.BREAK_EVEN.value:
+                        _scale_in_blocked = True
+                        break
+
+            # Gate 2 check: max_trades_per_day
+            _daily_limit_ok = (
+                config.max_trades_per_day <= 0
+                or daily_trade_count < config.max_trades_per_day
+            )
+
             if (
                 last_signal is not None
                 and cooldown_remaining <= 0
                 and _allow_new_trade
                 and len(open_positions) < config.max_concurrent_positions
+                and not _instrument_already_open
+                and not _scale_in_blocked
+                and _daily_limit_ok
             ):
                 new_pos = self._try_open_position(
                     signal=last_signal,
@@ -703,6 +749,7 @@ class Backtester:
                 )
                 if new_pos is not None:
                     open_positions.append(new_pos)
+                    daily_trade_count += 1
                     last_signal = None  # consume the signal
 
             # Decrement cooldown AFTER entry check so cooldown_bars=2
@@ -995,8 +1042,19 @@ class Backtester:
         if direction == "SELL" and tp1 >= entry_price:
             return None
 
-        # ── Position size ────────────────────────────────────────────
-        risk_amount = balance * config.risk_per_trade
+        # ── Position size (with drawdown-based risk reduction) ────────
+        # Matches live engine risk_manager.py Fixed Levels method:
+        # reduce risk when drawdown from peak exceeds thresholds.
+        effective_risk = config.risk_per_trade
+        if config.dd_level_1 > 0 and balance < config.initial_balance:
+            dd_pct = (config.initial_balance - balance) / config.initial_balance
+            if dd_pct >= config.dd_level_3:
+                effective_risk = config.dd_risk_3
+            elif dd_pct >= config.dd_level_2:
+                effective_risk = config.dd_risk_2
+            elif dd_pct >= config.dd_level_1:
+                effective_risk = config.dd_risk_1
+        risk_amount = balance * effective_risk
         pv = _pip_value(config.instrument)
         sl_pips = risk_dist / pv if pv > 0 else 0
         if sl_pips <= 0:

@@ -2460,7 +2460,7 @@ class TradingEngine:
                             "strategy_variant": setup.strategy_variant or getattr(setup, '_strategy_name', 'DETECTED'),
                             "direction": setup.direction,
                             "units": abs(setup.units),
-                            "entry_price": setup.entry_price,
+                            "entry_price": fill_price,
                             "stop_loss": setup.stop_loss,
                             "take_profit": setup.take_profit_1,
                             "mode": self.mode.value,
@@ -2477,7 +2477,7 @@ class TradingEngine:
                 self._push_notification(
                     "trade_executed",
                     f"Trade Ejecutado: {inst_text}",
-                    f"{dir_text} | Entry: {setup.entry_price:.5f} | SL: {setup.stop_loss:.5f} | TP: {setup.take_profit_1:.5f} | R:R {setup.reward_risk_ratio:.1f}",
+                    f"{dir_text} | Entry: {fill_price:.5f} | SL: {setup.stop_loss:.5f} | TP: {setup.take_profit_1:.5f} | R:R {setup.reward_risk_ratio:.1f}",
                     {"trade_id": trade_id, "instrument": setup.instrument},
                 )
                 self._daily_setups_executed += 1
@@ -2490,7 +2490,7 @@ class TradingEngine:
                             "trade_id": trade_id,
                             "instrument": setup.instrument,
                             "direction": setup.direction,
-                            "entry_price": setup.entry_price,
+                            "entry_price": fill_price,
                             "stop_loss": setup.stop_loss,
                             "take_profit": setup.take_profit_1,
                             "units": setup.units,
@@ -2515,7 +2515,7 @@ class TradingEngine:
                             trade_id=trade_id,
                             instrument=setup.instrument,
                             direction=setup.direction,
-                            entry_price=setup.entry_price,
+                            entry_price=fill_price,
                             sl=setup.stop_loss,
                             tp1=setup.take_profit_1,
                             tp_max=setup.take_profit_max,
@@ -2543,7 +2543,7 @@ class TradingEngine:
                         await self.alert_manager.send_trade_executed(
                             instrument=setup.instrument,
                             direction=setup.direction,
-                            entry=setup.entry_price,
+                            entry=fill_price,
                             sl=setup.stop_loss,
                             tp=setup.take_profit_1,
                             rr=setup.reward_risk_ratio,

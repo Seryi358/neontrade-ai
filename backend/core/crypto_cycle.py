@@ -109,6 +109,11 @@ class CryptoCycleAnalyzer:
                 "money flowing to stablecoins, not alts"
             )
 
+        # Rotation phase needs BOTH eth_outperforming_btc (from _analyze_btc_eth)
+        # AND btc_dominance_trend + altcoin_season (from _analyze_dominance).
+        # Must run after both to avoid stale defaults.
+        self._determine_rotation_phase(cycle)
+
         self._analyze_halving_phase(cycle)
         await self._analyze_rsi(cycle)
         await self._check_ema8_weekly(cycle)
@@ -240,31 +245,38 @@ class CryptoCycleAnalyzer:
 
                 cycle.eth_outperforming_btc = eth_perf > btc_perf
 
-                # Determine capital rotation phase based on dominance trend
-                # and relative performance
-                # Capital rotation sequence: btc -> eth -> large_alts -> small_alts -> memecoins
-                if cycle.btc_dominance_trend == "rising":
-                    cycle.rotation_phase = "btc"  # Money flowing into BTC
-                elif cycle.eth_outperforming_btc and cycle.btc_dominance_trend == "falling":
-                    # ETH outperforming + falling dominance = rotation to ETH/alts
-                    if cycle.altcoin_season:
-                        cycle.rotation_phase = "large_alts"  # Broad alt rotation
-                    else:
-                        cycle.rotation_phase = "eth"  # Early rotation to ETH
-                elif cycle.altcoin_season:
-                    # Late-cycle: distinguish small_alts vs memecoins.
-                    # When dominance is falling fast AND ETH is no longer leading
-                    # (ETH/BTC flat or falling while alts pump), we're in the
-                    # final memecoin speculation phase.
-                    if not cycle.eth_outperforming_btc and cycle.btc_dominance_trend == "falling":
-                        cycle.rotation_phase = "memecoins"  # Final euphoria phase
-                    else:
-                        cycle.rotation_phase = "small_alts"  # Late-cycle alt speculation
-                else:
-                    cycle.rotation_phase = "btc"  # Default: money in BTC
-
         except Exception as e:
             logger.debug(f"BTC/ETH analysis failed: {e}")
+
+    def _determine_rotation_phase(self, cycle: CryptoMarketCycle):
+        """Determine capital rotation phase from combined signals.
+
+        Must run AFTER both _analyze_btc_eth (sets eth_outperforming_btc)
+        and _analyze_dominance (sets btc_dominance_trend, altcoin_season).
+
+        Capital rotation sequence (TradingLab Crypto Specialization):
+          BTC -> ETH -> Large cap alts -> Small cap alts -> Memecoins
+        """
+        if cycle.btc_dominance_trend == "rising":
+            cycle.rotation_phase = "btc"  # Money flowing into BTC
+        elif cycle.eth_outperforming_btc and cycle.btc_dominance_trend == "falling":
+            # ETH outperforming + falling dominance = rotation to ETH/alts
+            if cycle.altcoin_season:
+                cycle.rotation_phase = "large_alts"  # Broad alt rotation
+            else:
+                cycle.rotation_phase = "eth"  # Early rotation to ETH
+        elif cycle.altcoin_season:
+            # Late-cycle: distinguish small_alts vs memecoins.
+            # When dominance is falling fast AND ETH is no longer leading
+            # (ETH/BTC flat or falling while alts pump), we're in the
+            # final memecoin speculation phase.
+            if not cycle.eth_outperforming_btc and cycle.btc_dominance_trend == "falling":
+                cycle.rotation_phase = "memecoins"  # Final euphoria phase
+            else:
+                cycle.rotation_phase = "small_alts"  # Late-cycle alt speculation
+        elif cycle.btc_dominance_trend != "unknown":
+            cycle.rotation_phase = "btc"  # Default when dominance data available
+        # If btc_dominance_trend is still "unknown", leave rotation_phase as "unknown"
 
     def get_dominance_transition(self, cycle: CryptoMarketCycle) -> Dict[str, str]:
         """Determine altcoin outlook from BTC dominance trend + BTC price trend.

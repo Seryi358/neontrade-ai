@@ -616,8 +616,9 @@ class TestCapitalRotation:
 
         analyzer = CryptoCycleAnalyzer(broker=broker)
         cycle = CryptoMarketCycle()
-        await analyzer._analyze_dominance(cycle)
         await analyzer._analyze_btc_eth(cycle)
+        await analyzer._analyze_dominance(cycle)
+        analyzer._determine_rotation_phase(cycle)
         assert cycle.rotation_phase == "btc"
 
     @pytest.mark.asyncio
@@ -633,8 +634,9 @@ class TestCapitalRotation:
 
         analyzer = CryptoCycleAnalyzer(broker=broker)
         cycle = CryptoMarketCycle()
-        await analyzer._analyze_dominance(cycle)
         await analyzer._analyze_btc_eth(cycle)
+        await analyzer._analyze_dominance(cycle)
+        analyzer._determine_rotation_phase(cycle)
         # eth_outperforming + falling dom + no altseason = "eth" phase
         if cycle.btc_dominance_trend == "falling" and cycle.eth_outperforming_btc and not cycle.altcoin_season:
             assert cycle.rotation_phase == "eth"

@@ -440,7 +440,7 @@ EMA ROLES (do NOT confuse):
 ═══════════════════════════════════════════════════════════════════
 
 Position Management EMA Grid (Forex):
-- LP (Long-term):  Swing=Daily EMA50, Day=H1 EMA50, Scalp=M15 EMA50
+- LP (Long-term):  Swing=Daily EMA50, Day=H1 EMA50, Scalp=M5 EMA50
 - CP (Short-term):  Swing=H1 EMA50, Day=M5 EMA50, Scalp=M1 EMA50
 - CPA (Aggressive): Swing=M15 EMA50, Day=M2 EMA50, Scalp=30s EMA50 (M1 as closest available if 30s not supported)
 

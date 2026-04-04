@@ -608,6 +608,9 @@ class TradingEngine:
             await self._sync_positions_from_broker()
         except Exception as e:
             logger.warning(f"Final position sync on stop failed: {e}")
+        # Close alert manager HTTP client to avoid connection leaks
+        if hasattr(self, 'alert_manager') and self.alert_manager:
+            await self.alert_manager.close()
 
     # ── Core Tick ────────────────────────────────────────────────
 

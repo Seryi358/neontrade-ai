@@ -115,6 +115,7 @@ class AlertManager:
         # Gmail OAuth2 token cache
         self._gmail_access_token: Optional[str] = None
         self._gmail_token_expires_at: float = 0.0
+        self._gmail_refresh_lock: asyncio.Lock = asyncio.Lock()
 
         # Try to load persisted config from disk (overridden by explicit arg)
         if config is None:
@@ -694,36 +695,42 @@ class AlertManager:
         if self._gmail_access_token and time.time() < self._gmail_token_expires_at:
             return self._gmail_access_token
 
-        cfg = self._config
-        resp = await self._get_http().post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "client_id": cfg.gmail_client_id,
-                "client_secret": cfg.gmail_client_secret,
-                "refresh_token": cfg.gmail_refresh_token,
-                "grant_type": "refresh_token",
-            },
-        )
-        if resp.status_code == 200:
-            try:
-                self._gmail_access_token = resp.json().get("access_token")
-            except (ValueError, KeyError) as e:
-                logger.error(f"Gmail token refresh returned 200 but malformed JSON: {e}")
-                self._gmail_access_token = None
-                self._gmail_token_expires_at = 0.0
-                return None
-            if not self._gmail_access_token:
-                logger.error("Gmail token refresh returned 200 but no access_token in response")
-                self._gmail_token_expires_at = 0.0
-                return None
-            self._gmail_token_expires_at = time.time() + 3500  # cache for ~58 min
-            logger.info("Gmail access token refreshed, expires in 3500s")
-            return self._gmail_access_token
+        # Serialize refresh attempts to prevent concurrent token races
+        async with self._gmail_refresh_lock:
+            # Re-check after acquiring lock (another coroutine may have refreshed)
+            if self._gmail_access_token and time.time() < self._gmail_token_expires_at:
+                return self._gmail_access_token
 
-        logger.error("Gmail token refresh failed: {} {}", resp.status_code, resp.text)
-        self._gmail_access_token = None
-        self._gmail_token_expires_at = 0.0
-        return None
+            cfg = self._config
+            resp = await self._get_http().post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": cfg.gmail_client_id,
+                    "client_secret": cfg.gmail_client_secret,
+                    "refresh_token": cfg.gmail_refresh_token,
+                    "grant_type": "refresh_token",
+                },
+            )
+            if resp.status_code == 200:
+                try:
+                    self._gmail_access_token = resp.json().get("access_token")
+                except (ValueError, KeyError) as e:
+                    logger.error(f"Gmail token refresh returned 200 but malformed JSON: {e}")
+                    self._gmail_access_token = None
+                    self._gmail_token_expires_at = 0.0
+                    return None
+                if not self._gmail_access_token:
+                    logger.error("Gmail token refresh returned 200 but no access_token in response")
+                    self._gmail_token_expires_at = 0.0
+                    return None
+                self._gmail_token_expires_at = time.time() + 3500  # cache for ~58 min
+                logger.info("Gmail access token refreshed, expires in 3500s")
+                return self._gmail_access_token
+
+            logger.error("Gmail token refresh failed: {} {}", resp.status_code, resp.text)
+            self._gmail_access_token = None
+            self._gmail_token_expires_at = 0.0
+            return None
 
 
 # ── Text helpers (module-private) ────────────────────────────────

@@ -1291,12 +1291,15 @@ async def set_alert_config(request: AlertConfigRequest):
     if not hasattr(engine, 'alert_manager'):
         raise HTTPException(501, "Alert manager not available")
 
-    from core.alerts import AlertConfig
+    from core.alerts import AlertConfig, _SENSITIVE_FIELDS
     current = engine.alert_manager._config
 
     updates = {k: v for k, v in request.model_dump().items() if v is not None}
     for key, value in updates.items():
         if hasattr(current, key):
+            # Skip masked values (e.g. "*****abcd") to prevent overwriting real secrets
+            if key in _SENSITIVE_FIELDS and isinstance(value, str) and value.startswith("*"):
+                continue
             setattr(current, key, value)
 
     engine.alert_manager.update_config(current)

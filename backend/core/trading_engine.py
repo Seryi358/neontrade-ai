@@ -691,6 +691,12 @@ class TradingEngine:
                     # Continue to normal scan — swing is allowed during news
                 else:
                     logger.info(f"News filter active: {news_desc} — skipping new trade execution")
+                    # Scalping: close positions on instruments affected by this specific news
+                    # Mentorship + should_close_for_news: "SCALPING: always close before news"
+                    # (news spikes can gap through tight scalping SLs causing outsized losses)
+                    if settings.trading_style == "scalping":
+                        await self._sync_positions_from_broker()
+                        await self._close_news_affected_positions()
                     # Still scan for analysis but don't execute new trades
                     await self._scan_analysis_only()
                     # Mentorship: day trading during news = "poner break evens y esperar"
@@ -709,65 +715,7 @@ class TradingEngine:
 
             # Step 0c: Close existing positions threatened by upcoming high-impact news
             # Trading Plan: 'Cerrar trades antes de noticias importantes'
-            if self.news_filter and self.position_manager.positions:
-                for trade_id, pos in list(self.position_manager.positions.items()):
-                    try:
-                        should_close, reason = await self.news_filter.should_close_for_news(pos.instrument)
-                        if should_close:
-                            await self.broker.close_trade(pos.trade_id)
-                            # Record trade result before removing
-                            pnl_val = 0.0
-                            news_exit_price = pos.entry_price  # fallback
-                            try:
-                                price_data = await self.broker.get_current_price(pos.instrument)
-                                news_exit_price = price_data.bid if pos.direction == "BUY" else price_data.ask
-                                pnl_val = ((news_exit_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - news_exit_price)) * abs(pos.units)
-                            except Exception as e:
-                                logger.warning(f"News close: could not get price for PnL ({e}), recording as $0")
-                            balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
-                            self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl_val / balance)
-                            self.position_manager.remove_position(pos.trade_id)
-                            self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
-                            logger.warning(f"News close: Closed {pos.instrument} — {reason}")
-                            # Persist to DB
-                            if self._db:
-                                try:
-                                    await self._db.update_trade(pos.trade_id, {
-                                        "status": "closed_news",
-                                        "closed_at": datetime.now(timezone.utc).isoformat(),
-                                        "exit_price": news_exit_price,
-                                        "pnl": pnl_val,
-                                    })
-                                except Exception as db_err:
-                                    logger.warning(f"DB update failed for news close {pos.trade_id}: {db_err}")
-                            # Record in trade journal
-                            if self.trade_journal:
-                                try:
-                                    self.trade_journal.record_trade(
-                                        trade_id=pos.trade_id,
-                                        instrument=pos.instrument,
-                                        pnl_dollars=pnl_val,
-                                        entry_price=pos.entry_price,
-                                        exit_price=news_exit_price,
-                                        strategy=getattr(pos, 'strategy_variant', 'UNKNOWN'),
-                                        direction=pos.direction,
-                                    )
-                                except Exception as je:
-                                    logger.warning(f"Trade journal failed for news close {pos.trade_id}: {je}")
-                            # Send alert
-                            if self.alert_manager:
-                                try:
-                                    await self.alert_manager.send_trade_closed(
-                                        instrument=pos.instrument,
-                                        pnl=pnl_val,
-                                        pips=0.0,
-                                        reason=f"Closed before news: {reason}",
-                                        strategy=getattr(pos, 'strategy_variant', '') or '',
-                                    )
-                                except Exception as e:
-                                    logger.warning(f"Close alert failed for {trade_id}: {e}")
-                    except Exception as e:
-                        logger.error(f"News close failed for {trade_id}: {e}")
+            await self._close_news_affected_positions()
 
             # Step 1: Update position management for open trades
             await self._manage_open_positions()
@@ -1431,6 +1379,75 @@ class TradingEngine:
             self._check_cpa_auto_triggers(prices)
         except Exception as e:
             logger.error(f"Error managing positions: {e}")
+
+    async def _close_news_affected_positions(self):
+        """Close positions on instruments threatened by upcoming high-impact news.
+
+        Trading Plan: 'Cerrar trades antes de noticias importantes'
+        Called during news windows to protect against news-spike slippage.
+        Scalping: always close.  Day trading: move to BE (handled by position manager).
+        Swing: proceeds with caution (this method still closes if should_close_for_news triggers).
+        """
+        if not self.news_filter or not self.position_manager.positions:
+            return
+        for trade_id, pos in list(self.position_manager.positions.items()):
+            try:
+                should_close, reason = await self.news_filter.should_close_for_news(pos.instrument)
+                if should_close:
+                    await self.broker.close_trade(pos.trade_id)
+                    # Record trade result before removing
+                    pnl_val = 0.0
+                    news_exit_price = pos.entry_price  # fallback
+                    try:
+                        price_data = await self.broker.get_current_price(pos.instrument)
+                        news_exit_price = price_data.bid if pos.direction == "BUY" else price_data.ask
+                        pnl_val = ((news_exit_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - news_exit_price)) * abs(pos.units)
+                    except Exception as e:
+                        logger.warning(f"News close: could not get price for PnL ({e}), recording as $0")
+                    balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+                    self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl_val / balance)
+                    self.position_manager.remove_position(pos.trade_id)
+                    self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
+                    logger.warning(f"News close: Closed {pos.instrument} — {reason}")
+                    # Persist to DB
+                    if self._db:
+                        try:
+                            await self._db.update_trade(pos.trade_id, {
+                                "status": "closed_news",
+                                "closed_at": datetime.now(timezone.utc).isoformat(),
+                                "exit_price": news_exit_price,
+                                "pnl": pnl_val,
+                            })
+                        except Exception as db_err:
+                            logger.warning(f"DB update failed for news close {pos.trade_id}: {db_err}")
+                    # Record in trade journal
+                    if self.trade_journal:
+                        try:
+                            self.trade_journal.record_trade(
+                                trade_id=pos.trade_id,
+                                instrument=pos.instrument,
+                                pnl_dollars=pnl_val,
+                                entry_price=pos.entry_price,
+                                exit_price=news_exit_price,
+                                strategy=getattr(pos, 'strategy_variant', 'UNKNOWN'),
+                                direction=pos.direction,
+                            )
+                        except Exception as je:
+                            logger.warning(f"Trade journal failed for news close {pos.trade_id}: {je}")
+                    # Send alert
+                    if self.alert_manager:
+                        try:
+                            await self.alert_manager.send_trade_closed(
+                                instrument=pos.instrument,
+                                pnl=pnl_val,
+                                pips=0.0,
+                                reason=f"Closed before news: {reason}",
+                                strategy=getattr(pos, 'strategy_variant', '') or '',
+                            )
+                        except Exception as ae:
+                            logger.warning(f"Close alert failed for {trade_id}: {ae}")
+            except Exception as e:
+                logger.error(f"News close failed for {trade_id}: {e}")
 
     def _check_cpa_auto_triggers(self, prices: dict):
         """Check CPA auto-trigger conditions for open positions (TradingLab mentorship).

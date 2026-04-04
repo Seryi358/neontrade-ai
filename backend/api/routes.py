@@ -1852,9 +1852,9 @@ async def get_screenshot_image(trade_id: str, filename: str):
     """Serve a screenshot image file."""
     from fastapi.responses import FileResponse
     import os
-    # Security: only allow alphanumeric + underscores + dashes + dots
+    # Security: only allow alphanumeric + underscores + dashes + dots, block traversal
     import re
-    if not re.match(r'^[\w\-\.]+$', filename):
+    if not re.match(r'^[\w\-\.]+$', filename) or '..' in filename:
         raise HTTPException(400, "Invalid filename")
     filepath = os.path.join("data", "screenshots", filename)
     if not os.path.exists(filepath):

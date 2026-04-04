@@ -3061,8 +3061,10 @@ class WhiteStrategy(BaseStrategy):
             confidence -= 3.0
             failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
-        # --- Paso 3: Pullback a EMA 50 1H + Fibonacci ---
-        pb_ok, pb_desc = _check_ema_pullback(analysis, "EMA_H1_50", direction)
+        # --- Paso 3: Pullback a setup EMA 50 + Fibonacci ---
+        # Style-adaptive: day=H1, swing=D, scalping=M5
+        setup_ema_key = _tf_ema("setup", 50)
+        pb_ok, pb_desc = _check_ema_pullback(analysis, setup_ema_key, direction)
         if pb_ok:
             confidence += 15.0
             met.append(f"Paso 3: {pb_desc}")
@@ -3674,9 +3676,11 @@ class BlackStrategy(BaseStrategy):
 
         # TradingLab: "Si la media movil de 50 de 1 hora esta actuando como
         # soporte o como resistencia dinamica, no hay black."
-        # Check if EMA 50 H1 acts as dynamic support (blocks SELL) or
+        # Check if setup EMA 50 acts as dynamic support (blocks SELL) or
         # dynamic resistance (blocks BUY).
-        ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
+        # Style-adaptive: day=H1, swing=D, scalping=M5
+        setup_ema_key_blk = _tf_ema("setup", 50)
+        ema_1h_50 = _ema_val(analysis, setup_ema_key_blk) or _ema_val(analysis, "EMA_H1_50")
         if ema_1h_50 and ema_1h_50 > 0:
             distance_to_ema = abs(entry_price - ema_1h_50) / entry_price
 

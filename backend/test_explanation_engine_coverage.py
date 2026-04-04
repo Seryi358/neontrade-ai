@@ -198,7 +198,7 @@ class TestStrategySteps:
     def test_black_steps(self, engine):
         signal = _mock_signal(strategy_value="BLACK")
         steps = engine._build_strategy_steps(signal)
-        assert len(steps) == 8
+        assert len(steps) == 7  # 7 steps per TradingLab mentorship (corrected from 8)
         assert any("RSI" in s for s in steps)
 
     def test_green_steps(self, engine):

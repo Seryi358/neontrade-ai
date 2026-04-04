@@ -4031,29 +4031,41 @@ class GreenStrategy(BaseStrategy):
                 failed.append("Paso 3: Fibonacci 0.75 claramente roto - pullback demasiado profundo (setup invalido)")
                 return False, score, met, failed
 
+        # TradingLab: "Fibonacci solo no cuenta. Fibonacci no es resistencia,
+        # Fibonacci es un nivel que añadimos extra, pero resistencia es
+        # horizontal, diagonal o dinámica." — need at least 1 real S/R or EMA.
+        real_sr_count = 0  # Non-Fibonacci levels (horizontal S/R, EMA)
         if price:
             tolerance = price * 0.005  # 0.5%
 
-            # Verificar confluencia de niveles
+            # Fibonacci levels (supplementary, NOT real S/R)
             if fib_382 and abs(price - fib_382) < tolerance:
                 confluence_count += 1
             if fib_618 and abs(price - fib_618) < tolerance:
                 confluence_count += 1
+            # EMA = dynamic S/R (counts as real)
             if ema_4h_50 and abs(price - ema_4h_50) < tolerance:
                 confluence_count += 1
+                real_sr_count += 1
 
             if direction == "BUY":
                 nearby_supports = [s for s in supports if abs(price - s) < tolerance]
                 confluence_count += len(nearby_supports)
+                real_sr_count += len(nearby_supports)
             else:
                 nearby_resistances = [r for r in resistances if abs(price - r) < tolerance]
                 confluence_count += len(nearby_resistances)
+                real_sr_count += len(nearby_resistances)
 
-        if confluence_count >= 2:
+        if confluence_count >= 2 and real_sr_count >= 1:
             score += 15.0
-            met.append(f"Paso 3: Alta confluencia ({confluence_count} niveles coinciden) - zona de soporte fuerte")
+            met.append(f"Paso 3: Alta confluencia ({confluence_count} niveles, {real_sr_count} S/R reales)")
+        elif confluence_count >= 2 and real_sr_count == 0:
+            # Fibonacci-only: not sufficient per mentorship
+            score += 5.0
+            failed.append("Paso 3: Solo Fibonacci — se necesita al menos 1 S/R real (horizontal, diagonal o EMA)")
         elif confluence_count == 1:
-            score += 8.0
+            score += 8.0 if real_sr_count >= 1 else 4.0
             met.append(f"Paso 3: Confluencia moderada ({confluence_count} nivel)")
         else:
             failed.append("Paso 3: Sin confluencia de niveles en zona actual")
@@ -4353,30 +4365,32 @@ class GreenStrategy(BaseStrategy):
                 return entry_price * 1.01
 
         # Advanced mode (default): SL below last swing before diagonal
+        # TradingLab: "le daremos un poquito de espacio" — 0.2% buffer
+        buffer_pct = 0.002
         if direction == "BUY":
             # 1H swing lows below entry = SL placement
             below = [sl for sl in swing_lows if sl < entry_price]
             if below:
-                return max(below)  # Tightest SL from 1H swing lows for high R:R
+                return max(below) * (1 - buffer_pct)  # Tightest 1H swing low + buffer
             # Fallback to key_levels supports
             support_below = [s for s in supports if s < entry_price]
             if support_below:
-                return max(support_below)
+                return max(support_below) * (1 - buffer_pct)
             # Fallback: ligeramente debajo de EMA 1H si disponible
             if ema_1h_50 and ema_1h_50 < entry_price:
-                return ema_1h_50 * 0.999
+                return ema_1h_50 * (1 - buffer_pct)
             return entry_price * 0.995  # 0.5% tight SL
         else:
             # 1H swing highs above entry = SL placement
             above = [sh for sh in swing_highs if sh > entry_price]
             if above:
-                return min(above)  # Tightest SL from 1H swing highs for high R:R
+                return min(above) * (1 + buffer_pct)  # Tightest 1H swing high + buffer
             # Fallback to key_levels resistances
             resistance_above = [r for r in resistances if r > entry_price]
             if resistance_above:
-                return min(resistance_above)
+                return min(resistance_above) * (1 + buffer_pct)
             if ema_1h_50 and ema_1h_50 > entry_price:
-                return ema_1h_50 * 1.001
+                return ema_1h_50 * (1 + buffer_pct)
             return entry_price * 1.005
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:

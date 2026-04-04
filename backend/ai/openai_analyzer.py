@@ -570,11 +570,11 @@ Entry Types:
 Execution Priority (all strategies): 5min MA50 > diagonal on 5min > 2min MA50 > diagonal on 2min.
 NEVER enter on break alone — require RCC (Rompe + Cierra + Confirma): price breaks the level, candle closes beyond it, next candle confirms.
 
-Trading Hours:
-- London session: 08:00-17:00 UTC (primary)
-- New York session: 13:00-22:00 UTC (secondary, overlap 13:00-17:00 is best)
+Trading Hours (ET = Eastern Time, shifts with DST: EDT=UTC-4, EST=UTC-5):
+- London session: 3:00 AM - 12:00 PM ET → 07:00-16:00 UTC (EDT) / 08:00-17:00 UTC (EST)
+- New York session: 8:00 AM - 5:00 PM ET → 12:00-21:00 UTC (EDT) / 13:00-22:00 UTC (EST)
+- Overlap (London+NY): 8:00 AM - 12:00 PM ET → 12:00-16:00 UTC (EDT) / 13:00-17:00 UTC (EST) — BEST
 - AVOID: Asian session for most pairs (low volatility, unpredictable moves)
-- BEST: London-NY overlap (13:00-17:00 UTC) — highest liquidity and volume
 
 Friday Close Rule:
 - Close ALL open positions before Friday 20:00 UTC
@@ -593,14 +593,13 @@ News Avoidance (per trading style):
 
 GREEN is the ONLY valid strategy for crypto:
 - Crypto markets are trend-driven with strong impulses; GREEN exploits this
-- The 7 sequential steps for crypto GREEN:
-  1. Identify the trend on the highest timeframe (Weekly)
-  2. Confirm breakout on the structure timeframe (Daily)
-  3. Wait for pullback on the intermediate timeframe
-  4. Identify continuation pattern (flag, pennant, triangle)
-  5. Draw diagonal/trendline on the pattern
-  6. RCC execution: Ruptura (break), Cierre (close beyond), Confirmacion (next candle confirms)
-  7. Set SL below pattern low / TP at measured move or Fibonacci extension
+- Same 6 Pasos as the main GREEN section (the steps are IDENTICAL, only timeframes differ):
+  Paso 1 (Tendencia): Directional structure on the highest TF
+  Paso 2 (Patrón): Correction within the HTF trend forms a pattern on the setup TF
+  Paso 3 (Confluencia): Pattern attacks S/R levels, Fibonacci, and EMAs
+  Paso 4 (Diagonal NON-NEGOTIABLE): Diagonal/trendline at the FINAL portion on confirmation TF
+  Paso 5 (RCC Entry): Ruptura + Cierre + Confirmación on execution TF
+  Paso 6 (SL/TP): SL below last swing on confirmation TF; TP at previous high/low on setup TF
 - NOTE: GREEN uses DIFFERENT timeframe layouts per trading style (mentorship): Swing: W->D->H1->M15, Day: H4->H1->M15->M2, Scalping: M15->M5->M1->30s. For crypto, the same layouts apply per CRYPTO_TIMEFRAMES in the strategy code.
 
 BMSB - Bull Market Support Band (Crypto Module 8):

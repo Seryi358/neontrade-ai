@@ -741,9 +741,23 @@ class RiskManager:
             f"Daily total: {self._funded_daily_pnl:+.2f}"
         )
 
+        # Check phase advancement on trade close (not on status read)
+        if settings.funded_account_mode:
+            profit_target = 0.0
+            if settings.funded_current_phase == 1:
+                profit_target = settings.funded_profit_target_phase1
+            elif settings.funded_current_phase == 2:
+                profit_target = settings.funded_profit_target_phase2
+            if profit_target > 0:
+                total_dd = self.get_current_drawdown()
+                initial_balance = self._peak_balance / (1 + total_dd) if total_dd < 1 else self._peak_balance
+                current_profit_pct = (self._current_balance - initial_balance) / initial_balance if initial_balance > 0 else 0
+                profit_progress = (current_profit_pct / profit_target * 100) if profit_target > 0 else 0
+                self._check_funded_phase_advancement(profit_target, profit_progress)
+
     def _check_funded_phase_advancement(self, profit_target: float, profit_progress: float) -> bool:
-        """Check and apply funded account phase transitions. Separated from get_funded_status
-        so read-only API calls don't trigger state mutations (RM-11 fix)."""
+        """Check and apply funded account phase transitions.
+        Called from record_funded_pnl (on trade close), NOT from get_funded_status."""
         if profit_target <= 0 or profit_progress < 100.0:
             return False
         if settings.funded_current_phase == 1:
@@ -795,9 +809,8 @@ class RiskManager:
             current_profit_pct = (self._current_balance - initial_balance) / initial_balance if initial_balance > 0 else 0
             profit_progress = (current_profit_pct / profit_target * 100) if profit_target > 0 else 0
 
-        # Phase advancement check — separated from read-only status to avoid
-        # mutating state on every GET request (RM-11 fix).
-        phase_advanced = self._check_funded_phase_advancement(profit_target, profit_progress)
+        # Phase advancement now happens in record_funded_pnl (on trade close),
+        # not here — this method is read-only for the GET API endpoint.
 
         can_trade, reason = self.check_funded_account_limits()
 
@@ -828,7 +841,7 @@ class RiskManager:
             "no_overnight": settings.funded_no_overnight,
             "no_news_trading": settings.funded_no_news_trading,
             "no_weekend": settings.funded_no_weekend,
-            "phase_advanced": phase_advanced,
+            "phase_advanced": False,  # Phase advancement now happens on trade close, not status read
         }
 
     @staticmethod

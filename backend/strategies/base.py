@@ -3893,6 +3893,29 @@ class BlackStrategy(BaseStrategy):
                 )
                 return None
 
+        # BLACK TP_max: Fibonacci 1.618 extension (projected Wave 1 target).
+        # BLACK anticipates a trend reversal — if the reversal develops into a full
+        # Wave 1, the Fib 1.618 extension is the maximum ambitious target.
+        tp1 = result.get("tp1")
+        if tp1:
+            fib_1618 = (
+                analysis.fibonacci_levels.get("ext_bull_1.618") if direction == "BUY"
+                else analysis.fibonacci_levels.get("ext_bear_1.618")
+            )
+            fib_1272 = (
+                analysis.fibonacci_levels.get("ext_bull_1.272") if direction == "BUY"
+                else analysis.fibonacci_levels.get("ext_bear_1.272")
+            )
+            # Try 1.618 first, then 1.272 — must be beyond tp1
+            if fib_1618:
+                valid = (fib_1618 > tp1) if direction == "BUY" else (fib_1618 < tp1)
+                if valid:
+                    result["tp_max"] = fib_1618
+            if "tp_max" not in result and fib_1272:
+                valid = (fib_1272 > tp1) if direction == "BUY" else (fib_1272 < tp1)
+                if valid:
+                    result["tp_max"] = fib_1272
+
         return result
 
 

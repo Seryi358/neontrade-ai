@@ -96,7 +96,7 @@ def make_pos(direction="BUY", entry=1.1000, sl=1.0950, tp1=1.1100, tp_max=1.1200
 
 
 def run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 # =====================================================================

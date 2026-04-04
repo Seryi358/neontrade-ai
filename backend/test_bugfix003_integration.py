@@ -344,7 +344,7 @@ def pm(broker, rm):
 
 
 def run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 async def simulate_detect_and_execute(

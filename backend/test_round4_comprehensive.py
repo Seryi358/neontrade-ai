@@ -592,7 +592,7 @@ async def test_risk_manager():
     settings.funded_account_mode = False  # Reset
 
 
-asyncio.get_event_loop().run_until_complete(test_risk_manager())
+asyncio.run(test_risk_manager())
 
 
 # ======================================================================

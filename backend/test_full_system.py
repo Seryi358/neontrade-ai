@@ -460,7 +460,7 @@ def test_c_position_manager():
 
         # Phase 1: INITIAL -> SL_MOVED (price at 20% to TP1)
         assert pos.phase == PositionPhase.INITIAL
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             pm._manage_position(pos, 1.1020)  # 20% toward TP1
         )
         if pos.phase != PositionPhase.INITIAL:
@@ -468,28 +468,28 @@ def test_c_position_manager():
 
         # Phase 2: SL_MOVED -> BREAK_EVEN (1% unrealized profit)
         if pos.phase == PositionPhase.SL_MOVED:
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 pm._manage_position(pos, 1.1110)  # 1% profit
             )
             print(f"    [{style}] Phase 2 -> {pos.phase.value}, SL={pos.current_sl:.5f}")
 
         # Phase 3: BREAK_EVEN -> TRAILING (70% to TP1)
         if pos.phase == PositionPhase.BREAK_EVEN:
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 pm._manage_position(pos, 1.1070)  # 70% to TP1
             )
             print(f"    [{style}] Phase 3 -> {pos.phase.value}, SL={pos.current_sl:.5f}")
 
         # Phase 4: TRAILING -> BEYOND_TP1 (TP1 hit)
         if pos.phase == PositionPhase.TRAILING_TO_TP1:
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 pm._manage_position(pos, 1.1100)  # TP1 reached
             )
             print(f"    [{style}] Phase 4 -> {pos.phase.value}, SL={pos.current_sl:.5f}")
 
         # Phase 5: BEYOND_TP1 -> TP_MAX hit
         if pos.phase == PositionPhase.BEYOND_TP1:
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 pm._manage_position(pos, 1.1200)  # TP_max reached
             )
             closed = pos.trade_id not in pm.positions
@@ -514,9 +514,9 @@ def test_c_position_manager():
     pm.track_position(sell_pos)
     pm.set_ema_values("GBP_USD", {"EMA_H4_50": 1.2950, "EMA_M5_50": 1.2990})
 
-    asyncio.get_event_loop().run_until_complete(pm._manage_position(sell_pos, 1.2980))
-    asyncio.get_event_loop().run_until_complete(pm._manage_position(sell_pos, 1.2870))
-    asyncio.get_event_loop().run_until_complete(pm._manage_position(sell_pos, 1.2930))
+    asyncio.run(pm._manage_position(sell_pos, 1.2980))
+    asyncio.run(pm._manage_position(sell_pos, 1.2870))
+    asyncio.run(pm._manage_position(sell_pos, 1.2930))
     print(f"  [PASS] SELL position handled: phase={sell_pos.phase.value}")
 
     print("  TEST C: ALL PASSED")
@@ -550,14 +550,14 @@ def test_d_risk_manager():
     print(f"  [PASS] D1b: Scalping risk = {risk_scalp:.2%}")
 
     # D2: Position size calculation
-    units = asyncio.get_event_loop().run_until_complete(
+    units = asyncio.run(
         rm.calculate_position_size("EUR_USD", TradingStyle.DAY_TRADING, 1.1000, 1.0950)
     )
     assert units > 0, f"Units should be positive for BUY, got {units}"
     print(f"  [PASS] D2: Position size = {units} units")
 
     # D2b: Zero SL distance
-    units_zero = asyncio.get_event_loop().run_until_complete(
+    units_zero = asyncio.run(
         rm.calculate_position_size("EUR_USD", TradingStyle.DAY_TRADING, 1.1000, 1.1000)
     )
     assert units_zero == 0, f"Zero SL distance should return 0, got {units_zero}"
@@ -757,7 +757,7 @@ def test_e_database_models():
         except Exception:
             pass
 
-    asyncio.get_event_loop().run_until_complete(_test_db())
+    asyncio.run(_test_db())
     print("  TEST E: ALL PASSED")
 
 

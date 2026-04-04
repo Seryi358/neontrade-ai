@@ -956,7 +956,7 @@ ok("balance_cache_is_ttl", isinstance(balance_cache, TTLCache))
 async def _test_retry_fn():
     return "ok"
 
-result_retry = asyncio.get_event_loop().run_until_complete(_test_retry_fn())
+result_retry = asyncio.run(_test_retry_fn())
 ok("retry_async_works", result_retry == "ok")
 
 # retry_async with failure then success
@@ -970,7 +970,7 @@ async def _test_retry_fail_then_ok():
     return "recovered"
 
 call_count = 0
-result_retry2 = asyncio.get_event_loop().run_until_complete(_test_retry_fail_then_ok())
+result_retry2 = asyncio.run(_test_retry_fail_then_ok())
 ok("retry_async_recovers", result_retry2 == "recovered")
 ok("retry_async_called_twice", call_count == 2)
 
@@ -988,11 +988,10 @@ ok("ec_finnhub_map_3", _FINNHUB_IMPACT_MAP[3] == "high")
 
 # fetch with no API key should not crash
 ec2 = EconomicCalendar()
-loop = asyncio.get_event_loop()
 # Patch settings to have no finnhub key
 with patch("eco_calendar.economic_calendar.settings") as mock_settings:
     mock_settings.finnhub_api_key = ""
-    loop.run_until_complete(ec2.fetch_today_events())
+    asyncio.run(ec2.fetch_today_events())
 ok("ec_no_key_no_crash", ec2._events == [])
 ok("ec_last_fetch_set", ec2._last_fetch is not None)
 
@@ -1124,7 +1123,7 @@ async def test_database():
 
     return results
 
-db_results = asyncio.get_event_loop().run_until_complete(test_database())
+db_results = asyncio.run(test_database())
 for key, val in db_results.items():
     ok(f"db_{key}", val, f"db_{key} failed")
 

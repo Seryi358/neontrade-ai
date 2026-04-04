@@ -673,11 +673,16 @@ async def get_performance_stats(days: int = Query(30, ge=1, le=365)):
 @router.get("/history/daily")
 async def get_daily_stats(date: Optional[str] = None):
     """Get daily trading statistics."""
+    from datetime import datetime, timezone
     from main import db
     if db is None:
-        return {}
+        return {
+            "date": date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "total_trades": 0, "winning_trades": 0, "losing_trades": 0,
+            "total_pnl": 0.0, "total_pips": 0.0, "max_drawdown": 0.0,
+            "best_trade_pnl": 0.0, "worst_trade_pnl": 0.0,
+        }
     if date is None:
-        from datetime import datetime, timezone
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         return await db.get_daily_stats(date)
@@ -1832,7 +1837,7 @@ async def get_trade_screenshots(trade_id: str):
     """Get screenshot file paths for a trade."""
     from main import engine
     if engine is None or engine.screenshot_generator is None:
-        return {"screenshots": [], "message": "Screenshot generator not available"}
+        return {"trade_id": trade_id, "screenshots": []}
     paths = engine.screenshot_generator.get_screenshot_path(trade_id)
     return {"trade_id": trade_id, "screenshots": paths}
 

@@ -744,6 +744,7 @@ class Backtester:
                     signal=last_signal,
                     config=config,
                     balance=balance,
+                    peak_balance=peak_balance,
                     bar_time=bar_time,
                     bar_close=bar_close,
                 )
@@ -980,6 +981,7 @@ class Backtester:
         balance: float,
         bar_time: str,
         bar_close: float,
+        peak_balance: float = 0.0,
     ) -> Optional[_SimulatedPosition]:
         """
         Validate the signal, apply slippage/spread, compute position
@@ -1046,8 +1048,9 @@ class Backtester:
         # Matches live engine risk_manager.py Fixed Levels method:
         # reduce risk when drawdown from peak exceeds thresholds.
         effective_risk = config.risk_per_trade
-        if config.dd_level_1 > 0 and balance < config.initial_balance:
-            dd_pct = (config.initial_balance - balance) / config.initial_balance
+        _peak = peak_balance if peak_balance > 0 else config.initial_balance
+        if config.dd_level_1 > 0 and balance < _peak:
+            dd_pct = (_peak - balance) / _peak
             if dd_pct >= config.dd_level_3:
                 effective_risk = config.dd_risk_3
             elif dd_pct >= config.dd_level_2:

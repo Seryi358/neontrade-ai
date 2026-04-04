@@ -855,15 +855,15 @@ class TradingEngine:
         Return (session_name, quality_score) based on current UTC hour.
 
         TradingLab mentorship (all times originally in ET, converted to UTC):
-        - SYDNEY (Australian): 5:00 PM - 2:00 AM ET → ~22:00-07:00 UTC
-        - ASIAN (Tokyo):       7:00 PM - 4:00 AM ET → ~00:00-09:00 UTC
-        - LONDON (European):   3:00 AM - 12:00 PM ET → ~08:00-17:00 UTC
-        - NEW_YORK:            8:00 AM - 5:00 PM ET → ~13:00-21:00 UTC
-        - OVERLAP (London+NY): 8:00 AM - 12:00 PM ET → ~13:00-17:00 UTC
+        - SYDNEY (Australian): 5:00 PM - 2:00 AM ET → 21:00-06:00 UTC (EDT)
+        - ASIAN (Tokyo):       7:00 PM - 4:00 AM ET → 23:00-08:00 UTC (EDT)
+        - LONDON (European):   3:00 AM - 12:00 PM ET → 07:00-16:00 UTC (EDT)
+        - NEW_YORK:            8:00 AM - 5:00 PM ET → 12:00-21:00 UTC (EDT)
+        - OVERLAP (London+NY): 8:00 AM - 12:00 PM ET → 12:00-16:00 UTC (EDT)
 
-        Note: ET shifts with DST (EST=UTC-5, EDT=UTC-4). These fixed UTC
-        boundaries approximate the EDT window. During EST the actual session
-        boundaries shift ~1h later in UTC.
+        DST handling: base values are EDT (UTC-4). _dst_offset() returns 0
+        for EDT, 1 for EST — shifting boundaries +1h in UTC during winter
+        (e.g. London 07:00 EDT → 08:00 EST).
 
         Quality scores reflect TradingLab guidance: overlap is peak volatility,
         London is the most liquid session, NY carries major news impact.
@@ -878,13 +878,13 @@ class TradingEngine:
         hour = now.hour
         # Apply DST offset: during EST (winter), sessions shift +1h in UTC
         offset = self._dst_offset(now)
-        if 13 + offset <= hour < 17 + offset:
+        if 12 + offset <= hour < 16 + offset:
             return ("OVERLAP", 1.0)
-        elif 8 + offset <= hour < 13 + offset:
+        elif 7 + offset <= hour < 12 + offset:
             return ("LONDON", 0.9)
-        elif 17 + offset <= hour < 21 + offset:
+        elif 16 + offset <= hour < 21 + offset:
             return ("NEW_YORK", 0.8)
-        elif hour < 8 + offset:
+        elif hour < 7 + offset:
             # Crypto is active in Asian hours — higher quality score
             return ("ASIAN", 0.7 if is_crypto else 0.5)
         else:

@@ -3723,12 +3723,16 @@ class BlackStrategy(BaseStrategy):
                 failed.append("EMA 50 1H actuando como S/R dinamica (precio muy cerca) — no Black")
                 return None
 
-            # Check direction-specific dynamic S/R behavior using recent candles
-            m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
-            if len(m5_candles) >= 5:
-                # Count how many of last 5 candles bounced off the EMA
+            # Check direction-specific dynamic S/R behavior using setup-TF candles
+            # TradingLab Black Day: Alex shows 2-3 HOURLY touches of the EMA 50 H1
+            # as the blocker, not M5 ticks. Must use H1 (or setup-TF) candles.
+            _setup_tf_map = {"day_trading": "H1", "swing": "D", "scalping": "M5"}
+            setup_tf_candle_key = _setup_tf_map.get(style, "H1")
+            setup_candles = getattr(analysis, 'last_candles', {}).get(setup_tf_candle_key, [])
+            if len(setup_candles) >= 5:
+                # Count how many of last 10 setup-TF candles bounced off the EMA
                 bounce_count = 0
-                for candle in m5_candles[-5:]:
+                for candle in setup_candles[-10:]:
                     c_low = candle.get("low", 0)
                     c_high = candle.get("high", 0)
                     c_close = candle.get("close", 0)

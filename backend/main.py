@@ -88,7 +88,10 @@ class ConnectionManager:
 
     async def send_personal(self, websocket: WebSocket, event_type: str, data: dict):
         """Send a typed event to a specific client."""
-        await websocket.send_json({"type": event_type, "data": data})
+        try:
+            await websocket.send_json({"type": event_type, "data": data})
+        except Exception:
+            self.disconnect(websocket)
 
 
 ws_manager = ConnectionManager()

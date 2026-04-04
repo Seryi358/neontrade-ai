@@ -641,9 +641,9 @@ TRADING_PROFILES = {
             # Drawdown — fixed 1% for safety
             "drawdown_method": "fixed_1pct",
             "delta_enabled": False,
-            # Session hours — London + NY
+            # Session hours — London + NY (EDT base; DST offset auto-adjusts +1h in winter)
             "trading_start_hour": 7,
-            "trading_end_hour": 22,
+            "trading_end_hour": 21,
             "close_before_friday_hour": 20,
             "no_new_trades_friday_hour": 18,
             "avoid_news_minutes_before": 30,
@@ -689,9 +689,9 @@ TRADING_PROFILES = {
             # Drawdown — fixed 1% (safest for beginners)
             "drawdown_method": "fixed_1pct",
             "delta_enabled": False,
-            # Session hours — same London + NY
+            # Session hours — same London + NY (EDT base; DST offset auto-adjusts +1h in winter)
             "trading_start_hour": 7,
-            "trading_end_hour": 22,
+            "trading_end_hour": 21,
             "close_before_friday_hour": 20,
             "no_new_trades_friday_hour": 18,
             "avoid_news_minutes_before": 30,

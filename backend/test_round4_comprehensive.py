@@ -929,4 +929,5 @@ if FAILED > 0:
         print(f"    {err}")
     print()
 
-sys.exit(0 if FAILED == 0 else 1)
+if __name__ == "__main__":
+    sys.exit(0 if FAILED == 0 else 1)

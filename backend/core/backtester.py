@@ -932,9 +932,19 @@ class Backtester:
         if risk_dist == 0:
             return None
         rr = reward_dist / risk_dist
-        if rr < config.min_rr_ratio:
+        # Strategy-specific R:R minimums per TradingLab mentorship
+        strategy_name = (signal.strategy_variant or signal.strategy.value).upper()
+        if "BLACK" in strategy_name:
+            effective_min_rr = 2.0  # Counter-trend requires higher R:R
+        elif "GREEN" in strategy_name:
+            effective_min_rr = 2.0  # Crypto/Elliott requires higher R:R
+        elif strategy_name == "BLUE_C":
+            effective_min_rr = 2.0  # Blue C: "mínimo 2 a 1, incluso 3 a 1"
+        else:
+            effective_min_rr = config.min_rr_ratio
+        if rr < effective_min_rr:
             logger.debug(
-                f"[Backtest] Signal rejected: R:R {rr:.2f} < {config.min_rr_ratio}"
+                f"[Backtest] Signal rejected: R:R {rr:.2f} < {effective_min_rr} ({strategy_name})"
             )
             return None
 

@@ -357,6 +357,7 @@ class Settings(BaseSettings):
     equities_watchlist: List[str] = [
         # Innovation (ARK) — from mentorship course materials
         "ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX", "PRNT", "IZRL",
+        "MOON",
         # Airlines
         "JETS", "AAL", "DAL", "UAL",
         # Banking
@@ -381,19 +382,20 @@ class Settings(BaseSettings):
         # Uranium
         "URA", "CCJ", "NXE", "DNN", "UUUU",
         # Agriculture
-        "COW", "MOO",
+        "COW", "MOO", "WOOD",
         # Electric Car
-        "NIO", "FCEL", "PLUG",
+        "NIO", "FCEL", "PLUG", "MGA",
         # AI
-        "NVDA", "IBM", "BIDU",
-        # Cannabis
-        "MJ", "MSOS", "TLRY", "CGC", "ACB",
+        "NVDA", "IBM", "BIDU", "YEXT",
+        # Cannabis — per TradingLab Watchlist module
+        "MJ", "MSOS", "TLRY", "CGC", "ACB", "CRON", "SNDL", "GRWG",
+        "VFF", "YOLO", "POTX", "MO",
         # VR
         "VUZI",
         # Crypto-related equities
-        "COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK", "BITO",
-        # Basic Materials
-        "GDX", "GLD", "SLV", "XME", "PALL", "PPLT",
+        "COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK", "BITO", "GBTC",
+        # Basic Materials — includes leveraged gold miners ETFs per mentorship
+        "GDX", "GLD", "SLV", "XME", "PALL", "PPLT", "DUST", "JNUG", "NUGT",
     ]
 
     # Crypto — separate allocation per Trading Plan (10% of trading capital)

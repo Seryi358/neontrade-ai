@@ -3912,14 +3912,14 @@ class GreenStrategy(BaseStrategy):
     - Crypto Day Trading: H4->H1->M15->M2 (per Crypto Mastery)
     - Crypto Scalping:    M15->M5->M1->M1 (M1 as fallback for 30s, per Crypto Mastery)
 
-    7 Pasos:
-    1. Direccion de tendencia semanal (alcista/bajista)
-    2. Correccion semanal forma un patron diario (cuna/triangulo)
-    3. Fibonacci, S/R, medias moviles como zonas de soporte dentro del patron
-    4. Bajar a 1H: encontrar cambio de tendencia al FINAL del patron
-       (rompimiento de diagonal, H&S, triangulo)
-    5. Copiar nivel de 1H a 15M, ejecutar en PRIMER rompimiento+confirmacion en 15M
-    6. SL debajo del minimo anterior de 1H (ajustado!). TP en maximo/minimo diario anterior
+    6 Pasos (Alex's exact structure):
+    1. (Tendencia) Direccion de tendencia semanal (alcista/bajista)
+    2. (Patron) Correccion semanal forma un patron diario (cuna/triangulo)
+    3. (Confluencia) Fibonacci, S/R, medias moviles como zonas de soporte dentro del patron
+    4. (Diagonal NON-NEGOTIABLE) Bajar a 1H: encontrar diagonal al FINAL del patron
+       — "Si no hay diagonal en una hora, no hay trade"
+    5. (RCC Entry) Copiar diagonal a 15M, ejecutar en PRIMER Ruptura+Cierre+Confirmacion
+    6. (SL/TP) SL debajo del minimo anterior de 1H. TP en maximo/minimo diario anterior
     """
 
     # Crypto timeframe layouts per trading style (Crypto Mastery)

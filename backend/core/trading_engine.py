@@ -455,6 +455,13 @@ class TradingEngine:
     async def approve_all_pending(self) -> int:
         """Approve and execute all pending setups. Returns count approved.
         Checks risk limits before each execution to avoid breaching max risk."""
+        if self._approve_lock is None:
+            self._approve_lock = asyncio.Lock()
+        async with self._approve_lock:
+            return await self._approve_all_pending_locked()
+
+    async def _approve_all_pending_locked(self) -> int:
+        """Inner implementation — must be called under _approve_lock."""
         self._expire_old_setups()
         pending = [s for s in self.pending_setups if s.status == "pending"]
         count = 0

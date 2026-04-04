@@ -5,6 +5,7 @@ analysis logs, pending approvals, and daily stats.
 """
 
 import json
+import sqlite3
 import uuid
 import aiosqlite
 from datetime import datetime, timezone
@@ -235,34 +236,38 @@ class TradeDatabase:
         trade_id = trade_data.get("id", str(uuid.uuid4()))
         now = datetime.now(timezone.utc).isoformat()
 
-        await self._db.execute(
-            """
-            INSERT INTO trades (
-                id, instrument, strategy, strategy_variant, direction,
-                units, entry_price, stop_loss, take_profit,
-                status, mode, confidence, risk_reward_ratio, reasoning,
-                opened_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                trade_id,
-                trade_data["instrument"],
-                trade_data.get("strategy"),
-                trade_data.get("strategy_variant"),
-                trade_data["direction"],
-                trade_data["units"],
-                trade_data["entry_price"],
-                trade_data["stop_loss"],
-                trade_data["take_profit"],
-                trade_data.get("status", "open"),
-                trade_data.get("mode", "AUTO"),
-                trade_data.get("confidence"),
-                trade_data.get("risk_reward_ratio"),
-                trade_data.get("reasoning"),
-                trade_data.get("opened_at", now),
-            ),
-        )
-        await self._db.commit()
+        try:
+            await self._db.execute(
+                """
+                INSERT INTO trades (
+                    id, instrument, strategy, strategy_variant, direction,
+                    units, entry_price, stop_loss, take_profit,
+                    status, mode, confidence, risk_reward_ratio, reasoning,
+                    opened_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    trade_id,
+                    trade_data["instrument"],
+                    trade_data.get("strategy"),
+                    trade_data.get("strategy_variant"),
+                    trade_data["direction"],
+                    trade_data["units"],
+                    trade_data["entry_price"],
+                    trade_data["stop_loss"],
+                    trade_data["take_profit"],
+                    trade_data.get("status", "open"),
+                    trade_data.get("mode", "AUTO"),
+                    trade_data.get("confidence"),
+                    trade_data.get("risk_reward_ratio"),
+                    trade_data.get("reasoning"),
+                    trade_data.get("opened_at", now),
+                ),
+            )
+            await self._db.commit()
+        except sqlite3.IntegrityError:
+            logger.warning(f"Duplicate trade ID {trade_id} — already exists in DB, skipping insert")
+            return trade_id
         logger.info(f"Trade recorded: {trade_id} | {trade_data['instrument']} {trade_data['direction']}")
         return trade_id
 

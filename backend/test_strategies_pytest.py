@@ -116,9 +116,10 @@ class TestBlueStrategy:
         self.blue = BlueStrategy()
 
     def test_htf_conditions_pass_with_ema_break(self):
-        """Blue requires 1H EMA 50 break."""
+        """Blue requires 1H EMA 50 break AND 4H EMA 50 NOT broken."""
         analysis = make_analysis(
             ema_h1_50=1.0980,  # price 1.10 > EMA → broken upward for BUY
+            ema_h4_50=1.1020,  # price 1.10 < EMA → NOT broken (BLUE territory)
         )
         ok, score, met, failed = self.blue.check_htf_conditions(analysis)
         assert ok, f"Blue HTF should pass. Failed: {failed}"

@@ -1525,6 +1525,18 @@ class BlueStrategy(BaseStrategy):
             # Sin rompimiento de EMA 50 1H, Blue no es valida
             return False, score, met, failed
 
+        # --- TradingLab rule: BLUE requires confirm-TF EMA 50 NOT broken ---
+        # If confirm EMA (4H for day, Weekly for swing) is ALSO broken, this is
+        # a RED (both broken), not a BLUE (only setup broken).
+        confirm_ema_key = _tf_ema("confirm", 50)
+        confirm_break, confirm_desc = _check_ema_break(analysis, confirm_ema_key, direction)
+        if confirm_break:
+            failed.append(
+                f"Paso 3b: Confirm EMA ({confirm_ema_key}) tambien rota — "
+                f"esto es RED, no BLUE"
+            )
+            return False, score, met, failed
+
         # Necesitamos al menos Paso 3 para continuar
         # Score minimo para pasar: haber roto la EMA 50 1H
         passed = score >= 20.0

@@ -673,18 +673,46 @@ class IBKRClient(BaseBroker):
         side = "BUY" if units > 0 else "SELL"
         quantity = abs(units)
 
+        orders = [{
+            "acctId": self._account_id,
+            "conid": conid,
+            "orderType": "LMT",
+            "side": side,
+            "quantity": quantity,
+            "price": price,
+            "tif": "GTC",
+        }]
+
+        if stop_loss is not None:
+            sl_side = "SELL" if side == "BUY" else "BUY"
+            orders.append({
+                "acctId": self._account_id,
+                "conid": conid,
+                "orderType": "STP",
+                "side": sl_side,
+                "quantity": quantity,
+                "price": stop_loss,
+                "tif": "GTC",
+                "isClose": True,
+            })
+
+        if take_profit is not None:
+            tp_side = "SELL" if side == "BUY" else "BUY"
+            orders.append({
+                "acctId": self._account_id,
+                "conid": conid,
+                "orderType": "LMT",
+                "side": tp_side,
+                "quantity": quantity,
+                "price": take_profit,
+                "tif": "GTC",
+                "isClose": True,
+            })
+
         try:
             data = await self._post(
                 f"/iserver/account/{self._account_id}/orders",
-                json_data={"orders": [{
-                    "acctId": self._account_id,
-                    "conid": conid,
-                    "orderType": "LMT",
-                    "side": side,
-                    "quantity": quantity,
-                    "price": price,
-                    "tif": "GTC",
-                }]},
+                json_data={"orders": orders},
             )
 
             if isinstance(data, list) and data:
@@ -698,8 +726,11 @@ class IBKRClient(BaseBroker):
                         first = confirm[0]
 
                 order_id = first.get("order_id") or first.get("orderId")
+                status = first.get("order_status", "")
+                logger.info(f"IBKR limit order: {instrument} {side} {quantity} @ {price} | ID={order_id}")
+
                 return OrderResult(
-                    success=True,
+                    success=status not in ("Rejected", "Cancelled"),
                     trade_id=str(order_id) if order_id else None,
                     units=units,
                     raw_response=first,
@@ -708,7 +739,9 @@ class IBKRClient(BaseBroker):
             return OrderResult(success=False, units=units, error=str(data))
 
         except httpx.HTTPStatusError as e:
-            return OrderResult(success=False, units=units, error=str(e))
+            error_msg = e.response.text if hasattr(e, 'response') else str(e)
+            logger.error(f"IBKR limit order failed: {error_msg}")
+            return OrderResult(success=False, units=units, error=error_msg)
 
     async def place_stop_order(
         self,

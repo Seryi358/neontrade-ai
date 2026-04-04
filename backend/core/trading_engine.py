@@ -866,17 +866,17 @@ class TradingEngine:
         is_crypto = bool(instrument) and _is_crypto_instrument(instrument)
 
         hour = now.hour
-        if 13 <= hour < 17:
+        # Apply DST offset: during EST (winter), sessions shift +1h in UTC
+        offset = self._dst_offset(now)
+        if 13 + offset <= hour < 17 + offset:
             return ("OVERLAP", 1.0)
-        elif 8 <= hour < 13:
+        elif 8 + offset <= hour < 13 + offset:
             return ("LONDON", 0.9)
-        elif 17 <= hour < 21:
+        elif 17 + offset <= hour < 21 + offset:
             return ("NEW_YORK", 0.8)
-        elif 0 <= hour < 8:
+        elif hour < 8 + offset:
             # Crypto is active in Asian hours — higher quality score
             return ("ASIAN", 0.7 if is_crypto else 0.5)
-        elif 21 <= hour:
-            return ("SYDNEY", 0.4)
         else:
             return ("SYDNEY", 0.4)
 

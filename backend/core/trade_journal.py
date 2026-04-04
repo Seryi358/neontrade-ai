@@ -50,6 +50,8 @@ class TradeJournal:
         self._current_losing_streak = 0
         self._max_losing_streak = 0
         self._max_losing_streak_pct = 0.0  # cumulative % of the max losing streak
+        self._current_streak_pct = 0.0  # cumulative % of current winning streak
+        self._current_losing_streak_pct = 0.0  # cumulative % of current losing streak
         self._trade_counter = 0
         self._accumulator = 1.0  # Compound growth tracker (Excel column O)
         self._dd_by_year: Dict[str, float] = {}  # year -> max DD that year
@@ -111,9 +113,6 @@ class TradeJournal:
             self._current_winning_streak += 1
             self._current_losing_streak = 0
             self._current_losing_streak_pct = 0.0
-            # Track cumulative % for current streak
-            if not hasattr(self, '_current_streak_pct'):
-                self._current_streak_pct = 0.0
             self._current_streak_pct += pnl_pct
             if self._current_winning_streak > self._max_winning_streak:
                 self._max_winning_streak = self._current_winning_streak
@@ -122,9 +121,6 @@ class TradeJournal:
             self._current_losing_streak += 1
             self._current_winning_streak = 0
             self._current_streak_pct = 0.0
-            # Track cumulative loss % for current losing streak
-            if not hasattr(self, '_current_losing_streak_pct'):
-                self._current_losing_streak_pct = 0.0
             self._current_losing_streak_pct += abs(pnl_pct)
             if self._current_losing_streak > self._max_losing_streak:
                 self._max_losing_streak = self._current_losing_streak
@@ -743,6 +739,8 @@ class TradeJournal:
                 "current_losing_streak": self._current_losing_streak,
                 "max_losing_streak": self._max_losing_streak,
                 "max_losing_streak_pct": self._max_losing_streak_pct,
+                "current_streak_pct": self._current_streak_pct,
+                "current_losing_streak_pct": self._current_losing_streak_pct,
                 "trade_counter": self._trade_counter,
                 "accumulator": self._accumulator,
                 "dd_by_year": self._dd_by_year,
@@ -799,8 +797,8 @@ class TradeJournal:
                 self._trade_counter = data.get("trade_counter", len(self._trades))
                 self._accumulator = data.get("accumulator", 1.0)
                 self._dd_by_year = data.get("dd_by_year", {})
-                self._current_streak_pct = 0.0
-                self._current_losing_streak_pct = 0.0
+                self._current_streak_pct = data.get("current_streak_pct", 0.0)
+                self._current_losing_streak_pct = data.get("current_losing_streak_pct", 0.0)
                 logger.info(
                     f"Trade journal loaded: {len(self._trades)} trades, "
                     f"balance=${self._current_balance:.2f}"

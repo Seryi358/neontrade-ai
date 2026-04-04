@@ -191,7 +191,8 @@ class _SimulatedPosition:
     # Phase thresholds (mirror position_manager.py constants)
     # ------------------------------------------------------------------
     _PHASE1_THRESHOLD = 0.20   # 20 % to TP1 -> move SL to structure
-    _BE_THRESHOLD = 0.50       # Backtester uses 50% to TP1 as BE trigger (simplified); live uses 1% unrealized profit
+    # BE triggers at 1x risk distance (Alex: "cuando ya tengo un 1% de ganancia"),
+    # NOT at 50% to TP1. For 2:1 R:R these coincide, but for other ratios they differ.
     _TRAILING_THRESHOLD = 0.70 # 70 % to TP1 -> start trailing
     _TRAIL_PCT = 0.40          # fallback trailing distance (% of TP dist)
     _AGGRESSIVE_TRAIL_PCT = 0.20
@@ -292,7 +293,9 @@ class _SimulatedPosition:
                 self.phase = PositionPhase.SL_MOVED
 
         elif self.phase == PositionPhase.SL_MOVED:
-            if progress >= self._BE_THRESHOLD:
+            # BE at 1x risk distance (mentorship: "cuando ya tengo un 1% de ganancia")
+            risk_distance = abs(self.trade.entry_price - self.trade.stop_loss)
+            if profit >= risk_distance:
                 spread_buffer = abs(
                     self.trade.entry_price - self.trade.stop_loss
                 ) * 0.02
@@ -643,10 +646,11 @@ class Backtester:
                 if _bar_dt:
                     _h = _bar_dt.hour
                     _wd = _bar_dt.weekday()  # 0=Mon, 4=Fri
-                    # Trading hours: London open through NY close (08:00-21:00 UTC)
-                    # Per TradingLab sessions: London 08-16, Overlap 13-17, NY 13-21
-                    # Block Asian (00-08) and off-hours (21-24) for new entries
-                    if _h < 8 or _h >= 21:
+                    # Trading hours: London open through NY close (07:00-21:00 UTC)
+                    # EDT: London 07-16, Overlap 12-16, NY 16-21
+                    # EST: London 08-17, Overlap 13-17, NY 17-22
+                    # Using 07:00 start to cover EDT London open (3AM EDT=07:00 UTC)
+                    if _h < 7 or _h >= 21:
                         _allow_new_trade = False
                     # Friday: no new trades after 18:00 UTC
                     if _wd == 4 and _h >= 18:

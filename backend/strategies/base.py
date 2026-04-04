@@ -301,10 +301,7 @@ def _check_ema_break(analysis: AnalysisResult, ema_key: str, direction: str) -> 
     if ema_val is None:
         return False, f"EMA {ema_key} no disponible"
 
-    # Precio de referencia: EMA M5 5 como proxy del precio actual
-    price = _ema_val(analysis, "EMA_M5_5")
-    if price is None:
-        price = _ema_val(analysis, "EMA_M5_20")
+    price = _get_current_price_proxy(analysis)
     if price is None:
         return False, "No se puede determinar precio actual para comparar con EMA"
 
@@ -328,7 +325,7 @@ def _check_ema_pullback(analysis: AnalysisResult, ema_key: str, direction: str) 
     if not ema_val:
         return False, f"EMA {ema_key} no disponible"
 
-    price = _ema_val(analysis, "EMA_M5_5")
+    price = _get_current_price_proxy(analysis)
     if price is None:
         return False, "Precio actual no disponible"
 

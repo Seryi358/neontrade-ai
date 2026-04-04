@@ -650,10 +650,13 @@ class CapitalClient(BaseBroker):
             if deal_ref:
                 return await self._confirm_deal(deal_ref, units, instrument)
 
+            # No dealReference — order did not go through
+            logger.error(f"Market order: no dealReference in response — treating as failure")
             return OrderResult(
-                success=True,
-                trade_id=deal_ref,
+                success=False,
+                trade_id=None,
                 units=units,
+                error="No dealReference returned by broker",
                 raw_response=raw,
             )
 
@@ -683,7 +686,7 @@ class CapitalClient(BaseBroker):
         size = abs(units)
 
         expiry = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours))
-        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%S")
+        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         order_data: Dict[str, Any] = {
             "epic": epic,
@@ -717,10 +720,13 @@ class CapitalClient(BaseBroker):
             if deal_ref:
                 return await self._confirm_deal(deal_ref, units, instrument)
 
+            # No dealReference — order did not go through
+            logger.error(f"Limit order: no dealReference in response — treating as failure")
             return OrderResult(
-                success=True,
-                trade_id=deal_ref,
+                success=False,
+                trade_id=None,
                 units=units,
+                error="No dealReference returned by broker",
                 raw_response=raw,
             )
 
@@ -754,7 +760,7 @@ class CapitalClient(BaseBroker):
         size = abs(units)
 
         expiry = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours))
-        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%S")
+        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         order_data: Dict[str, Any] = {
             "epic": epic,
@@ -789,10 +795,13 @@ class CapitalClient(BaseBroker):
             if deal_ref:
                 return await self._confirm_deal(deal_ref, units, instrument)
 
+            # No dealReference — order did not go through
+            logger.error(f"Stop order: no dealReference in response — treating as failure")
             return OrderResult(
-                success=True,
-                trade_id=deal_ref,
+                success=False,
+                trade_id=None,
                 units=units,
+                error="No dealReference returned by broker",
                 raw_response=raw,
             )
 

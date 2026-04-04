@@ -8,7 +8,7 @@ FOREX/EQUITIES/INDICES (Trading Mastery module):
   Style LP (Long-term) — PRIMARY timeframes:
     - Swing: trail with Daily EMA 50 (optional wider: Weekly)
     - Day Trading: trail with H1 EMA 50 (optional wider: H4)
-    - Scalping: trail with M15 EMA 50
+    - Scalping: trail with M5 EMA 50 (per Workshop de Scalping)
 
   Style CP (Short-term) — PRIMARY timeframes:
     - Swing: trail with H1 EMA 50 (optional wider: H4)
@@ -22,7 +22,9 @@ CRYPTO (Esp. Criptomonedas module — wider due to volatility):
     - Scalping: trail with M15 EMA 50
 
   Style DAILY (Mid-term) — Daily EMA 50:
-    - All styles: trail with Daily EMA 50
+    - Swing: trail with Daily EMA 50
+    - Day Trading: trail with H4 EMA 50 (fallback from Daily)
+    - Scalping: trail with M15 EMA 50 (fallback from Daily)
     - Sits between LP (Weekly) and CP (H1) for crypto
 
   Style CP (Short-term) — PRIMARY timeframes:
@@ -42,10 +44,9 @@ Hybrid approach (recommended):
   - Close partial position if CPA triggers exit, continue LP/CP with remaining
 
 Partial profit taking: configurable via allow_partial_profits parameter.
-Alex personally does not take partials ("No se toman parciales de ganancia"),
-but the mentorship teaches it as a valid option and the CPA section
-explicitly recommends partial closes at key levels. Default is False
-(Alex's preference), but can be enabled.
+The mentorship teaches partials as a valid option — especially for crypto
+("formulas hibridas: 50% TP + 50% trail"). The CPA section explicitly
+recommends partial closes at key levels. Default is False but can be enabled.
 
 Give space to the EMA — buffer slightly below/above, never place SL exactly on it.
 """

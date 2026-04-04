@@ -2560,6 +2560,10 @@ class TradingEngine:
             setup.status = "expired"
             return
 
+        # SELL orders need negative units — broker interprets sign as direction
+        if setup.direction == "SELL":
+            units = -abs(units)
+
         trade_risk = TradeRisk(
             instrument=setup.instrument,
             style=_style,

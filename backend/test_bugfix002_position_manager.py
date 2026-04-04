@@ -297,7 +297,8 @@ class TestBreakEvenPhase:
         pos = make_pos(direction="BUY", entry=1.1000, sl=1.0950, tp1=1.1100,
                        phase=PositionPhase.BREAK_EVEN)
         # EMA ABOVE current price = unfavorable for BUY (EMA is resistance, not support)
-        pm._latest_emas[pos.instrument] = {"EMA_M5_50": 1.1050}
+        # Use the actual base EMA key (EMA_H1_50 for LP/day_trading) — not a different TF
+        pm._latest_emas[pos.instrument] = {"EMA_H1_50": 1.1050}
 
         run(pm._handle_be_phase(pos, 1.1030))  # current price below EMA → unfavorable
         assert pos.phase == PositionPhase.BREAK_EVEN
@@ -428,8 +429,8 @@ class TestAggressivePhase:
                        tp_max=1.1200, phase=PositionPhase.BEYOND_TP1)
         pos.current_sl = 1.1050
 
-        # CPA EMA key for LP/day_trading = EMA_M5_50
-        pm.set_ema_values("EUR_USD", {"EMA_M5_50": 1.1080})
+        # CPA EMA key for LP/day_trading = EMA_M2_50 — use the actual key
+        pm.set_ema_values("EUR_USD", {"EMA_M2_50": 1.1080})
 
         # buffer (aggressive) = 0.01 * 0.01 = 0.0001
         # new_sl = 1.1080 - 0.0001 = 1.1079 > 1.1050 → move
@@ -605,11 +606,12 @@ class TestEMAFallback:
         val = pm._get_trail_ema("EUR_USD", "EMA_H1_50")
         assert val == 1.1050
 
-    def test_fallback_chain(self, pm):
+    def test_no_fallback_returns_none(self, pm):
         pm.set_ema_values("EUR_USD", {"EMA_M5_50": 1.1030})
-        # EMA_H1_50 not available → fallback chain tries H4→H1→M15→M5
+        # EMA_H1_50 not available → returns None (no style-blind fallback)
+        # Callers handle None with calibrated percentage-based trailing
         val = pm._get_trail_ema("EUR_USD", "EMA_H1_50")
-        assert val == 1.1030
+        assert val is None
 
     def test_none_when_no_ema(self, pm):
         val = pm._get_trail_ema("EUR_USD", "EMA_H1_50")

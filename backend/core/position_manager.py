@@ -402,23 +402,18 @@ class PositionManager:
 
     def _get_trail_ema(self, instrument: str, ema_key: str) -> Optional[float]:
         """
-        Look up an EMA value for an instrument, with fallback chain.
-        Returns None if no EMA data is available.
+        Look up an EMA value for an instrument.
+        Returns None if the requested EMA is not available — callers handle
+        this with percentage-based fallback trailing which is well-calibrated
+        per phase (40% normal, 20% aggressive).
+
+        NOTE: Previously had a static fallback chain (H4→H1→M15→M5) that was
+        style-blind — e.g. CPA scalping requesting M1 would fall back to H4,
+        defeating tight trailing.  Removed: returning None is safer than
+        returning an EMA from a drastically different timeframe.
         """
         emas = self._latest_emas.get(instrument, {})
-        value = emas.get(ema_key)
-        if value is not None:
-            return value
-
-        # Fallback: try common EMA 50 keys in descending specificity
-        for fallback_key in ("EMA_H4_50", "EMA_H1_50", "EMA_M15_50", "EMA_M5_50"):
-            value = emas.get(fallback_key)
-            if value is not None:
-                logger.debug(
-                    f"{instrument}: {ema_key} not available, falling back to {fallback_key}"
-                )
-                return value
-        return None
+        return emas.get(ema_key)
 
     def _ema_buffer(self, pos: ManagedPosition, aggressive: bool = False) -> float:
         """

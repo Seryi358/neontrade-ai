@@ -81,7 +81,6 @@ class RiskManager:
     def __init__(self, broker_client):
         self.broker = broker_client
         self._active_risks: Dict[str, float] = {}  # trade_id -> risk_percent
-        self._active_instruments: Dict[str, str] = {}  # trade_id -> instrument
         # Drawdown tracking
         self._peak_balance: float = 0.0
         self._current_balance: float = 0.0

@@ -53,8 +53,7 @@ ok("cfg_ibkr_access_token", s.ibkr_access_token == "")
 ok("cfg_ibkr_environment", s.ibkr_environment in ("live", "paper"))
 ok("cfg_capital_api_key", isinstance(s.capital_api_key, str))
 ok("cfg_capital_environment", s.capital_environment in ("demo", "live"))
-ok("cfg_oanda_api_key", isinstance(s.oanda_api_key, str))
-ok("cfg_oanda_environment", s.oanda_environment in ("practice", "live"))
+# OANDA settings removed — out of scope per PROJECT.md
 ok("cfg_openai_api_key", isinstance(s.openai_api_key, str))
 ok("cfg_app_secret_key", isinstance(s.app_secret_key, str) and len(s.app_secret_key) > 0)
 ok("cfg_app_host", s.app_host == "0.0.0.0")
@@ -410,11 +409,9 @@ ok("se_has_analyze", hasattr(ScalpingAnalyzer, "analyze") or hasattr(ScalpingAna
 print("\n=== SECTION 10: BROKERS ===")
 
 from broker.base import BaseBroker, CandleData
-from broker.oanda_client import OandaClient
 from broker.capital_client import CapitalClient
 
 ok("base_broker_class", BaseBroker is not None)
-ok("oanda_broker_class", OandaClient is not None)
 ok("capital_broker_class", CapitalClient is not None)
 
 # IBKRClient requires cryptography module - verify file exists
@@ -1435,7 +1432,7 @@ required_files = [
     "core/resilience.py", "core/scalping_engine.py", "core/crypto_cycle.py",
     "core/monthly_review.py", "core/screenshot_generator.py",
     "strategies/__init__.py", "strategies/base.py",
-    "broker/__init__.py", "broker/base.py", "broker/oanda_client.py",
+    "broker/__init__.py", "broker/base.py",
     "broker/capital_client.py", "broker/ibkr_client.py",
     "api/__init__.py", "api/routes.py",
     "db/__init__.py", "db/models.py",

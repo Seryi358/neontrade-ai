@@ -284,7 +284,7 @@ async def run_tests():
         (settings.risk_swing == 0.01, "Swing risk = 1%"),
         (settings.max_total_risk == 0.07, "Max total risk = 7%"),
         (settings.correlated_risk_pct == 0.0075, "Correlated factor = 0.75"),
-        (settings.min_rr_ratio == 1.5, "Min R:R = 2.0"),
+        (settings.min_rr_ratio == 1.5, "Min R:R = 1.5"),
         (settings.min_rr_black == 2.0, "Min R:R BLACK = 2.0"),
         (settings.min_rr_green == 2.0, "Min R:R GREEN = 2.0"),
         (settings.move_sl_to_be_pct_to_tp1 == 0.50, "BE at 1% unrealized profit"),

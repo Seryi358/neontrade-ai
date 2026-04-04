@@ -3308,10 +3308,8 @@ class WhiteStrategy(BaseStrategy):
                 result["tp1"] = min(valid_swing_highs)
             else:
                 above = sorted([r for r in resistances if r > entry_price])
-                if len(above) >= 2:
-                    result["tp1"] = above[1]
-                elif above:
-                    result["tp1"] = above[0]
+                if above:
+                    result["tp1"] = above[0]  # Nearest resistance (same as PINK)
 
             # tp_max: next swing high beyond tp1
             tp1 = result.get("tp1")
@@ -3330,10 +3328,8 @@ class WhiteStrategy(BaseStrategy):
                 result["tp1"] = max(valid_swing_lows)
             else:
                 below = sorted([s for s in supports if s < entry_price], reverse=True)
-                if len(below) >= 2:
-                    result["tp1"] = below[1]
-                elif below:
-                    result["tp1"] = below[0]
+                if below:
+                    result["tp1"] = below[0]  # Nearest support (same as PINK)
 
             # tp_max: next swing low beyond tp1
             tp1 = result.get("tp1")

@@ -942,7 +942,7 @@ def test_h_cross_module_consistency():
 
     # H2: Settings fields used in risk_manager and position_manager
     settings_obj = Settings()
-    settings_fields = set(settings_obj.model_fields.keys())
+    settings_fields = set(Settings.model_fields.keys())
     used_settings = [
         "risk_day_trading", "risk_scalping", "risk_swing",
         "max_total_risk", "correlated_risk_pct", "min_rr_ratio",

@@ -712,6 +712,10 @@ class AlertManager:
                 self._gmail_access_token = None
                 self._gmail_token_expires_at = 0.0
                 return None
+            if not self._gmail_access_token:
+                logger.error("Gmail token refresh returned 200 but no access_token in response")
+                self._gmail_token_expires_at = 0.0
+                return None
             self._gmail_token_expires_at = time.time() + 3500  # cache for ~58 min
             logger.info("Gmail access token refreshed, expires in 3500s")
             return self._gmail_access_token

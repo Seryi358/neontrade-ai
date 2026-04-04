@@ -1906,6 +1906,8 @@ class TradingEngine:
                         direction=signal.direction,
                         entry_type=getattr(signal, 'entry_type', 'MARKET'),
                         limit_price=getattr(signal, 'limit_price', None),
+                        trailing_tp_only=getattr(signal, 'trailing_tp_only', False),
+                        strategy_variant=getattr(signal, 'strategy_variant', None),
                     )
 
                     explanation = self._latest_explanations.get(instrument)

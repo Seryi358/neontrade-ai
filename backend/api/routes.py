@@ -1840,6 +1840,9 @@ async def get_full_watchlist():
 @router.get("/screenshots/{trade_id}")
 async def get_trade_screenshots(trade_id: str):
     """Get screenshot file paths for a trade."""
+    import re
+    if not re.match(r'^[\w\-\.]+$', trade_id) or '..' in trade_id:
+        raise HTTPException(400, "Invalid trade_id")
     from main import engine
     if engine is None or engine.screenshot_generator is None:
         return {"trade_id": trade_id, "screenshots": []}
@@ -1854,6 +1857,8 @@ async def get_screenshot_image(trade_id: str, filename: str):
     import os
     # Security: only allow alphanumeric + underscores + dashes + dots, block traversal
     import re
+    if not re.match(r'^[\w\-\.]+$', trade_id) or '..' in trade_id:
+        raise HTTPException(400, "Invalid trade_id")
     if not re.match(r'^[\w\-\.]+$', filename) or '..' in filename:
         raise HTTPException(400, "Invalid filename")
     filepath = os.path.join("data", "screenshots", filename)
@@ -1904,6 +1909,9 @@ async def generate_monthly_review(month: str = Query(..., description="YYYY-MM f
 @router.get("/monthly-review/{month}")
 async def get_monthly_review(month: str):
     """Get a previously generated monthly review."""
+    import re
+    if not re.match(r'^\d{4}-\d{2}$', month):
+        raise HTTPException(400, "Month must be in YYYY-MM format")
     from main import engine
     if engine is None or not hasattr(engine, 'monthly_review') or engine.monthly_review is None:
         raise HTTPException(503, "Monthly review not available")

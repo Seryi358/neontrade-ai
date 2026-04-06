@@ -185,8 +185,10 @@ class MonthlyReviewGenerator:
             instrument = trade.get("instrument", "UNKNOWN")
 
             # ── Win / Loss / BE classification ────────────────────────────
-            is_win = result == "TP" or pnl_pct >= 0.1
-            is_loss = result == "SL" or pnl_pct <= -0.1
+            # Use P&L as primary classifier; result code as tiebreaker for
+            # small values. A TP with negative P&L (fees/slippage) is NOT a win.
+            is_win = pnl_pct >= 0.1 or (result == "TP" and pnl_pct >= 0)
+            is_loss = pnl_pct <= -0.1 or (result == "SL" and pnl_pct < 0)
 
             if is_win:
                 report.winning_trades += 1
@@ -363,6 +365,8 @@ class MonthlyReviewGenerator:
             report.win_rate = report.winning_trades / report.total_trades
         if report.gross_loss > 0:
             report.profit_factor = report.gross_profit / report.gross_loss
+        elif report.gross_profit > 0:
+            report.profit_factor = 99.99  # All profitable, no losses
         report.net_pnl = report.gross_profit - report.gross_loss
         if balance_start > 0:
             report.net_pnl_pct = (report.net_pnl / balance_start) * 100

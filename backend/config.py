@@ -741,7 +741,7 @@ FUNDED_ACCOUNT_PRESETS = {
             "funded_max_daily_dd": 0.04,
             "funded_max_total_dd": 0.06,
             "funded_profit_target_phase1": 0.10,
-            "funded_profit_target_phase2": 0.05,
+            # No phase 2 — sprint is a single-phase evaluation
         },
     },
     "ftmo_instant": {

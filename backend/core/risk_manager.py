@@ -726,16 +726,29 @@ class RiskManager:
             if now.weekday() >= 5:  # Saturday=5, Sunday=6
                 return (False, "Funded (normal): no weekend trading allowed")
 
-        # Overnight restriction: block trades outside session hours
+        # Overnight restriction: block trades outside session hours (DST-adjusted)
         if getattr(settings, 'funded_no_overnight', False):
-            if now.hour < settings.trading_start_hour or now.hour >= settings.trading_end_hour:
+            offset = self._dst_offset(now)
+            start = settings.trading_start_hour + offset
+            end = settings.trading_end_hour + offset
+            if now.hour < start or now.hour >= end:
                 return (
                     False,
                     f"Funded (normal): no overnight trading "
-                    f"(current hour {now.hour} UTC, session {settings.trading_start_hour}-{settings.trading_end_hour})",
+                    f"(current hour {now.hour} UTC, session {start}-{end} UTC, DST offset={offset})",
                 )
 
         return (True, "")
+
+    @staticmethod
+    def _dst_offset(now: datetime) -> int:
+        """Return UTC hour offset for EST vs EDT (same logic as trading_engine)."""
+        try:
+            from zoneinfo import ZoneInfo
+            et = now.astimezone(ZoneInfo("America/New_York"))
+            return 0 if et.dst() else 1
+        except Exception:
+            return 0
 
     def record_funded_pnl(self, pnl_amount: float):
         """

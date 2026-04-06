@@ -489,6 +489,11 @@ class NewsFilter:
                     event_time_str = item.get("date", "")
                     try:
                         event_time = datetime.fromisoformat(event_time_str.replace("Z", "+00:00"))
+                        # Ensure timezone-aware (same as FairEconomy handler)
+                        if event_time.tzinfo is None:
+                            event_time = event_time.replace(tzinfo=timezone.utc)
+                        else:
+                            event_time = event_time.astimezone(timezone.utc)
                     except (ValueError, AttributeError):
                         continue
 

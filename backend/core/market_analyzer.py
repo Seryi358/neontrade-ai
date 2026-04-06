@@ -639,8 +639,9 @@ class MarketAnalyzer:
         - ACCELERATING: candles getting larger, price moving away from EMA 50
         - DECELERATING: candles getting smaller, price approaching EMA 50
 
-        Priority: overbought/oversold extremes take precedence, then accel/decel,
-        then neutral.
+        Priority: accel/decel takes precedence (R26: BLACK needs both overbought
+        AND decel — returning overbought early would hide the decel state).
+        RSI overbought/oversold is returned only if no accel/decel detected.
         """
         if df.empty or len(df) < 50:
             return MarketCondition.NEUTRAL

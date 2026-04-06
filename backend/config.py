@@ -559,13 +559,46 @@ def _load_risk_overrides():
         "funded_no_weekend", "scalping_enabled", "scalping_max_daily_dd",
         "scalping_max_total_dd", "trading_start_hour", "trading_end_hour",
     }
+    # Range validation — must match the API endpoint constraints (routes.py PUT /risk-config)
+    _RANGE_CHECKS = {
+        "risk_day_trading":       (0.001, 0.10),
+        "risk_scalping":          (0.001, 0.05),
+        "risk_swing":             (0.005, 0.10),
+        "max_total_risk":         (0.01,  0.25),
+        "correlated_risk_pct":    (0.001, 0.05),
+        "min_rr_ratio":           (0.5,   5.0),
+        "move_sl_to_be_pct_to_tp1": (0.1, 0.9),
+        "delta_parameter":        (0.1,   0.95),
+        "delta_max_risk":         (0.001, 0.10),
+        "min_rr_black":           (0.5,   5.0),
+        "min_rr_green":           (0.5,   5.0),
+        "min_rr_blue_c":          (0.5,   5.0),
+        "funded_max_daily_dd":    (0.01,  0.20),
+        "funded_max_total_dd":    (0.01,  0.30),
+        "funded_max_total_dd_phase2": (0.01, 0.30),
+        "funded_profit_target_phase1": (0.01, 0.50),
+        "funded_profit_target_phase2": (0.01, 0.50),
+        "scalping_max_daily_dd":  (0.01,  0.20),
+        "scalping_max_total_dd":  (0.01,  0.30),
+        "trading_start_hour":     (0, 23),
+        "trading_end_hour":       (0, 23),
+    }
     if os.path.exists(risk_path):
         try:
             with open(risk_path) as f:
                 overrides = json.load(f)
             for key, value in overrides.items():
-                if key in _ALLOWED_RISK_KEYS and hasattr(settings, key):
-                    setattr(settings, key, value)
+                if key not in _ALLOWED_RISK_KEYS or not hasattr(settings, key):
+                    continue
+                if key in _RANGE_CHECKS:
+                    lo, hi = _RANGE_CHECKS[key]
+                    if not isinstance(value, (int, float)) or not (lo <= value <= hi):
+                        import logging
+                        logging.getLogger(__name__).error(
+                            f"risk_config.json: {key}={value!r} out of range [{lo}, {hi}] — SKIPPED"
+                        )
+                        continue
+                setattr(settings, key, value)
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning(f"Failed to load risk overrides from data/risk_config.json: {e}")

@@ -679,18 +679,24 @@ class Backtester:
                 if _bar_dt:
                     _h = _bar_dt.hour
                     _wd = _bar_dt.weekday()  # 0=Mon, 4=Fri
-                    # Trading hours: London open through NY close (07:00-21:00 UTC)
-                    # EDT: London 07-16, Overlap 12-16, NY 16-21
-                    # EST: London 08-17, Overlap 13-17, NY 17-22
-                    # Using 07:00 start to cover EDT London open (3AM EDT=07:00 UTC)
-                    if _h < 7 or _h >= 21:
+                    # DST offset: match live engine behavior (config hours are EDT)
+                    try:
+                        from zoneinfo import ZoneInfo
+                        _et = _bar_dt.astimezone(ZoneInfo("America/New_York"))
+                        _dst_off = 0 if _et.dst() else 1
+                    except Exception:
+                        _dst_off = 0
+                    _start = settings.trading_start_hour + _dst_off
+                    _end = settings.trading_end_hour + _dst_off
+                    if _h < _start or _h >= _end:
                         _allow_new_trade = False
-                    # Friday: no new trades after 18:00 UTC
-                    if _wd == 4 and _h >= 18:
+                    # Friday: no new trades after configured hour (DST-adjusted)
+                    _no_new_fri = settings.no_new_trades_friday_hour + _dst_off
+                    if _wd == 4 and _h >= _no_new_fri:
                         _allow_new_trade = False
-                    # Friday EOD: force-close all open positions at 21:00 UTC
-                    # Forex last H1 bar starts at 21:00 (market closes 22:00); _h >= 22 never exists in data
-                    if _wd == 4 and _h >= 21 and open_positions:
+                    # Friday EOD: force-close all open positions (DST-adjusted)
+                    _close_fri = settings.close_before_friday_hour + _dst_off
+                    if _wd == 4 and _h >= _close_fri and open_positions:
                         for pos in list(open_positions):
                             pos.force_close(bar_close, "FRIDAY_CLOSE")
                             pos.trade.exit_time = bar_time

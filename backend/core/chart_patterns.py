@@ -953,6 +953,7 @@ def _detect_cup_and_handle(
     if len(df) < 30 or len(swing_highs) < 2 or len(swing_lows) < 1:
         return None
 
+    # Reset index so idxmin/idxmax return positions, not labels
     data = df.reset_index(drop=True)
     n = len(data)
 

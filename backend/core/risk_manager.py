@@ -594,6 +594,9 @@ class RiskManager:
         - All others -> settings.min_rr_ratio (1.5) — general minimum
         Range: 1.5:1 to 2.5:1 per ch18.3.
         """
+        if entry_price is None or stop_loss is None or take_profit_1 is None:
+            return False
+
         risk = abs(entry_price - stop_loss)
         reward = abs(take_profit_1 - entry_price)
 

@@ -616,6 +616,11 @@ class CapitalClient(BaseBroker):
         units > 0 = BUY, units < 0 = SELL
         Capital.com accepts fractional sizes (e.g., 0.001 for crypto).
         """
+        if units == 0:
+            return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
+        if broker_circuit_breaker.is_open:
+            return OrderResult(success=False, trade_id=None, units=units, error="Circuit breaker OPEN — broker unavailable")
+
         epic = await self._resolve_epic(instrument)
         direction = "BUY" if units > 0 else "SELL"
         size = abs(units)
@@ -638,6 +643,7 @@ class CapitalClient(BaseBroker):
                 "/api/v1/positions", headers=self._auth_headers(), json=order_data,
             )
             resp.raise_for_status()
+            broker_circuit_breaker.record_success()
             raw = resp.json()
 
             deal_ref = raw.get("dealReference")
@@ -661,8 +667,13 @@ class CapitalClient(BaseBroker):
             )
 
         except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+            broker_circuit_breaker.record_failure()
             error_msg = str(e)
             if isinstance(e, httpx.HTTPStatusError):
+                if e.response.status_code == 401:
+                    self._cst = None
+                    self._security_token = None
+                    self._session_time = None
                 try:
                     error_body = e.response.json()
                     error_msg = error_body.get("errorCode", error_msg)
@@ -681,6 +692,11 @@ class CapitalClient(BaseBroker):
         expiry_hours: int = 24,
     ) -> OrderResult:
         """Place a limit order at a specific price."""
+        if units == 0:
+            return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
+        if broker_circuit_breaker.is_open:
+            return OrderResult(success=False, trade_id=None, units=units, error="Circuit breaker OPEN — broker unavailable")
+
         epic = await self._resolve_epic(instrument)
         direction = "BUY" if units > 0 else "SELL"
         size = abs(units)
@@ -709,6 +725,7 @@ class CapitalClient(BaseBroker):
                 "/api/v1/workingorders", headers=self._auth_headers(), json=order_data,
             )
             resp.raise_for_status()
+            broker_circuit_breaker.record_success()
             raw = resp.json()
             deal_ref = raw.get("dealReference")
 
@@ -731,8 +748,13 @@ class CapitalClient(BaseBroker):
             )
 
         except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+            broker_circuit_breaker.record_failure()
             error_msg = str(e)
             if isinstance(e, httpx.HTTPStatusError):
+                if e.response.status_code == 401:
+                    self._cst = None
+                    self._security_token = None
+                    self._session_time = None
                 try:
                     error_msg = e.response.json().get("errorCode", error_msg)
                 except Exception:
@@ -754,7 +776,12 @@ class CapitalClient(BaseBroker):
         SELL stop: placed below current price (breakdown below support).
         units > 0 = BUY, units < 0 = SELL.
         """
-        await self._ensure_session()  # Bug fix R26: was missing, causing 401 after idle
+        if units == 0:
+            return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
+        if broker_circuit_breaker.is_open:
+            return OrderResult(success=False, trade_id=None, units=units, error="Circuit breaker OPEN — broker unavailable")
+
+        await self._ensure_session()
         epic = await self._resolve_epic(instrument)
         direction = "BUY" if units > 0 else "SELL"
         size = abs(units)
@@ -784,6 +811,7 @@ class CapitalClient(BaseBroker):
                 json=order_data,
             )
             resp.raise_for_status()
+            broker_circuit_breaker.record_success()
             raw = resp.json()
             deal_ref = raw.get("dealReference")
 
@@ -806,8 +834,13 @@ class CapitalClient(BaseBroker):
             )
 
         except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+            broker_circuit_breaker.record_failure()
             error_msg = str(e)
             if isinstance(e, httpx.HTTPStatusError):
+                if e.response.status_code == 401:
+                    self._cst = None
+                    self._security_token = None
+                    self._session_time = None
                 try:
                     error_msg = e.response.json().get("errorCode", error_msg)
                 except Exception:

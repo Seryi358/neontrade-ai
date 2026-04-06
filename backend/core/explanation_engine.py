@@ -82,8 +82,8 @@ class ExplanationEngine:
         tf_explanations = []
 
         # Weekly/Daily analysis
-        htf_trend_es = self.TREND_DESC.get(analysis_result.htf_trend.value, "desconocido")
-        htf_cond_es = self.CONDITION_DESC.get(analysis_result.htf_condition.value, "neutral")
+        htf_trend_es = self.TREND_DESC.get(analysis_result.htf_trend.value, "desconocido") if analysis_result.htf_trend else "desconocido"
+        htf_cond_es = self.CONDITION_DESC.get(analysis_result.htf_condition.value, "neutral") if analysis_result.htf_condition else "neutral"
 
         tf_explanations.append(TimeframeExplanation(
             timeframe="Diario (D)",
@@ -113,7 +113,7 @@ class ExplanationEngine:
         ))
 
         # 1H analysis
-        ltf_trend_es = self.TREND_DESC.get(analysis_result.ltf_trend.value, "desconocido")
+        ltf_trend_es = self.TREND_DESC.get(analysis_result.ltf_trend.value, "desconocido") if analysis_result.ltf_trend else "desconocido"
         ema_h1_50 = analysis_result.ema_values.get("EMA_H1_50", None)
 
         tf_explanations.append(TimeframeExplanation(
@@ -147,9 +147,9 @@ class ExplanationEngine:
         else:
             conditions_missing.append(f"Score de calidad insuficiente: {analysis_result.score:.0f}/100 (necesita >= 65)")
 
-        if analysis_result.key_levels.get("supports"):
+        if analysis_result.key_levels and analysis_result.key_levels.get("supports"):
             conditions_met.append(f"Niveles de soporte identificados: {len(analysis_result.key_levels['supports'])}")
-        if analysis_result.key_levels.get("resistances"):
+        if analysis_result.key_levels and analysis_result.key_levels.get("resistances"):
             conditions_met.append(f"Niveles de resistencia identificados: {len(analysis_result.key_levels['resistances'])}")
 
         if analysis_result.fibonacci_levels:
@@ -409,7 +409,7 @@ class ExplanationEngine:
         """Format a short version for push notifications."""
         if explanation.strategy_detected:
             return (
-                f"{'🟢' if explanation.overall_bias == 'ALCISTA' else '🔴'} "
+                f"{'🟢' if explanation.overall_bias == 'ALCISTA' else '🔴' if explanation.overall_bias == 'BAJISTA' else '🟡'} "
                 f"{explanation.instrument}: "
                 f"Estrategia {explanation.strategy_detected} detectada | "
                 f"Score: {explanation.score:.0f} | "

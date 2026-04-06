@@ -265,8 +265,12 @@ class TradeDatabase:
                 ),
             )
             await self._db.commit()
-        except sqlite3.IntegrityError:
-            logger.warning(f"Duplicate trade ID {trade_id} — already exists in DB, skipping insert")
+        except sqlite3.IntegrityError as e:
+            error_msg = str(e).lower()
+            if "unique" in error_msg or "primary" in error_msg:
+                logger.warning(f"Duplicate trade ID {trade_id} — already exists in DB, skipping insert")
+            else:
+                logger.error(f"Trade {trade_id} INSERT failed — integrity constraint: {e}")
             return trade_id
         logger.info(f"Trade recorded: {trade_id} | {trade_data['instrument']} {trade_data['direction']}")
         return trade_id

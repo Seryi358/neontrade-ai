@@ -555,7 +555,7 @@ class AlertManager:
         )
         if resp.status_code != 200:
             raise RuntimeError(
-                f"Telegram API returned {resp.status_code}: {resp.text}"
+                f"Telegram API returned {resp.status_code}"
             )
         logger.info("Telegram alert sent: {}", title)
 
@@ -595,7 +595,7 @@ class AlertManager:
         resp = await self._get_http().post(url, json=payload)
         if resp.status_code not in (200, 204):
             raise RuntimeError(
-                f"Discord webhook returned {resp.status_code}: {resp.text}"
+                f"Discord webhook returned {resp.status_code}"
             )
         logger.info("Discord alert sent: {}", title)
 
@@ -685,7 +685,7 @@ class AlertManager:
         )
         if resp.status_code != 200:
             raise RuntimeError(
-                f"Gmail API returned {resp.status_code}: {resp.text}"
+                f"Gmail API returned {resp.status_code}"
             )
         logger.info("Gmail alert sent: {}", plain_title)
 
@@ -727,7 +727,7 @@ class AlertManager:
                 logger.info("Gmail access token refreshed, expires in 3500s")
                 return self._gmail_access_token
 
-            logger.error("Gmail token refresh failed: {} {}", resp.status_code, resp.text)
+            logger.error("Gmail token refresh failed: status {}", resp.status_code)
             self._gmail_access_token = None
             self._gmail_token_expires_at = 0.0
             return None

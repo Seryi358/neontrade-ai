@@ -1677,6 +1677,7 @@ class BlueStrategy(BaseStrategy):
 
         if not entry_found:
             failed.append(f"Paso 6: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
+            return None
 
         # Additional confirmation: secondary EMA break adds confluence
         if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
@@ -2206,6 +2207,7 @@ class RedStrategy(BaseStrategy):
 
         if not entry_found:
             failed.append(f"Paso 6: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
+            return None
 
         # Additional confirmation: secondary EMA break adds confluence if not already the primary entry
         if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
@@ -2793,6 +2795,7 @@ class PinkStrategy(BaseStrategy):
 
         if not entry_found:
             failed.append(f"Paso 5: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
+            return None
 
         # Additional confluence: both EMA levels confirm
         if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
@@ -3226,6 +3229,7 @@ class WhiteStrategy(BaseStrategy):
 
         if not entry_found:
             failed.append(f"Paso 5: Sin entrada valida (ni EMA {exec_tf} ni diagonal) - {ema_exec_desc}")
+            return None
 
         # Additional confluence: both EMA levels confirm
         if entry_found and ema_sec_break and ema_exec_break and sec_ema_key:
@@ -3738,6 +3742,7 @@ class BlackStrategy(BaseStrategy):
 
         if not entry_found:
             failed.append(f"Paso 6: Sin rompimiento {exec_tf} ni diagonal - {ema_exec_desc}")
+            return None
 
         # NOTE: RSI divergence already checked above (Paso 5c) with BLACK-specific
         # logic (+15/-10). Do NOT call _check_rsi_divergence() here to avoid double-counting.

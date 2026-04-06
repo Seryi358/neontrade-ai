@@ -39,6 +39,7 @@ from broker.base import (
     AccountSummary,
     TradeInfo,
 )
+from core.resilience import broker_circuit_breaker
 
 
 # ── Granularity mapping (our format -> IBKR format) ─────────
@@ -595,6 +596,8 @@ class IBKRClient(BaseBroker):
         """Place a market order. units > 0 = BUY, units < 0 = SELL."""
         if units == 0:
             return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
+        if broker_circuit_breaker.is_open:
+            return OrderResult(success=False, trade_id=None, units=units, error="Circuit breaker OPEN — broker unavailable")
         await self._ensure_account_id()
         conid = await self._resolve_conid(instrument)
 
@@ -657,6 +660,10 @@ class IBKRClient(BaseBroker):
                 status = first.get("order_status", "")
                 logger.info(f"IBKR order: {instrument} {side} {quantity} | ID={order_id}")
 
+                if status not in ("Rejected", "Cancelled"):
+                    broker_circuit_breaker.record_success()
+                else:
+                    broker_circuit_breaker.record_failure()
                 return OrderResult(
                     success=status not in ("Rejected", "Cancelled"),
                     trade_id=str(order_id) if order_id else None,
@@ -667,8 +674,12 @@ class IBKRClient(BaseBroker):
             return OrderResult(success=False, units=units, error=str(data))
 
         except Exception as e:
+            broker_circuit_breaker.record_failure()
             error_msg = e.response.text if hasattr(e, 'response') else str(e)
             logger.error(f"IBKR order failed: {error_msg}")
+            if hasattr(e, 'response') and getattr(e.response, 'status_code', 0) == 401:
+                self._lst = None
+                self._lst_expiry = None
             return OrderResult(success=False, units=units, error=error_msg)
 
     async def place_limit_order(
@@ -683,6 +694,8 @@ class IBKRClient(BaseBroker):
         """Place a limit order at a specific price."""
         if units == 0:
             return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
+        if broker_circuit_breaker.is_open:
+            return OrderResult(success=False, trade_id=None, units=units, error="Circuit breaker OPEN — broker unavailable")
         await self._ensure_account_id()
         conid = await self._resolve_conid(instrument)
 
@@ -745,6 +758,10 @@ class IBKRClient(BaseBroker):
                 status = first.get("order_status", "")
                 logger.info(f"IBKR limit order: {instrument} {side} {quantity} @ {price} | ID={order_id}")
 
+                if status not in ("Rejected", "Cancelled"):
+                    broker_circuit_breaker.record_success()
+                else:
+                    broker_circuit_breaker.record_failure()
                 return OrderResult(
                     success=status not in ("Rejected", "Cancelled"),
                     trade_id=str(order_id) if order_id else None,
@@ -755,8 +772,12 @@ class IBKRClient(BaseBroker):
             return OrderResult(success=False, units=units, error=str(data))
 
         except Exception as e:
+            broker_circuit_breaker.record_failure()
             error_msg = e.response.text if hasattr(e, 'response') else str(e)
             logger.error(f"IBKR limit order failed: {error_msg}")
+            if hasattr(e, 'response') and getattr(e.response, 'status_code', 0) == 401:
+                self._lst = None
+                self._lst_expiry = None
             return OrderResult(success=False, units=units, error=error_msg)
 
     async def place_stop_order(
@@ -774,6 +795,8 @@ class IBKRClient(BaseBroker):
         """
         if units == 0:
             return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
+        if broker_circuit_breaker.is_open:
+            return OrderResult(success=False, trade_id=None, units=units, error="Circuit breaker OPEN — broker unavailable")
         await self._ensure_account_id()
         conid = await self._resolve_conid(instrument)
 
@@ -836,6 +859,10 @@ class IBKRClient(BaseBroker):
                 status = first.get("order_status", "")
                 logger.info(f"IBKR stop order: {instrument} {side} {quantity} @ {stop_price} | ID={order_id}")
 
+                if status not in ("Rejected", "Cancelled"):
+                    broker_circuit_breaker.record_success()
+                else:
+                    broker_circuit_breaker.record_failure()
                 return OrderResult(
                     success=status not in ("Rejected", "Cancelled"),
                     trade_id=str(order_id) if order_id else None,
@@ -846,8 +873,12 @@ class IBKRClient(BaseBroker):
             return OrderResult(success=False, units=units, error=str(data))
 
         except Exception as e:
+            broker_circuit_breaker.record_failure()
             error_msg = e.response.text if hasattr(e, 'response') else str(e)
             logger.error(f"IBKR stop order failed: {error_msg}")
+            if hasattr(e, 'response') and getattr(e.response, 'status_code', 0) == 401:
+                self._lst = None
+                self._lst_expiry = None
             return OrderResult(success=False, units=units, error=error_msg)
 
     # ── Trade Management ─────────────────────────────────────

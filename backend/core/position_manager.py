@@ -823,7 +823,10 @@ class PositionManager:
             )
             if tp_max_reached:
                 try:
-                    await self.broker.close_trade(pos.trade_id)
+                    ok = await self.broker.close_trade(pos.trade_id)
+                    if not ok:
+                        logger.error(f"{pos.trade_id}: broker.close_trade returned False at TP_max — position remains tracked")
+                        return
                     pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
                     pnl = pnl_per_unit * abs(pos.units) if pos.units else 0.0
                     logger.info(
@@ -858,7 +861,10 @@ class PositionManager:
 
             if both_broken:
                 try:
-                    await self.broker.close_trade(pos.trade_id)
+                    ok = await self.broker.close_trade(pos.trade_id)
+                    if not ok:
+                        logger.error(f"{pos.trade_id}: broker.close_trade returned False at emergency exit — position remains tracked")
+                        return
                     pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
                     pnl = pnl_per_unit * abs(pos.units) if pos.units else 0.0
                     logger.warning(

@@ -925,7 +925,10 @@ class TradingEngine:
 
             if should_close:
                 try:
-                    await self.broker.close_trade(trade_id)
+                    ok = await self.broker.close_trade(trade_id)
+                    if not ok:
+                        logger.error(f"Friday close: broker.close_trade({trade_id}) returned False — skipping cleanup")
+                        continue
                     # Record trade result BEFORE cleanup (delta/reentry tracking)
                     pos = self.position_manager.positions.get(trade_id)
                     if current and entry:
@@ -1394,7 +1397,10 @@ class TradingEngine:
             try:
                 should_close, reason = await self.news_filter.should_close_for_news(pos.instrument)
                 if should_close:
-                    await self.broker.close_trade(pos.trade_id)
+                    ok = await self.broker.close_trade(pos.trade_id)
+                    if not ok:
+                        logger.error(f"News close: broker.close_trade({pos.trade_id}) returned False — position remains tracked")
+                        continue
                     # Record trade result before removing
                     pnl_val = 0.0
                     news_exit_price = pos.entry_price  # fallback

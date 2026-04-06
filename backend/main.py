@@ -97,7 +97,8 @@ class ConnectionManager:
         """Send a typed event to a specific client."""
         try:
             await websocket.send_json({"type": event_type, "data": data})
-        except Exception:
+        except Exception as e:
+            logger.warning(f"WS send_personal failed ({event_type}): {e!r}")
             self.disconnect(websocket)
 
 
@@ -197,8 +198,8 @@ async def _periodic_cleanup():
         try:
             from core.security import rate_limiter
             rate_limiter.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Rate limiter cleanup failed: {e!r}")
 
         # DB retention cleanup — once per day
         try:
@@ -308,8 +309,8 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
         try:
             await websocket.close(code=1011, reason="Internal error")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"WS close after error failed: {e!r}")
 
 
 async def _handle_ws_command(websocket: WebSocket, data: dict):

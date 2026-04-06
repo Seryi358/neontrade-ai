@@ -874,11 +874,15 @@ class MarketAnalyzer:
                         # Bullish FVG filled if price comes back down through it
                         if candle_low <= fvg["low"]:
                             fvg["filled"] = True
+                            fvg["reacted"] = True
+                            fvg["partially_filled"] = True
                             break
                     else:
                         # Bearish FVG filled if price comes back up through it
                         if candle_high >= fvg["high"]:
                             fvg["filled"] = True
+                            fvg["reacted"] = True
+                            fvg["partially_filled"] = True
                             break
 
                     # Check if price touched the start of the FVG (reaction point)

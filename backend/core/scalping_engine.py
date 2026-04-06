@@ -1122,7 +1122,7 @@ class ScalpingAnalyzer:
         self,
         scalp_data: ScalpingData,
         direction: str,
-        method: str = "fast",
+        method: str = "fixed_tp",
         ema_buffer_pct: float = 0.001,
     ) -> Dict[str, Any]:
         """

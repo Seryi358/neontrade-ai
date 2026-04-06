@@ -547,12 +547,24 @@ def _load_risk_overrides():
     import json
     _config_dir = os.path.dirname(os.path.abspath(__file__))
     risk_path = os.path.join(_config_dir, "data", "risk_config.json")
+    _ALLOWED_RISK_KEYS = {
+        "risk_day_trading", "risk_scalping", "risk_swing", "max_total_risk",
+        "correlated_risk_pct", "min_rr_ratio", "move_sl_to_be_pct_to_tp1",
+        "drawdown_method", "delta_enabled", "delta_parameter", "delta_max_risk",
+        "scale_in_require_be", "min_rr_black", "min_rr_green", "min_rr_blue_c",
+        "funded_account_mode", "funded_account_type", "funded_evaluation_type",
+        "funded_max_daily_dd", "funded_max_total_dd", "funded_max_total_dd_phase2",
+        "funded_profit_target_phase1", "funded_profit_target_phase2",
+        "funded_current_phase", "funded_no_overnight", "funded_no_news_trading",
+        "funded_no_weekend", "scalping_enabled", "scalping_max_daily_dd",
+        "scalping_max_total_dd", "trading_start_hour", "trading_end_hour",
+    }
     if os.path.exists(risk_path):
         try:
             with open(risk_path) as f:
                 overrides = json.load(f)
             for key, value in overrides.items():
-                if hasattr(settings, key):
+                if key in _ALLOWED_RISK_KEYS and hasattr(settings, key):
                     setattr(settings, key, value)
         except Exception as e:
             import logging

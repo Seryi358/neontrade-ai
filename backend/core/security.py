@@ -93,7 +93,7 @@ class SecurityConfig:
         if not self.api_keys:
             return True  # No keys configured = open access (first run)
         key_hash = self._hash_key(raw_key)
-        return key_hash in self.api_keys
+        return any(hmac.compare_digest(key_hash, h) for h in self.api_keys)
 
     def revoke_key(self, key_hash: str) -> bool:
         """Revoke an API key by its hash."""
@@ -187,10 +187,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         # 2. Skip auth for public endpoints, static assets, and WebSocket upgrades
         is_public = (
             path in PUBLIC_ENDPOINTS
-            or path.startswith("/docs")
-            or path.startswith("/redoc")
-            or path.startswith("/_expo")
-            or path.startswith("/assets")
+            or path.startswith("/docs/")
+            or path.startswith("/redoc/")
+            or path.startswith("/_expo/")
+            or path.startswith("/assets/")
         )
         # Only skip auth for actual WebSocket path, NOT just Upgrade header
         # (prevents auth bypass via fake Upgrade header on API endpoints)

@@ -593,6 +593,8 @@ class IBKRClient(BaseBroker):
         take_profit: Optional[float] = None,
     ) -> OrderResult:
         """Place a market order. units > 0 = BUY, units < 0 = SELL."""
+        if units == 0:
+            return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
         await self._ensure_account_id()
         conid = await self._resolve_conid(instrument)
 
@@ -679,6 +681,8 @@ class IBKRClient(BaseBroker):
         expiry_hours: int = 24,
     ) -> OrderResult:
         """Place a limit order at a specific price."""
+        if units == 0:
+            return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
         await self._ensure_account_id()
         conid = await self._resolve_conid(instrument)
 
@@ -768,6 +772,8 @@ class IBKRClient(BaseBroker):
 
         IBKR REST API supports STP (stop) orders via /iserver/account/{acctId}/orders.
         """
+        if units == 0:
+            return OrderResult(success=False, trade_id=None, units=0, error="Cannot place order with 0 units")
         await self._ensure_account_id()
         conid = await self._resolve_conid(instrument)
 

@@ -1101,7 +1101,7 @@ Be specific and actionable. Reference TradingLab strategy names and rules where 
                 temperature=0.3,
                 max_tokens=500,
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content or "Market overview unavailable."
         except Exception as e:
             logger.error("Market overview failed: {}", e)
             return "Market overview unavailable."
@@ -1215,7 +1215,7 @@ Use HTML tags for formatting (<b>, <br>, <ul>/<li>) since this may be sent via e
                 temperature=0.2,
                 max_tokens=1500,
             )
-            report = response.choices[0].message.content
+            report = response.choices[0].message.content or "<b>Daily report unavailable</b>"
             logger.info(
                 "Daily report generated: {} trades, P&L={:+.2f}, DD={:.2f}%",
                 total_trades,

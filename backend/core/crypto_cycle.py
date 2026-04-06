@@ -63,6 +63,8 @@ class CryptoCycleAnalyzer:
         self.broker = broker
         self._cache: Optional[CryptoMarketCycle] = None
         self._cache_time: Optional[datetime] = None
+        self._cache_bmsb: Optional[Dict] = None
+        self._cache_pi_cycle: Optional[Dict] = None
         self._http = httpx.AsyncClient(timeout=10.0)
         # Track consecutive weekly closes below BMSB for confirmation logic.
         # The mentorship emphasizes needing a weekly CLOSE below BMSB plus
@@ -82,7 +84,9 @@ class CryptoCycleAnalyzer:
             pi_cycle: Pi Cycle dict from AnalysisResult (keys: near_top, near_bottom).
         """
         now = datetime.now(timezone.utc)
-        if self._cache and self._cache_time and (now - self._cache_time).total_seconds() < 3600:
+        if (self._cache and self._cache_time
+                and (now - self._cache_time).total_seconds() < 3600
+                and self._cache_bmsb == bmsb and self._cache_pi_cycle == pi_cycle):
             return self._cache
 
         cycle = CryptoMarketCycle()
@@ -128,6 +132,8 @@ class CryptoCycleAnalyzer:
         cycle.last_updated = now.isoformat()
         self._cache = cycle
         self._cache_time = now
+        self._cache_bmsb = bmsb
+        self._cache_pi_cycle = pi_cycle
         return cycle
 
     async def _analyze_dominance(self, cycle: CryptoMarketCycle):

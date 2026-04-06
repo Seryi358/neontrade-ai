@@ -146,8 +146,9 @@ class MarketAnalyzer:
             "H1": 200,   # ~8 days of 1H
             "M15": 200,  # ~2 days of 15m
             "M5": 200,   # ~17 hours of 5m
-            "M2": 200,   # ~6.6 hours of 2m, needed for CPA Day Trading (Alex: "2 minutos")
             "M1": 200,   # ~3.3 hours, needed for scalping position management
+            "M2": 200,   # ~6.6 hours of 2m, needed for CPA Day Trading (Alex: "2 minutos")
+            # NOTE: M1 must be fetched BEFORE M2 so the M2→M1 fallback works
         }
 
         for tf, count in timeframes.items():

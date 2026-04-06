@@ -688,9 +688,9 @@ class Backtester:
                     # Friday: no new trades after 18:00 UTC
                     if _wd == 4 and _h >= 18:
                         _allow_new_trade = False
-                    # Friday EOD: force-close all open positions at 22:00 UTC
-                    # TradingLab: no weekend exposure — close everything before market close
-                    if _wd == 4 and _h >= 22 and open_positions:
+                    # Friday EOD: force-close all open positions at 21:00 UTC
+                    # Forex last H1 bar starts at 21:00 (market closes 22:00); _h >= 22 never exists in data
+                    if _wd == 4 and _h >= 21 and open_positions:
                         for pos in list(open_positions):
                             pos.force_close(bar_close, "FRIDAY_CLOSE")
                             pos.trade.exit_time = bar_time
@@ -721,7 +721,8 @@ class Backtester:
             _scale_in_blocked = False
             if config.scale_in_require_be and open_positions:
                 for pos in open_positions:
-                    if pos.phase.value < PositionPhase.BREAK_EVEN.value:
+                    # INITIAL and SL_MOVED are before BREAK_EVEN — block scale-in
+                    if pos.phase in (PositionPhase.INITIAL, PositionPhase.SL_MOVED):
                         _scale_in_blocked = True
                         break
 

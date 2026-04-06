@@ -447,6 +447,10 @@ class PositionManager:
                 continue
 
             price_data = current_prices[pos.instrument]
+            if price_data is None:
+                logger.warning(f"{trade_id}: price_data is None for {pos.instrument} — skipping update")
+                continue
+
             current_price = (
                 price_data.ask if pos.direction == "SELL"
                 else price_data.bid

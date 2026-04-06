@@ -573,11 +573,11 @@ def _load_risk_overrides():
         "min_rr_black":           (0.5,   5.0),
         "min_rr_green":           (0.5,   5.0),
         "min_rr_blue_c":          (0.5,   5.0),
-        "funded_max_daily_dd":    (0.01,  0.20),
+        "funded_max_daily_dd":    (0.01,  1.0),   # 1.0 = no daily DD limit (instant funding)
         "funded_max_total_dd":    (0.01,  0.30),
-        "funded_max_total_dd_phase2": (0.01, 0.30),
-        "funded_profit_target_phase1": (0.01, 0.50),
-        "funded_profit_target_phase2": (0.01, 0.50),
+        "funded_max_total_dd_phase2": (0.0, 0.30),  # 0.0 = not applicable (single-phase)
+        "funded_profit_target_phase1": (0.0, 0.50),  # 0.0 = no target (instant funding)
+        "funded_profit_target_phase2": (0.0, 0.50),  # 0.0 = no target (instant/single-phase)
         "scalping_max_daily_dd":  (0.01,  0.20),
         "scalping_max_total_dd":  (0.01,  0.30),
         "trading_start_hour":     (0, 23),

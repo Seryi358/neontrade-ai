@@ -14,7 +14,7 @@ import {
   RefreshControl,
   ScrollView,
 } from 'react-native';
-import { theme } from '../theme/cyberpunk';
+import { theme } from '../theme/apple-glass';
 
 const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {

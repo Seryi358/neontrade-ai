@@ -12,7 +12,7 @@ import {
   ScrollView,
   RefreshControl,
 } from 'react-native';
-import { theme } from '../theme/cyberpunk';
+import { theme } from '../theme/apple-glass';
 const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
@@ -472,32 +472,30 @@ export default function CryptoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    paddingHorizontal: theme.spacing.md,
+    backgroundColor: '#f2f2f7',
+    paddingHorizontal: 16,
   },
   topPadding: {
-    paddingTop: theme.spacing.lg,
+    paddingTop: 24,
   },
 
   // Phase card
   phaseCenter: {
     alignItems: 'center',
-    marginVertical: theme.spacing.sm,
+    marginVertical: 8,
   },
   sentimentText: {
-    fontFamily: theme.fonts.semibold,
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
-    letterSpacing: 2,
     marginTop: 6,
   },
   phaseDescription: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 12,
-    color: theme.colors.textMuted,
+    fontSize: 13,
+    color: '#aeaeb2',
     textAlign: 'center',
     marginTop: 8,
-    lineHeight: 18,
+    lineHeight: 20,
   },
 
   // Big value
@@ -505,17 +503,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginVertical: theme.spacing.sm,
+    marginVertical: 8,
   },
   bigNumber: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 32,
-    color: theme.colors.textWhite,
-    fontWeight: '600',
+    fontSize: 34,
+    color: '#1d1d1f',
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   trendArrow: {
-    fontFamily: theme.fonts.heading,
     fontSize: 22,
+    fontWeight: '600',
   },
 
   // Badge row
@@ -523,13 +521,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    marginTop: theme.spacing.xs,
+    marginTop: 4,
   },
   warningNote: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 10,
+    fontSize: 12,
     textAlign: 'center',
-    letterSpacing: 1,
     marginTop: 8,
   },
 
@@ -538,34 +534,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: 8,
     flexWrap: 'wrap',
     gap: 2,
   },
   rotationNode: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
   },
   rotationNodeActive: {
-    borderColor: theme.colors.neonCyan,
-    backgroundColor: 'rgba(93, 244, 254, 0.15)',
+    backgroundColor: 'rgba(0,122,255,0.1)',
   },
   rotationNodeText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#aeaeb2',
   },
   rotationNodeTextActive: {
-    color: theme.colors.neonCyan,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   rotationArrow: {
-    fontFamily: theme.fonts.mono,
     fontSize: 12,
-    color: theme.colors.cp2077YellowDim,
+    color: '#aeaeb2',
     marginHorizontal: 2,
   },
 
@@ -573,42 +566,34 @@ const styles = StyleSheet.create({
   indicatorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.spacing.sm,
+    gap: 8,
   },
   indicatorCell: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: theme.colors.backgroundLight,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.sm,
-    padding: theme.spacing.sm,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 14,
+    padding: 12,
     gap: 4,
   },
   indicatorTitle: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 11,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1d1d1f',
   },
   indicatorSubtitle: {
-    fontFamily: theme.fonts.light,
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    letterSpacing: 1,
+    fontSize: 10,
+    color: '#aeaeb2',
     marginBottom: 4,
   },
   indicatorNote: {
-    fontFamily: theme.fonts.light,
-    fontSize: 9,
-    color: theme.colors.neonOrange,
+    fontSize: 10,
+    color: '#FF9500',
     marginTop: 2,
-    letterSpacing: 1,
   },
   rsiValue: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
   },
 
   // Allocation
@@ -617,37 +602,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 24,
-    marginVertical: theme.spacing.sm,
+    marginVertical: 8,
   },
   allocItem: {
     alignItems: 'center',
   },
   allocPct: {
-    fontFamily: theme.fonts.heading,
     fontSize: 28,
-    color: theme.colors.neonCyan,
-    letterSpacing: 2,
+    fontWeight: '700',
+    color: '#007AFF',
+    letterSpacing: -0.3,
   },
   allocLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#aeaeb2',
+    letterSpacing: 0.3,
   },
   allocDivider: {
     width: 1,
     height: 36,
-    backgroundColor: theme.colors.border,
+    backgroundColor: 'rgba(0,0,0,0.04)',
   },
 
   // Last updated
   lastUpdated: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    color: theme.colors.textMuted,
+    fontSize: 10,
+    color: '#aeaeb2',
     textAlign: 'center',
     marginTop: 8,
-    letterSpacing: 2,
   },
 });

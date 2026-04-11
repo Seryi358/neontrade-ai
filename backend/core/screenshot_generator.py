@@ -43,22 +43,22 @@ except ImportError:
 
 # ── NeonTrade Cyberpunk Theme ────────────────────────────────────
 THEME = {
-    "bg": "#0a0713",
-    "bg_card": "#12101f",
-    "bullish": "#00ff88",
-    "bearish": "#ff2e63",
-    "text": "#e2e8f0",
-    "text_dim": "#8892a4",
-    "grid": "#1a1535",
-    "entry": "#00f0ff",       # Cyan
-    "sl": "#ff2e63",          # Red
-    "tp": "#00ff88",          # Green
-    "tp_max": "#ffdd00",      # Yellow
-    "ema_fast": "#00f0ff",    # Cyan (EMA 2)
-    "ema_slow": "#eb4eca",    # Pink (EMA 5)
-    "current_price": "#ffffff",
-    "info_box_bg": "#12101fcc",
-    "info_box_border": "#2a2550",
+    "bg": "#f2f2f7",            # Apple: systemGroupedBackground
+    "bg_card": "#ffffff",        # Apple: white card
+    "bullish": "#34C759",        # Apple: systemGreen
+    "bearish": "#FF3B30",        # Apple: systemRed
+    "text": "#1d1d1f",           # Apple: label
+    "text_dim": "#86868b",       # Apple: secondaryLabel
+    "grid": "#e5e5ea",           # Apple: systemGray5
+    "entry": "#007AFF",          # Apple: systemBlue
+    "sl": "#FF3B30",             # Apple: systemRed
+    "tp": "#34C759",             # Apple: systemGreen
+    "tp_max": "#FF9500",         # Apple: systemOrange
+    "ema_fast": "#007AFF",       # Apple: systemBlue (EMA 2)
+    "ema_slow": "#AF52DE",       # Apple: systemPurple (EMA 5)
+    "current_price": "#1d1d1f",  # Dark text on light bg
+    "info_box_bg": "#ffffffee",  # White semi-transparent
+    "info_box_border": "#e5e5ea",
 }
 
 

@@ -1,7 +1,8 @@
 /**
- * NeonTrade AI - Dashboard Screen (HQ)
- * Command Center HUD with account overview, engine status,
- * risk monitoring, active positions, and daily activity.
+ * NeonTrade AI - Dashboard Screen
+ * Account overview, engine status, risk monitoring,
+ * active positions, and daily activity.
+ * Design: Apple Liquid Glass Light
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,7 +13,7 @@ import {
   ScrollView,
   RefreshControl,
 } from 'react-native';
-import { theme } from '../theme/cyberpunk';
+import { theme } from '../theme/apple-glass';
 
 /** Safe toFixed — handles null/undefined/NaN without crashing */
 const safe = (v: any, decimals = 2): string => {
@@ -178,23 +179,23 @@ export default function DashboardScreen() {
     val > 0 ? '\u25B2' : val < 0 ? '\u25BC' : '\u25CF';
 
   const ddSeverityColor = (level: string | null) => {
-    if (level === 'critical') return theme.colors.neonRed;
-    if (level === 'high') return theme.colors.neonOrange;
-    if (level === 'moderate') return theme.colors.neonYellow;
+    if (level === 'critical') return theme.colors.loss;
+    if (level === 'high') return theme.colors.warning;
+    if (level === 'moderate') return '#FFCC00';
     return theme.colors.textMuted;
   };
 
   const riskColor = (pct: number) => {
-    if (pct >= 4) return theme.colors.neonRed;
-    if (pct >= 3) return theme.colors.neonOrange;
-    if (pct >= 2) return theme.colors.neonYellow;
-    return theme.colors.neonGreen;
+    if (pct >= 4) return theme.colors.loss;
+    if (pct >= 3) return theme.colors.warning;
+    if (pct >= 2) return '#FFCC00';
+    return theme.colors.profit;
   };
 
   if (loading && !account && !status) {
     return (
       <View style={styles.container}>
-        <LoadingState message="CONNECTING TO HQ..." />
+        <LoadingState message="Connecting..." />
       </View>
     );
   }
@@ -212,12 +213,12 @@ export default function DashboardScreen() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={theme.colors.cp2077Yellow}
+          tintColor="#007AFF"
         />
       }
     >
       {/* ── HUD Header ─────────────────────────────────── */}
-      <HUDHeader title="COMMAND CENTER // HQ" subtitle={
+      <HUDHeader title="Dashboard" subtitle={
         `${new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC`
       } />
 
@@ -228,9 +229,9 @@ export default function DashboardScreen() {
 
       {/* ── Account Overview ───────────────────────────── */}
       <HUDCard>
-        <HUDSectionTitle title="ACCOUNT" icon="\u25C8" />
+        <HUDSectionTitle title="Account" icon="\u25C8" />
 
-        {/* Balance - large cyan */}
+        {/* Balance */}
         <Text style={styles.balanceAmount}>
           {account ? formatCurrency(account.balance) : '---'}
         </Text>
@@ -238,12 +239,12 @@ export default function DashboardScreen() {
         <HUDDivider />
 
         <HUDStatRow
-          label="EQUITY"
+          label="Equity"
           value={account ? formatCurrency(account.equity) : '---'}
           valueColor={theme.colors.textSecondary}
         />
         <HUDStatRow
-          label="UNREALIZED P&L"
+          label="Unrealized P&L"
           value={
             account
               ? `${pnlArrow(account.unrealized_pnl)} ${formatCurrency(Math.abs(account.unrealized_pnl))}`
@@ -252,32 +253,32 @@ export default function DashboardScreen() {
           valueColor={account ? pnlColor(account.unrealized_pnl) : theme.colors.textMuted}
         />
         <HUDStatRow
-          label="MARGEN DISPONIBLE"
+          label="Available margin"
           value={account ? formatCurrency(account.margin_available ?? account.equity) : '---'}
-          valueColor={theme.colors.neonCyan}
+          valueColor="#007AFF"
         />
       </HUDCard>
 
       {/* ── Engine Status Row ──────────────────────────── */}
       <HUDCard>
-        <HUDSectionTitle title="ENGINE STATUS" icon="\u25C6" />
+        <HUDSectionTitle title="Engine status" icon="\u25C6" />
         <View style={styles.engineRow}>
           <HUDBadge
-            label={status?.mode ?? 'AUTO'}
-            color={status?.mode === 'MANUAL' ? theme.colors.neonCyan : theme.colors.neonGreen}
+            label={status?.mode ?? 'Auto'}
+            color={status?.mode === 'MANUAL' ? '#007AFF' : theme.colors.profit}
           />
           <View style={styles.statusDot}>
             <View
               style={[
                 styles.dot,
-                { backgroundColor: status?.running ? theme.colors.neonGreen : theme.colors.neonRed },
+                { backgroundColor: status?.running ? theme.colors.profit : theme.colors.loss },
               ]}
             />
             <Text style={[
               styles.statusLabel,
-              { color: status?.running ? theme.colors.neonGreen : theme.colors.neonRed },
+              { color: status?.running ? theme.colors.profit : theme.colors.loss },
             ]}>
-              {status?.running ? 'CONNECTED' : 'OFFLINE'}
+              {status?.running ? 'Connected' : 'Offline'}
             </Text>
           </View>
           <View style={styles.connectionQuality}>
@@ -293,7 +294,7 @@ export default function DashboardScreen() {
         accentColor={riskColor(totalRiskPct)}
         borderColor={
           riskStatus?.dd_alert_level === 'critical'
-            ? theme.colors.neonRed
+            ? theme.colors.loss
             : undefined
         }
         style={
@@ -303,20 +304,20 @@ export default function DashboardScreen() {
         }
       >
         <HUDSectionTitle
-          title="RISK MONITOR"
+          title="Risk monitor"
           icon="!"
           color={riskColor(totalRiskPct)}
         />
 
         <HUDProgressBar
-          label="CURRENT RISK"
+          label="Current risk"
           value={maxRiskPct > 0 ? (totalRiskPct / maxRiskPct) * 100 : 0}
           maxLabel={`${safe(maxRiskPct, 1)}% MAX`}
           color={riskColor(totalRiskPct)}
           showValue
         />
         <Text style={styles.riskActual}>
-          {totalRiskPct.toFixed(1)}% DEPLOYED
+          {totalRiskPct.toFixed(1)}% deployed
         </Text>
 
         <HUDDivider />
@@ -324,7 +325,7 @@ export default function DashboardScreen() {
         {riskStatus && (
           <>
             <HUDStatRow
-              label="DRAWDOWN"
+              label="Drawdown"
               value={`-${safe(riskStatus.current_drawdown)}%`}
               valueColor={ddSeverityColor(riskStatus.dd_alert_level)}
             />
@@ -332,17 +333,17 @@ export default function DashboardScreen() {
               <HUDBadge
                 label={
                   riskStatus.dd_alert_level === 'critical'
-                    ? 'DD CRITICO'
+                    ? 'DD Critical'
                     : riskStatus.dd_alert_level === 'high'
-                      ? 'DD ALTO'
-                      : 'DD ALERTA'
+                      ? 'DD High'
+                      : 'DD Alert'
                 }
                 color={ddSeverityColor(riskStatus.dd_alert_level)}
                 small
               />
             )}
             <HUDStatRow
-              label="MAX RISK / DIA"
+              label="Max risk / day"
               value={maxTotalRisk != null ? `${safe(maxRiskPct, 1)}%` : '---'}
               valueColor={theme.colors.textMuted}
             />
@@ -353,7 +354,7 @@ export default function DashboardScreen() {
       {/* ── Active Positions ───────────────────────────── */}
       <HUDCard>
         <HUDSectionTitle
-          title={`ACTIVE POSITIONS (${positions.length})`}
+          title={`Active positions (${positions.length})`}
           icon="\u25A3"
         />
 
@@ -386,60 +387,60 @@ export default function DashboardScreen() {
             </View>
           ))
         ) : (
-          <Text style={styles.emptyText}>NO ACTIVE POSITIONS</Text>
+          <Text style={styles.emptyText}>No active positions</Text>
         )}
       </HUDCard>
 
       {/* ── Daily Activity Grid ────────────────────────── */}
       {activity && (
         <HUDCard>
-          <HUDSectionTitle title="DAILY ACTIVITY" icon="\u25C7" />
+          <HUDSectionTitle title="Daily activity" icon="\u25C7" />
           <View style={styles.activityGrid}>
             <View style={styles.activityCell}>
               <Text style={styles.activityValue}>{activity.scans_completed}</Text>
-              <Text style={styles.activityLabel}>SCANS</Text>
+              <Text style={styles.activityLabel}>Scans</Text>
             </View>
             <View style={styles.activityCell}>
               <Text style={styles.activityValue}>{activity.setups_found}</Text>
-              <Text style={styles.activityLabel}>SETUPS</Text>
+              <Text style={styles.activityLabel}>Setups</Text>
             </View>
             <View style={styles.activityCell}>
-              <Text style={[styles.activityValue, { color: theme.colors.neonGreen }]}>
+              <Text style={[styles.activityValue, { color: theme.colors.profit }]}>
                 {activity.setups_executed}
               </Text>
-              <Text style={styles.activityLabel}>EXECUTED</Text>
+              <Text style={styles.activityLabel}>Executed</Text>
             </View>
             <View style={styles.activityCell}>
-              <Text style={[styles.activityValue, { color: theme.colors.neonRed }]}>
+              <Text style={[styles.activityValue, { color: theme.colors.loss }]}>
                 {activity.setups_skipped_ai}
               </Text>
-              <Text style={styles.activityLabel}>AI REJECTS</Text>
+              <Text style={styles.activityLabel}>AI rejects</Text>
             </View>
           </View>
           {activity.scans_completed > 0 && (
-            <Text style={styles.engineActive}>ENGINE ACTIVE // SCANNING</Text>
+            <Text style={styles.engineActive}>Engine active</Text>
           )}
         </HUDCard>
       )}
 
       {/* ── Drawdown Recovery Table ────────────────────── */}
       {riskStatus && riskStatus.current_drawdown > 0 && (
-        <HUDCard accentColor={theme.colors.neonYellow}>
-          <HUDSectionTitle title="RECOVERY MATH" icon="!" color={theme.colors.neonYellow} />
+        <HUDCard accentColor="#FFCC00">
+          <HUDSectionTitle title="Recovery math" icon="!" color={theme.colors.warning} />
 
           <View style={styles.recoveryHeader}>
             <HUDStatRow
-              label="DD ACTUAL"
+              label="Current DD"
               value={`-${safe(riskStatus.current_drawdown)}%`}
               valueColor={theme.colors.loss}
             />
             <HUDStatRow
-              label="PARA RECUPERAR"
+              label="To recover"
               value={`+${safe(riskStatus.recovery_pct_needed)}%`}
-              valueColor={theme.colors.neonYellow}
+              valueColor={theme.colors.warning}
             />
             <HUDStatRow
-              label="PERDIDO"
+              label="Lost"
               value={`-$${safe(riskStatus.loss_dollars, 0)}`}
               valueColor={theme.colors.loss}
             />
@@ -447,10 +448,9 @@ export default function DashboardScreen() {
 
           <HUDDivider />
 
-          {/* HUD Data Table */}
           <View style={styles.tableHeader}>
-            <Text style={styles.tableHeaderText}>PERDIDA</Text>
-            <Text style={styles.tableHeaderText}>PARA RECUPERAR</Text>
+            <Text style={styles.tableHeaderText}>Loss</Text>
+            <Text style={styles.tableHeaderText}>To recover</Text>
           </View>
           {(riskStatus.recovery_table || []).map(([loss, recovery]) => {
             const isActiveRow =
@@ -472,7 +472,7 @@ export default function DashboardScreen() {
                     styles.tableCell,
                     {
                       color:
-                        recovery >= 50 ? theme.colors.neonRed : theme.colors.neonYellow,
+                        recovery >= 50 ? theme.colors.loss : theme.colors.warning,
                     },
                   ]}
                 >
@@ -491,40 +491,39 @@ export default function DashboardScreen() {
       {/* ── System Info Footer ─────────────────────────── */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          BROKER: {(status?.broker ?? 'CAPITAL').toUpperCase()}
+          Broker: {status?.broker ?? 'Capital'}
         </Text>
         <Text style={styles.footerText}>
-          WATCHLIST: {status?.watchlist_count ?? 0} PAIRS
+          Watchlist: {status?.watchlist_count ?? 0} pairs
         </Text>
         <Text style={styles.footerText}>
-          ENGINE v2.2 // NEONTRADE AI
+          Engine v2.2 -- NeonTrade AI
         </Text>
       </View>
     </ScrollView>
   );
 }
 
-// ── Styles ──────────────────────────────────────────────
+// ── Styles (Apple Liquid Glass Light) ───────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#f2f2f7',
   },
   content: {
-    padding: theme.spacing.md,
-    paddingBottom: theme.spacing.xxl,
+    padding: 16,
+    paddingBottom: 48,
   },
 
   // Balance
   balanceAmount: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 32,
-    color: theme.colors.cp2077Yellow,
-    textShadowColor: theme.colors.cp2077YellowGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
-    marginVertical: theme.spacing.sm,
+    fontFamily: theme.fonts.primary,
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#1d1d1f',
+    letterSpacing: -0.5,
+    marginVertical: 8,
   },
 
   // Engine Status
@@ -532,7 +531,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.xs,
+    paddingVertical: 4,
   },
   statusDot: {
     flexDirection: 'row',
@@ -545,35 +544,35 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusLabel: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 11,
-    letterSpacing: 2,
+    fontFamily: theme.fonts.primary,
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0,
   },
   connectionQuality: {
     alignItems: 'center',
   },
   connectionBars: {
-    fontFamily: theme.fonts.mono,
+    fontFamily: theme.fonts.primary,
     fontSize: 14,
-    color: theme.colors.neonGreen,
-    letterSpacing: 1,
+    color: '#34C759',
   },
 
   // Risk
   riskActual: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
+    fontFamily: theme.fonts.primary,
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#aeaeb2',
     marginTop: 2,
   },
   pulseBorder: {
-    borderColor: theme.colors.neonRed,
-    shadowColor: theme.colors.neonRed,
+    borderColor: '#FF3B30',
+    shadowColor: '#FF3B30',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.18,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 6,
   },
 
   // Positions
@@ -581,9 +580,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   positionLeft: {
     flexDirection: 'row',
@@ -591,32 +590,33 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   positionPair: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 14,
-    color: theme.colors.textWhite,
-    letterSpacing: 1,
+    fontFamily: theme.fonts.primary,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1d1d1f',
   },
   positionRight: {
     alignItems: 'flex-end',
   },
   positionPnl: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 13,
+    fontFamily: theme.fonts.primary,
+    fontSize: 15,
+    fontWeight: '600',
   },
   positionPhase: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 2,
+    fontFamily: theme.fonts.primary,
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#86868b',
     marginTop: 2,
   },
   emptyText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 11,
-    color: theme.colors.textMuted,
+    fontFamily: theme.fonts.primary,
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#aeaeb2',
     textAlign: 'center',
-    paddingVertical: theme.spacing.lg,
-    letterSpacing: 3,
+    paddingVertical: 24,
   },
 
   // Daily Activity Grid (2x2)
@@ -627,87 +627,90 @@ const styles = StyleSheet.create({
   activityCell: {
     width: '50%',
     alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    borderWidth: 0.5,
-    borderColor: theme.colors.border,
+    paddingVertical: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.04)',
   },
   activityValue: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 22,
-    color: theme.colors.textWhite,
+    fontFamily: theme.fonts.primary,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1d1d1f',
   },
   activityLabel: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
+    fontFamily: theme.fonts.primary,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#aeaeb2',
+    letterSpacing: 0.3,
     marginTop: 4,
-    textTransform: 'uppercase',
   },
   engineActive: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    color: theme.colors.neonGreen,
+    fontFamily: theme.fonts.primary,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#34C759',
     textAlign: 'center',
-    letterSpacing: 3,
-    marginTop: theme.spacing.sm,
+    marginTop: 8,
   },
 
   // Recovery Table
   recoveryHeader: {
-    marginBottom: theme.spacing.xs,
+    marginBottom: 4,
   },
   tableHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: 16,
     marginBottom: 4,
   },
   tableHeaderText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
+    fontFamily: theme.fonts.primary,
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#aeaeb2',
+    letterSpacing: 0.3,
   },
   tableRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 3,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
   },
   tableRowActive: {
-    backgroundColor: 'rgba(255, 184, 0, 0.12)',
-    borderRadius: 2,
+    backgroundColor: 'rgba(0, 122, 255, 0.06)',
+    borderRadius: 8,
     borderLeftWidth: 2,
-    borderLeftColor: theme.colors.neonYellow,
+    borderLeftColor: '#007AFF',
   },
   tableCell: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 12,
+    fontFamily: theme.fonts.primary,
+    fontSize: 13,
+    fontWeight: '500',
   },
   quoteText: {
-    fontFamily: theme.fonts.light,
-    fontSize: 10,
-    color: theme.colors.textMuted,
+    fontFamily: theme.fonts.primary,
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#aeaeb2',
     textAlign: 'center',
     fontStyle: 'italic',
-    letterSpacing: 1,
-    marginTop: theme.spacing.md,
+    marginTop: 16,
   },
 
   // Footer
   footer: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    paddingVertical: 24,
+    marginTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.06)',
     gap: 4,
   },
   footerText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
+    fontFamily: theme.fonts.primary,
+    fontSize: 11,
+    fontWeight: '400',
+    color: '#aeaeb2',
   },
 });

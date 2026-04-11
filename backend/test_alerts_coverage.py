@@ -148,8 +148,8 @@ class TestBuildEmailHtml:
 
     def test_contains_neontrade_branding(self):
         html = _build_email_html("Title", "Body")
-        assert "NEONTRADE AI" in html
-        assert "NeonTrade AI v2.2" in html
+        assert "NeonTrade AI" in html
+        assert "TradingLab" in html
 
 
 # ──────────────────────────────────────────────────────────────────

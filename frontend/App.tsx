@@ -1,8 +1,8 @@
 /**
  * NeonTrade AI - Main App
- * Cyberpunk 2077 HUD-style AI Trading System
+ * Apple Liquid Glass Light UI
  *
- * Navigation: 5 tabs (HQ, TRADE, MARKET, LOG, SYS)
+ * Navigation: 5 tabs (HQ, Trade, Market, Log, Settings)
  * TRADE/MARKET/LOG tabs use internal sub-navigation (state-based)
  */
 
@@ -19,7 +19,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useFonts } from 'expo-font';
-import { theme } from './src/theme/cyberpunk';
+import { theme } from './src/theme/apple-glass';
 
 // ── Error Boundary ──────────────────────────────────────
 
@@ -41,24 +41,21 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <SafeAreaView style={errorStyles.container}>
-          {/* Scan lines overlay */}
-          <View style={errorStyles.scanLines} />
-
           <Text style={errorStyles.icon}>!</Text>
-          <Text style={errorStyles.title}>SYSTEM MALFUNCTION</Text>
+          <Text style={errorStyles.title}>Something Went Wrong</Text>
           <View style={errorStyles.divider} />
 
           <ScrollView style={errorStyles.scrollArea}>
             <Text style={errorStyles.errorDetail}>{this.state.error}</Text>
           </ScrollView>
 
-          <Text style={errorStyles.code}>ERR::FATAL_EXCEPTION</Text>
+          <Text style={errorStyles.code}>An unexpected error occurred</Text>
 
           <Text
             style={errorStyles.rebootBtn}
             onPress={() => this.setState({ hasError: false, error: '' })}
           >
-            REBOOT SYSTEM
+            Try Again
           </Text>
         </SafeAreaView>
       );
@@ -70,84 +67,54 @@ class ErrorBoundary extends React.Component<
 const errorStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.backgroundDark,
+    backgroundColor: '#f2f2f7',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
   },
-  scanLines: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.04,
-    // Simulated scan lines via repeating borders
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(251, 48, 72, 0.2)',
-  },
   icon: {
-    fontSize: 52,
-    color: theme.colors.neonRed,
-    fontFamily: 'Rajdhani-Bold',
-    textShadowColor: 'rgba(251, 48, 72, 0.6)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 30,
+    fontSize: 48,
+    color: '#FF3B30',
+    fontWeight: '700',
     marginBottom: 8,
   },
   title: {
-    color: theme.colors.neonRed,
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 24,
-    letterSpacing: 8,
-    textTransform: 'uppercase',
-    textShadowColor: 'rgba(251, 48, 72, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
+    color: '#1d1d1f',
+    fontWeight: '600',
+    fontSize: 22,
+    letterSpacing: 0.3,
+    marginBottom: 4,
   },
   divider: {
-    width: '50%',
-    height: 1,
-    backgroundColor: theme.colors.neonRed,
+    width: '40%',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0,0,0,0.12)',
     marginVertical: 16,
-    shadowColor: theme.colors.neonRed,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
   },
   scrollArea: {
     maxHeight: 160,
     marginBottom: 12,
   },
   errorDetail: {
-    color: theme.colors.neonRed,
-    fontFamily: 'Rajdhani',
-    fontSize: 11,
+    color: '#86868b',
+    fontSize: 13,
     textAlign: 'center',
-    letterSpacing: 1,
-    opacity: 0.8,
+    lineHeight: 18,
   },
   code: {
-    color: theme.colors.textMuted,
-    fontFamily: 'Rajdhani',
-    fontSize: 9,
-    letterSpacing: 3,
+    color: '#aeaeb2',
+    fontSize: 12,
     marginBottom: 24,
   },
   rebootBtn: {
-    color: theme.colors.neonCyan,
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 14,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    borderWidth: 1,
-    borderColor: theme.colors.neonCyan,
+    color: '#007AFF',
+    fontWeight: '600',
+    fontSize: 16,
     paddingHorizontal: 28,
-    paddingVertical: 10,
-    borderRadius: 2,
-    textShadowColor: theme.colors.neonCyanGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,122,255,0.08)',
+    overflow: 'hidden',
   },
 });
 
@@ -160,6 +127,7 @@ import ManualModeScreen from './src/screens/ManualModeScreen';
 import WatchlistScreen from './src/screens/WatchlistScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import JournalScreen from './src/screens/JournalScreen';
+import ExamScreen from './src/screens/ExamScreen';
 import CryptoScreen from './src/screens/CryptoScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
@@ -205,34 +173,30 @@ function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
 
 const subTabStyles = StyleSheet.create({
   safeArea: {
-    backgroundColor: theme.colors.backgroundDark,
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
   bar: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.backgroundDark,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
     paddingHorizontal: 8,
     paddingTop: 8,
   },
   tab: {
     flex: 1,
     textAlign: 'center',
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 11,
-    letterSpacing: 3,
-    color: theme.colors.textMuted,
+    fontWeight: '600',
+    fontSize: 13,
+    letterSpacing: 0.2,
+    color: '#8E8E93',
     paddingVertical: 10,
-    textTransform: 'uppercase',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    color: theme.colors.cp2077Yellow,
-    borderBottomColor: theme.colors.cp2077Yellow,
-    textShadowColor: theme.colors.cp2077YellowGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
+    color: '#007AFF',
+    borderBottomColor: '#007AFF',
   },
 });
 
@@ -242,9 +206,9 @@ function TradeScreen() {
   return (
     <SubTabScreen
       tabs={[
-        { key: 'analysis', label: 'SCAN', component: AnalysisScreen },
-        { key: 'chart', label: 'CHART', component: ChartScreen },
-        { key: 'manual', label: 'MANUAL', component: ManualModeScreen },
+        { key: 'analysis', label: 'Scan', component: AnalysisScreen },
+        { key: 'chart', label: 'Chart', component: ChartScreen },
+        { key: 'manual', label: 'Manual', component: ManualModeScreen },
       ]}
     />
   );
@@ -254,8 +218,8 @@ function MarketScreen() {
   return (
     <SubTabScreen
       tabs={[
-        { key: 'watchlist', label: 'WATCHLIST', component: WatchlistScreen },
-        { key: 'crypto', label: 'CRYPTO', component: CryptoScreen },
+        { key: 'watchlist', label: 'Watchlist', component: WatchlistScreen },
+        { key: 'crypto', label: 'Crypto', component: CryptoScreen },
       ]}
     />
   );
@@ -265,8 +229,9 @@ function LogScreen() {
   return (
     <SubTabScreen
       tabs={[
-        { key: 'history', label: 'HISTORY', component: HistoryScreen },
-        { key: 'journal', label: 'JOURNAL', component: JournalScreen },
+        { key: 'history', label: 'History', component: HistoryScreen },
+        { key: 'journal', label: 'Journal', component: JournalScreen },
+        { key: 'exam', label: 'Exam', component: ExamScreen },
       ]}
     />
   );
@@ -288,10 +253,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
       style={[
         tabIconStyles.icon,
         {
-          color: focused ? theme.colors.cp2077Yellow : theme.colors.textMuted,
-          textShadowColor: focused ? theme.colors.cp2077YellowGlow : 'transparent',
-          textShadowOffset: { width: 0, height: 0 },
-          textShadowRadius: focused ? 10 : 0,
+          color: focused ? '#007AFF' : '#8E8E93',
         },
       ]}
     >
@@ -303,7 +265,6 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 const tabIconStyles = StyleSheet.create({
   icon: {
     fontSize: 18,
-    fontFamily: 'Rajdhani-Bold',
     marginTop: 2,
   },
 });
@@ -311,59 +272,24 @@ const tabIconStyles = StyleSheet.create({
 // ── Boot / Loading Screen ───────────────────────────────
 
 function BootScreen() {
-  const lineWidth = useRef(new Animated.Value(0)).current;
-  const textOpacity = useRef(new Animated.Value(0)).current;
-  const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Boot sequence animation
-    Animated.sequence([
-      Animated.timing(lineWidth, {
-        toValue: 1,
-        duration: 1200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(textOpacity, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(subtitleOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [lineWidth, textOpacity, subtitleOpacity]);
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity]);
 
   return (
     <View style={bootStyles.container}>
-      {/* Animated yellow boot line */}
-      <Animated.View
-        style={[
-          bootStyles.bootLine,
-          {
-            width: lineWidth.interpolate({
-              inputRange: [0, 1],
-              outputRange: ['0%', '60%'],
-            }),
-          },
-        ]}
-      />
-
-      {/* Title */}
-      <Animated.Text style={[bootStyles.title, { opacity: textOpacity }]}>
-        NEONTRADE AI
+      <Animated.Text style={[bootStyles.title, { opacity }]}>
+        NeonTrade AI
       </Animated.Text>
 
-      {/* Version info */}
-      <Animated.Text style={[bootStyles.versionText, { opacity: textOpacity }]}>
-        v1.0 // SYSTEM INITIALIZING...
-      </Animated.Text>
-
-      {/* Powered by */}
-      <Animated.Text style={[bootStyles.poweredBy, { opacity: subtitleOpacity }]}>
-        POWERED BY TRADINGLAB
+      <Animated.Text style={[bootStyles.subtitle, { opacity }]}>
+        Loading...
       </Animated.Text>
     </View>
   );
@@ -372,46 +298,21 @@ function BootScreen() {
 const bootStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.backgroundDark,
+    backgroundColor: '#f2f2f7',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bootLine: {
-    height: 2,
-    backgroundColor: theme.colors.cp2077Yellow,
-    marginBottom: 24,
-    shadowColor: theme.colors.cp2077Yellow,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 12,
-    elevation: 8,
-  },
   title: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 36,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 12,
-    textTransform: 'uppercase',
-    textShadowColor: theme.colors.cp2077YellowGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 25,
+    fontWeight: '700',
+    fontSize: 28,
+    color: '#1d1d1f',
+    letterSpacing: 0.5,
+    marginBottom: 8,
   },
-  versionText: {
-    fontFamily: 'Rajdhani',
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
-    marginTop: 12,
-    textTransform: 'uppercase',
-  },
-  poweredBy: {
-    fontFamily: 'Rajdhani',
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    letterSpacing: 4,
-    marginTop: 8,
-    textTransform: 'uppercase',
-    opacity: 0.5,
+  subtitle: {
+    fontSize: 15,
+    color: '#8E8E93',
+    fontWeight: '400',
   },
 });
 
@@ -439,32 +340,27 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.backgroundDark }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
         <NavigationContainer>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <Tab.Navigator
             screenOptions={{
               headerShown: false,
               tabBarStyle: {
-                backgroundColor: theme.colors.backgroundDark,
-                borderTopWidth: 1,
-                borderTopColor: theme.colors.cp2077Yellow,
+                backgroundColor: 'rgba(255,255,255,0.92)',
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: 'rgba(0,0,0,0.06)',
                 height: 60,
                 paddingBottom: 6,
                 paddingTop: 6,
-                elevation: 16,
-                shadowColor: theme.colors.cp2077Yellow,
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.15,
-                shadowRadius: 10,
+                elevation: 0,
               },
-              tabBarActiveTintColor: theme.colors.cp2077Yellow,
-              tabBarInactiveTintColor: theme.colors.textMuted,
+              tabBarActiveTintColor: '#007AFF',
+              tabBarInactiveTintColor: '#8E8E93',
               tabBarLabelStyle: {
-                fontFamily: 'Rajdhani-Bold',
-                fontSize: 9,
-                letterSpacing: 2,
-                textTransform: 'uppercase',
+                fontWeight: '500',
+                fontSize: 10,
+                letterSpacing: 0.1,
               },
             }}
           >
@@ -472,7 +368,7 @@ export default function App() {
               name="Dashboard"
               component={DashboardScreen}
               options={{
-                tabBarLabel: 'HQ',
+                tabBarLabel: 'Home',
                 tabBarIcon: ({ focused }) => (
                   <TabIcon label="HQ" focused={focused} />
                 ),
@@ -482,7 +378,7 @@ export default function App() {
               name="Trade"
               component={TradeScreen}
               options={{
-                tabBarLabel: 'TRADE',
+                tabBarLabel: 'Trade',
                 tabBarIcon: ({ focused }) => (
                   <TabIcon label="TRADE" focused={focused} />
                 ),
@@ -492,7 +388,7 @@ export default function App() {
               name="Market"
               component={MarketScreen}
               options={{
-                tabBarLabel: 'MARKET',
+                tabBarLabel: 'Market',
                 tabBarIcon: ({ focused }) => (
                   <TabIcon label="MARKET" focused={focused} />
                 ),
@@ -502,7 +398,7 @@ export default function App() {
               name="Log"
               component={LogScreen}
               options={{
-                tabBarLabel: 'LOG',
+                tabBarLabel: 'Log',
                 tabBarIcon: ({ focused }) => (
                   <TabIcon label="LOG" focused={focused} />
                 ),
@@ -512,7 +408,7 @@ export default function App() {
               name="Settings"
               component={SettingsScreen}
               options={{
-                tabBarLabel: 'SYS',
+                tabBarLabel: 'Settings',
                 tabBarIcon: ({ focused }) => (
                   <TabIcon label="SYS" focused={focused} />
                 ),

@@ -12,7 +12,7 @@ import {
   FlatList,
   TouchableOpacity,
 } from 'react-native';
-import { theme } from '../theme/cyberpunk';
+import { theme } from '../theme/apple-glass';
 const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
@@ -206,9 +206,9 @@ export default function WatchlistScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.md,
-    paddingTop: theme.spacing.lg,
+    backgroundColor: '#f2f2f7',
+    padding: 16,
+    paddingTop: 24,
   },
   list: {
     flex: 1,
@@ -220,24 +220,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   instrumentName: {
-    fontFamily: theme.fonts.heading,
     fontSize: 17,
-    color: theme.colors.textWhite,
-    letterSpacing: 2,
+    fontWeight: '600',
+    color: '#1d1d1f',
+    letterSpacing: -0.2,
   },
   scoreBox: {
     alignItems: 'center',
   },
   scoreNumber: {
-    fontFamily: theme.fonts.mono,
     fontSize: 26,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   scoreLabel: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 8,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#aeaeb2',
+    letterSpacing: 0.3,
   },
   // Tags row
   tagsRow: {
@@ -248,9 +247,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   trendTag: {
-    fontFamily: theme.fonts.semibold,
-    fontSize: 10,
-    letterSpacing: 1,
+    fontSize: 12,
+    fontWeight: '600',
   },
   // Strategy row
   strategyRow: {
@@ -260,7 +258,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: 'rgba(0,0,0,0.04)',
   },
   // Strategy checklist
   checklistRow: {
@@ -269,7 +267,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: 'rgba(0,0,0,0.04)',
     flexWrap: 'wrap',
   },
   checklistItem: {
@@ -278,13 +276,11 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   checklistDot: {
-    fontFamily: theme.fonts.mono,
     fontSize: 11,
   },
   checklistLabel: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: '500',
   },
   // Header stats
   headerStatsRow: {
@@ -297,20 +293,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerStatValue: {
-    fontFamily: theme.fonts.mono,
     fontSize: 22,
-    color: theme.colors.cp2077Yellow,
-    fontWeight: 'bold',
+    color: '#007AFF',
+    fontWeight: '700',
   },
   headerStatLabel: {
-    fontFamily: theme.fonts.primary,
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#aeaeb2',
+    letterSpacing: 0.3,
   },
   headerStatDivider: {
     width: 1,
     height: 30,
-    backgroundColor: theme.colors.border,
+    backgroundColor: 'rgba(0,0,0,0.04)',
   },
 });

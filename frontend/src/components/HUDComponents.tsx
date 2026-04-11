@@ -1,20 +1,20 @@
 /**
- * NeonTrade AI - HUD Components
- * Reusable Cyberpunk 2077-styled UI components for the trading HUD.
- * Cold dark backgrounds, neon accents, angular design language.
+ * NeonTrade AI - Glass UI Components
+ * Apple Liquid Glass Light (iOS 26) styled UI components.
+ * Translucent glass cards, soft shadows, SF Pro typography.
  *
  * Components:
- * 1. HUDCard — Main card container with left accent border and corner brackets
- * 2. HUDHeader — Screen header with decorative line and dot
- * 3. HUDStatRow — Key-value row for financial data with optional trend
- * 4. HUDDivider — Horizontal line divider with optional centered label
- * 5. HUDBadge — Status/info badge (solid/outline/glow variants)
- * 6. HUDProgressBar — Score/progress bar with animated fill and glow
- * 7. HUDSectionTitle — Section separator ("▸ TITLE" + line)
- * 8. LoadingState — Boot sequence animation with filling line
- * 9. EmptyState — No data state with hexagon icon
- * 10. ErrorState — Error card with retry button
- * + SubNavPills — Pill-style sub-navigation bar
+ * 1. HUDCard — Glass card with blur backdrop, soft shadow, 20px radius
+ * 2. HUDHeader — Large bold title (34px) with gray subtitle
+ * 3. HUDStatRow — Key-value row with Apple typography and trend arrows
+ * 4. HUDDivider — Simple 1px rgba(0,0,0,0.06) separator
+ * 5. HUDBadge — Rounded pill with tinted background
+ * 6. HUDProgressBar — Thin 4px track with rounded fill, no glow
+ * 7. HUDSectionTitle — 13px uppercase label in secondary gray
+ * 8. LoadingState — Centered spinner animation with message
+ * 9. EmptyState — Centered icon + title + subtitle
+ * 10. ErrorState — Red-tinted glass card with retry button
+ * + SubNavPills — Apple segmented control with glass background
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -25,11 +25,12 @@ import {
   Animated,
   ViewStyle,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
-import { theme } from '../theme/cyberpunk';
+import { theme } from '../theme/apple-glass';
 
 // ============================================================================
-// 1. HUDCard — Main card container with left accent border and corner brackets
+// 1. HUDCard — Glass card with blur, soft shadow, rounded corners
 // ============================================================================
 
 interface HUDCardProps {
@@ -45,7 +46,7 @@ interface HUDCardProps {
 export function HUDCard({
   children,
   title,
-  accentColor = theme.colors.cp2077Yellow,
+  accentColor,
   borderColor,
   backgroundColor,
   style,
@@ -53,51 +54,22 @@ export function HUDCard({
   return (
     <View
       style={[
-        hudStyles.card,
-        {
-          borderLeftColor: accentColor,
-          ...(borderColor ? { borderColor } : {}),
-          ...(backgroundColor ? { backgroundColor } : {}),
-        },
+        glassStyles.card,
+        borderColor ? { borderColor } : undefined,
+        backgroundColor ? { backgroundColor } : undefined,
         style,
       ]}
     >
-      {/* Top-left corner bracket */}
-      <View
-        style={[
-          hudStyles.cornerBracketTL,
-          { borderTopColor: accentColor + '60' },
-        ]}
-      />
-      {/* Bottom-right corner bracket */}
-      <View
-        style={[
-          hudStyles.cornerBracketBR,
-          {
-            borderBottomColor: accentColor + '60',
-            borderRightColor: accentColor + '60',
-          },
-        ]}
-      />
-
       {title != null && (
-        <View style={hudStyles.cardTitleRow}>
-          <View
-            style={[hudStyles.cardTitleDot, { backgroundColor: accentColor }]}
-          />
-          <Text style={[hudStyles.cardTitleText, { color: accentColor }]}>
-            {title}
-          </Text>
-        </View>
+        <Text style={glassStyles.cardTitle}>{title}</Text>
       )}
-
       {children}
     </View>
   );
 }
 
 // ============================================================================
-// 2. HUDHeader — Screen header with decorative line and dot
+// 2. HUDHeader — Large bold title with gray subtitle
 // ============================================================================
 
 interface HUDHeaderProps {
@@ -110,33 +82,28 @@ interface HUDHeaderProps {
 export function HUDHeader({
   title,
   subtitle,
-  color = theme.colors.cp2077Yellow,
+  color,
   rightElement,
 }: HUDHeaderProps) {
   return (
-    <View style={hudStyles.headerContainer}>
-      <View style={hudStyles.headerContent}>
-        <View style={hudStyles.headerTextBlock}>
-          <Text style={[hudStyles.headerTitle, { color }]}>{title}</Text>
+    <View style={glassStyles.headerContainer}>
+      <View style={glassStyles.headerContent}>
+        <View style={glassStyles.headerTextBlock}>
+          <Text style={glassStyles.headerTitle}>{title}</Text>
           {subtitle && (
-            <Text style={hudStyles.headerSubtitle}>{subtitle}</Text>
+            <Text style={glassStyles.headerSubtitle}>{subtitle}</Text>
           )}
         </View>
         {rightElement && (
-          <View style={hudStyles.headerRight}>{rightElement}</View>
+          <View style={glassStyles.headerRight}>{rightElement}</View>
         )}
-      </View>
-      {/* Decorative line below with yellow dot */}
-      <View style={hudStyles.headerLineRow}>
-        <View style={[hudStyles.headerDot, { backgroundColor: color }]} />
-        <View style={[hudStyles.headerLine, { backgroundColor: color + '50' }]} />
       </View>
     </View>
   );
 }
 
 // ============================================================================
-// 3. HUDStatRow — Key-value display for financial data
+// 3. HUDStatRow — Key-value display with Apple typography
 // ============================================================================
 
 interface HUDStatRowProps {
@@ -166,23 +133,23 @@ export function HUDStatRow({
         : undefined;
 
   const resolvedColor =
-    valueColor || trendColor || theme.colors.textSecondary;
+    valueColor || trendColor || theme.colors.textPrimary;
 
   return (
-    <View style={hudStyles.statRow}>
-      <Text style={hudStyles.statLabel}>{label}</Text>
-      <View style={hudStyles.statValueRow}>
+    <View style={glassStyles.statRow}>
+      <Text style={glassStyles.statLabel}>{label}</Text>
+      <View style={glassStyles.statValueRow}>
         {trendIcon !== '' && (
-          <Text style={[hudStyles.statTrendIcon, { color: trendColor }]}>
+          <Text style={[glassStyles.statTrendIcon, { color: trendColor }]}>
             {trendIcon}
           </Text>
         )}
         <Text
           style={[
-            hudStyles.statValue,
+            glassStyles.statValue,
             { color: resolvedColor },
-            mono && { fontFamily: theme.fonts.mono },
-            large && { fontSize: 18 },
+            mono && { fontVariant: ['tabular-nums' as const] },
+            large && { fontSize: 20 },
           ]}
         >
           {String(value)}
@@ -193,7 +160,7 @@ export function HUDStatRow({
 }
 
 // ============================================================================
-// 4. HUDDivider — Horizontal line divider with optional centered label
+// 4. HUDDivider — Simple 1px separator
 // ============================================================================
 
 interface HUDDividerProps {
@@ -204,34 +171,26 @@ interface HUDDividerProps {
 
 export function HUDDivider({
   label,
-  color = theme.colors.coldGray,
+  color,
   style,
 }: HUDDividerProps) {
   if (label) {
     return (
-      <View style={[hudStyles.dividerWithLabel, style]}>
-        <View style={[hudStyles.dividerLine, { backgroundColor: color }]} />
-        <Text style={hudStyles.dividerLabelText}>{label}</Text>
-        <View style={[hudStyles.dividerLine, { backgroundColor: color }]} />
+      <View style={[glassStyles.dividerWithLabel, style]}>
+        <View style={glassStyles.dividerLine} />
+        <Text style={glassStyles.dividerLabelText}>{label}</Text>
+        <View style={glassStyles.dividerLine} />
       </View>
     );
   }
 
   return (
-    <View style={[hudStyles.dividerContainer, style]}>
-      <View
-        style={[
-          hudStyles.dividerAccent,
-          { backgroundColor: theme.colors.cp2077YellowDim },
-        ]}
-      />
-      <View style={[hudStyles.dividerLine, { backgroundColor: color }]} />
-    </View>
+    <View style={[glassStyles.dividerSimple, style]} />
   );
 }
 
 // ============================================================================
-// 5. HUDBadge — Status/info badge (solid / outline / glow)
+// 5. HUDBadge — Rounded pill with tinted background
 // ============================================================================
 
 interface HUDBadgeProps {
@@ -259,39 +218,30 @@ export function HUDBadge({
   const effectiveSize = size ?? (small ? 'sm' : 'md');
 
   const sizeMap = {
-    sm: { px: 6, py: 2, fs: 8, ls: 1 },
-    md: { px: 10, py: 3, fs: 10, ls: 2 },
-    lg: { px: 14, py: 6, fs: 13, ls: 2 },
+    sm: { px: 8, py: 3, fs: 11, lh: 14 },
+    md: { px: 12, py: 5, fs: 13, lh: 16 },
+    lg: { px: 16, py: 7, fs: 15, lh: 18 },
   };
   const s = sizeMap[effectiveSize];
 
   const containerStyle: ViewStyle[] = [
-    hudStyles.badge,
+    glassStyles.badge,
     {
       paddingHorizontal: s.px,
       paddingVertical: s.py,
     },
   ];
 
-  if (variant === 'solid') {
+  // "glow" variant maps to "tinted" in Apple style (light color bg)
+  if (variant === 'solid' || variant === 'glow') {
     containerStyle.push({
-      backgroundColor: color + '25',
-      borderColor: color,
+      backgroundColor: color + '18',
     });
   } else if (variant === 'outline') {
     containerStyle.push({
       backgroundColor: 'transparent',
-      borderColor: color,
-    });
-  } else if (variant === 'glow') {
-    containerStyle.push({
-      backgroundColor: color + '22',
-      borderColor: color,
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.5,
-      shadowRadius: 8,
-      elevation: 6,
+      borderWidth: 1,
+      borderColor: color + '40',
     });
   }
 
@@ -299,8 +249,8 @@ export function HUDBadge({
     <View style={containerStyle}>
       <Text
         style={[
-          hudStyles.badgeText,
-          { color, fontSize: s.fs, letterSpacing: s.ls },
+          glassStyles.badgeText,
+          { color, fontSize: s.fs, lineHeight: s.lh },
         ]}
       >
         {displayText}
@@ -310,7 +260,7 @@ export function HUDBadge({
 }
 
 // ============================================================================
-// 6. HUDProgressBar — Score/progress bar with animated fill and glow
+// 6. HUDProgressBar — Apple-style thin track with rounded fill
 // ============================================================================
 
 interface HUDProgressBarProps {
@@ -330,7 +280,7 @@ export function HUDProgressBar({
   color = theme.colors.cp2077Yellow,
   showValue = true,
   showLabel,
-  height = 6,
+  height = 4,
 }: HUDProgressBarProps) {
   const clampedValue = Math.min(100, Math.max(0, value));
   const animValue = useRef(new Animated.Value(0)).current;
@@ -338,7 +288,7 @@ export function HUDProgressBar({
   useEffect(() => {
     Animated.timing(animValue, {
       toValue: clampedValue,
-      duration: 800,
+      duration: 600,
       useNativeDriver: false,
     }).start();
   }, [clampedValue]);
@@ -352,41 +302,30 @@ export function HUDProgressBar({
   const shouldShowLabel = showLabel ?? showValue;
 
   return (
-    <View style={hudStyles.progressContainer}>
+    <View style={glassStyles.progressContainer}>
       {(label || shouldShowLabel) && (
-        <View style={hudStyles.progressHeader}>
+        <View style={glassStyles.progressHeader}>
           {label ? (
-            <Text style={hudStyles.progressLabel}>{label}</Text>
+            <Text style={glassStyles.progressLabel}>{label}</Text>
           ) : (
             <View />
           )}
           {shouldShowLabel && (
-            <Text style={[hudStyles.progressValue, { color }]}>
+            <Text style={[glassStyles.progressValue, { color }]}>
               {clampedValue.toFixed(1)}%{maxLabel ? ` / ${maxLabel}` : ''}
             </Text>
           )}
         </View>
       )}
-      <View style={[hudStyles.progressTrack, { height }]}>
+      <View style={[glassStyles.progressTrack, { height, borderRadius: height / 2 }]}>
         <Animated.View
           style={[
-            hudStyles.progressFill,
+            glassStyles.progressFill,
             {
               width: widthInterp as unknown as number,
               height,
               backgroundColor: color,
-            },
-          ]}
-        />
-        {/* Glow overlay */}
-        <Animated.View
-          style={[
-            hudStyles.progressGlow,
-            {
-              width: widthInterp as unknown as number,
-              height: height + 4,
-              backgroundColor: color,
-              opacity: 0.2,
+              borderRadius: height / 2,
             },
           ]}
         />
@@ -396,107 +335,61 @@ export function HUDProgressBar({
 }
 
 // ============================================================================
-// 7. HUDSectionTitle — Section separator with title
+// 7. HUDSectionTitle — Uppercase label in secondary gray
 // ============================================================================
 
 interface HUDSectionTitleProps {
   title: string;
   color?: string;
-  icon?: string; // unicode char, defaults to "▸"
+  icon?: string;
 }
 
 export function HUDSectionTitle({
   title,
-  color = theme.colors.cp2077Yellow,
-  icon = '\u25B8',
+  color = theme.colors.textSecondary,
 }: HUDSectionTitleProps) {
   return (
-    <View style={hudStyles.sectionTitleContainer}>
-      <Text style={[hudStyles.sectionTitleText, { color }]}>
-        {icon} {title}
+    <View style={glassStyles.sectionTitleContainer}>
+      <Text style={[glassStyles.sectionTitleText, { color }]}>
+        {title}
       </Text>
-      <View
-        style={[hudStyles.sectionTitleLine, { backgroundColor: color + '50' }]}
-      />
     </View>
   );
 }
 
 // ============================================================================
-// 8. LoadingState — Boot sequence animation with filling line
+// 8. LoadingState — Centered spinner with message
 // ============================================================================
 
 interface LoadingStateProps {
   message?: string;
 }
 
-export function LoadingState({ message = 'LOADING DATA...' }: LoadingStateProps) {
-  const lineAnim = useRef(new Animated.Value(0)).current;
-  const textOpacity = useRef(new Animated.Value(0.4)).current;
+export function LoadingState({ message = 'Loading...' }: LoadingStateProps) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Boot line fills left to right, repeating
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(lineAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-        Animated.timing(lineAnim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: false,
-        }),
-      ]),
-    ).start();
-
-    // Pulsing text opacity
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 0.4,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  const lineWidth = lineAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
-
   return (
-    <View style={hudStyles.loadingContainer}>
-      <Animated.Text
-        style={[hudStyles.loadingText, { opacity: textOpacity }]}
-      >
-        {message}
-      </Animated.Text>
-      <View style={hudStyles.bootLineTrack}>
-        <Animated.View
-          style={[
-            hudStyles.bootLineFill,
-            { width: lineWidth as unknown as number },
-          ]}
-        />
-      </View>
-      <Text style={hudStyles.loadingSubtext}>
-        NEONTRADE AI // SYSTEM INIT
-      </Text>
-    </View>
+    <Animated.View style={[glassStyles.loadingContainer, { opacity: fadeAnim }]}>
+      <ActivityIndicator
+        size="large"
+        color={theme.colors.cp2077Yellow}
+        style={glassStyles.loadingSpinner}
+      />
+      <Text style={glassStyles.loadingText}>{message}</Text>
+    </Animated.View>
   );
 }
 
 // ============================================================================
-// 9. EmptyState — No data state with icon
+// 9. EmptyState — Centered icon + title + subtitle
 // ============================================================================
 
 interface EmptyStateProps {
@@ -513,25 +406,24 @@ export function EmptyState({
   title,
   subtitle,
   hint,
-  icon = '\u2B21', // hexagon
+  icon = '\u25CB', // simple circle
 }: EmptyStateProps) {
-  const displayTitle = title ?? message ?? 'NO DATA';
+  const displayTitle = title ?? message ?? 'No Data';
 
   return (
-    <View style={hudStyles.emptyContainer}>
-      <Text style={hudStyles.emptyIcon}>{icon}</Text>
-      <Text style={hudStyles.emptyTitle}>{displayTitle}</Text>
+    <View style={glassStyles.emptyContainer}>
+      <Text style={glassStyles.emptyIcon}>{icon}</Text>
+      <Text style={glassStyles.emptyTitle}>{displayTitle}</Text>
       {subtitle && (
-        <Text style={hudStyles.emptySubtitle}>{subtitle}</Text>
+        <Text style={glassStyles.emptySubtitle}>{subtitle}</Text>
       )}
-      {hint && <Text style={hudStyles.emptyHint}>{hint}</Text>}
-      <View style={hudStyles.emptyDecorLine} />
+      {hint && <Text style={glassStyles.emptyHint}>{hint}</Text>}
     </View>
   );
 }
 
 // ============================================================================
-// 10. ErrorState — Error card with retry button
+// 10. ErrorState — Red-tinted glass card with retry button
 // ============================================================================
 
 interface ErrorStateProps {
@@ -541,23 +433,20 @@ interface ErrorStateProps {
 
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <View style={hudStyles.errorContainer}>
-      {/* Red left accent is via borderLeftColor */}
-      <View style={hudStyles.errorContent}>
-        <View style={hudStyles.errorHeaderRow}>
-          <Text style={hudStyles.errorIconText}>{'\u26A0'}</Text>
-          <Text style={hudStyles.errorTitle}>SYSTEM ERROR</Text>
+    <View style={glassStyles.errorContainer}>
+      <View style={glassStyles.errorContent}>
+        <View style={glassStyles.errorHeaderRow}>
+          <Text style={glassStyles.errorIconText}>{'\u26A0'}</Text>
+          <Text style={glassStyles.errorTitle}>Something went wrong</Text>
         </View>
-        <Text style={hudStyles.errorMessage}>{message}</Text>
+        <Text style={glassStyles.errorMessage}>{message}</Text>
         {onRetry && (
           <TouchableOpacity
-            style={hudStyles.retryButton}
+            style={glassStyles.retryButton}
             onPress={onRetry}
             activeOpacity={0.7}
           >
-            <Text style={hudStyles.retryButtonText}>
-              {'\u27F3'} RETRY
-            </Text>
+            <Text style={glassStyles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -566,7 +455,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
 }
 
 // ============================================================================
-// SubNavPills — Pill-style sub-navigation bar
+// SubNavPills — Apple segmented control style
 // ============================================================================
 
 interface SubNavPillsProps {
@@ -577,19 +466,20 @@ interface SubNavPillsProps {
 
 export function SubNavPills({ options, activeKey, onSelect }: SubNavPillsProps) {
   return (
-    <View style={hudStyles.pillsContainer}>
+    <View style={glassStyles.pillsContainer}>
       {options.map((opt) => {
         const isActive = opt.key === activeKey;
         return (
           <TouchableOpacity
             key={opt.key}
-            style={[hudStyles.pill, isActive && hudStyles.pillActive]}
+            style={[glassStyles.pill, isActive && glassStyles.pillActive]}
             onPress={() => onSelect(opt.key)}
+            activeOpacity={0.7}
           >
             <Text
               style={[
-                hudStyles.pillText,
-                isActive && hudStyles.pillTextActive,
+                glassStyles.pillText,
+                isActive && glassStyles.pillTextActive,
               ]}
             >
               {opt.label}
@@ -602,62 +492,35 @@ export function SubNavPills({ options, activeKey, onSelect }: SubNavPillsProps) 
 }
 
 // ============================================================================
-// Styles
+// Styles — Apple Liquid Glass Light
 // ============================================================================
 
-const hudStyles = StyleSheet.create({
-  // -- HUDCard --------------------------------------------------------
+const glassStyles = StyleSheet.create({
+  // -- HUDCard (Glass Card) -----------------------------------------------
   card: {
     backgroundColor: theme.colors.backgroundCard,
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: theme.glass.card.borderRadius,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.cp2077Yellow,
-    padding: theme.spacing.md,
+    borderColor: theme.colors.glassBorder,
+    padding: theme.spacing.md + 4,
     marginBottom: theme.spacing.md,
-    position: 'relative',
-    overflow: 'hidden',
+    // Soft shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  cornerBracketTL: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 14,
-    height: 14,
-    borderTopWidth: 1,
-    borderLeftWidth: 0,
-    borderColor: 'transparent',
-  },
-  cornerBracketBR: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderBottomWidth: 1,
-    borderRightWidth: 1,
-    borderColor: 'transparent',
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  cardTitleDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    marginRight: theme.spacing.sm,
-  },
-  cardTitleText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 4,
+  cardTitle: {
+    fontFamily: theme.fonts.semibold,
+    fontWeight: '600',
+    fontSize: 17,
+    color: theme.colors.textPrimary,
+    letterSpacing: -0.2,
+    marginBottom: theme.spacing.sm + 4,
   },
 
-  // -- HUDHeader ------------------------------------------------------
+  // -- HUDHeader ----------------------------------------------------------
   headerContainer: {
     paddingVertical: theme.spacing.md,
     marginBottom: theme.spacing.sm,
@@ -672,50 +535,34 @@ const hudStyles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: theme.fonts.heading,
-    fontSize: 20,
-    letterSpacing: 6,
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    fontSize: 34,
+    letterSpacing: -0.5,
+    color: theme.colors.textPrimary,
   },
   headerSubtitle: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    marginTop: 2,
+    fontFamily: theme.fonts.primary,
+    fontWeight: '400',
+    fontSize: 15,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
   },
   headerRight: {
     marginLeft: theme.spacing.md,
   },
-  headerLineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.sm,
-  },
-  headerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: theme.spacing.sm,
-  },
-  headerLine: {
-    flex: 1,
-    height: 1,
-  },
 
-  // -- HUDStatRow -----------------------------------------------------
+  // -- HUDStatRow ---------------------------------------------------------
   statRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   statLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    fontFamily: theme.fonts.primary,
+    fontWeight: '400',
+    fontSize: 13,
+    color: theme.colors.textSecondary,
     flex: 1,
   },
   statValueRow: {
@@ -728,24 +575,21 @@ const hudStyles = StyleSheet.create({
   },
   statValue: {
     fontFamily: theme.fonts.semibold,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 17,
+    color: theme.colors.textPrimary,
   },
 
-  // -- HUDDivider -----------------------------------------------------
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // -- HUDDivider ---------------------------------------------------------
+  dividerSimple: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     marginVertical: theme.spacing.sm,
-    height: 1,
-  },
-  dividerAccent: {
-    width: 30,
-    height: 1,
   },
   dividerLine: {
     flex: 1,
     height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   dividerWithLabel: {
     flexDirection: 'row',
@@ -753,26 +597,24 @@ const hudStyles = StyleSheet.create({
     marginVertical: theme.spacing.sm,
   },
   dividerLabelText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 9,
+    fontFamily: theme.fonts.primary,
+    fontWeight: '500',
+    fontSize: 12,
     color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 3,
     marginHorizontal: theme.spacing.sm,
   },
 
-  // -- HUDBadge -------------------------------------------------------
+  // -- HUDBadge -----------------------------------------------------------
   badge: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: theme.borderRadius.md,
     alignSelf: 'flex-start',
   },
   badgeText: {
-    fontFamily: theme.fonts.heading,
-    textTransform: 'uppercase',
+    fontFamily: theme.fonts.medium,
+    fontWeight: '500',
   },
 
-  // -- HUDProgressBar -------------------------------------------------
+  // -- HUDProgressBar -----------------------------------------------------
   progressContainer: {
     marginVertical: theme.spacing.xs,
   },
@@ -780,22 +622,21 @@ const hudStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   progressLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 10,
-    color: theme.colors.textMuted,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    fontFamily: theme.fonts.primary,
+    fontWeight: '400',
+    fontSize: 13,
+    color: theme.colors.textSecondary,
   },
   progressValue: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 12,
+    fontFamily: theme.fonts.semibold,
+    fontWeight: '600',
+    fontSize: 13,
   },
   progressTrack: {
-    backgroundColor: theme.colors.coldGray + '40',
-    borderRadius: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -803,76 +644,40 @@ const hudStyles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    borderRadius: 1,
-  },
-  progressGlow: {
-    position: 'absolute',
-    top: -2,
-    left: 0,
-    borderRadius: 4,
   },
 
-  // -- HUDSectionTitle ------------------------------------------------
+  // -- HUDSectionTitle ----------------------------------------------------
   sectionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
+    marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.sm,
   },
   sectionTitleText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
+    fontFamily: theme.fonts.medium,
+    fontWeight: '500',
+    fontSize: 13,
     textTransform: 'uppercase',
-    letterSpacing: 4,
-    marginRight: theme.spacing.sm,
-  },
-  sectionTitleLine: {
-    flex: 1,
-    height: 1,
+    letterSpacing: 0.5,
+    color: theme.colors.textSecondary,
   },
 
-  // -- LoadingState ---------------------------------------------------
+  // -- LoadingState -------------------------------------------------------
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: theme.spacing.xxl,
-    backgroundColor: theme.colors.backgroundDark,
+  },
+  loadingSpinner: {
+    marginBottom: theme.spacing.md,
   },
   loadingText: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 14,
-    color: theme.colors.cp2077Yellow,
-    letterSpacing: 6,
-    textTransform: 'uppercase',
-    marginBottom: theme.spacing.lg,
-  },
-  bootLineTrack: {
-    width: 200,
-    height: 2,
-    backgroundColor: theme.colors.coldGray + '40',
-    borderRadius: 1,
-    overflow: 'hidden',
-  },
-  bootLineFill: {
-    height: 2,
-    backgroundColor: theme.colors.cp2077Yellow,
-    shadowColor: theme.colors.cp2077Yellow,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  loadingSubtext: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 9,
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 3,
-    marginTop: theme.spacing.md,
+    fontFamily: theme.fonts.primary,
+    fontWeight: '400',
+    fontSize: 15,
+    color: theme.colors.textSecondary,
   },
 
-  // -- EmptyState -----------------------------------------------------
+  // -- EmptyState ---------------------------------------------------------
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -881,56 +686,47 @@ const hudStyles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
   },
   emptyIcon: {
-    fontSize: 40,
-    color: theme.colors.coldGray,
+    fontSize: 44,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.md,
-    opacity: 0.5,
+    opacity: 0.4,
   },
   emptyTitle: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
+    fontFamily: theme.fonts.semibold,
+    fontWeight: '600',
+    fontSize: 17,
+    color: theme.colors.textPrimary,
     textAlign: 'center',
-    textTransform: 'uppercase',
   },
   emptySubtitle: {
     fontFamily: theme.fonts.primary,
-    fontSize: 11,
-    color: theme.colors.textMuted,
+    fontWeight: '400',
+    fontSize: 15,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginTop: theme.spacing.sm,
-    opacity: 0.6,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   emptyHint: {
     fontFamily: theme.fonts.primary,
-    fontSize: 10,
-    color: theme.colors.neonCyan,
+    fontWeight: '400',
+    fontSize: 13,
+    color: theme.colors.cp2077Yellow,
     textAlign: 'center',
     marginTop: theme.spacing.sm,
-    letterSpacing: 1,
-  },
-  emptyDecorLine: {
-    width: 40,
-    height: 1,
-    backgroundColor: theme.colors.coldGray,
-    marginTop: theme.spacing.lg,
   },
 
-  // -- ErrorState -----------------------------------------------------
+  // -- ErrorState ---------------------------------------------------------
   errorContainer: {
-    backgroundColor: theme.colors.backgroundCard,
+    backgroundColor: 'rgba(255, 59, 48, 0.06)',
     borderWidth: 1,
-    borderColor: theme.colors.neonRedDim,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.neonRed,
-    borderRadius: theme.borderRadius.sm,
+    borderColor: 'rgba(255, 59, 48, 0.15)',
+    borderRadius: theme.glass.card.borderRadius,
     overflow: 'hidden',
     marginVertical: theme.spacing.md,
   },
   errorContent: {
-    padding: theme.spacing.md,
+    padding: theme.spacing.md + 4,
   },
   errorHeaderRow: {
     flexDirection: 'row',
@@ -938,70 +734,69 @@ const hudStyles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   errorIconText: {
-    fontSize: 16,
+    fontSize: 18,
     color: theme.colors.neonRed,
     marginRight: theme.spacing.sm,
-    textShadowColor: theme.colors.neonRedGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
   },
   errorTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 12,
+    fontFamily: theme.fonts.semibold,
+    fontWeight: '600',
+    fontSize: 17,
     color: theme.colors.neonRed,
-    textTransform: 'uppercase',
-    letterSpacing: 4,
   },
   errorMessage: {
     fontFamily: theme.fonts.primary,
-    fontSize: 13,
+    fontWeight: '400',
+    fontSize: 15,
     color: theme.colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 20,
     marginBottom: theme.spacing.md,
   },
   retryButton: {
-    backgroundColor: theme.colors.neonRed + '22',
-    borderWidth: 1,
-    borderColor: theme.colors.neonRed,
-    borderRadius: theme.borderRadius.sm,
-    paddingVertical: theme.spacing.sm,
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: theme.spacing.sm + 2,
     paddingHorizontal: theme.spacing.md,
     alignSelf: 'flex-start',
   },
   retryButtonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 12,
+    fontFamily: theme.fonts.semibold,
+    fontWeight: '600',
+    fontSize: 15,
     color: theme.colors.neonRed,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
   },
 
-  // -- SubNavPills ----------------------------------------------------
+  // -- SubNavPills (Segmented Control) ------------------------------------
   pillsContainer: {
     flexDirection: 'row',
     alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.round,
-    overflow: 'hidden',
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    borderRadius: theme.borderRadius.md,
+    padding: 2,
     marginBottom: theme.spacing.md,
   },
   pill: {
     paddingHorizontal: 20,
     paddingVertical: 8,
+    borderRadius: theme.borderRadius.md - 2,
     backgroundColor: 'transparent',
   },
   pillActive: {
-    backgroundColor: theme.colors.cp2077Yellow,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   pillText: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+    fontFamily: theme.fonts.medium,
+    fontWeight: '500',
+    fontSize: 13,
+    color: theme.colors.textSecondary,
   },
   pillTextActive: {
-    color: theme.colors.backgroundDark,
+    color: theme.colors.textPrimary,
+    fontWeight: '600',
   },
 });

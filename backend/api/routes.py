@@ -2299,3 +2299,213 @@ async def get_crypto_allocation():
         "crypto_position_mgmt_style": settings.crypto_position_mgmt_style,
         "memecoins_monitor_only": settings.memecoins_monitor_only,
     }
+
+
+# ── Exam Submission (TradingLab Final Exam) ─────────────────────────
+
+class ExamRequest(BaseModel):
+    trade_ids: List[str]  # Exactly 5 trade IDs
+
+
+@router.post("/exam/generate")
+async def generate_exam_report(req: ExamRequest):
+    """Generate a TradingLab exam report with 5 trades.
+    Each trade includes: chart screenshot, HTF/LTF analysis, strategy identification,
+    risk calculation, and rule checklist."""
+    from main import db, engine
+    import base64
+    from pathlib import Path
+
+    if db is None:
+        raise HTTPException(503, "Database not available")
+    if len(req.trade_ids) != 5:
+        raise HTTPException(400, "Exactly 5 trade IDs required for exam submission")
+
+    trades = []
+    for tid in req.trade_ids:
+        # Get trade from DB
+        cursor = await db._db.execute(
+            "SELECT * FROM trades WHERE id = ?", [tid]
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(404, f"Trade {tid} not found")
+        trade = dict(row)
+
+        # Get analysis data if available
+        analysis = engine.last_scan_results.get(trade.get("instrument", ""), None)
+
+        # Get screenshot if exists
+        screenshot_b64 = None
+        screenshots_dir = Path("data/screenshots")
+        if screenshots_dir.exists():
+            # Find screenshot for this trade
+            for f in screenshots_dir.glob(f"*{tid}*"):
+                if f.suffix == ".png":
+                    screenshot_b64 = base64.b64encode(f.read_bytes()).decode()
+                    break
+
+        # Build trade analysis for exam
+        exam_trade = {
+            "trade_id": tid,
+            "instrument": trade.get("instrument", "Unknown"),
+            "direction": trade.get("direction", "Unknown"),
+            "strategy": trade.get("strategy", "Unknown"),
+            "strategy_variant": trade.get("strategy_variant", ""),
+            "entry_price": trade.get("entry_price", 0),
+            "exit_price": trade.get("exit_price", 0),
+            "stop_loss": trade.get("stop_loss", 0),
+            "take_profit": trade.get("take_profit", 0),
+            "pnl": trade.get("pnl", 0),
+            "status": trade.get("status", ""),
+            "opened_at": trade.get("opened_at", ""),
+            "closed_at": trade.get("closed_at", ""),
+            "units": trade.get("units", 0),
+            "ai_analysis": trade.get("ai_analysis", ""),
+            "screenshot_b64": screenshot_b64,
+            "htf_analysis": None,
+            "ltf_analysis": None,
+        }
+
+        # Add analysis details if available
+        if analysis:
+            exam_trade["htf_analysis"] = {
+                "trend": str(getattr(analysis, 'htf_trend', 'N/A')),
+                "condition": str(getattr(analysis, 'market_condition', 'N/A')),
+                "score": getattr(analysis, 'score', 0),
+            }
+            exam_trade["ltf_analysis"] = {
+                "trend": str(getattr(analysis, 'ltf_trend', 'N/A')),
+                "convergence": getattr(analysis, 'trend_convergence', False),
+            }
+
+        trades.append(exam_trade)
+
+    # Build HTML report
+    html = _build_exam_html(trades)
+    return {"html": html, "trades": trades}
+
+
+@router.get("/exam/trades")
+async def get_exam_eligible_trades():
+    """Get all closed trades eligible for exam submission."""
+    from main import db
+    if db is None:
+        return []
+    trades = await db.get_trade_history(limit=200, offset=0)
+    return [t for t in trades if t.get("status", "") != "open"]
+
+
+def _build_exam_html(trades: list) -> str:
+    """Build Apple-style HTML report for TradingLab exam submission."""
+    from datetime import datetime, timezone
+
+    ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+
+    trade_sections = ""
+    for i, t in enumerate(trades, 1):
+        pnl = t.get("pnl", 0) or 0
+        pnl_color = "#34C759" if pnl >= 0 else "#FF3B30"
+        pnl_sign = "+" if pnl >= 0 else ""
+        status = t.get("status", "").replace("closed_", "").upper()
+        direction = t.get("direction", "")
+        dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
+
+        # Screenshot image
+        img_html = ""
+        if t.get("screenshot_b64"):
+            img_html = f'<img src="data:image/png;base64,{t["screenshot_b64"]}" style="width:100%;border-radius:12px;margin-bottom:16px;" alt="Chart">'
+
+        # Analysis details
+        htf_html = ""
+        if t.get("htf_analysis"):
+            htf = t["htf_analysis"]
+            htf_html = f'''
+            <div style="margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;">HTF ANALYSIS</span><br>
+                <span style="font-size:14px;color:#1d1d1f;">Trend: {htf.get("trend", "N/A")} | Condition: {htf.get("condition", "N/A")} | Score: {htf.get("score", 0)}/100</span>
+            </div>'''
+
+        ltf_html = ""
+        if t.get("ltf_analysis"):
+            ltf = t["ltf_analysis"]
+            conv = "Yes" if ltf.get("convergence") else "No"
+            ltf_html = f'''
+            <div style="margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;">LTF ANALYSIS</span><br>
+                <span style="font-size:14px;color:#1d1d1f;">Trend: {ltf.get("trend", "N/A")} | Convergence: {conv}</span>
+            </div>'''
+
+        trade_sections += f'''
+        <div style="background:#ffffff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <span style="font-size:12px;font-weight:600;color:#86868b;">TRADE {i} OF 5</span>
+                <span style="font-size:12px;font-weight:600;color:{pnl_color};background:{pnl_color}18;padding:4px 10px;border-radius:8px;">{status}</span>
+            </div>
+
+            <div style="font-size:24px;font-weight:700;color:#1d1d1f;letter-spacing:-0.3px;margin-bottom:4px;">{t.get("instrument", "")}</div>
+            <div style="margin-bottom:16px;">
+                <span style="font-size:14px;font-weight:600;color:{dir_color};">{direction.upper()}</span>
+                <span style="font-size:14px;color:#86868b;margin-left:8px;">{t.get("strategy", "")} {t.get("strategy_variant", "")}</span>
+            </div>
+
+            {img_html}
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">ENTRY</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{t.get("entry_price", 0)}</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">SL</div>
+                    <div style="font-size:14px;font-weight:600;color:#FF3B30;">{t.get("stop_loss", 0)}</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">TP</div>
+                    <div style="font-size:14px;font-weight:600;color:#34C759;">{t.get("take_profit", 0)}</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">P&amp;L</div>
+                    <div style="font-size:14px;font-weight:600;color:{pnl_color};">{pnl_sign}${abs(pnl):.2f}</div>
+                </div>
+            </div>
+
+            {htf_html}
+            {ltf_html}
+
+            <div style="margin-top:8px;">
+                <span style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;">RISK MANAGEMENT</span><br>
+                <span style="font-size:14px;color:#1d1d1f;">Units: {t.get("units", 0)} | Opened: {t.get("opened_at", "N/A")} | Closed: {t.get("closed_at", "N/A")}</span>
+            </div>
+
+            {f'<div style="margin-top:12px;background:#f9f9f9;border-radius:10px;padding:12px;"><span style="font-size:12px;font-weight:600;color:#86868b;">AI ANALYSIS</span><br><span style="font-size:13px;color:#86868b;line-height:1.6;">{t.get("ai_analysis", "")}</span></div>' if t.get("ai_analysis") else ""}
+        </div>'''
+
+    return f'''<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeonTrade AI - TradingLab Exam</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif; }}
+  body {{ background: #f2f2f7; color: #1d1d1f; padding: 24px; }}
+  @media print {{ body {{ padding: 0; }} }}
+</style>
+</head>
+<body>
+<div style="max-width:700px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:32px;">
+        <div style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">TradingLab Final Exam</div>
+        <div style="font-size:34px;font-weight:700;color:#1d1d1f;letter-spacing:-0.5px;">Trade Analysis Report</div>
+        <div style="font-size:15px;color:#86868b;margin-top:8px;">Generated by NeonTrade AI &middot; {ts}</div>
+    </div>
+
+    {trade_sections}
+
+    <div style="text-align:center;padding:24px;color:#aeaeb2;font-size:12px;">
+        NeonTrade AI &middot; TradingLab Mentorship &middot; {ts}
+    </div>
+</div>
+</body>
+</html>'''

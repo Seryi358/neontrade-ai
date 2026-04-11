@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../theme/cyberpunk';
+import { theme } from '../theme/apple-glass';
 import { STRATEGY_COLORS as BASE_STRATEGY_COLORS } from '../services/api';
 
 const STRATEGY_COLORS: Record<string, string> = {
@@ -40,8 +40,10 @@ export default function StrategyBadge({ strategy, size = 'md', showLabel = true 
   const dotSize = size === 'sm' ? 8 : size === 'md' ? 12 : 16;
   const fontSize = size === 'sm' ? 9 : size === 'md' ? 11 : 14;
 
+  const pillBg = `${color}14`; // ~8% opacity
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: pillBg, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 }]}>
       <View
         style={[
           styles.dot,
@@ -50,10 +52,6 @@ export default function StrategyBadge({ strategy, size = 'md', showLabel = true 
             height: dotSize,
             borderRadius: dotSize / 2,
             backgroundColor: color,
-            shadowColor: color,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.8,
-            shadowRadius: 4,
           },
         ]}
       />
@@ -66,12 +64,12 @@ export default function StrategyBadge({ strategy, size = 'md', showLabel = true 
 
 export function ConfidenceBadge({ level }: { level: string }) {
   const color =
-    level === 'ALTA' ? theme.colors.neonGreen :
-    level === 'MEDIA' ? theme.colors.neonYellow :
-    theme.colors.neonRed;
+    level === 'ALTA' ? '#34C759' :
+    level === 'MEDIA' ? '#FF9500' :
+    '#8E8E93';
 
   return (
-    <View style={[styles.confidenceBadge, { borderColor: color }]}>
+    <View style={[styles.confidenceBadge, { backgroundColor: `${color}14`, borderColor: 'transparent' }]}>
       <Text style={[styles.confidenceText, { color }]}>{level}</Text>
     </View>
   );
@@ -94,26 +92,21 @@ const styles = StyleSheet.create({
   },
   dot: {},
   label: {
-    fontFamily: theme.fonts.bold,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   confidenceBadge: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
   confidenceText: {
-    fontFamily: theme.fonts.semibold,
-    fontSize: 10,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   direction: {
-    fontFamily: theme.fonts.bold,
     fontSize: 13,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    fontWeight: '600',
   },
 });

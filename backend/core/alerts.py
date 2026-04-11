@@ -235,23 +235,23 @@ class AlertManager:
         if not self._config.notify_trade_executed:
             return
 
-        dir_color = "#28c775" if direction.upper() == "BUY" else "#fb3048"
+        dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
         dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
         title = f"TRADE EXECUTED // {instrument}"
         body = (
-            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
+            f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
             f'{instrument}</span>\n'
             f'<span style="color:{dir_color};font-size:16px;font-weight:600;">'
             f'{dir_icon} {direction.upper()}</span> '
-            f'<span style="color:#a1a9b1;">// {strategy}</span>\n\n'
-            f'<span style="color:#a1a9b1;">ENTRY</span> '
+            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
+            f'<span style="color:#86868b;">ENTRY</span> '
             f'<span style="color:#fcfcfc;font-weight:600;">{entry}</span>\n'
-            f'<span style="color:#fb3048;">SL</span> '
+            f'<span style="color:#FF3B30;">SL</span> '
             f'<span style="color:#fcfcfc;">{sl}</span>\n'
-            f'<span style="color:#28c775;">TP</span> '
+            f'<span style="color:#34C759;">TP</span> '
             f'<span style="color:#fcfcfc;">{tp}</span>\n'
-            f'<span style="color:#a1a9b1;">R:R</span> '
-            f'<span style="color:#fdf500;font-weight:600;">{rr:.2f}:1</span>'
+            f'<span style="color:#86868b;">R:R</span> '
+            f'<span style="color:#FF9500;font-weight:600;">{rr:.2f}:1</span>'
         )
         data = {
             "instrument": instrument,
@@ -282,7 +282,7 @@ class AlertManager:
             return
 
         title = f"SETUP DETECTED // {instrument}"
-        dir_color = "#28c775" if direction.upper() == "BUY" else "#fb3048"
+        dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
         dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
 
         # Build rich email body with strategy details and AI opinion
@@ -347,14 +347,14 @@ class AlertManager:
         dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
         title = f"SETUP REJECTED BY AI // {instrument}"
         body = (
-            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
+            f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
             f'{instrument}</span>\n'
-            f'<span style="color:#a1a9b1;">{dir_icon} {direction.upper()}</span> '
-            f'<span style="color:#a1a9b1;">// {strategy}</span>\n\n'
-            f'<span style="color:#fb3048;font-weight:600;">AI: {ai_recommendation}</span> '
-            f'<span style="color:#a1a9b1;">Score:</span> '
-            f'<span style="color:#fdf500;font-weight:600;">{ai_score}/100</span>\n'
-            f'<span style="color:#a1a9b1;">{ai_reasoning}</span>'
+            f'<span style="color:#86868b;">{dir_icon} {direction.upper()}</span> '
+            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
+            f'<span style="color:#FF3B30;font-weight:600;">AI: {ai_recommendation}</span> '
+            f'<span style="color:#86868b;">Score:</span> '
+            f'<span style="color:#FF9500;font-weight:600;">{ai_score}/100</span>\n'
+            f'<span style="color:#86868b;">{ai_reasoning}</span>'
         )
         data = {
             "instrument": instrument,
@@ -376,20 +376,20 @@ class AlertManager:
         if not self._config.notify_trade_closed:
             return
 
-        pnl_color = "#28c775" if pnl >= 0 else "#fb3048"
+        pnl_color = "#34C759" if pnl >= 0 else "#FF3B30"
         result_label = "WIN" if pnl > 0 else ("BREAK EVEN" if pnl == 0 else "LOSS")
         sign = "+" if pnl >= 0 else ""
         title = f"TRADE CLOSED // {instrument}"
         body = (
-            f'<span style="color:#5df4fe;font-size:18px;font-weight:700;letter-spacing:2px;">'
+            f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
             f'{instrument}</span> '
-            f'<span style="color:#a1a9b1;">// {strategy}</span>\n\n'
+            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
             f'<span style="color:{pnl_color};font-size:22px;font-weight:700;">'
             f'{sign}${pnl:.2f}</span> '
             f'<span style="color:{pnl_color};font-size:13px;">{result_label}</span>\n'
-            f'<span style="color:#a1a9b1;">PIPS</span> '
+            f'<span style="color:#86868b;">PIPS</span> '
             f'<span style="color:#fcfcfc;">{sign}{pips:.1f}</span>\n'
-            f'<span style="color:#a1a9b1;">REASON</span> '
+            f'<span style="color:#86868b;">REASON</span> '
             f'<span style="color:#ee00ff;">{reason}</span>'
         )
         data = {
@@ -775,16 +775,13 @@ def _html_to_plain(html: str) -> str:
 
 
 def _build_email_html(title: str, body: str) -> str:
-    """Wrap *body* in a code-style HTML email using Daemon 2.0 colors.
+    """Wrap *body* in an Apple-style minimalist HTML email.
 
-    Style: plain text, code aesthetic, Rajdhani font, no gradients, no emojis,
-    no icons, no decorations. Just text on a dark background like a terminal.
+    Style: clean, white background, SF Pro font stack, generous whitespace,
+    subtle gray borders, Apple system colors for accents.
+    Inspired by apple.com communications and Apple Card notifications.
 
-    Colors from ~/.local/share/color-schemes/Daemon2.colors:
-      BG: #210e15, outer: #040a10, accent: #5df4fe, border: #355d65,
-      text: #d1c5c0, inactive: #a1a9b1
-
-    Gmail dark mode: forced light-only color scheme so colors never change.
+    Gmail dark mode: forced light-only color scheme so colors stay consistent.
     """
     body_html = body.replace("\n", "<br>\n")
     ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
@@ -797,69 +794,63 @@ def _build_email_html(title: str, body: str) -> str:
 <meta name="color-scheme" content="light only">
 <meta name="supported-color-schemes" content="light only">
 <title>NeonTrade AI</title>
-<!--[if mso]><style>*{{font-family:Consolas,monospace !important;}}</style><![endif]-->
+<!--[if mso]><style>*{{font-family:'Segoe UI',Helvetica,Arial,sans-serif !important;}}</style><![endif]-->
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
   :root {{ color-scheme: light only; }}
-  [data-ogsc] body, [data-ogsb] body {{ background-color: #040a10 !important; }}
-  u + .body .nt-card {{ background-color: #210e15 !important; }}
-  u + .body .nt-text {{ color: #d1c5c0 !important; }}
-  u + .body .nt-cyan {{ color: #5df4fe !important; }}
-  u + .body .nt-dim {{ color: #a1a9b1 !important; }}
   @media only screen and (max-width: 600px) {{
     .nt-outer {{ width: 100% !important; }}
     .nt-card {{ width: 100% !important; }}
-    .nt-pad {{ padding-left: 16px !important; padding-right: 16px !important; }}
+    .nt-pad {{ padding-left: 20px !important; padding-right: 20px !important; }}
   }}
 </style>
 </head>
-<body class="body" style="margin:0;padding:0;background-color:#040a10;-webkit-text-size-adjust:100%;">
+<body class="body" style="margin:0;padding:0;background-color:#f5f5f7;-webkit-text-size-adjust:100%;font-family:-apple-system,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif;">
 <u></u>
-<div style="background-color:#040a10;width:100%;margin:0;padding:0;">
-<table role="presentation" class="nt-outer" width="100%" cellpadding="0" cellspacing="0" style="background-color:#040a10;">
-<tr><td align="center" style="padding:20px 8px;">
+<div style="background-color:#f5f5f7;width:100%;margin:0;padding:0;">
+<table role="presentation" class="nt-outer" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f7;">
+<tr><td align="center" style="padding:32px 16px;">
 
-<table role="presentation" class="nt-card" width="580" cellpadding="0" cellspacing="0"
-       style="max-width:580px;width:100%;background-color:#210e15;border:1px solid #355d65;border-collapse:separate;">
+<table role="presentation" class="nt-card" width="600" cellpadding="0" cellspacing="0"
+       style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;border-collapse:separate;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
 
   <!-- header -->
-  <tr><td class="nt-pad" style="padding:20px 24px 4px 24px;">
-    <span class="nt-dim" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:11px;font-weight:400;color:#355d65;letter-spacing:2px;">
-      // NEONTRADE AI</span>
+  <tr><td class="nt-pad" style="padding:32px 32px 0 32px;">
+    <span style="font-family:-apple-system,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;text-transform:uppercase;">
+      NeonTrade AI</span>
   </td></tr>
 
   <!-- title -->
-  <tr><td class="nt-pad" style="padding:4px 24px 8px 24px;">
-    <span class="nt-cyan" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;color:#5df4fe;text-transform:uppercase;letter-spacing:2px;">
+  <tr><td class="nt-pad" style="padding:8px 32px 16px 32px;">
+    <span style="font-family:-apple-system,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:28px;font-weight:700;color:#1d1d1f;letter-spacing:-0.3px;line-height:1.15;">
       {title}</span>
   </td></tr>
 
   <!-- divider -->
-  <tr><td class="nt-pad" style="padding:0 24px;">
+  <tr><td class="nt-pad" style="padding:0 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr><td style="height:1px;background-color:#355d65;font-size:0;">&nbsp;</td></tr>
+      <tr><td style="height:1px;background-color:#e5e5ea;font-size:0;">&nbsp;</td></tr>
     </table>
   </td></tr>
 
   <!-- body -->
-  <tr><td class="nt-pad nt-text" style="padding:16px 24px 20px 24px;font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;color:#d1c5c0;font-size:15px;line-height:1.8;font-weight:400;">
+  <tr><td class="nt-pad" style="padding:24px 32px 28px 32px;font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1d1d1f;font-size:15px;line-height:1.7;font-weight:400;">
     {body_html}
   </td></tr>
 
   <!-- footer divider -->
-  <tr><td class="nt-pad" style="padding:0 24px;">
+  <tr><td class="nt-pad" style="padding:0 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr><td style="height:1px;background-color:#355d65;font-size:0;">&nbsp;</td></tr>
+      <tr><td style="height:1px;background-color:#e5e5ea;font-size:0;">&nbsp;</td></tr>
     </table>
   </td></tr>
 
   <!-- footer -->
-  <tr><td class="nt-pad" style="padding:12px 24px 16px 24px;">
+  <tr><td class="nt-pad" style="padding:16px 32px 24px 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
-        <td class="nt-dim" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
-          // NeonTrade AI v2.2 / TradingLab</td>
-        <td align="right" style="font-family:'Rajdhani','Avenir Next Condensed','Avenir Next',Helvetica,Arial,sans-serif;font-size:10px;font-weight:400;color:#355d65;letter-spacing:1px;">
+        <td style="font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;color:#aeaeb2;">
+          NeonTrade AI &middot; TradingLab</td>
+        <td align="right" style="font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;color:#aeaeb2;">
           {ts}</td>
       </tr>
     </table>

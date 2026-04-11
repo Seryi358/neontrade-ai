@@ -324,7 +324,7 @@ class TradeDatabase:
             query += " AND strategy = ?"
             params.append(strategy)
 
-        query += " ORDER BY closed_at DESC LIMIT ? OFFSET ?"
+        query += " ORDER BY COALESCE(closed_at, opened_at) DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         cursor = await self._db.execute(query, params)

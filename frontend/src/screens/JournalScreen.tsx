@@ -142,7 +142,7 @@ export default function JournalScreen() {
       setError(null);
       const [statsRes, tradesRes] = await Promise.all([
         authFetch(`${API_URL}/api/v1/journal/stats`),
-        authFetch(`${API_URL}/api/v1/journal/trades?limit=30`),
+        authFetch(`${API_URL}/api/v1/journal/trades?limit=200`),
       ]);
 
       if (!statsRes.ok || !tradesRes.ok) {

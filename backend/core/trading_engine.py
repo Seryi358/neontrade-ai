@@ -1275,13 +1275,27 @@ class TradingEngine:
                             "reason": "external",
                         })
 
+                    # Determine actual close reason from heuristic
+                    if pos.direction == "BUY":
+                        if pos.take_profit_1 and close_price >= pos.take_profit_1:
+                            close_status = "closed_tp"
+                        elif close_price <= pos.current_sl:
+                            close_status = "closed_sl"
+                        else:
+                            close_status = "closed_external"
+                    else:  # SELL
+                        if pos.take_profit_1 and close_price <= pos.take_profit_1:
+                            close_status = "closed_tp"
+                        elif close_price >= pos.current_sl:
+                            close_status = "closed_sl"
+                        else:
+                            close_status = "closed_external"
+
                     # Persist close to database with PnL data
-                    # Bug fix R26: use the actual close_price from broker (line 932-947),
-                    # NOT highest/lowest_price which overstates PnL
                     if self._db:
                         try:
                             await self._db.update_trade(tid, {
-                                "status": "closed_manual",
+                                "status": close_status,
                                 "closed_at": datetime.now(timezone.utc).isoformat(),
                                 "exit_price": close_price,
                                 "pnl": pnl_dollars,
@@ -1545,7 +1559,14 @@ class TradingEngine:
     async def _scan_analysis_only(self):
         """Scan all watchlist pairs for analysis only (no trade execution).
         Used during off-hours and news events to keep UI data fresh."""
+        # Reset circuit breaker so a previous batch failure doesn't block this scan
+        if broker_circuit_breaker.is_open:
+            broker_circuit_breaker.reset()
+
+        failed_count = 0
+        total_count = 0
         for instrument in get_active_watchlist():
+            total_count += 1
             try:
                 analysis = await self.market_analyzer.full_analysis(instrument)
                 self._last_scan_results[instrument] = analysis
@@ -1556,9 +1577,13 @@ class TradingEngine:
                 )
                 self._latest_explanations[instrument] = explanation
             except Exception as e:
-                logger.debug(f"Off-hours scan failed for {instrument}: {e}")
+                failed_count += 1
+                logger.warning(f"Analysis-only scan failed for {instrument}: {e}")
             # Throttle between pairs to avoid 429 rate limits from broker API
             await asyncio.sleep(1.5)
+
+        if failed_count > 0:
+            logger.warning(f"Analysis-only scan: {failed_count}/{total_count} instruments failed")
 
     # ── Initial Scan (startup, ignores market hours) ────────────
 

@@ -1001,7 +1001,7 @@ def test_position_risk():
 
     # Risk for styles
     check("T182: Day trading risk is 1%", rm.get_risk_for_style(RMStyle.DAY_TRADING) == 0.01)
-    check("T183: Scalping risk is 0.5%", rm.get_risk_for_style(RMStyle.SCALPING) == 0.005)
+    check("T183: Scalping risk is 1%", rm.get_risk_for_style(RMStyle.SCALPING) == 0.01)
     check("T184: Swing risk is 1%", rm.get_risk_for_style(RMStyle.SWING) == 0.01)
 
     # Register/unregister trades
@@ -1150,7 +1150,7 @@ def test_crypto_config_journal():
     from config import settings
 
     check("T221: risk_day_trading default 1%", settings.risk_day_trading == 0.01)
-    check("T222: risk_scalping default 0.5%", settings.risk_scalping == 0.005)
+    check("T222: risk_scalping default 1%", settings.risk_scalping == 0.01)
     check("T223: risk_swing default 1%", settings.risk_swing == 0.01)
     check("T224: max_total_risk default 7%", settings.max_total_risk == 0.07)
     check("T225: min_rr_ratio default 2.0", settings.min_rr_ratio == 1.5)

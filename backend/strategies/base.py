@@ -1825,10 +1825,11 @@ class BlueStrategy(BaseStrategy):
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float, variant: str = "BLUE_B") -> Dict[str, float]:
         """
-        BLUE TP levels — variant-specific per TradingLab mentorship:
-        - BLUE_A: TP1 = confirm-TF EMA50, TP_max = Fib 1.272 or 1.618 extension
-        - BLUE_B: TP1 = confirm-TF EMA50, TP_max = EMA 4H or next S/R
-        - BLUE_C: TP1 = Previous swing high/low (NOT EMA50 — entry is AT the EMA rejection)
+        BLUE TP levels per TradingLab mentorship:
+        - ALL variants (A/B/C): TP1 = confirm-TF EMA50 (4H for day trading)
+          "el take profit SIEMPRE media movil de 50 de 4 horas"
+        - BLUE_A: TP_max = Fib 1.272 or 1.618 extension (more aggressive)
+        - BLUE_B/C: TP_max = EMA 4H or next S/R (conservative)
         Swing adaptation: TP1 = EMA 50 Weekly (not 4H) per mentorship.
         """
         # Use style-adaptive confirm-timeframe EMA (4H for day, Weekly for swing, M15 for scalping)
@@ -1841,32 +1842,12 @@ class BlueStrategy(BaseStrategy):
 
         result: Dict[str, float] = {}
 
-        if variant == "BLUE_C":
-            # BLUE C: entry is a rejection AT the EMA 50 — using EMA as TP would be
-            # near entry. Use previous swing high/low instead (per AI prompt / mentorship).
-            if direction == "BUY":
-                valid_highs = [sh for sh in swing_highs if sh > entry_price]
-                if valid_highs:
-                    result["tp1"] = min(valid_highs)
-                else:
-                    above = [r for r in resistances if r > entry_price]
-                    if above:
-                        result["tp1"] = min(above)
-            else:
-                valid_lows = [sl for sl in swing_lows if sl < entry_price]
-                if valid_lows:
-                    result["tp1"] = max(valid_lows)
-                else:
-                    below = [s for s in supports if s < entry_price]
-                    if below:
-                        result["tp1"] = max(below)
-        else:
-            # BLUE A/B: TP1 = confirm-TF EMA 50
-            if ema_4h_50 and ema_4h_50 > 0:
-                if direction == "BUY" and ema_4h_50 > entry_price:
-                    result["tp1"] = ema_4h_50
-                elif direction == "SELL" and ema_4h_50 < entry_price:
-                    result["tp1"] = ema_4h_50
+        # ALL BLUE variants: TP1 = confirm-TF EMA 50 (SIEMPRE per mentorship)
+        if ema_4h_50 and ema_4h_50 > 0:
+            if direction == "BUY" and ema_4h_50 > entry_price:
+                result["tp1"] = ema_4h_50
+            elif direction == "SELL" and ema_4h_50 < entry_price:
+                result["tp1"] = ema_4h_50
 
         if "tp1" not in result:
             # Fallback: resistencia/soporte mas cercano
@@ -2717,6 +2698,7 @@ class PinkStrategy(BaseStrategy):
                     "Paso 4c: Patron correctivo no parece estar cerca de completitud "
                     "(PINK entra al COMPLETAR el patron, no al inicio)"
                 )
+                return None  # Hard-block: PINK requires pattern near completion
 
         # --- Paso 5: Ejecutar al final del patron en exec TF (RCC) ---
         # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
@@ -2884,14 +2866,10 @@ class PinkStrategy(BaseStrategy):
         )
 
     def get_sl_placement(self, analysis: AnalysisResult, direction: str, entry_price: float) -> float:
-        """PINK SL: below the PREVIOUS swing extreme, NOT the nearest/tightest.
+        """PINK SL: below the nearest swing low (minimo anterior del patron correctivo) + buffer.
 
-        TradingLab PINK Day (Alex): "stop loss por encima del máximo anterior,
-        no este máximo último y tampoco ceñido, sino el máximo anterior y
-        dándole espacio al máximo anterior."
-        Translation: NOT the most recent swing extreme but the one BEFORE it,
-        with buffer. The corrective pattern creates a recent extreme that is
-        too close/tight — using it gets you stopped out by pattern volatility.
+        TradingLab PINK mentorship: "minimo anterior del patron correctivo"
+        — the nearest swing low protecting the corrective pattern, with buffer.
         """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
@@ -2899,18 +2877,14 @@ class PinkStrategy(BaseStrategy):
 
         if direction == "BUY":
             below = sorted([s for s in supports if s < entry_price], reverse=True)
-            if len(below) >= 2:
-                # Skip nearest (pattern extreme), use second nearest per mentorship
-                return below[1] * (1 - buffer_pct)
-            elif len(below) == 1:
+            if below:
+                # Nearest swing low protecting the pattern + buffer
                 return below[0] * (1 - buffer_pct)
             return entry_price * 0.985  # 1.5% fallback
         else:
             above = sorted([r for r in resistances if r > entry_price])
-            if len(above) >= 2:
-                # Skip nearest (pattern extreme), use second nearest per mentorship
-                return above[1] * (1 + buffer_pct)
-            elif len(above) == 1:
+            if above:
+                # Nearest swing high protecting the pattern + buffer
                 return above[0] * (1 + buffer_pct)
             return entry_price * 1.015  # 1.5% fallback
 
@@ -3098,8 +3072,8 @@ class WhiteStrategy(BaseStrategy):
         if wave_count in ("4", "5"):
             pink_proxy_score += 1
 
-        # Need at least 2 of the 4 proxy conditions to confirm PINK phase
-        if pink_proxy_score < 2:
+        # Need at least 3 of the 4 proxy conditions to confirm PINK phase
+        if pink_proxy_score < 3:
             failed.append(
                 f"White requiere contexto post-Pink: solo {pink_proxy_score}/4 "
                 f"condiciones proxy cumplidas (BOS={has_recent_bos}, "
@@ -3316,19 +3290,28 @@ class WhiteStrategy(BaseStrategy):
         """WHITE SL: nearest swing extreme + buffer (Blue-like, NOT second-nearest like PINK).
 
         TradingLab: WHITE is Blue-like continuation after PINK, so SL uses
-        nearest previous extreme with "dandole espacio" buffer (same as BLUE).
+        nearest previous swing extreme with "dandole espacio" buffer (same as BLUE).
+        Prefers swing_highs/swing_lows from analysis over generic resistances/supports.
         """
+        swing_highs = getattr(analysis, 'swing_highs', [])
+        swing_lows = getattr(analysis, 'swing_lows', [])
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
         buffer_pct = 0.002  # 0.2% buffer — "dandole espacio"
 
         if direction == "BUY":
-            below = [s for s in supports if s < entry_price]
+            # Prefer swing lows, fall back to generic supports
+            below = [s for s in swing_lows if s < entry_price]
+            if not below:
+                below = [s for s in supports if s < entry_price]
             if below:
                 return max(below) * (1 - buffer_pct)
             return entry_price * 0.99
         else:
-            above = [r for r in resistances if r > entry_price]
+            # Prefer swing highs, fall back to generic resistances
+            above = [s for s in swing_highs if s > entry_price]
+            if not above:
+                above = [r for r in resistances if r > entry_price]
             if above:
                 return min(above) * (1 + buffer_pct)
             return entry_price * 1.01
@@ -3761,12 +3744,8 @@ class BlackStrategy(BaseStrategy):
         setup_ema_key_blk = _tf_ema("setup", 50)
         ema_1h_50 = _ema_val(analysis, setup_ema_key_blk) or _ema_val(analysis, "EMA_H1_50")
         if ema_1h_50 and ema_1h_50 > 0:
-            distance_to_ema = abs(entry_price - ema_1h_50) / entry_price
-
-            # Check if price is near EMA (within 0.3%) = acting as S/R
-            if distance_to_ema < 0.003:
-                failed.append("EMA 50 1H actuando como S/R dinamica (precio muy cerca) — no Black")
-                return None
+            # Mere proximity is NOT disqualifying per mentorship.
+            # Only block when there are 3+ confirmed bounces (see below).
 
             # Check direction-specific dynamic S/R behavior using setup-TF candles
             # TradingLab Black Day: Alex shows 2-3 HOURLY touches of the EMA 50 H1
@@ -4254,12 +4233,15 @@ class GreenStrategy(BaseStrategy):
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
-                # Look for diagonal/trendline breakout on 15M or M5
+                # Look for diagonal/trendline breakout on execution timeframe
+                # Forex: only M15 per Trading Mastery. Crypto: M5/M2 also accepted.
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break", "triangle_break")):
-                    if ptf in ("M15", "M5", ""):
+                    is_crypto = _is_crypto_instrument(analysis.instrument)
+                    accepted_tfs = ("M15", "M5", "M2", "") if is_crypto else ("M15", "")
+                    if ptf in accepted_tfs:
                         diagonal_breakout_detected = True
                         confidence += 15.0
-                        met.append(f"Paso 5: Rompimiento de diagonal en 15M detectado ({ptype})")
+                        met.append(f"Paso 5: Rompimiento de diagonal en {ptf or 'M15'} detectado ({ptype})")
                         break
 
         # Also check structure breaks as proxy for diagonal breakout
@@ -4281,8 +4263,10 @@ class GreenStrategy(BaseStrategy):
         # NO EMA fallback — if no diagonal breakout, no trade.
         # TradingLab: "si no hay ruptura, fuera. No hay trade." — MANDATORY
         if not diagonal_breakout_detected:
+            is_crypto_fb = _is_crypto_instrument(analysis.instrument)
+            tf_label = "M15/M5/M2" if is_crypto_fb else "M15"
             failed.append(
-                "Paso 5 [OBLIGATORIO]: Sin rompimiento de diagonal en M15/M5 - GREEN requiere "
+                f"Paso 5 [OBLIGATORIO]: Sin rompimiento de diagonal en {tf_label} - GREEN requiere "
                 "diagonal breakout (NO fallback a EMAs per mentorship)"
             )
             return None
@@ -4411,9 +4395,20 @@ class GreenStrategy(BaseStrategy):
         except Exception as e:
             logger.warning(f"GREEN SL mode config read failed, using default 'advanced': {e}")
 
-        # Use swing_lows/swing_highs which come from 1H analysis (not daily S/R)
+        # Mentorship: SL below the previous H1 minimum (BUY) or above the
+        # previous H1 maximum (SELL). swing_lows / swing_highs MUST be sourced
+        # from H1 candles for GREEN — never from daily S/R levels.
         swing_lows = getattr(analysis, 'swing_lows', [])
         swing_highs = getattr(analysis, 'swing_highs', [])
+
+        # Fallback: if swing data is empty, derive from raw H1 candles
+        h1_candles = getattr(analysis, 'last_candles', {}).get("H1", [])
+        if not swing_lows and h1_candles:
+            swing_lows = [c.get("low", c.get("l", 0)) for c in h1_candles if isinstance(c, dict)]
+            swing_lows = [v for v in swing_lows if v > 0]
+        if not swing_highs and h1_candles:
+            swing_highs = [c.get("high", c.get("h", 0)) for c in h1_candles if isinstance(c, dict)]
+            swing_highs = [v for v in swing_highs if v > 0]
         ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
 
         # Fallback: use key_levels supports/resistances if no swing data

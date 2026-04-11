@@ -74,7 +74,7 @@ ok("cfg_database_url", "sqlite" in s.database_url)
 # Trading plan
 ok("cfg_trading_style", s.trading_style in ("day_trading", "scalping", "swing"))
 ok("cfg_risk_day_trading", s.risk_day_trading == 0.01)
-ok("cfg_risk_scalping", s.risk_scalping == 0.005)
+ok("cfg_risk_scalping", s.risk_scalping == 0.01)
 ok("cfg_risk_swing", s.risk_swing == 0.01)
 ok("cfg_max_total_risk", s.max_total_risk == 0.07)
 ok("cfg_correlated_risk_pct", s.correlated_risk_pct == 0.0075)

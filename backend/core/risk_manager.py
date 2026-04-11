@@ -4,7 +4,7 @@ Implements all risk management rules from the TradingLab Trading Plan.
 
 Rules:
 - 1% risk per Day Trade
-- 0.5% risk per Scalping trade (NeonTrade AI default)
+- 1% risk per Scalping trade (TradingLab universal; users can lower)
 - 1% risk per Swing Trade (NON-NEGOTIABLE — same as day trading per mentorship)
 - Max 7% total risk at any time
 - Correlated pairs: 0.75% each instead of full risk
@@ -312,12 +312,23 @@ class RiskManager:
         self._accumulated_gain += pnl_percent
         self._delta_accumulated_gain += pnl_percent
 
-        # Reset accumulated gain on loss (delta resets on losing trade)
+        # Mentorship: delta works on accumulated P&L vs thresholds, not per-trade reset.
+        # Only drop to the previous level rather than full reset on any loss.
         if pnl_percent < 0:
-            self._accumulated_gain = 0.0
-            self._delta_accumulated_gain = 0.0
-            self._current_delta_risk = 0.0
-            logger.info("Delta algorithm: reset after losing trade")
+            self._delta_accumulated_gain = max(0.0, self._delta_accumulated_gain + pnl_percent)
+            self._accumulated_gain = max(0.0, self._accumulated_gain + pnl_percent)
+            # Recalculate current level based on remaining accumulated gain
+            delta_threshold = (self._max_historical_dd or 0.05) * settings.delta_parameter
+            if delta_threshold > 0 and self._delta_accumulated_gain >= delta_threshold * 2:
+                self._current_delta_risk = 0.01  # Stay at level 2 (2%)
+            elif delta_threshold > 0 and self._delta_accumulated_gain >= delta_threshold:
+                self._current_delta_risk = 0.005  # Drop to level 1 (1.5%)
+            else:
+                self._current_delta_risk = 0.0  # Back to base level
+            logger.info(
+                f"Delta algorithm: loss absorbed, accumulated_gain={self._delta_accumulated_gain:.4f}, "
+                f"delta_risk={self._current_delta_risk:.4f}"
+            )
 
         # Reentry tracking — increment consecutive stop-out count for this instrument
         if pnl_percent < 0:
@@ -374,8 +385,16 @@ class RiskManager:
         From Esp. Criptomonedas - Reentradas Efectivas:
         - 1st entry: 1.0x (full risk)
         - Subsequent: reads from settings.reentry_risk_N
-        - Beyond max_reentries_per_setup: BLOCKED (returns 0.0)"""
+        - Beyond max_reentries_per_setup: BLOCKED (returns 0.0)
+        Forex: no progressive risk reduction per mentorship (just enforce BE requirement)."""
+        from strategies.base import _is_crypto_instrument
         count = self.get_reentry_count(instrument)
+
+        # Forex: no progressive risk reduction — only BE requirement applies
+        if not _is_crypto_instrument(instrument):
+            return 1.0  # Forex: no progressive risk reduction per mentorship
+
+        # Crypto: progressive risk reduction on reentries
         max_reentries = settings.max_reentries_per_setup
         if count == 0:
             return 1.0

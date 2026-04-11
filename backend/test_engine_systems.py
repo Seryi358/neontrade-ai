@@ -280,7 +280,7 @@ async def run_tests():
     print("\n[12] TRADINGLAB CONFIG VERIFICATION")
     checks = [
         (settings.risk_day_trading == 0.01, "Day trading risk = 1%"),
-        (settings.risk_scalping == 0.005, "Scalping risk = 0.5%"),
+        (settings.risk_scalping == 0.01, "Scalping risk = 1%"),
         (settings.risk_swing == 0.01, "Swing risk = 1%"),
         (settings.max_total_risk == 0.07, "Max total risk = 7%"),
         (settings.correlated_risk_pct == 0.0075, "Correlated factor = 0.75"),

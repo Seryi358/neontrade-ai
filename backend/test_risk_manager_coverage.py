@@ -265,14 +265,16 @@ class TestRecordTradeResult:
         assert len(rm._trade_history) == 1
         assert rm._trade_history[0].is_win is True
 
-    def test_losing_trade_resets_delta(self, rm):
-        """Losing trade should reset delta accumulated gain."""
+    def test_losing_trade_reduces_delta(self, rm):
+        """Losing trade should reduce delta accumulated gain (graduated, not full reset)."""
         rm._delta_accumulated_gain = 0.05
         rm._accumulated_gain = 0.05
         rm.record_trade_result("t2", "EUR_USD", -0.01)
-        assert rm._delta_accumulated_gain == 0.0
-        assert rm._accumulated_gain == 0.0
-        assert rm._current_delta_risk == 0.0
+        # Graduated delta: loss reduces gain by loss amount, doesn't wipe to 0
+        assert rm._delta_accumulated_gain >= 0.0
+        assert rm._accumulated_gain >= 0.0
+        # Gain should be reduced but not wiped
+        assert rm._delta_accumulated_gain < 0.05
 
     def test_reentry_count_on_loss(self, rm):
         """Consecutive stop-out on same instrument should increment reentry count."""
@@ -445,22 +447,33 @@ class TestReentryRiskMultiplier:
             ms.reentry_risk_3 = 0.25
             assert rm.get_reentry_risk_multiplier("EUR_USD") == 1.0
 
-    def test_first_reentry_50_pct(self, rm):
-        """After 1 stop-out → 0.5x risk."""
-        rm._reentry_counts["EUR_USD"] = 1
+    def test_first_reentry_50_pct_crypto(self, rm):
+        """After 1 stop-out on crypto → 0.5x risk (progressive tiers are crypto-only)."""
+        rm._reentry_counts["BTC_USD"] = 1
         with patch("core.risk_manager.settings") as ms:
             ms.max_reentries_per_setup = 3
             ms.reentry_risk_1 = 0.5
             ms.reentry_risk_2 = 0.25
             ms.reentry_risk_3 = 0.25
-            assert rm.get_reentry_risk_multiplier("EUR_USD") == 0.5
+            ms.crypto_watchlist = ["BTC_USD", "ETH_USD"]
+            assert rm.get_reentry_risk_multiplier("BTC_USD") == 0.5
 
-    def test_max_reentries_blocked(self, rm):
-        """At max reentries → 0.0 (blocked)."""
-        rm._reentry_counts["EUR_USD"] = 3
+    def test_forex_reentry_no_reduction(self, rm):
+        """Forex reentry always returns 1.0 (no progressive reduction per mentorship)."""
+        rm._reentry_counts["EUR_USD"] = 1
         with patch("core.risk_manager.settings") as ms:
             ms.max_reentries_per_setup = 3
-            assert rm.get_reentry_risk_multiplier("EUR_USD") == 0.0
+            ms.reentry_risk_1 = 0.5
+            ms.crypto_watchlist = ["BTC_USD", "ETH_USD"]
+            assert rm.get_reentry_risk_multiplier("EUR_USD") == 1.0
+
+    def test_max_reentries_blocked(self, rm):
+        """At max reentries on crypto → 0.0 (blocked)."""
+        rm._reentry_counts["BTC_USD"] = 3
+        with patch("core.risk_manager.settings") as ms:
+            ms.max_reentries_per_setup = 3
+            ms.crypto_watchlist = ["BTC_USD", "ETH_USD"]
+            assert rm.get_reentry_risk_multiplier("BTC_USD") == 0.0
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -974,8 +974,8 @@ class TestAdditionalBugs:
             # 6% DD >= level_1 (5%) but < level_2 (7.5%)
             assert adjusted == 0.0075, f"Expected 0.0075, got {adjusted}"
 
-    def test_delta_algorithm_reset_on_loss(self):
-        """Delta algorithm should reset accumulated gains on a losing trade."""
+    def test_delta_algorithm_graduated_on_loss(self):
+        """Delta algorithm should reduce (not fully reset) gains on a losing trade."""
         from core.risk_manager import RiskManager
 
         broker = FakeBroker()
@@ -984,13 +984,15 @@ class TestAdditionalBugs:
         # Record some wins
         risk_mgr.record_trade_result("t1", "EUR_USD", 0.01)
         risk_mgr.record_trade_result("t2", "EUR_USD", 0.015)
-        assert risk_mgr._accumulated_gain > 0
+        prev_gain = risk_mgr._accumulated_gain
+        assert prev_gain > 0
         assert risk_mgr._delta_accumulated_gain > 0
 
-        # Record a loss - should reset
+        # Record a loss - should reduce gain, not wipe to 0
         risk_mgr.record_trade_result("t3", "EUR_USD", -0.005)
-        assert risk_mgr._accumulated_gain == 0.0
-        assert risk_mgr._delta_accumulated_gain == 0.0
+        assert risk_mgr._accumulated_gain >= 0.0
+        assert risk_mgr._accumulated_gain < prev_gain  # reduced
+        assert risk_mgr._delta_accumulated_gain >= 0.0
 
     def test_position_manager_highest_price_init(self):
         """

@@ -36,7 +36,7 @@ check("active_broker default", settings.active_broker == "capital")
 check("trading_style default", settings.trading_style == "day_trading")
 check("risk_day_trading default 1%", settings.risk_day_trading == 0.01)
 check("risk_scalping default 1%", settings.risk_scalping == 0.01)
-check("max_total_risk default 7%", settings.max_total_risk == 0.07)
+check("max_total_risk default 3%", settings.max_total_risk == 0.03)
 check("min_rr_ratio default", settings.min_rr_ratio == 1.5)
 check("min_rr_black default", settings.min_rr_black == 2.0)
 check("min_rr_green default", settings.min_rr_green == 2.0)
@@ -73,7 +73,7 @@ check("correlated_risk_pct default 0.75", settings.correlated_risk_pct == 0.0075
 
 # --- Drawdown settings ---
 print("\n[7.7] Drawdown settings")
-check("drawdown_method default 'fixed_1pct'", settings.drawdown_method == "fixed_1pct")
+check("drawdown_method default 'fixed_levels'", settings.drawdown_method == "fixed_levels")
 check("drawdown_min_risk default 0.25%", settings.drawdown_min_risk == 0.0025)
 check("delta_enabled default False", settings.delta_enabled is False)
 

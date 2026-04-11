@@ -76,13 +76,15 @@ class Settings(BaseSettings):
     # "me he dado cuenta que lo que más me gusta es el day trading [...] es el
     #  estilo que se adapta más a mí" — Alex (Estilos de trading)
     # User can change this; all strategies adapt to the selected style.
+    # NOTE: With small accounts (<$500), day_trading with tight SLs is recommended.
+    # Swing trading requires wider SLs that may exceed 1% risk at minimum lot sizes.
     trading_style: str = "day_trading"
 
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.01           # TradingLab: 1% universal (users can lower for extra safety)
     risk_swing: float = 0.01             # 1% default (Alex's Trading Plan uses 3% for swing; adjustable via API)
-    max_total_risk: float = 0.07          # 7% max simultaneous open risk
+    max_total_risk: float = 0.03          # 3% max simultaneous open risk (conservative for <$500 accounts)
 
     # Correlated pairs risk reduction (ch18.3)
     # Mentorship: "entrar con el 0,75% de riesgo en cada uno"
@@ -133,9 +135,9 @@ class Settings(BaseSettings):
     # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
     # Mentorship: "sobreoperar después de una pérdida" is a top-5 failure mode.
     # These limits protect against emotional trading during drawdowns.
-    max_trades_per_day: int = 5           # Max trades per day (0 = unlimited). Alex: conservative 3-5/day
-    cooldown_after_consecutive_losses: int = 2  # After N consecutive losses, enforce cooldown
-    cooldown_minutes: int = 60            # Minutes to wait after consecutive loss threshold
+    max_trades_per_day: int = 3           # Max 3 trades/day for small accounts (preserves capital)
+    cooldown_after_consecutive_losses: int = 2  # After 2 consecutive losses, enforce cooldown
+    cooldown_minutes: int = 120           # 2 hours cooldown (extra caution with small capital)
 
     # Re-entry risk reduction (configurable per trader's plan)
     # Mentorship: "Cada uno pone sus normas" — these are DEFAULTS, not hard rules.
@@ -168,7 +170,8 @@ class Settings(BaseSettings):
     # Methods: "fixed_1pct" (always 1%, recommended for beginners),
     #          "variable" (win-rate based, most professional),
     #          "fixed_levels" (step-down at DD thresholds, most conservative)
-    drawdown_method: str = "fixed_1pct"
+    # For small accounts (<$500): fixed_levels protects capital aggressively
+    drawdown_method: str = "fixed_levels"
     # Fixed levels: reduce risk at these drawdown thresholds
     # Values from TradingPlan_2024.pdf "Cálculo fijo" screenshot:
     # Level 1: -4.12% DD (4 trades * 1.03% avg loss)
@@ -277,7 +280,7 @@ class Settings(BaseSettings):
     # ── Discretion Level (ch22.1 Trading Plan) ──────────────────
     # Beginners: 100% precision, 0% discretion. Follow the plan exactly.
     # Alex (experienced): 80% precision, 20% discretion.
-    discretion_pct: float = 0.0  # 0% discretion for beginners
+    discretion_pct: float = 0.0  # 0% discretion — follow the plan exactly (especially with small capital)
 
     # ── Forex Watchlist (from mentorship course materials) ──────────────────────────
     # TradingLab focus: "mercado de Divisas (including indices and metals)"
@@ -285,19 +288,20 @@ class Settings(BaseSettings):
     # Exotics: USD exotics are better than EUR exotics (more volume, better
     # pattern respect). Alex pruned EUR exotics over time.
     forex_watchlist: List[str] = [
-        # Principales USD (7 pairs — the core)
-        "AUD_USD", "EUR_USD", "GBP_USD", "NZD_USD",
-        "USD_CAD", "USD_CHF", "USD_JPY",
-        # Principales EUR
-        "EUR_AUD", "EUR_CHF", "EUR_GBP", "EUR_JPY", "EUR_NZD",
-        # Principales CAD
-        "AUD_CAD", "CAD_CHF", "EUR_CAD", "GBP_CAD", "NZD_CAD",
-        # Principales JPY
-        "AUD_JPY", "CAD_JPY", "CHF_JPY", "GBP_JPY", "NZD_JPY",
-        # Otros cruces
-        "AUD_CHF", "AUD_NZD", "GBP_AUD", "GBP_CHF", "GBP_NZD", "NZD_CHF",
-        # Metales (included in forex per TradingLab — treated as currencies)
-        "XAU_USD", "XAG_USD",
+        # Principales USD — lowest spreads, best for small accounts
+        "EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD",
+        "USD_CHF", "NZD_USD",
+        # High-volume crosses — reasonable spreads
+        "EUR_GBP", "EUR_JPY", "GBP_JPY",
+        # Gold — trades well on Capital.com with small lots
+        "XAU_USD",
+        # Additional pairs (wider spreads, disabled for <$500 accounts)
+        # Uncomment when account grows past $500:
+        # "EUR_AUD", "EUR_CHF", "EUR_NZD", "EUR_CAD",
+        # "AUD_CAD", "AUD_JPY", "CAD_JPY", "CHF_JPY", "NZD_JPY",
+        # "GBP_AUD", "GBP_CHF", "GBP_NZD", "GBP_CAD",
+        # "AUD_CHF", "AUD_NZD", "NZD_CHF", "NZD_CAD", "CAD_CHF",
+        # "XAG_USD",
     ]
 
     # Correlation pairs map (TradingLab: enter with 0.75% each if correlated)

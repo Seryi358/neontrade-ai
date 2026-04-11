@@ -779,7 +779,7 @@ def test_block_7_config():
     check("risk_day_trading 1%", settings.risk_day_trading == 0.01)
     check("risk_scalping 1%", settings.risk_scalping == 0.01)
     check("risk_swing 1%", settings.risk_swing == 0.01)
-    check("max_total_risk 7%", settings.max_total_risk == 0.07)
+    check("max_total_risk 3%", settings.max_total_risk == 0.03)
     check("correlated_risk_pct 0.75", settings.correlated_risk_pct == 0.0075)
 
     # EMAs
@@ -1258,7 +1258,7 @@ def test_block_12_regressions():
     check("R8: scale_in_require_be True", settings.scale_in_require_be is True)
     check("R8: partial_taking False", settings.partial_taking is False)
     check("R8: sl_management_style ema", settings.sl_management_style == "ema")
-    check("R8: drawdown_method fixed_1pct", settings.drawdown_method == "fixed_1pct")
+    check("R8: drawdown_method fixed_levels", settings.drawdown_method == "fixed_levels")
     check("R8: delta_enabled False", settings.delta_enabled is False)
 
     # ---- R8b: Scalping timeframes ----

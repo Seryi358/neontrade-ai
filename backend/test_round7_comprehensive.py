@@ -998,7 +998,7 @@ def block_8_config():
     check("B8-01 risk_day_trading = 0.01", abs(settings.risk_day_trading - 0.01) < 1e-9)
     check("B8-02 risk_scalping = 0.01", abs(settings.risk_scalping - 0.01) < 1e-9)
     check("B8-03 risk_swing = 0.01", abs(settings.risk_swing - 0.01) < 1e-9)
-    check("B8-04 max_total_risk = 0.07", abs(settings.max_total_risk - 0.07) < 1e-9)
+    check("B8-04 max_total_risk = 0.03", abs(settings.max_total_risk - 0.03) < 1e-9)
     check("B8-05 min_rr_ratio = 1.5", abs(settings.min_rr_ratio - 1.5) < 1e-9)
     check("B8-06 correlated_risk_pct = 0.0075", abs(settings.correlated_risk_pct - 0.0075) < 1e-9)
     check("B8-07 forex watchlist non-empty", len(settings.forex_watchlist) > 20)
@@ -1013,7 +1013,7 @@ def block_8_config():
     check("B8-16 correlation_groups has entries", len(settings.correlation_groups) >= 5)
     check("B8-17 XAU_USD in watchlist", "XAU_USD" in settings.forex_watchlist)
     check("B8-18 BTC_USD in crypto", "BTC_USD" in settings.crypto_watchlist)
-    check("B8-19 drawdown_method = fixed_1pct", settings.drawdown_method == "fixed_1pct")
+    check("B8-19 drawdown_method = fixed_levels", settings.drawdown_method == "fixed_levels")
     check("B8-20 scale_in_require_be True", settings.scale_in_require_be is True)
 
 

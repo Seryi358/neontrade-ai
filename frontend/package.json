@@ -1,7 +1,7 @@
 {
-  "name": "neontrade-ai",
+  "name": "atlas-trading",
   "version": "2.2.0",
-  "description": "NeonTrade AI - Cyberpunk Trading System",
+  "description": "Atlas - AI Trading System",
   "main": "index.js",
   "scripts": {
     "start": "expo start",

@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Chart Screen
+ * Atlas - Chart Screen
  * Professional TradingView lightweight-charts integration with cyberpunk theme.
  * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
  *

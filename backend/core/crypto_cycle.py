@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Crypto Market Cycle Analyzer
+Atlas - Crypto Market Cycle Analyzer
 Tracks BTC dominance, altcoin season, and market cycle phases.
 Concepts from TradingLab Crypto Specialization Module 6.
 """

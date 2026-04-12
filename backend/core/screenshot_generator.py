@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Trade Screenshot Generator
+Atlas - Trade Screenshot Generator
 Generates chart screenshots for every executed trade.
 
 From Trading Plan:
@@ -41,7 +41,7 @@ try:
 except ImportError:
     HAS_MPLFINANCE = False
 
-# ── NeonTrade Cyberpunk Theme ────────────────────────────────────
+# ── Atlas Cyberpunk Theme ────────────────────────────────────
 THEME = {
     "bg": "#f2f2f7",            # Apple: systemGroupedBackground
     "bg_card": "#ffffff",        # Apple: white card
@@ -371,7 +371,7 @@ class TradeScreenshotGenerator:
         # Timestamp watermark
         ts = trade_info.get("timestamp", "")
         ax.text(
-            0.99, 0.01, f"NeonTrade AI  |  {ts} UTC",
+            0.99, 0.01, f"Atlas  |  {ts} UTC",
             transform=ax.transAxes, fontsize=7,
             color=THEME["text_dim"], alpha=0.5,
             ha="right", va="bottom",
@@ -674,7 +674,7 @@ class TradeScreenshotGenerator:
         # Watermark
         ts = trade_info.get("timestamp", "")
         ax.text(
-            5, 0.7, f"NeonTrade AI  |  {ts} UTC  |  No chart data available",
+            5, 0.7, f"Atlas  |  {ts} UTC  |  No chart data available",
             fontsize=8, color=THEME["text_dim"], alpha=0.5,
             ha="center", va="center",
         )

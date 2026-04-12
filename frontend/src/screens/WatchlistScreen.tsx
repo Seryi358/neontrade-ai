@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Watchlist Screen
+ * Atlas - Watchlist Screen
  * Shows all watched pairs with analysis scores, strategy detections, and signals.
  * CyberPunk 2077 HUD redesign with sub-navigation pills.
  */

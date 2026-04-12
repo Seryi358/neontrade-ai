@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Journal Screen
+ * Atlas - Journal Screen
  * Comprehensive trade journal with stats, trade list, and emotional notes.
  * CyberPunk 2077 HUD redesign with sub-navigation pills.
  */

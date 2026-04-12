@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - API Service
+ * Atlas - API Service
  * Centralized API communication and WebSocket management.
  */
 
@@ -13,15 +13,15 @@ function getBaseUrl(): string {
   // 1. Check localStorage for user-configured remote URL
   if (typeof window !== 'undefined') {
     try {
-      const saved = window.localStorage.getItem('neontrade_backend_url');
+      const saved = window.localStorage.getItem('atlas_backend_url');
       if (saved && saved.startsWith('http')) {
         return saved.replace(/\/+$/, '');
       }
     } catch {}
   }
   // 2. Check Electron injected variable
-  if (typeof window !== 'undefined' && (window as any).__NEONTRADE_API_HOST__) {
-    return `http://${(window as any).__NEONTRADE_API_HOST__}`;
+  if (typeof window !== 'undefined' && (window as any).__ATLAS_API_HOST__) {
+    return `http://${(window as any).__ATLAS_API_HOST__}`;
   }
   // 3. Auto-detect: if served from a non-localhost origin (EasyPanel/VPS),
   //    use that origin as the API base URL (same-origin deployment)
@@ -46,7 +46,7 @@ export let WS_URL = API_URL.replace('http', 'ws') + '/ws';
 export function setBackendUrl(url: string): void {
   const clean = url.replace(/\/+$/, '');
   if (typeof window !== 'undefined') {
-    try { window.localStorage.setItem('neontrade_backend_url', clean); } catch {}
+    try { window.localStorage.setItem('atlas_backend_url', clean); } catch {}
   }
   API_URL = clean;
   WS_URL = clean.replace('http', 'ws') + '/ws';
@@ -60,7 +60,7 @@ export function setBackendUrl(url: string): void {
  */
 export function resetBackendUrl(): void {
   if (typeof window !== 'undefined') {
-    try { window.localStorage.removeItem('neontrade_backend_url'); } catch {}
+    try { window.localStorage.removeItem('atlas_backend_url'); } catch {}
   }
   API_URL = DEFAULT_URL;
   WS_URL = DEFAULT_URL.replace('http', 'ws') + '/ws';
@@ -74,12 +74,12 @@ export function resetBackendUrl(): void {
 function getApiKey(): string {
   if (typeof window !== 'undefined') {
     try {
-      const saved = window.localStorage.getItem('neontrade_api_key');
+      const saved = window.localStorage.getItem('atlas_api_key');
       if (saved) return saved;
     } catch {}
     // Auto-injected by backend when served from same origin (EasyPanel/Docker)
     try {
-      const injected = (window as any).__NEONTRADE_API_KEY__;
+      const injected = (window as any).__ATLAS_API_KEY__;
       if (injected) return injected;
     } catch {}
   }
@@ -88,13 +88,13 @@ function getApiKey(): string {
 
 export function setApiKey(key: string): void {
   if (typeof window !== 'undefined') {
-    try { window.localStorage.setItem('neontrade_api_key', key); } catch {}
+    try { window.localStorage.setItem('atlas_api_key', key); } catch {}
   }
 }
 
 export function clearApiKey(): void {
   if (typeof window !== 'undefined') {
-    try { window.localStorage.removeItem('neontrade_api_key'); } catch {}
+    try { window.localStorage.removeItem('atlas_api_key'); } catch {}
   }
 }
 

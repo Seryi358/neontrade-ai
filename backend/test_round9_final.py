@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 9 FINAL CERTIFICATION Test Suite
+Atlas - Round 9 FINAL CERTIFICATION Test Suite
 450+ assertions. Every module, every edge case, every regression from rounds 1-8.
 """
 
@@ -1535,7 +1535,7 @@ def test_block_13_new():
 
 def main():
     print("\n" + "=" * 70)
-    print("  NeonTrade AI - ROUND 9 FINAL CERTIFICATION TEST SUITE")
+    print("  Atlas - ROUND 9 FINAL CERTIFICATION TEST SUITE")
     print("  Target: 450+ assertions")
     print("=" * 70)
 

@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Economic Calendar (DEPRECATED)
+Atlas - Economic Calendar (DEPRECATED)
 
 DEPRECATION NOTICE:
     This module is a legacy implementation superseded by

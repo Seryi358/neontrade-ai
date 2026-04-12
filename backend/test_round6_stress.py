@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 6 Comprehensive Stress Test Suite
+Atlas - Round 6 Comprehensive Stress Test Suite
 Covers ALL 30 regression tests from rounds 1-5, PLUS 16 new tests (31-46).
 Total: 46 test areas.
 """
@@ -1387,7 +1387,7 @@ def test_46_frontend_backend_url_match():
 
 def main():
     print("=" * 70)
-    print("  NeonTrade AI - Round 6 Comprehensive Stress Test")
+    print("  Atlas - Round 6 Comprehensive Stress Test")
     print("  46 test areas: 36 regression + 7 stress + 3 integration")
     print("=" * 70)
 

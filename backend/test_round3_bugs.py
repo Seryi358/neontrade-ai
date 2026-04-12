@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 3 Bug Hunting Tests
+Atlas - Round 3 Bug Hunting Tests
 Comprehensive tests for data flow integrity, edge cases, concurrency,
 API routes, config validation, database integrity, and frontend-backend contract.
 """

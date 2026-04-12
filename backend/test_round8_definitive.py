@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 8 DEFINITIVE Test Suite
+Atlas - Round 8 DEFINITIVE Test Suite
 400+ assertions covering EVERYTHING.
 """
 
@@ -1830,7 +1830,7 @@ def test_integration():
 
 def main():
     print("=" * 70)
-    print("  NeonTrade AI - Round 8 DEFINITIVE Test Suite (400+ assertions)")
+    print("  Atlas - Round 8 DEFINITIVE Test Suite (400+ assertions)")
     print("=" * 70)
 
     try:

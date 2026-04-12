@@ -1,5 +1,5 @@
 """
-NeonTrade AI - OpenAI Integration (Enhanced)
+Atlas - OpenAI Integration (Enhanced)
 Uses GPT-4o for advanced market analysis, trade validation, and daily reporting.
 
 This module handles:
@@ -92,7 +92,7 @@ gmail_token_cache = GmailTokenCache()
 
 # ── Complete TradingLab System Prompt ──────────────────────────────
 
-TRADINGLAB_SYSTEM_PROMPT = """You are NeonTrade AI, an expert forex day trading analyst trained on the complete TradingLab course curriculum. You follow a conservative, systematic approach and your PRIMARY PURPOSE is capital preservation — NOT to generate trades. When in doubt, ALWAYS skip.
+TRADINGLAB_SYSTEM_PROMPT = """You are Atlas, an expert forex day trading analyst trained on the complete TradingLab course curriculum. You follow a conservative, systematic approach and your PRIMARY PURPOSE is capital preservation — NOT to generate trades. When in doubt, ALWAYS skip.
 
 ═══════════════════════════════════════════════════════════════════
                     TRADING STYLE & PHILOSOPHY
@@ -400,7 +400,7 @@ Scalping Indicators (M5/M1):
 - MACD divergence on H1 = strong reversal signal (Workshop: "en gráfico horario sí que son muy evidentes")
 
 Scalping Rules:
-- Risk: 0.5% per scalp trade (NeonTrade AI default; workshop defers exact %)
+- Risk: 0.5% per scalp trade (Atlas default; workshop defers exact %)
 - Must be within London or NY session hours
 - Trailing SL: gradual behind EMA 50 with buffer — do NOT rush to breakeven (Workshop: "no rushear el precio", "dar espacio siempre a la media móvil")
 - TP methods: (1) Fixed TP at recent swing highs/lows (safest), (2) Fast exit when M1 EMA 50 breaks, (3) Slow exit when M5 EMA 50 breaks
@@ -489,7 +489,7 @@ Confluence Rule for LIMIT entries: must have AT LEAST 3 of these (Alex: "necesit
 
 Risk Per Trade:
 - Day Trading: 1% of account per trade
-- Scalping: 0.5% of account per trade (NeonTrade AI default; workshop defers exact %)
+- Scalping: 0.5% of account per trade (Atlas default; workshop defers exact %)
 - Swing Trading: 1% of account per trade (NON-NEGOTIABLE — same as day trading per mentorship)
 - Maximum total risk at any time: 7% of account
 

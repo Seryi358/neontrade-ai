@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Analysis Screen
+ * Atlas - Analysis Screen
  * Detailed analysis for a selected instrument with strategy explanations in Spanish.
  * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
  */

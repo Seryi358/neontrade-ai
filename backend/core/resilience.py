@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Resilience Utilities
+Atlas - Resilience Utilities
 Retry with exponential backoff, circuit breaker, and TTL cache for broker calls.
 """
 

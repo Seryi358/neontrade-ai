@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Glass UI Components
+ * Atlas - Glass UI Components
  * Apple Liquid Glass Light (iOS 26) styled UI components.
  * Translucent glass cards, soft shadows, SF Pro typography.
  *

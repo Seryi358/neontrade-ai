@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Broker Connection Test
+Atlas - Broker Connection Test
 Tests live connection to Capital.com:
   1. Authentication (session creation)
   2. Account summary (balance, equity)
@@ -29,7 +29,7 @@ async def test_connection():
     dry_run = "--dry-run" in sys.argv
 
     print("=" * 60)
-    print("  NeonTrade AI - Broker Connection Test")
+    print("  Atlas - Broker Connection Test")
     print("  Broker: Capital.com")
     print(f"  Environment: {settings.capital_environment.upper()}")
     print(f"  Mode: {'DRY RUN (no trades)' if dry_run else 'LIVE TEST (will open & close a trade)'}")

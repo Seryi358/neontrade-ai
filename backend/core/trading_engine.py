@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Trading Engine
+Atlas - Trading Engine
 Main orchestrator that ties everything together.
 
 Flow:
@@ -121,7 +121,7 @@ def _create_broker():
 
 
 class TradingEngine:
-    """Main trading engine - the brain of NeonTrade AI."""
+    """Main trading engine - the brain of Atlas."""
 
     def __init__(self):
         self.broker = _create_broker()
@@ -511,7 +511,7 @@ class TradingEngine:
     async def start(self):
         """Start the trading engine."""
         logger.info("=" * 60)
-        logger.info("  NeonTrade AI - Trading Engine Starting")
+        logger.info("  Atlas - Trading Engine Starting")
         logger.info(f"  Mode: {self.mode.value}")
         logger.info("=" * 60)
 
@@ -565,7 +565,7 @@ class TradingEngine:
             try:
                 await self.alert_manager.send_engine_status(
                     "STARTED",
-                    f"NeonTrade AI engine started. Mode: {self.mode.value}. "
+                    f"Atlas engine started. Mode: {self.mode.value}. "
                     f"Broker: {broker_name}. Balance: {balance} {currency}. "
                     f"Watching {len(get_active_watchlist())} pairs.",
                 )
@@ -2726,7 +2726,7 @@ class TradingEngine:
                 if self.alert_manager:
                     await self.alert_manager.send_alert(
                         "ai_daily_report",
-                        f"NeonTrade AI - Daily Report {today}",
+                        f"Atlas - Daily Report {today}",
                         report,
                     )
             except Exception as e:
@@ -2867,7 +2867,7 @@ class TradingEngine:
             checklist = self._build_presession_checklist(session_label)
 
             body = (
-                f"<b>NeonTrade AI is ALIVE and running.</b>\n\n"
+                f"<b>Atlas is ALIVE and running.</b>\n\n"
                 f"<b>Balance:</b> {balance_str}\n"
                 f"<b>Mode:</b> {mode}\n"
                 f"<b>Open Positions:</b> {open_positions}\n"
@@ -2881,7 +2881,7 @@ class TradingEngine:
 
             await self.alert_manager.send_alert(
                 "engine_status",
-                f"NeonTrade AI - Morning Heartbeat ({now.strftime('%Y-%m-%d')})",
+                f"Atlas - Morning Heartbeat ({now.strftime('%Y-%m-%d')})",
                 body,
             )
             logger.info("Morning heartbeat email sent (with pre-session checklist)")
@@ -2907,7 +2907,7 @@ class TradingEngine:
 
             await self.alert_manager.send_alert(
                 "presession_checklist",
-                f"NeonTrade AI - Checklist {session_label} ({now.strftime('%Y-%m-%d')})",
+                f"Atlas - Checklist {session_label} ({now.strftime('%Y-%m-%d')})",
                 body,
             )
             logger.info(f"Pre-session checklist sent for {session_label}")

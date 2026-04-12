@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Main App
+ * Atlas - Main App
  * Apple Liquid Glass Light UI
  *
  * Navigation: 5 tabs (HQ, Trade, Market, Log, Settings)
@@ -285,7 +285,7 @@ function BootScreen() {
   return (
     <View style={bootStyles.container}>
       <Animated.Text style={[bootStyles.title, { opacity }]}>
-        NeonTrade AI
+        Atlas
       </Animated.Text>
 
       <Animated.Text style={[bootStyles.subtitle, { opacity }]}>

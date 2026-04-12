@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeonTrade AI - Gmail OAuth2 Setup Script
+Atlas - Gmail OAuth2 Setup Script
 Run this ONCE on a machine with a browser to obtain a refresh token.
 
 Usage:
@@ -8,7 +8,7 @@ Usage:
 
 The script will:
 1. Open your browser for Google login
-2. Ask you to authorize NeonTrade AI to send emails
+2. Ask you to authorize Atlas to send emails
 3. Save the refresh token to your .env file
 
 After running this, copy the GMAIL_REFRESH_TOKEN value to your
@@ -57,7 +57,7 @@ def main():
     }
 
     print("=" * 50)
-    print("  NeonTrade AI - Gmail OAuth2 Setup")
+    print("  Atlas - Gmail OAuth2 Setup")
     print("=" * 50)
     print()
     print("A browser window will open for Google login.")

@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Manual Mode Screen
+ * Atlas - Manual Mode Screen
  * Shows pending trade setups awaiting user approval.
  * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
  */
@@ -435,7 +435,7 @@ export default function ManualModeScreen() {
       ) : (
         <EmptyState
           title="No hay operaciones pendientes"
-          subtitle="Cuando NeonTrade detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion."
+          subtitle="Cuando Atlas detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion."
           hint="Cambia al modo MANUAL en Configuracion para aprobar operaciones manualmente."
         />
       )}

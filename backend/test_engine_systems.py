@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Engine Systems Test
+Atlas - Engine Systems Test
 Tests risk manager, position manager, strategies, news filter, and trading engine.
 """
 
@@ -24,7 +24,7 @@ async def run_tests():
     global passed, failed
 
     print("=" * 70)
-    print("  NeonTrade AI - Engine Systems Test")
+    print("  Atlas - Engine Systems Test")
     print("=" * 70)
 
     # ── TEST 1: Risk Manager ──────────────────────────────────────

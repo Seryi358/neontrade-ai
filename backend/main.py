@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Main Entry Point
+Atlas - Main Entry Point
 FastAPI server + Trading Engine orchestration.
 WebSocket with typed events for real-time frontend updates.
 """
@@ -36,7 +36,7 @@ os.makedirs("logs", exist_ok=True)
 os.makedirs("data", exist_ok=True)
 
 logger.add(
-    "logs/neontrade_{time:YYYY-MM-DD}.log",
+    "logs/atlas_{time:YYYY-MM-DD}.log",
     rotation="1 day",
     retention="30 days",
     level="DEBUG",
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     """Start trading engine on app startup, stop on shutdown."""
     global db
     logger.info("=" * 60)
-    logger.info("  NeonTrade AI v3.0 - Liquid Glass - Starting Up")
+    logger.info("  Atlas v3.0 - Liquid Glass - Starting Up")
     logger.info("=" * 60)
 
     # Startup diagnostics (mask secrets but confirm they exist)
@@ -151,7 +151,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown — cancel tasks and await them to prevent CancelledError warnings
-    logger.info("NeonTrade AI shutting down...")
+    logger.info("Atlas shutting down...")
     await engine.stop()
     engine_task.cancel()
     status_task.cancel()
@@ -215,7 +215,7 @@ async def _periodic_cleanup():
 
 # ── FastAPI App ──────────────────────────────────────────────────
 app = FastAPI(
-    title="NeonTrade AI",
+    title="Atlas",
     description="Cyberpunk AI-Powered Forex Trading System - Powered by TradingLab Strategies",
     version="3.0.0",
     lifespan=lifespan,
@@ -404,7 +404,7 @@ if os.path.isdir(_static_dir):
         api_key = settings.api_secret_key or ""
         if api_key:
             encoded = base64.b64encode(api_key.encode()).decode()
-            injection = f'<script>window.__NEONTRADE_API_KEY__=atob("{encoded}");</script>'
+            injection = f'<script>window.__ATLAS_API_KEY__=atob("{encoded}");</script>'
         else:
             injection = ""
         return _index_html_raw.replace("</head>", f"{injection}</head>")

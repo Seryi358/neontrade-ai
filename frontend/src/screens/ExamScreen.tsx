@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Exam Screen
+ * Atlas - Exam Screen
  * TradingLab Final Exam: select 5 trades, generate analysis report.
  * Design: Apple Liquid Glass Light
  */

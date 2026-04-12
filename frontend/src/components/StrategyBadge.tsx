@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Strategy Badge Component
+ * Atlas - Strategy Badge Component
  * Shows a colored badge for each trading strategy.
  */
 

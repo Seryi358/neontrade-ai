@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "NeonTrade AI",
-    "slug": "neontrade-ai",
+    "name": "Atlas",
+    "slug": "atlas-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "scheme": "neontrade",
+    "scheme": "atlas",
     "platforms": ["web", "ios", "android"],
     "icon": "./src/assets/icon.png",
     "ios": {
-      "bundleIdentifier": "com.phinodia.neontrade",
+      "bundleIdentifier": "com.phinodia.atlas",
       "supportsTablet": true,
       "backgroundColor": "#0a0a1a",
       "icon": "./src/assets/icon.png",
@@ -20,7 +20,7 @@
       }
     },
     "android": {
-      "package": "com.phinodia.neontrade",
+      "package": "com.phinodia.atlas",
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/icon.png",
         "backgroundColor": "#0a0a1a"

@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 5 Comprehensive Test Suite
+Atlas - Round 5 Comprehensive Test Suite
 Covers ALL 19 regression tests from previous rounds PLUS 11 new tests.
 Total: 30 test areas.
 """
@@ -1155,7 +1155,7 @@ def test_30_crypto_only_green():
 
 def main():
     print("\n" + "=" * 70)
-    print("  NEONTRADE AI - ROUND 5 COMPREHENSIVE TEST SUITE")
+    print("  ATLAS AI - ROUND 5 COMPREHENSIVE TEST SUITE")
     print("  30 tests: 19 regressions + 11 new")
     print("=" * 70)
 

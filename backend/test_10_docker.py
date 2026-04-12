@@ -52,11 +52,11 @@ check("docker-compose.yml exists", os.path.isfile(compose))
 with open(compose, 'r') as f:
     dc_content = f.read()
 
-check("Service named neontrade", "neontrade" in dc_content)
+check("Service named atlas", "atlas" in dc_content)
 check("Port mapping 8000:8000", "8000:8000" in dc_content)
 check("env_file references backend/.env", "backend/.env" in dc_content)
-check("Volume for data", "neontrade-data" in dc_content)
-check("Volume for logs", "neontrade-logs" in dc_content)
+check("Volume for data", "atlas-data" in dc_content)
+check("Volume for logs", "atlas-logs" in dc_content)
 check("Healthcheck configured", "healthcheck" in dc_content)
 check("Healthcheck uses /health", "/health" in dc_content)
 check("Memory limit set", "memory" in dc_content)
@@ -95,7 +95,7 @@ if os.path.isfile(env_example):
 else:
     check(".env.example exists", False, "file not found - CREATING IT")
     # Create .env.example with all needed vars
-    env_example_content = """# NeonTrade AI - Environment Variables
+    env_example_content = """# Atlas - Environment Variables
 # Copy to .env and fill in your values
 
 # ── Broker Selection ──────────────────────────────────────────

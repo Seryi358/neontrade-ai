@@ -25,7 +25,7 @@ from loguru import logger
 
 # Default path matches the app's data directory
 DEFAULT_DB_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "data", "neontrade.db"
+    os.path.dirname(__file__), "..", "..", "data", "atlas.db"
 )
 
 VALID_STATUSES = (

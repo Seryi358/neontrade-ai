@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Scalping Engine
+Atlas - Scalping Engine
 From TradingLab Workshop de Scalping.
 
 Scalping temporal hierarchy (compressed from day trading):
@@ -13,10 +13,10 @@ Position Management (TradingLab Scalping Workshop, Section 7):
 - Method 2 (fast): Exit when price closes below EMA 50 on M1 (~7-10% profit)
 - Method 3 (slow): Exit when price closes below EMA 50 on M5 (~10%+ profit)
 
-Risk: 0.5% per trade (NeonTrade AI default — see note below)
+Risk: 0.5% per trade (Atlas default — see note below)
 
 NOTE: The 0.5% per-trade risk, 5% daily drawdown, and 10% total drawdown
-limits are ALL NeonTrade AI defaults, NOT from the TradingLab Scalping
+limits are ALL Atlas defaults, NOT from the TradingLab Scalping
 Workshop. The workshop says "in scalping you must risk less" but defers
 the exact percentage to future upgrades. The 0.5% is a reasonable
 app-chosen value. The DD limits match funded account rules for safety.

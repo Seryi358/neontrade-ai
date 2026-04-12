@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Monthly Review Generator
+Atlas - Monthly Review Generator
 Trading Plan: "Mensualmente: revisar todos los trades ejecutados y conclusiones para optimización"
 
 Generates comprehensive monthly reports with:

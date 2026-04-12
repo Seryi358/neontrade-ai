@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Configuration
+Atlas - Configuration
 Multi-broker Trading System powered by TradingLab Strategies
 """
 
@@ -237,7 +237,7 @@ class Settings(BaseSettings):
     # RED is the recommended strategy for scalping. Avoid BLUE in scalping
     # (15M-to-5M ratio is 3x, making ruptures too similar between timeframes).
     scalping_enabled: bool = False
-    # NeonTrade AI defaults (NOT from workshop — workshop defers DD limits)
+    # Atlas defaults (NOT from workshop — workshop defers DD limits)
     scalping_max_daily_dd: float = 0.05  # 5% max daily drawdown (app-added safety)
     scalping_max_total_dd: float = 0.10  # 10% max total drawdown (app-added safety)
     # BLUE strategy handling in scalping (Workshop Section 10):

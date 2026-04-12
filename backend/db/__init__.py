@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Database Package
+Atlas - Database Package
 SQLite-based trade history, analysis logs, and pending approvals.
 """
 

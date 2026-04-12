@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Settings Screen
+ * Atlas - Settings Screen
  * Cyberpunk 2077 HUD-style system configuration.
  * Decomposed into 12 HUDCard sections with collapsible panels.
  */
@@ -243,11 +243,11 @@ export default function SettingsScreen() {
   const [editingBackendUrl, setEditingBackendUrl] = useState(false);
   const [backendUrlDraft, setBackendUrlDraft] = useState(API_URL);
   const [apiKeyValue, setApiKeyValue] = useState(() => {
-    const stored = safeGetLocalStorage('neontrade_api_key');
+    const stored = safeGetLocalStorage('atlas_api_key');
     if (stored) return stored;
     if (Platform.OS === 'web') {
       try {
-        const injected = (window as any).__NEONTRADE_API_KEY__;
+        const injected = (window as any).__ATLAS_API_KEY__;
         if (injected) return injected;
       } catch {}
     }
@@ -648,8 +648,8 @@ export default function SettingsScreen() {
         </View>
         <Text style={styles.modeDescription}>
           {mode === 'AUTO'
-            ? 'NeonTrade opera automaticamente basado en las estrategias detectadas'
-            : 'NeonTrade te sugiere operaciones y tu decides si ejecutar o no'
+            ? 'Atlas opera automaticamente basado en las estrategias detectadas'
+            : 'Atlas te sugiere operaciones y tu decides si ejecutar o no'
           }
         </Text>
 
@@ -1164,7 +1164,7 @@ export default function SettingsScreen() {
                 onChangeText={setBackendUrlDraft}
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholder="https://neontrade.tu-vps.com"
+                placeholder="https://atlas.tu-vps.com"
                 placeholderTextColor={theme.colors.textMuted}
               />
               <TouchableOpacity
@@ -1307,7 +1307,7 @@ export default function SettingsScreen() {
         <HUDDivider />
 
         {/* Version */}
-        <HUDStatRow label="Version" value="NeonTrade AI v1.0" valueColor={theme.colors.textMuted} />
+        <HUDStatRow label="Version" value="Atlas v1.0" valueColor={theme.colors.textMuted} />
         <HUDStatRow label="Theme" value="Liquid Glass Light" valueColor={theme.colors.textSecondary} />
       </HUDCard>
 

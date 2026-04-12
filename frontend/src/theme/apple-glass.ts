@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Apple Liquid Glass Theme
+ * Atlas - Apple Liquid Glass Theme
  * Inspired by iOS 26 Liquid Glass design language.
  * Font: SF Pro Display (system font) — clean, professional, Apple-native.
  *

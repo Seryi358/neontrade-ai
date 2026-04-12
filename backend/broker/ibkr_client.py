@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Interactive Brokers (IBKR) Web API Client
+Atlas - Interactive Brokers (IBKR) Web API Client
 Implements BaseBroker interface using IBKR OAuth 1.0a REST API.
 
 Auth flow (OAuth 1.0a with Live Session Token):

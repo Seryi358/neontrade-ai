@@ -146,9 +146,9 @@ class TestBuildEmailHtml:
         html = _build_email_html("Title", "My body content")
         assert "My body content" in html
 
-    def test_contains_neontrade_branding(self):
+    def test_contains_atlas_branding(self):
         html = _build_email_html("Title", "Body")
-        assert "NeonTrade AI" in html
+        assert "Atlas" in html
         assert "TradingLab" in html
 
 

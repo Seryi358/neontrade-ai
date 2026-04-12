@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - History Screen
+ * Atlas - History Screen
  * Trade history with performance stats and filtering by strategy color.
  * CyberPunk 2077 HUD redesign with sub-navigation pills.
  */

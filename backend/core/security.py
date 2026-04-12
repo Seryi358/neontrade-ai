@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Security Module
+Atlas - Security Module
 API Key authentication, rate limiting, IP whitelist, and security headers.
 
 All endpoints require a valid API key via header: X-API-Key

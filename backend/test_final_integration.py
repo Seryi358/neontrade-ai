@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeonTrade AI - FINAL Comprehensive Integration Test
+Atlas - FINAL Comprehensive Integration Test
 Tests all 7 areas requested. Reports failures without fixing.
 """
 import sys

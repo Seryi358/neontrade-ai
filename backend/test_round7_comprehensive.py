@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 7 Comprehensive Test Suite
+Atlas - Round 7 Comprehensive Test Suite
 300+ individual assertions across 11 blocks.
 """
 
@@ -1372,7 +1372,7 @@ def block_11_regressions():
 
 def main():
     print("=" * 70)
-    print("  NeonTrade AI - Round 7 Comprehensive Test Suite")
+    print("  Atlas - Round 7 Comprehensive Test Suite")
     print("=" * 70)
 
     try:

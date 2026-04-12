@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Cyberpunk Theme
+ * Atlas - Cyberpunk Theme
  * Colors matched EXACTLY to user's Daemon 2.0 KDE Plasma theme.
  * Font: Rajdhani EVERYWHERE — geometric, futuristic sans-serif.
  *

@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 2 Deep Bug Hunting Tests
+Atlas - Round 2 Deep Bug Hunting Tests
 Runtime bugs, edge cases, and integration issues.
 """
 
@@ -1048,7 +1048,7 @@ def test_h_cross_module_consistency():
 def main():
     """Run all round 2 tests."""
     print("=" * 70)
-    print("  NeonTrade AI - Round 2 Deep Bug Hunting")
+    print("  Atlas - Round 2 Deep Bug Hunting")
     print("  Runtime bugs, edge cases, integration issues")
     print("=" * 70)
 

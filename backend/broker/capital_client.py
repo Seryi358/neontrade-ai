@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Capital.com API Client
+Atlas - Capital.com API Client
 Implements BaseBroker interface for Capital.com REST API.
 
 Capital.com uses session-based auth with CST + X-SECURITY-TOKEN headers.

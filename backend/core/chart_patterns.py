@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Advanced Chart Pattern Detection
+Atlas - Advanced Chart Pattern Detection
 Detects classic chart patterns from price data using swing point analysis.
 
 Patterns detected:

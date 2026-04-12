@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Trade Journal
+Atlas - Trade Journal
 Implements the complete TradingLab trade tracking system from Registro de trades.xlsx.
 
 Numeric fields (from Excel Registro_de_trades.xlsx):

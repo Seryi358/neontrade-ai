@@ -1,5 +1,5 @@
 """
-NeonTrade AI - ROUND 10 ULTIMATE TEST SUITE
+Atlas - ROUND 10 ULTIMATE TEST SUITE
 500+ assertions covering ALL system components.
 Includes all round 9 tests (483) plus new tests for untested areas.
 """
@@ -1314,11 +1314,11 @@ ok("docker_static_dir", "/app/static" in dockerfile)
 # Read docker-compose content
 with open(compose_path) as f:
     compose = f.read()
-ok("compose_service_neontrade", "neontrade" in compose)
+ok("compose_service_atlas", "atlas" in compose)
 ok("compose_port_8000", "8000:8000" in compose)
 ok("compose_env_file", "backend/.env" in compose)
-ok("compose_volume_data", "neontrade-data" in compose)
-ok("compose_volume_logs", "neontrade-logs" in compose)
+ok("compose_volume_data", "atlas-data" in compose)
+ok("compose_volume_logs", "atlas-logs" in compose)
 ok("compose_healthcheck", "healthcheck" in compose)
 ok("compose_health_endpoint", "/health" in compose)
 ok("compose_restart", "restart: always" in compose)

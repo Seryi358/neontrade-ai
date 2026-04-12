@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Crypto Market Cycle Dashboard
+ * Atlas - Crypto Market Cycle Dashboard
  * Dedicated screen for crypto market analysis from TradingLab Esp. Criptomonedas.
  * CyberPunk 2077 HUD redesign with sub-navigation pills.
  */

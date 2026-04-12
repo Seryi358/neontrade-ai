@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Estrategias de Trading
+Atlas - Estrategias de Trading
 Implementacion completa de las 6 estrategias del curso TradingLab.
 
 Estrategias (por color):

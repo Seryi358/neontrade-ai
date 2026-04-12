@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Economic Calendar / News Filter
+Atlas - Economic Calendar / News Filter
 Checks for upcoming high/medium-impact economic events to avoid trading during news.
 
 Data sources (in priority order):
@@ -405,7 +405,7 @@ class NewsFilter:
             try:
                 resp = await self._http.get(
                     url,
-                    headers={"User-Agent": "Mozilla/5.0 (compatible; NeonTradeAI/2.0)"},
+                    headers={"User-Agent": "Mozilla/5.0 (compatible; AtlasAI/2.0)"},
                 )
                 if resp.status_code != 200:
                     logger.debug(f"FairEconomy returned status {resp.status_code} for {url}")
@@ -473,7 +473,7 @@ class NewsFilter:
             resp = await self._http.get(
                 "https://economic-calendar.tradingeconomics.com/api/calendar",
                 params={"day": today},
-                headers={"User-Agent": "NeonTradeAI/1.0"},
+                headers={"User-Agent": "AtlasAI/1.0"},
             )
             if resp.status_code == 200:
                 data = resp.json()

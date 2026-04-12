@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Database Models
+Atlas - Database Models
 SQLite models using aiosqlite for async trade history,
 analysis logs, pending approvals, and daily stats.
 """
@@ -14,9 +14,9 @@ from loguru import logger
 
 
 class TradeDatabase:
-    """Async SQLite database for NeonTrade AI trade tracking."""
+    """Async SQLite database for Atlas trade tracking."""
 
-    def __init__(self, db_path: str = "data/neontrade.db"):
+    def __init__(self, db_path: str = "data/atlas.db"):
         self.db_path = db_path
         self._db: Optional[aiosqlite.Connection] = None
 

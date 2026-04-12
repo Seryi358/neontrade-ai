@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Backtesting Engine
+Atlas - Backtesting Engine
 Walk-forward historical simulation of trading strategies.
 
 Fetches multi-timeframe candle history from the broker (Capital.com API),
@@ -486,7 +486,7 @@ class _HistoricalBrokerAdapter:
 
 class Backtester:
     """
-    Walk-forward backtesting engine for NeonTrade AI strategies.
+    Walk-forward backtesting engine for Atlas strategies.
 
     Workflow
     --------

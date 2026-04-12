@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Risk Manager
+Atlas - Risk Manager
 Implements all risk management rules from the TradingLab Trading Plan.
 
 Rules:

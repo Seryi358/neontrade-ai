@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Round 4 Comprehensive Test
+Atlas - Round 4 Comprehensive Test
 Tests ALL critical paths in a single script.
 """
 

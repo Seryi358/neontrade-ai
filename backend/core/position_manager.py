@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Position Manager
+Atlas - Position Manager
 Manages open positions: SL movement, BE, trailing stops.
 
 From TradingLab Mentorship - Position Management Styles (all based on EMA 50):

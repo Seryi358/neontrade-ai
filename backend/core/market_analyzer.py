@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Market Analyzer
+Atlas - Market Analyzer
 Multi-timeframe analysis engine following Trading Plan methodology.
 
 HTF Analysis (Weekly/Daily):

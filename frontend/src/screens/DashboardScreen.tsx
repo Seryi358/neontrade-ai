@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Dashboard Screen
+ * Atlas - Dashboard Screen
  * Account overview, engine status, risk monitoring,
  * active positions, and daily activity.
  * Design: Apple Liquid Glass Light
@@ -497,7 +497,7 @@ export default function DashboardScreen() {
           Watchlist: {status?.watchlist_count ?? 0} pairs
         </Text>
         <Text style={styles.footerText}>
-          Engine v2.2 -- NeonTrade AI
+          Engine v2.2 -- Atlas
         </Text>
       </View>
     </ScrollView>

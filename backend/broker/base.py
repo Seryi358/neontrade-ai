@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Abstract Broker Interface
+Atlas - Abstract Broker Interface
 Enables multi-broker support (OANDA, TagMarkets, etc.)
 """
 
@@ -80,7 +80,7 @@ class TradeInfo:
 class BaseBroker(ABC):
     """
     Abstract base class for all broker implementations.
-    Every broker must implement these methods to be compatible with NeonTrade AI.
+    Every broker must implement these methods to be compatible with Atlas.
     """
 
     def __init__(self, broker_type: BrokerType):

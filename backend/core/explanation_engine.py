@@ -1,5 +1,5 @@
 """
-NeonTrade AI - Explanation Engine
+Atlas - Explanation Engine
 Generates detailed human-readable explanations in Spanish
 for every trading decision the system makes.
 """

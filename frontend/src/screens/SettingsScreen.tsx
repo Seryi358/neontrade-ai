@@ -160,23 +160,25 @@ function CollapsibleSection({ title, children, defaultOpen = false, accentColor 
   );
 }
 
-// ── CP2077 Toggle Switch ───────────────────────────────
+// ── iOS Toggle Switch ──────────────────────────────────
 
-interface CP2077SwitchProps {
+interface IOSSwitchProps {
   value: boolean;
   onValueChange: (val: boolean) => void;
   disabled?: boolean;
   activeColor?: string;
 }
 
-function CP2077Switch({ value, onValueChange, disabled = false, activeColor = theme.colors.cp2077Yellow }: CP2077SwitchProps) {
+function CP2077Switch({ value, onValueChange, disabled = false, activeColor = '#4CD964' }: IOSSwitchProps) {
   return (
     <Switch
       value={value}
       onValueChange={onValueChange}
-      trackColor={{ false: theme.colors.backgroundLight, true: `${activeColor}40` }}
-      thumbColor={value ? activeColor : theme.colors.textMuted}
+      trackColor={{ false: '#E5E5EA', true: activeColor }}
+      thumbColor="#FFFFFF"
+      ios_backgroundColor="#E5E5EA"
       disabled={disabled}
+      style={{ transform: [{ scale: 0.9 }] }}
     />
   );
 }

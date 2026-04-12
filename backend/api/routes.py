@@ -2304,12 +2304,12 @@ async def get_crypto_allocation():
 # ── Exam Submission (TradingLab Final Exam) ─────────────────────────
 
 class ExamRequest(BaseModel):
-    trade_ids: List[str]  # Exactly 5 trade IDs
+    trade_ids: List[str]  # 3 trade IDs for TradingLab exam
 
 
 @router.post("/exam/generate")
 async def generate_exam_report(req: ExamRequest):
-    """Generate a TradingLab exam report with 5 trades.
+    """Generate a TradingLab exam report with 3 trades.
     Each trade includes: chart screenshot, HTF/LTF analysis, strategy identification,
     risk calculation, and rule checklist."""
     from main import db, engine
@@ -2318,8 +2318,8 @@ async def generate_exam_report(req: ExamRequest):
 
     if db is None:
         raise HTTPException(503, "Database not available")
-    if len(req.trade_ids) != 5:
-        raise HTTPException(400, "Exactly 5 trade IDs required for exam submission")
+    if len(req.trade_ids) < 1 or len(req.trade_ids) > 5:
+        raise HTTPException(400, "Between 1 and 5 trade IDs required for exam submission")
 
     trades = []
     for tid in req.trade_ids:
@@ -2439,7 +2439,7 @@ def _build_exam_html(trades: list) -> str:
         trade_sections += f'''
         <div style="background:#ffffff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <span style="font-size:12px;font-weight:600;color:#86868b;">TRADE {i} OF 5</span>
+                <span style="font-size:12px;font-weight:600;color:#86868b;">TRADE {i} OF {len(trades)}</span>
                 <span style="font-size:12px;font-weight:600;color:{pnl_color};background:{pnl_color}18;padding:4px 10px;border-radius:8px;">{status}</span>
             </div>
 

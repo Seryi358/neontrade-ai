@@ -1,6 +1,6 @@
 /**
  * Atlas - Exam Screen
- * TradingLab Final Exam: select 5 trades, generate analysis report.
+ * TradingLab Final Exam: select 3 trades, generate analysis report.
  * Design: Apple Liquid Glass Light
  */
 
@@ -70,7 +70,7 @@ export default function ExamScreen() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-      } else if (next.size < 5) {
+      } else if (next.size < 3) {
         next.add(id);
       }
       return next;
@@ -78,8 +78,8 @@ export default function ExamScreen() {
   };
 
   const generateReport = async () => {
-    if (selected.size !== 5) {
-      Alert.alert('Select 5 Trades', 'You need exactly 5 trades for the exam.');
+    if (selected.size < 3) {
+      Alert.alert('Select Trades', 'You need at least 3 trades for the exam.');
       return;
     }
     setGenerating(true);
@@ -123,7 +123,7 @@ export default function ExamScreen() {
           </TouchableOpacity>
         </View>
         <HUDCard title="Preview">
-          <Text style={styles.previewText}>Report generated with 5 trades. Open it in the browser to view the full analysis with charts.</Text>
+          <Text style={styles.previewText}>Report generated. Open it in the browser. Open it in the browser to view the full analysis with charts.</Text>
         </HUDCard>
       </View>
     );
@@ -173,12 +173,12 @@ export default function ExamScreen() {
     <View style={styles.container}>
       <HUDHeader
         title="Exam"
-        subtitle={`TradingLab Final · ${selected.size}/5 selected`}
+        subtitle={`TradingLab Final · ${selected.size}/3 selected`}
       />
 
       <View style={styles.infoCard}>
         <Text style={styles.infoText}>
-          Select exactly 5 trades to include in your TradingLab exam submission.
+          Select at least 3 trades to include in your TradingLab exam submission.
           Each trade will include a chart screenshot, strategy analysis, and risk assessment.
         </Text>
       </View>
@@ -194,15 +194,15 @@ export default function ExamScreen() {
       {selected.size > 0 && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
-            style={[styles.generateBtn, selected.size === 5 && styles.generateBtnActive]}
+            style={[styles.generateBtn, selected.size >= 3 && styles.generateBtnActive]}
             onPress={generateReport}
-            disabled={generating || selected.size !== 5}
+            disabled={generating || selected.size < 3}
           >
             {generating ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Text style={styles.generateBtnText}>
-                Generate Report ({selected.size}/5)
+                Generate Report ({selected.size}/3)
               </Text>
             )}
           </TouchableOpacity>

@@ -166,24 +166,39 @@ class CapitalClient(BaseBroker):
             if self._target_account_id:
                 target = self._target_account_id
             else:
-                # Auto-detect: the real account typically has the smaller balance
-                # (user deposit vs. virtual demo funds like ~$60k)
-                # If there's only one account, use it
+                # Auto-detect: prefer LIVE/CFD account by type field (BUG-02 fix).
                 if len(accounts) == 1:
                     target = accounts[0]["accountId"]
                 else:
-                    # Sort by balance ascending — the real account has less money
-                    sorted_accts = sorted(
-                        accounts,
-                        key=lambda a: float(a.get("balance", {}).get("balance", 0)),
-                    )
-                    target = sorted_accts[0]["accountId"]
-                    real_bal = float(sorted_accts[0].get("balance", {}).get("balance", 0))
-                    demo_bal = float(sorted_accts[-1].get("balance", {}).get("balance", 0))
-                    logger.info(
-                        f"Detected {len(accounts)} sub-accounts: "
-                        f"real=${real_bal:,.2f}, demo=${demo_bal:,.2f}"
-                    )
+                    # Try to find account by accountType field first
+                    live_accounts = [
+                        a for a in accounts
+                        if a.get("accountType", a.get("type", "")).upper() in ("LIVE", "CFD")
+                    ]
+                    if live_accounts:
+                        target = live_accounts[0]["accountId"]
+                        logger.info(
+                            f"Selected LIVE/CFD account {target} by accountType field "
+                            f"(from {len(accounts)} sub-accounts)"
+                        )
+                    else:
+                        # Fallback: the real account typically has the smaller balance
+                        # (user deposit vs. virtual demo funds like ~$60k)
+                        logger.warning(
+                            "No accountType field found on accounts — falling back to "
+                            "balance heuristic (lowest balance = real). Verify correct account!"
+                        )
+                        sorted_accts = sorted(
+                            accounts,
+                            key=lambda a: float(a.get("balance", {}).get("balance", 0)),
+                        )
+                        target = sorted_accts[0]["accountId"]
+                        real_bal = float(sorted_accts[0].get("balance", {}).get("balance", 0))
+                        demo_bal = float(sorted_accts[-1].get("balance", {}).get("balance", 0))
+                        logger.info(
+                            f"Detected {len(accounts)} sub-accounts: "
+                            f"real=${real_bal:,.2f}, demo=${demo_bal:,.2f}"
+                        )
 
             # Check if we're already on the right account
             session_resp = await self._client.get(
@@ -577,6 +592,13 @@ class CapitalClient(BaseBroker):
         bid = float(latest.get("closePrice", {}).get("bid", 0))
         ask = float(latest.get("closePrice", {}).get("ask", 0))
 
+        # BUG-07 fix: reject zero/None prices instead of propagating silently
+        if not bid or not ask:
+            raise ValueError(
+                f"Invalid price data for {instrument}: bid={bid}, ask={ask}. "
+                f"Market may be closed or data unavailable."
+            )
+
         return PriceData(
             bid=bid,
             ask=ask,
@@ -863,14 +885,26 @@ class CapitalClient(BaseBroker):
                 trade_id = affected[0]["dealId"] if affected else deal_id
                 if not trade_id:
                     # Capital.com accepted but gave no trade ID — try to find from open positions
-                    logger.warning(f"Order ACCEPTED but no dealId returned for {instrument}. Searching open positions...")
+                    logger.warning(
+                        f"Order ACCEPTED but no dealId returned for {instrument}. "
+                        "Falling back to position search by instrument — may match wrong trade if multiple positions exist."
+                    )
                     try:
-                        trades = await self.get_open_trades()
-                        for t in trades:
-                            if t.instrument == instrument:
-                                trade_id = t.trade_id
-                                logger.info(f"Found trade ID from open positions: {trade_id}")
-                                break
+                        raw = await self._get("/api/v1/positions")
+                        candidates = [
+                            p for p in raw.get("positions", [])
+                            if self._denormalize_instrument(
+                                p.get("market", {}).get("epic", p.get("position", {}).get("epic", ""))
+                            ) == instrument
+                        ]
+                        # Sort by creation date descending to pick the most recent position
+                        candidates.sort(
+                            key=lambda p: p.get("position", {}).get("createdDateUTC", ""),
+                            reverse=True,
+                        )
+                        if candidates:
+                            trade_id = candidates[0].get("position", {}).get("dealId", "")
+                            logger.info(f"Found trade ID from open positions (most recent): {trade_id}")
                     except Exception as e:
                         logger.error(f"Failed to search open positions for trade ID: {e}")
                 return OrderResult(

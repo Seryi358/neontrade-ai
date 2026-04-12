@@ -602,7 +602,9 @@ class TestDeltaAlgorithm:
     def test_record_loss_resets_accumulated(self, rm):
         rm.record_trade_result("t1", "EUR_USD", 0.02)
         rm.record_trade_result("t2", "EUR_USD", -0.01)
-        assert rm._delta_accumulated_gain == 0.0
+        # Graduated reduction: 0.02 + (-0.01) = 0.01 (not full reset to 0)
+        assert rm._delta_accumulated_gain >= 0.0
+        assert rm._delta_accumulated_gain == pytest.approx(0.01)
 
     def test_history_trimmed_at_200(self, rm):
         for i in range(210):

@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.01           # TradingLab: 1% universal (users can lower for extra safety)
-    risk_swing: float = 0.01             # 1% default (Alex's Trading Plan uses 3% for swing; adjustable via API)
+    risk_swing: float = 0.01             # 1% universal per TradingLab mentorship
     max_total_risk: float = 0.03          # 3% max simultaneous open risk (conservative for <$500 accounts)
 
     # Correlated pairs risk reduction (ch18.3)

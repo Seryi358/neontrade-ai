@@ -213,6 +213,7 @@ class TradingEngine:
         # Internal state
         self._running = False
         self._scan_interval = 120  # seconds (2 minutes)
+        self._pre_scalping_interval: int = self._scan_interval  # saved before scalping
         self._last_scan_results: Dict[str, AnalysisResult] = {}
         self._latest_explanations: Dict[str, StrategyExplanation] = {}
         self._startup_error: str = ""  # Last broker connection error (for diagnostics)
@@ -400,16 +401,17 @@ class TradingEngine:
         if enabled and _SCALPING_AVAILABLE:
             if self.scalping_analyzer is None:
                 self.scalping_analyzer = ScalpingAnalyzer(self.broker)
-            # Use faster scan interval for scalping
+            # Save current interval before switching to scalping speed
+            self._pre_scalping_interval = self._scan_interval
             self._scan_interval = self._scalping_scan_interval
             logger.info(
                 f"Scalping ENABLED — scan interval set to {self._scalping_scan_interval}s"
             )
         else:
-            # Restore normal scan interval
-            self._scan_interval = 120
+            # Restore the scan interval that was active before scalping was enabled
+            self._scan_interval = self._pre_scalping_interval
             if not enabled:
-                logger.info("Scalping DISABLED — scan interval restored to 120s")
+                logger.info(f"Scalping DISABLED — scan interval restored to {self._pre_scalping_interval}s")
 
     def get_pending_setups(self) -> List[dict]:
         """Get all pending (non-expired) setups as dicts."""
@@ -1020,6 +1022,16 @@ class TradingEngine:
                     balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
                     self.risk_manager.record_trade_result(tid, pos.instrument, pnl / balance if balance > 0 else 0.0)
 
+                    # BUG-05 fix: close via broker FIRST, then update DB on success
+                    try:
+                        ok = await self.broker.close_trade(tid)
+                        if not ok:
+                            logger.error(f"Broker close_trade returned False for funded overnight {tid} — skipping DB update")
+                            continue
+                    except Exception as be:
+                        logger.error(f"Broker close_trade failed for funded overnight {tid}: {be}")
+                        continue
+
                     if self._db:
                         await self._db.update_trade(tid, {
                             "status": "closed_funded_overnight",
@@ -1044,6 +1056,7 @@ class TradingEngine:
                 except Exception as e:
                     logger.warning(f"Failed to process funded close for {tid}: {e}")
 
+            # Close any remaining trades not tracked in position_manager
             await self.broker.close_all_trades()
             self.risk_manager.unregister_all_trades()
             self.position_manager.positions.clear()

@@ -91,6 +91,12 @@ class SecurityConfig:
         if not self.auth_enabled:
             return True
         if not self.api_keys:
+            # BUG-09 fix: make open-access mode extremely visible
+            logger.error(
+                "!!! SECURITY WARNING !!! No API keys configured — ALL requests are allowed. "
+                "Generate an API key immediately for production use. "
+                "This is only acceptable during initial development setup."
+            )
             return True  # No keys configured = open access (first run)
         key_hash = self._hash_key(raw_key)
         return any(hmac.compare_digest(key_hash, h) for h in self.api_keys)

@@ -601,14 +601,28 @@ async def emergency_close_all():
         logger.error(f"Emergency close-all broker call failed: {e}")
         raise HTTPException(503, f"Error al cerrar posiciones: {str(e)}")
 
-    # Record trade results before clearing state (CLAUDE.md Rule #4)
-    if hasattr(engine, 'risk_manager'):
+    # Record trade results with actual PnL before clearing state (CLAUDE.md Rule #4, BUG-06 fix)
+    if hasattr(engine, 'risk_manager') and hasattr(engine, 'position_manager'):
         rm = engine.risk_manager
+        pm = engine.position_manager
+        balance = getattr(rm, '_current_balance', 1.0) or 1.0
         for trade_id, risk_pct in list(rm._active_risks.items()):
             parts = trade_id.split(":")
             inst = parts[0] if len(parts) > 1 else "unknown"
             try:
-                rm.record_trade_result(trade_id, inst, 0.0)
+                # Compute actual PnL from position entry price and last known price
+                pnl_pct = 0.0
+                pos = pm.positions.get(trade_id)
+                if pos is not None:
+                    try:
+                        price_data = await broker.get_current_price(pos.instrument)
+                        close_price = price_data.bid if pos.direction == "BUY" else price_data.ask
+                        pnl_per_unit = (close_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - close_price)
+                        pnl_dollars = pnl_per_unit * abs(pos.units) if pos.units else 0.0
+                        pnl_pct = pnl_dollars / balance if balance > 0 else 0.0
+                    except Exception as pe:
+                        logger.warning(f"Could not compute PnL for {trade_id}: {pe}")
+                rm.record_trade_result(trade_id, inst, pnl_pct)
             except Exception as e:
                 logger.warning(f"Failed to record emergency close for {trade_id}: {e}")
 
@@ -1177,8 +1191,11 @@ async def set_risk_config(request: RiskConfigRequest):
         updates["risk_swing"] = request.risk_swing
 
     if request.max_total_risk is not None:
-        if not (0.01 <= request.max_total_risk <= 0.25):
-            raise HTTPException(400, "max_total_risk debe estar entre 1% y 25%")
+        # BUG-08 fix: hard cap at 10% to prevent catastrophic risk exposure
+        if request.max_total_risk > 0.10:
+            raise HTTPException(400, "max_total_risk no puede superar 10% (0.10) — límite de seguridad")
+        if not (0.01 <= request.max_total_risk <= 0.10):
+            raise HTTPException(400, "max_total_risk debe estar entre 1% y 10%")
         settings.max_total_risk = request.max_total_risk
         updates["max_total_risk"] = request.max_total_risk
 

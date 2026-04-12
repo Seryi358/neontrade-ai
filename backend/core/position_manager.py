@@ -900,6 +900,28 @@ class PositionManager:
                         f"{pos.direction} (price={current_price:.5f}, CPA={proxy_ema:.5f}). "
                         f"Consider closing. (Limitation: EMA_M5_2/EMA_M5_5 not available)"
                     )
+            else:
+                # BUG-03 fix: no EMA data at all — force emergency close to protect capital
+                logger.warning(
+                    f"{pos.trade_id}: EMERGENCY — no EMA data available for {pos.instrument}. "
+                    f"Closing position as safety measure."
+                )
+                try:
+                    ok = await self.broker.close_trade(pos.trade_id)
+                    if not ok:
+                        logger.error(f"{pos.trade_id}: broker.close_trade returned False at emergency_no_ema — position remains tracked")
+                        return
+                    pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
+                    pnl = pnl_per_unit * abs(pos.units) if pos.units else 0.0
+                    if self.risk_manager:
+                        self.risk_manager.unregister_trade(pos.trade_id, pos.instrument)
+                        balance = getattr(self.risk_manager, '_current_balance', 1.0) or 1.0
+                        self.risk_manager.record_trade_result(pos.trade_id, pos.instrument, pnl / balance)
+                    await self._notify_trade_closed(pos, current_price, pnl, "emergency_no_ema")
+                    self.remove_position(pos.trade_id)
+                    return
+                except Exception as e:
+                    logger.error(f"{pos.trade_id}: Failed emergency_no_ema exit: {e}")
 
         # Use CPA EMA 50 for aggressive trailing beyond TP1
         aggressive_ema = self._get_trail_ema(pos.instrument, cpa_key)
@@ -952,12 +974,12 @@ class PositionManager:
                 # Use the most recent swing low that is below current price
                 valid_lows = [sl for sl in swing_lows if sl < current_price]
                 if valid_lows:
-                    new_sl = valid_lows[0] - buffer  # Most recent swing low minus buffer
+                    new_sl = valid_lows[-1] - buffer  # Most recent swing low minus buffer (BUG-04 fix)
                     if new_sl > pos.current_sl:
                         await self._update_sl(pos, new_sl)
                         logger.debug(
                             f"{pos.trade_id}: PRICE_ACTION trail SL -> {new_sl:.5f} "
-                            f"(swing low={valid_lows[0]:.5f})"
+                            f"(swing low={valid_lows[-1]:.5f})"
                         )
         else:  # SELL
             swing_highs = swings.get("highs", [])
@@ -965,12 +987,12 @@ class PositionManager:
                 # Use the most recent swing high that is above current price
                 valid_highs = [sh for sh in swing_highs if sh > current_price]
                 if valid_highs:
-                    new_sl = valid_highs[0] + buffer  # Most recent swing high plus buffer
+                    new_sl = valid_highs[-1] + buffer  # Most recent swing high plus buffer (BUG-04 fix)
                     if new_sl < pos.current_sl:
                         await self._update_sl(pos, new_sl)
                         logger.debug(
                             f"{pos.trade_id}: PRICE_ACTION trail SL -> {new_sl:.5f} "
-                            f"(swing high={valid_highs[0]:.5f})"
+                            f"(swing high={valid_highs[-1]:.5f})"
                         )
 
     async def _trail_with_percentage(self, pos: ManagedPosition, current_price: float, trail_pct: float):

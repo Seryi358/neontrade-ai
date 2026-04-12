@@ -1394,10 +1394,10 @@ class BaseStrategy(ABC):
             elif ew_desc:
                 signal.conditions_met.append(ew_desc)
 
-            # TradingLab: PINK and BLACK must ALWAYS use MARKET entries.
-            # Limit and Stop entries are only available for BLUE, RED, and WHITE.
+            # TradingLab: PINK, WHITE, and BLACK must ALWAYS use MARKET entries.
+            # Limit and Stop entries are only available for BLUE and RED.
             _allows_non_market = self.color in (
-                StrategyColor.BLUE, StrategyColor.RED, StrategyColor.WHITE,
+                StrategyColor.BLUE, StrategyColor.RED,
             )
 
             # TradingLab: Check for limit entry opportunity (3-level confluence)
@@ -2996,13 +2996,14 @@ class WhiteStrategy(BaseStrategy):
             failed.append("Paso 1: Sin tendencia HTF - White requiere contexto post-Pink")
             return False, score, met, failed
 
-        # Mentorship: "no operes contra tendencia" — hard-block for WHITE
+        # Mentorship: "no operes contra tendencia" — but WHITE comes after PINK,
+        # so LTF may be pulling back (temporary divergence). Penalty, not hard-block.
         if analysis.htf_ltf_convergence:
             score += 10.0
             met.append("Paso 1b: Convergencia HTF/LTF (indica tendencia consolidada)")
         else:
-            failed.append("Paso 1b: Sin convergencia HTF/LTF — WHITE bloqueado (no operes contra tendencia)")
-            return False, score, met, failed
+            score -= 10.0
+            failed.append("Paso 1b: Sin convergencia HTF/LTF — penalización -10 (post-PINK pullback posible)")
 
         # --- Paso 2: Impulso + pullback en setup TF ---
         # Verificar que EMA 50 setup-TF esta en el lado correcto (tendencia ya rota previamente)
@@ -3369,16 +3370,26 @@ class WhiteStrategy(BaseStrategy):
                     if further_sup:
                         result["tp_max"] = sorted(further_sup, reverse=True)[0]
 
-        # Fallback: EMA H4 50 as tp_max if no swing/S/R levels found
+        # Fallback: second-nearest swing extreme as tp_max (NOT EMA H4 — that's BLACK's TP)
         if "tp_max" not in result:
             tp1 = result.get("tp1")
             if tp1:
-                ema_h4_50 = _ema_val(analysis, "EMA_H4_50")
-                if ema_h4_50:
-                    if direction == "BUY" and ema_h4_50 > tp1:
-                        result["tp_max"] = ema_h4_50
-                    elif direction == "SELL" and ema_h4_50 < tp1:
-                        result["tp_max"] = ema_h4_50
+                if direction == "BUY":
+                    further_highs = [sh for sh in swing_highs if sh > tp1]
+                    if further_highs:
+                        result["tp_max"] = min(further_highs)
+                    else:
+                        further_res = [r for r in resistances if r > tp1]
+                        if further_res:
+                            result["tp_max"] = sorted(further_res)[0]
+                else:
+                    further_lows = [sl for sl in swing_lows if sl < tp1]
+                    if further_lows:
+                        result["tp_max"] = max(further_lows)
+                    else:
+                        further_sup = [s for s in supports if s < tp1]
+                        if further_sup:
+                            result["tp_max"] = sorted(further_sup, reverse=True)[0]
 
         return result
 
@@ -3634,15 +3645,23 @@ class BlackStrategy(BaseStrategy):
             confidence += 5.0
             met.append("Paso 5d: Consolidacion detectada (DOJI = compresion/indecision)")
 
-        # --- Paso 5e: REQUIRED 1H candlestick pattern at completion zone ---
+        # --- Paso 5e: REQUIRED candlestick pattern at completion zone ---
         # TradingLab Step 6: "esperara que se complete al maximo este patron de
         # 1 hora y en el momento en el que se esta formando algun patron de
         # candlestick bajar a 5 minutos."
-        # A bearish/bullish candlestick pattern on 1H is REQUIRED before checking 5M.
-        h1_candle_patterns = getattr(analysis, 'h1_candlestick_patterns', [])
-        if not h1_candle_patterns:
-            # Fallback: use the general candlestick_patterns (which are from the LTF analysis)
-            h1_candle_patterns = analysis.candlestick_patterns
+        # For swing style, check DAILY candlestick patterns (not H1).
+        # For day_trading/scalping, check H1 as before.
+        style = _get_trading_style()
+        if style == "swing":
+            h1_candle_patterns = getattr(analysis, 'daily_candlestick_patterns', [])
+            if not h1_candle_patterns:
+                # Fallback: use the general candlestick_patterns
+                h1_candle_patterns = analysis.candlestick_patterns
+        else:
+            h1_candle_patterns = getattr(analysis, 'h1_candlestick_patterns', [])
+            if not h1_candle_patterns:
+                # Fallback: use the general candlestick_patterns (which are from the LTF analysis)
+                h1_candle_patterns = analysis.candlestick_patterns
 
         h1_has_pattern, h1_pattern_desc = _has_reversal_pattern(analysis, direction)
         if h1_has_pattern:
@@ -3861,18 +3880,27 @@ class BlackStrategy(BaseStrategy):
         """BLACK SL: nearest swing extreme + buffer. Counter-trend so tighter than PINK.
 
         TradingLab: "dandole espacio" — 0.2% buffer on all SL placements.
+        Prefers swing_lows/swing_highs from analysis over generic supports/resistances.
         """
+        swing_highs = getattr(analysis, 'swing_highs', [])
+        swing_lows = getattr(analysis, 'swing_lows', [])
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
         buffer_pct = 0.002  # 0.2% buffer — "dandole espacio"
 
         if direction == "BUY":
-            below = [s for s in supports if s < entry_price]
+            # Prefer swing lows, fall back to generic supports
+            below = [s for s in swing_lows if s < entry_price]
+            if not below:
+                below = [s for s in supports if s < entry_price]
             if below:
                 return max(below) * (1 - buffer_pct)
             return entry_price * 0.985  # 1.5% fallback (tight for counter-trend)
         else:
-            above = [r for r in resistances if r > entry_price]
+            # Prefer swing highs, fall back to generic resistances
+            above = [s for s in swing_highs if s > entry_price]
+            if not above:
+                above = [r for r in resistances if r > entry_price]
             if above:
                 return min(above) * (1 + buffer_pct)
             return entry_price * 1.015
@@ -3885,13 +3913,13 @@ class BlackStrategy(BaseStrategy):
         result: Dict[str, float] = {}
 
         if ema_4h_50 and ema_4h_50 > 0:
-            # Apply 97% offset: exit slightly before EMA 4H, not exactly on it
-            # Alex: "no queremos ser el último en salir" — sacrifice a few pips for safety
+            # Apply 93% offset: exit before EMA 4H with meaningful buffer
+            # Alex: "no queremos ser el último en salir" — sacrifice 7% of distance for safety
             if direction == "BUY" and ema_4h_50 > entry_price:
-                offset_tp = entry_price + (ema_4h_50 - entry_price) * 0.97
+                offset_tp = entry_price + (ema_4h_50 - entry_price) * 0.93
                 result["tp1"] = offset_tp
             elif direction == "SELL" and ema_4h_50 < entry_price:
-                offset_tp = entry_price - (entry_price - ema_4h_50) * 0.97
+                offset_tp = entry_price - (entry_price - ema_4h_50) * 0.93
                 result["tp1"] = offset_tp
 
         if "tp1" not in result:

@@ -59,9 +59,16 @@ class MockRiskManager:
 
     def __init__(self):
         self.be_marked = []
+        self._current_balance = 10000.0
 
     def mark_position_at_be(self, trade_id):
         self.be_marked.append(trade_id)
+
+    def unregister_trade(self, trade_id, instrument):
+        pass
+
+    def record_trade_result(self, trade_id, instrument, pnl_percent):
+        pass
 
 
 @pytest.fixture
@@ -455,17 +462,16 @@ class TestAggressivePhase:
         assert len(broker.closed) == 1
 
     @patch("config.settings")
-    def test_fallback_percentage_when_no_cpa_ema(self, mock_settings, pm, broker):
+    def test_emergency_close_when_no_cpa_ema(self, mock_settings, pm, broker):
         pos = make_pos(direction="BUY", entry=1.1000, sl=1.0950, tp1=1.1100,
                        tp_max=1.1200, phase=PositionPhase.BEYOND_TP1)
         pos.current_sl = 1.1050
+        pm.track_position(pos)
 
-        # No EMA data → fallback 20% trail
+        # No EMA data → BUG-03 fix: emergency close to protect capital
         run(pm._handle_aggressive_phase(pos, 1.1150))
-        # trail_distance = 0.01 * 0.2 = 0.002
-        # new_sl = 1.1150 - 0.002 = 1.1130 > 1.1050 → moves
-        assert len(broker.sl_updates) > 0
-        assert broker.sl_updates[-1][1] == pytest.approx(1.1150 - 0.01 * 0.2, abs=1e-5)
+        assert len(broker.closed) == 1
+        assert broker.closed[0][0] == "test-001"
 
 
 # =====================================================================
@@ -516,10 +522,11 @@ class TestPriceActionTrailing:
                        phase=PositionPhase.TRAILING_TO_TP1)
         pos.current_sl = 1.0990
 
-        pm.set_swing_values("EUR_USD", [1.1050], [1.1010, 1.0980])
+        pm.set_swing_values("EUR_USD", [1.1050], [1.0980, 1.1010])
 
         # buffer = 0.01 * 0.02 = 0.0002
-        # Most recent swing low below price: 1.1010
+        # Code uses valid_lows[-1] (most recent swing low below price)
+        # valid_lows = [1.0980, 1.1010] (both < 1.1050), most recent = 1.1010
         # new_sl = 1.1010 - 0.0002 = 1.1008 > 1.0990 → moves up
         run(pm._trail_with_price_action(pos, 1.1050))
         assert len(broker.sl_updates) > 0
@@ -535,11 +542,12 @@ class TestPriceActionTrailing:
 
         pm.set_swing_values("EUR_USD", [1.0980, 1.1010], [1.0920])
 
-        # Most recent swing high above current price: 1.0980
-        # new_sl = 1.0980 + 0.0002 = 1.0982 < 1.1020 → moves down
+        # Code uses valid_highs[-1] (most recent swing high above price)
+        # valid_highs = [1.0980, 1.1010] (both > 1.0950), most recent = 1.1010
+        # new_sl = 1.1010 + 0.0002 = 1.1012 < 1.1020 → moves down
         run(pm._trail_with_price_action(pos, 1.0950))
         assert len(broker.sl_updates) > 0
-        assert broker.sl_updates[-1][1] == pytest.approx(1.0980 + 0.01 * 0.02, abs=1e-5)
+        assert broker.sl_updates[-1][1] == pytest.approx(1.1010 + 0.01 * 0.02, abs=1e-5)
 
     @patch("config.settings")
     def test_fallback_when_no_swing_data(self, mock_settings, broker, risk_mgr):

@@ -309,8 +309,11 @@ class RiskManager:
         self._trade_history.append(result)
 
         # Update accumulated gain for delta
-        self._accumulated_gain += pnl_percent
-        self._delta_accumulated_gain += pnl_percent
+        # Only add positive PnL here; negative PnL is handled exclusively in the loss branch
+        # to avoid double-counting losses (BUG-01 fix).
+        if pnl_percent >= 0:
+            self._accumulated_gain += pnl_percent
+            self._delta_accumulated_gain += pnl_percent
 
         # Mentorship: delta works on accumulated P&L vs thresholds, not per-trade reset.
         # Only drop to the previous level rather than full reset on any loss.

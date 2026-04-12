@@ -311,12 +311,15 @@ class TestWhiteStrategy:
         assert ok, f"WHITE should pass with convergence. Failed: {failed}"
 
     def test_htf_fails_without_convergence(self):
-        """WHITE hard-blocks without convergence."""
+        """WHITE applies -10 confidence penalty without convergence (soft penalty, not hard-block)."""
         analysis = make_analysis(
             convergence=False,
         )
         ok, score, met, failed = self.white.check_htf_conditions(analysis)
-        assert not ok, "WHITE should fail without convergence"
+        # WHITE no longer hard-blocks on convergence=False — it applies a -10 penalty instead
+        assert ok, "WHITE should pass without convergence (soft penalty, not hard-block)"
+        assert any("penalización" in f.lower() or "penalty" in f.lower() or "-10" in f for f in failed), \
+            "Should mention the convergence penalty"
 
     def test_sl_uses_swing_extreme(self):
         """WHITE SL = previous swing extreme (not Fib like Blue)."""

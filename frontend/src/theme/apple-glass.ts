@@ -513,7 +513,7 @@ export const cssTheme = `
 `;
 
 // Divider and status CSS
-export const hudDividerCss = \`
+export const hudDividerCss = `
   .glass-divider {
     border: none;
     border-top: 1px solid rgba(0,0,0,0.06);
@@ -533,7 +533,7 @@ export const hudDividerCss = \`
     padding: 4px 0;
     border-radius: 8px;
   }
-\`;
+`;
 
 // Strategy badge color helper (TradingLab 6-color system)
 export const getStrategyColor = (strategy: string): string => {

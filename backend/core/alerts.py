@@ -236,13 +236,13 @@ class AlertManager:
             return
 
         dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
-        dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
+        # No emoji/icon prefix
         title = f"TRADE EXECUTED // {instrument}"
         body = (
             f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
             f'{instrument}</span>\n'
             f'<span style="color:{dir_color};font-size:16px;font-weight:600;">'
-            f'{dir_icon} {direction.upper()}</span> '
+            f'{direction.upper()}</span> '
             f'<span style="color:#86868b;">// {strategy}</span>\n\n'
             f'<span style="color:#86868b;">ENTRY</span> '
             f'<span style="color:#fcfcfc;font-weight:600;">{entry}</span>\n'
@@ -283,13 +283,13 @@ class AlertManager:
 
         title = f"SETUP DETECTED // {instrument}"
         dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
-        dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
+        # No emoji/icon prefix
 
         # Build rich email body with strategy details and AI opinion
         parts = [
             f'<b>PENDING APPROVAL</b>\n',
             f'<b>{instrument}</b>',
-            f'{dir_icon} <b>{direction.upper()}</b>\n',
+            f'<b>{direction.upper()}</b>\n',
             f'<b>Estrategia:</b> {strategy}' if strategy else '',
             f'<b>Entry:</b> {entry:.5f}',
             f'<b>SL:</b> {sl:.5f}' if sl else '',
@@ -344,12 +344,12 @@ class AlertManager:
         if not self._config.notify_setup_rejected:
             return
 
-        dir_icon = "\u25B2" if direction.upper() == "BUY" else "\u25BC"
+        # No emoji/icon prefix
         title = f"SETUP REJECTED BY AI // {instrument}"
         body = (
             f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
             f'{instrument}</span>\n'
-            f'<span style="color:#86868b;">{dir_icon} {direction.upper()}</span> '
+            f'<span style="color:#86868b;">{direction.upper()}</span> '
             f'<span style="color:#86868b;">// {strategy}</span>\n\n'
             f'<span style="color:#FF3B30;font-weight:600;">AI: {ai_recommendation}</span> '
             f'<span style="color:#86868b;">Score:</span> '
@@ -413,8 +413,7 @@ class AlertManager:
         best = stats.get("best_trade", "N/A")
         worst = stats.get("worst_trade", "N/A")
 
-        pnl_emoji = "\U0001F4C8" if total_pnl >= 0 else "\U0001F4C9"  # chart up / down
-        title = f"{pnl_emoji} Daily Summary"
+        title = "Daily Summary"
         sign = "+" if total_pnl >= 0 else ""
 
         # Activity proof stats
@@ -451,7 +450,7 @@ class AlertManager:
         entry_price: float,
     ):
         """Notify about SL moves and phase changes on an open position."""
-        title = f"\U0001F504 Position Update: {instrument}"  # arrows circle
+        title = f"Position Update: {instrument}"
         body = (
             f"<b>Instrument:</b> {instrument}\n"
             f"<b>Phase:</b> {phase}\n"
@@ -468,13 +467,7 @@ class AlertManager:
 
     async def send_engine_status(self, status: str, message: str):
         """Notify about engine start, stop, or error events."""
-        status_emojis = {
-            "started": "\U00002705",   # check mark
-            "stopped": "\U000026D4",   # no entry
-            "error": "\U0000274C",     # cross mark
-        }
-        emoji = status_emojis.get(status.lower(), "\U00002139\uFE0F")  # info
-        title = f"{emoji} Engine {status.capitalize()}"
+        title = f"Engine {status.capitalize()}"
         body = (
             f"<b>Status:</b> {status.upper()}\n"
             f"<b>Message:</b> {message}\n"
@@ -490,7 +483,7 @@ class AlertManager:
         current_risk: float,
     ):
         """Notify about risk threshold warnings."""
-        title = f"\U000026A0\uFE0F Risk Alert: {alert_type}"  # warning sign
+        title = f"Risk Alert: {alert_type}"
         body = (
             f"<b>Alert Type:</b> {alert_type}\n"
             f"<b>Message:</b> {message}\n"
@@ -507,7 +500,7 @@ class AlertManager:
 
     async def test_channel(self, channel: AlertChannel) -> bool:
         """Send a test message to *one* channel. Returns True on success."""
-        title = "\U0001F6CE\uFE0F NeonTrade AI - Test Notification"
+        title = "NeonTrade AI - Test Notification"
         body = (
             "If you can see this message, your notification channel "
             "is configured correctly.\n\n"

@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Cache bust: v3.0 Liquid Glass (2026-04-12)
 # Copy backend code
 COPY backend/ .
 

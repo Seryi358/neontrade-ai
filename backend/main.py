@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     """Start trading engine on app startup, stop on shutdown."""
     global db
     logger.info("=" * 60)
-    logger.info("  NeonTrade AI v1.0 - Starting Up")
+    logger.info("  NeonTrade AI v3.0 - Liquid Glass - Starting Up")
     logger.info("=" * 60)
 
     # Startup diagnostics (mask secrets but confirm they exist)
@@ -217,7 +217,7 @@ async def _periodic_cleanup():
 app = FastAPI(
     title="NeonTrade AI",
     description="Cyberpunk AI-Powered Forex Trading System - Powered by TradingLab Strategies",
-    version="1.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 

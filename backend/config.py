@@ -76,8 +76,9 @@ class Settings(BaseSettings):
     # "me he dado cuenta que lo que más me gusta es el day trading [...] es el
     #  estilo que se adapta más a mí" — Alex (Estilos de trading)
     # User can change this; all strategies adapt to the selected style.
-    # NOTE: With small accounts (<$500), day_trading with tight SLs is recommended.
-    # Swing trading requires wider SLs that may exceed 1% risk at minimum lot sizes.
+    # NOTE: The 1% rule works at any capital level. Capital.com supports 0.001 lots
+    # (1,000 units) which risks ~$0.20 per 20-pip SL — well within 1% of $190.
+    # Alex started trading with 500 EUR. No minimum capital is specified in the mentorship.
     trading_style: str = "day_trading"
 
     # Risk per trade by style (ch18.3 Regla del 1%)
@@ -257,9 +258,13 @@ class Settings(BaseSettings):
     funded_account_type: str = "swing"
     # Evaluation type: "2phase" (standard), "1phase" (sprint, tighter DD), "instant", "real" (passed)
     funded_evaluation_type: str = "2phase"
-    # DD limits - standard 2-phase (5%/10%). Sprint/1-phase: 4%/6% (set manually)
-    funded_max_daily_dd: float = 0.05  # 5% max daily drawdown (2-phase); 4% for 1-phase
-    funded_max_total_dd: float = 0.10  # 10% max total drawdown Phase 1 (2-phase); 6% for 1-phase
+    # DD limits auto-applied based on evaluation_type:
+    #   "2phase": 5% daily / 10% total (FTMO standard)
+    #   "1phase"/"sprint": 4% daily / 6% total (tighter)
+    #   "instant": same as 2phase
+    #   "real": same as 2phase (passed evaluation)
+    funded_max_daily_dd: float = 0.05
+    funded_max_total_dd: float = 0.10
     funded_max_total_dd_phase2: float = 0.0  # If >0, override funded_max_total_dd when in Phase 2 (e.g. BitFunded: 8%)
     # Profit targets for evaluation phases
     funded_profit_target_phase1: float = 0.10  # 10% for Phase 1 (FTMO), 8% (5RF)

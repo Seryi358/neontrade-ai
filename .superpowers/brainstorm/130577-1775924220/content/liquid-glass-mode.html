@@ -1,0 +1,122 @@
+<h2>Liquid Glass - Light o Dark Mode?</h2>
+<p class="subtitle">El efecto Liquid Glass funciona en ambos fondos. Cual prefieres para NeonTrade AI?</p>
+
+<div class="split">
+  <div class="card" data-choice="light" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="background: linear-gradient(145deg, #f2f2f7 0%, #e5e5ea 50%, #f2f2f7 100%); padding: 20px; min-height: 280px; position: relative; overflow: hidden;">
+      <!-- Subtle mesh gradient background -->
+      <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(0,122,255,0.08) 0%, transparent 70%); border-radius: 50%;"></div>
+      <div style="position: absolute; bottom: -30px; left: -30px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(52,199,89,0.06) 0%, transparent 70%); border-radius: 50%;"></div>
+
+      <div style="font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif; position: relative; z-index: 1;">
+        <!-- Nav bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div style="font-size: 22px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.3px;">NeonTrade</div>
+          <div style="width: 28px; height: 28px; background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.5)); backdrop-filter: blur(20px); border-radius: 50%; border: 1px solid rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 12px; color: #86868b;">S</span>
+          </div>
+        </div>
+
+        <!-- Balance card - Liquid Glass -->
+        <div style="background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(255,255,255,0.45)); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); border-radius: 20px; padding: 18px; border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -1px 2px rgba(0,0,0,0.02); margin-bottom: 10px;">
+          <div style="font-size: 12px; color: #86868b; font-weight: 500;">Portfolio</div>
+          <div style="font-size: 32px; font-weight: 700; color: #1d1d1f; letter-spacing: -1px; margin: 2px 0;">$190.42</div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; color: #34c759; font-weight: 600;">+$4.62</span>
+            <span style="font-size: 12px; color: #86868b;">+2.4% today</span>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+          <div style="flex:1; background: linear-gradient(135deg, rgba(255,255,255,0.75), rgba(255,255,255,0.35)); backdrop-filter: blur(30px) saturate(150%); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.5); box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);">
+            <div style="font-size: 10px; color: #86868b; font-weight: 500;">Win Rate</div>
+            <div style="font-size: 20px; font-weight: 600; color: #1d1d1f;">67%</div>
+          </div>
+          <div style="flex:1; background: linear-gradient(135deg, rgba(255,255,255,0.75), rgba(255,255,255,0.35)); backdrop-filter: blur(30px) saturate(150%); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.5); box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);">
+            <div style="font-size: 10px; color: #86868b; font-weight: 500;">Trades</div>
+            <div style="font-size: 20px; font-weight: 600; color: #1d1d1f;">12</div>
+          </div>
+          <div style="flex:1; background: linear-gradient(135deg, rgba(255,255,255,0.75), rgba(255,255,255,0.35)); backdrop-filter: blur(30px) saturate(150%); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.5); box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);">
+            <div style="font-size: 10px; color: #86868b; font-weight: 500;">Score</div>
+            <div style="font-size: 20px; font-weight: 600; color: #007AFF;">78</div>
+          </div>
+        </div>
+
+        <!-- Position pill -->
+        <div style="background: linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.3)); backdrop-filter: blur(20px); border-radius: 12px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.4); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-size: 13px; font-weight: 600; color: #1d1d1f;">EUR/USD</span>
+            <span style="font-size: 11px; color: #34c759; font-weight: 500; margin-left: 6px;">BUY</span>
+          </div>
+          <span style="font-size: 13px; font-weight: 600; color: #34c759;">+$2.40</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Light Liquid Glass</h3>
+      <p>Fondo #f2f2f7, cristales blancos translucidos, reflejos internos, sombras suaves. Como la nueva Stocks app de iOS 26. Limpio y profesional para uso diurno.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="dark" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="background: linear-gradient(145deg, #000000 0%, #1c1c1e 50%, #000000 100%); padding: 20px; min-height: 280px; position: relative; overflow: hidden;">
+      <!-- Subtle mesh gradient background -->
+      <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(10,132,255,0.12) 0%, transparent 70%); border-radius: 50%;"></div>
+      <div style="position: absolute; bottom: -30px; left: -30px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(48,209,88,0.08) 0%, transparent 70%); border-radius: 50%;"></div>
+
+      <div style="font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif; position: relative; z-index: 1;">
+        <!-- Nav bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div style="font-size: 22px; font-weight: 700; color: #f5f5f7; letter-spacing: -0.3px;">NeonTrade</div>
+          <div style="width: 28px; height: 28px; background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05)); backdrop-filter: blur(20px); border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 12px; color: #86868b;">S</span>
+          </div>
+        </div>
+
+        <!-- Balance card - Liquid Glass Dark -->
+        <div style="background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)); backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); border-radius: 20px; padding: 18px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 2px rgba(0,0,0,0.1); margin-bottom: 10px;">
+          <div style="font-size: 12px; color: #86868b; font-weight: 500;">Portfolio</div>
+          <div style="font-size: 32px; font-weight: 700; color: #f5f5f7; letter-spacing: -1px; margin: 2px 0;">$190.42</div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; color: #30d158; font-weight: 600;">+$4.62</span>
+            <span style="font-size: 12px; color: #86868b;">+2.4% today</span>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+          <div style="flex:1; background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03)); backdrop-filter: blur(30px) saturate(150%); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">
+            <div style="font-size: 10px; color: #86868b; font-weight: 500;">Win Rate</div>
+            <div style="font-size: 20px; font-weight: 600; color: #f5f5f7;">67%</div>
+          </div>
+          <div style="flex:1; background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03)); backdrop-filter: blur(30px) saturate(150%); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">
+            <div style="font-size: 10px; color: #86868b; font-weight: 500;">Trades</div>
+            <div style="font-size: 20px; font-weight: 600; color: #f5f5f7;">12</div>
+          </div>
+          <div style="flex:1; background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03)); backdrop-filter: blur(30px) saturate(150%); border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">
+            <div style="font-size: 10px; color: #86868b; font-weight: 500;">Score</div>
+            <div style="font-size: 20px; font-weight: 600; color: #0A84FF;">78</div>
+          </div>
+        </div>
+
+        <!-- Position pill -->
+        <div style="background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); backdrop-filter: blur(20px); border-radius: 12px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-size: 13px; font-weight: 600; color: #f5f5f7;">EUR/USD</span>
+            <span style="font-size: 11px; color: #30d158; font-weight: 500; margin-left: 6px;">BUY</span>
+          </div>
+          <span style="font-size: 13px; font-weight: 600; color: #30d158;">+$2.40</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Dark Liquid Glass</h3>
+      <p>Fondo negro puro, cristales oscuros con bordes luminosos, reflejos sutiles sobre negro. Como las apps Pro de Apple en dark mode con Liquid Glass. Elegante para trading nocturno.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 20px;">
+  <p class="subtitle">Ambos usan el mismo efecto Liquid Glass. La diferencia es el fondo y la intensidad de los reflejos. Haz click en tu preferido.</p>
+</div>

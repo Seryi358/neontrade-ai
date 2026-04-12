@@ -702,8 +702,8 @@ def _check_smc_confluence(analysis, direction: str, entry_price: float) -> tuple
     if hasattr(analysis, 'liquidity_sweep') and analysis.liquidity_sweep:
         sweep = analysis.liquidity_sweep
         sweep_dir = sweep.get("direction", "")
-        if (direction == "BUY" and sweep_dir == "bullish") or \
-           (direction == "SELL" and sweep_dir == "bearish"):
+        if (direction == "BUY" and sweep_dir == "swept_lows") or \
+           (direction == "SELL" and sweep_dir == "swept_highs"):
             bonus += 6.0
             level = sweep.get("level", "unknown")
             details.append(f"Liquidity sweep en {level} ({sweep_dir})")
@@ -1122,11 +1122,11 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
         # Check last two swing lows for double bottom pattern
         recent_lows = swing_lows[-2:]
         if recent_lows[0] > 0 and recent_lows[1] > 0:
-            pct_diff = abs(recent_lows[0] - recent_lows[1]) / max(recent_lows[0], recent_lows[1])
+            pct_diff = abs(recent_lows[1] - recent_lows[0]) / max(recent_lows[0], recent_lows[1])
             if pct_diff <= double_pattern_tolerance:
                 return "BLUE_A"
-            # Also detect "minimo creciente" (higher low) - the second low is higher
-            if recent_lows[1] > recent_lows[0]:
+            # Also detect "minimo creciente" (higher low) - only if within 1.5% (true double bottom shape)
+            if pct_diff <= 0.015 and recent_lows[1] > recent_lows[0]:
                 return "BLUE_A"
 
     if direction == "SELL" and len(swing_highs) >= 2:
@@ -1136,8 +1136,8 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
             pct_diff = abs(recent_highs[0] - recent_highs[1]) / max(recent_highs[0], recent_highs[1])
             if pct_diff <= double_pattern_tolerance:
                 return "BLUE_A"
-            # Also detect "maximo decreciente" (lower high) - the second high is lower
-            if recent_highs[1] < recent_highs[0]:
+            # Also detect "maximo decreciente" (lower high) - only if within 1.5% (true double top shape)
+            if pct_diff <= 0.015 and recent_highs[1] < recent_highs[0]:
                 return "BLUE_A"
 
     # Fallback: check chart_patterns for explicit reversal pattern labels

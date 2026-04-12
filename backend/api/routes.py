@@ -1169,7 +1169,7 @@ async def get_risk_status():
 async def set_risk_config(request: RiskConfigRequest):
     """Update risk management configuration at runtime."""
     from config import settings
-    import json, os
+    import json, os, tempfile
 
     updates = {}
     if request.risk_day_trading is not None:
@@ -1256,8 +1256,17 @@ async def set_risk_config(request: RiskConfigRequest):
             pass
     existing.update(updates)
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w") as f:
-        json.dump(existing, f, indent=2)
+    fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(config_path), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(existing, f, indent=2)
+        os.replace(tmp_path, config_path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
     return {
         "updated": updates,

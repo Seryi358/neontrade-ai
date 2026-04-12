@@ -713,7 +713,13 @@ class RiskManager:
         if sod_balance <= 0:
             return (True, "")  # Balance not yet initialized — don't block on stale data
         if settings.funded_evaluation_type != "instant" and sod_balance > 0:
-            daily_dd_limit = settings.funded_max_daily_dd * sod_balance
+            # Auto-apply correct DD limits based on evaluation type
+            # Workshop: 1-phase/sprint = 4% daily / 6% total (tighter than 2-phase 5%/10%)
+            if settings.funded_evaluation_type in ("1phase", "sprint"):
+                effective_daily_dd = min(settings.funded_max_daily_dd, 0.04)
+            else:
+                effective_daily_dd = settings.funded_max_daily_dd
+            daily_dd_limit = effective_daily_dd * sod_balance
             if self._funded_daily_pnl < 0 and abs(self._funded_daily_pnl) >= daily_dd_limit:
                 return (
                     False,
@@ -724,7 +730,11 @@ class RiskManager:
         # Check total DD: overall drawdown vs funded max total DD
         # Phase 2 may have a tighter DD limit (e.g. BitFunded: 10% → 8%)
         total_dd = self.get_current_drawdown()
-        effective_total_dd = settings.funded_max_total_dd
+        # Auto-apply correct total DD based on evaluation type
+        if settings.funded_evaluation_type in ("1phase", "sprint"):
+            effective_total_dd = min(settings.funded_max_total_dd, 0.06)
+        else:
+            effective_total_dd = settings.funded_max_total_dd
         if (settings.funded_current_phase == 2
                 and getattr(settings, 'funded_max_total_dd_phase2', 0) > 0):
             effective_total_dd = settings.funded_max_total_dd_phase2

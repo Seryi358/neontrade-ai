@@ -99,6 +99,10 @@ class ConnectionManager:
             await websocket.send_json({"type": event_type, "data": data})
         except Exception as e:
             logger.warning(f"WS send_personal failed ({event_type}): {e!r}")
+            try:
+                await websocket.close()
+            except Exception:
+                pass
             self.disconnect(websocket)
 
 

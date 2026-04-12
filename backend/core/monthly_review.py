@@ -155,6 +155,17 @@ class MonthlyReviewGenerator:
             generated_at=datetime.now(timezone.utc).isoformat(),
         )
 
+        if month:
+            filtered = []
+            for t in trades:
+                t_month = t.get("month", "") or ""
+                t_opened = t.get("opened_at", "") or ""
+                if str(t_month).startswith(month) or str(t_opened).startswith(month):
+                    filtered.append(t)
+            # Only filter if we got results; if no trades match, keep all (backward compat)
+            if filtered:
+                trades = filtered
+
         if not trades:
             report.recommendations.append(
                 "No trades executed this month. Review if trading plan conditions were met."

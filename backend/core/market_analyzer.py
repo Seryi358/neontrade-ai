@@ -418,9 +418,9 @@ class MarketAnalyzer:
             weekly_closes = w_df["close"].tolist()
             sma_20 = sum(weekly_closes[-20:]) / 20
             # EMA 21
-            ema_21 = weekly_closes[0]
+            ema_21 = sum(weekly_closes[:21]) / 21
             multiplier = 2 / (21 + 1)
-            for price_val in weekly_closes[1:]:
+            for price_val in weekly_closes[21:]:
                 ema_21 = (price_val - ema_21) * multiplier + ema_21
             last_weekly_close = weekly_closes[-1]
             # Check if last close is below both BMSB bands
@@ -433,8 +433,8 @@ class MarketAnalyzer:
                 # Recalculate SMA 20 and EMA 21 as of the previous week
                 if len(weekly_closes) >= 21:
                     prev_sma_20 = sum(weekly_closes[-21:-1]) / 20
-                    prev_ema_21 = weekly_closes[0]
-                    for price_val in weekly_closes[1:-1]:
+                    prev_ema_21 = sum(weekly_closes[:21]) / 21
+                    for price_val in weekly_closes[21:-1]:
                         prev_ema_21 = (price_val - prev_ema_21) * multiplier + prev_ema_21
                     bearish_confirmed = (
                         prev_weekly_close < prev_sma_20
@@ -565,7 +565,7 @@ class MarketAnalyzer:
         EMA 20/50 confirmation: must agree with structure for a definitive call.
         SMA 200: long-term trend filter (price above = bullish bias, below = bearish).
         """
-        if df.empty or len(df) < 50:
+        if df.empty or len(df) < 52:
             return Trend.RANGING
 
         data = df.reset_index(drop=True)
@@ -2941,6 +2941,7 @@ class MarketAnalyzer:
         # --- New York session High / Low (12:00-21:00 UTC EDT, DST-adjusted) ---
         if not h1.empty and isinstance(h1.index, pd.DatetimeIndex):
             now_liq = datetime.now(timezone.utc)
+            d_liq = self._dst_offset()  # 0=EDT, 1=EST
             ny_start = now_liq.replace(hour=12 + d_liq, minute=0, second=0, microsecond=0)
             ny_end = now_liq.replace(hour=21 + d_liq, minute=0, second=0, microsecond=0)
             ny_candles = h1[

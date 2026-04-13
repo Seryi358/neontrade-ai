@@ -1117,7 +1117,7 @@ async def get_risk_config():
         "risk_day_trading": settings.risk_day_trading,
         "risk_scalping": settings.risk_scalping,
         "risk_swing": settings.risk_swing,
-        "max_total_risk": settings.max_total_risk,
+        "max_total_risk": round(settings.max_total_risk, 4),
         "correlated_risk_pct": settings.correlated_risk_pct,
         "min_rr_ratio": settings.min_rr_ratio,
         "move_sl_to_be_pct_to_tp1": settings.move_sl_to_be_pct_to_tp1,
@@ -1142,6 +1142,9 @@ async def get_risk_config():
         "delta_enabled": settings.delta_enabled,
         "delta_parameter": settings.delta_parameter,
         "delta_max_risk": settings.delta_max_risk,
+        # Position management
+        "be_trigger_method": settings.be_trigger_method,
+        "position_management_style": settings.position_management_style,
         # Scale-in rule
         "scale_in_require_be": settings.scale_in_require_be,
         # Friday trading cutoff

@@ -1,7 +1,7 @@
 /**
  * Atlas - Chart Screen
- * Professional TradingView lightweight-charts integration with cyberpunk theme.
- * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
+ * Professional TradingView lightweight-charts integration.
+ * Apple Liquid Glass Light design.
  *
  * Web: Uses lightweight-charts directly in a DOM div.
  * Native: Falls back to the custom React Native candlestick renderer.

@@ -435,7 +435,7 @@ export default function JournalScreen() {
       <HUDCard>
         <HUDSectionTitle title="MONTHLY REVIEW" />
 
-        {/* Generate button - CP2077 yellow */}
+        {/* Generate button */}
         <TouchableOpacity
           style={styles.generateButton}
           onPress={generateMonthlyReview}
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // Generate Review Button (CP2077 Yellow)
+  // Generate Review Button
   generateButton: {
     backgroundColor: theme.colors.cp2077Yellow,
     paddingVertical: 12,

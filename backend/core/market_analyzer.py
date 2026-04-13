@@ -1139,8 +1139,8 @@ class MarketAnalyzer:
             "H1": [20, 50],  # EMA 20 for small pullback detection on H1
             "M15": [5, 20, 50],
             "M5": [2, 5, 20, 50],
-            # M2: Capital.com supports MINUTE_2 — needed for CPA Day Trading
-            # Alex: "el corto plazo agresivo son 2 minutos"
+            # M2: derived from M1 data (Capital.com has no MINUTE_2 resolution)
+            # Used for CPA Day Trading trailing — Alex: "el corto plazo agresivo son 2 minutos"
             "M2": [5, 50],
             "M1": [50],  # EMA 50 for scalping CP/CPA management
         }

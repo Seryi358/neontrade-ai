@@ -1,7 +1,7 @@
 /**
  * Atlas - Manual Mode Screen
  * Shows pending trade setups awaiting user approval.
- * CP2077 HUD redesign with shared sub-navigation for TRADE tab views.
+ * Apple Liquid Glass Light design.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';

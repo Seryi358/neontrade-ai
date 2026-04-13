@@ -1,6 +1,6 @@
 /**
  * Atlas - Settings Screen
- * Cyberpunk 2077 HUD-style system configuration.
+ * Apple Liquid Glass system configuration.
  * Decomposed into 12 HUDCard sections with collapsible panels.
  */
 
@@ -168,7 +168,7 @@ interface IOSSwitchProps {
   activeColor?: string;
 }
 
-function CP2077Switch({ value, onValueChange, disabled = false, activeColor = '#4CD964' }: IOSSwitchProps) {
+function IOSSwitch({ value, onValueChange, disabled = false, activeColor = '#4CD964' }: IOSSwitchProps) {
   const animValue = React.useRef(new Animated.Value(value ? 1 : 0)).current;
 
   React.useEffect(() => {
@@ -684,7 +684,7 @@ export default function SettingsScreen() {
               {mode}
             </Text>
           </View>
-          <CP2077Switch
+          <IOSSwitch
             value={mode === 'AUTO'}
             onValueChange={toggleMode}
             disabled={actionLoading === 'mode'}
@@ -776,7 +776,7 @@ export default function SettingsScreen() {
                   <Text style={styles.strategyDesc}>{strat.description}</Text>
                 </View>
               </View>
-              <CP2077Switch
+              <IOSSwitch
                 value={strategyConfig[strat.key] ?? true}
                 onValueChange={(val) => toggleStrategy(strat.key, val)}
                 activeColor={strat.color}
@@ -795,7 +795,7 @@ export default function SettingsScreen() {
                       </Text>
                       <Text style={styles.variantDesc}>{variant.description}</Text>
                     </View>
-                    <CP2077Switch
+                    <IOSSwitch
                       value={strategyConfig[variant.key] ?? true}
                       onValueChange={(val) => toggleStrategy(variant.key, val)}
                       activeColor={strat.color}
@@ -875,7 +875,7 @@ export default function SettingsScreen() {
               {scalpingEnabled ? 'ACTIVO' : 'INACTIVO'}
             </Text>
           </View>
-          <CP2077Switch
+          <IOSSwitch
             value={scalpingEnabled}
             onValueChange={toggleScalping}
             disabled={actionLoading === 'scalping'}
@@ -913,7 +913,7 @@ export default function SettingsScreen() {
               {fundedEnabled ? 'ACTIVO' : 'INACTIVO'}
             </Text>
           </View>
-          <CP2077Switch
+          <IOSSwitch
             value={fundedEnabled}
             onValueChange={toggleFunded}
             disabled={actionLoading === 'funded'}

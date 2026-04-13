@@ -41,7 +41,7 @@ try:
 except ImportError:
     HAS_MPLFINANCE = False
 
-# ── Atlas Cyberpunk Theme ────────────────────────────────────
+# ── Atlas Chart Theme ────────────────────────────────────
 THEME = {
     "bg": "#f2f2f7",            # Apple: systemGroupedBackground
     "bg_card": "#ffffff",        # Apple: white card

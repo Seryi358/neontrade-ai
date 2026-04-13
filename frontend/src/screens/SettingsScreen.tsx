@@ -11,7 +11,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   RefreshControl,
   ActivityIndicator,
   Alert,
@@ -160,7 +159,7 @@ function CollapsibleSection({ title, children, defaultOpen = false, accentColor 
   );
 }
 
-// ── iOS Toggle Switch ──────────────────────────────────
+// ── iOS Toggle Switch (custom, works identically on web/iOS/Android) ──
 
 interface IOSSwitchProps {
   value: boolean;
@@ -170,16 +169,60 @@ interface IOSSwitchProps {
 }
 
 function CP2077Switch({ value, onValueChange, disabled = false, activeColor = '#4CD964' }: IOSSwitchProps) {
+  const animValue = React.useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    Animated.spring(animValue, {
+      toValue: value ? 1 : 0,
+      useNativeDriver: false,
+      bounciness: 2,
+      speed: 15,
+    }).start();
+  }, [value]);
+
+  const trackBg = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E5E5EA', activeColor],
+  });
+
+  const thumbX = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [2, 21],
+  });
+
   return (
-    <Switch
-      value={value}
-      onValueChange={onValueChange}
-      trackColor={{ false: '#E5E5EA', true: activeColor }}
-      thumbColor="#FFFFFF"
-      ios_backgroundColor="#E5E5EA"
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => !disabled && onValueChange(!value)}
       disabled={disabled}
-      style={{ transform: [{ scale: 0.9 }] }}
-    />
+      style={{ opacity: disabled ? 0.4 : 1 }}
+    >
+      <Animated.View
+        style={{
+          width: 51,
+          height: 31,
+          borderRadius: 15.5,
+          backgroundColor: trackBg,
+          justifyContent: 'center',
+          padding: 0,
+        }}
+      >
+        <Animated.View
+          style={{
+            width: 27,
+            height: 27,
+            borderRadius: 13.5,
+            backgroundColor: '#FFFFFF',
+            transform: [{ translateX: thumbX }],
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 2.5,
+            elevation: 4,
+          }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 

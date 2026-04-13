@@ -2692,6 +2692,28 @@ class TradingEngine:
                 f"{price_diff_pct:.2%}). Skipping execution."
             )
             setup.status = "expired"
+            # Notify user that their approved setup was not executed
+            if self._ws_broadcast:
+                try:
+                    await self._ws_broadcast("setup_expired", {
+                        "setup_id": setup.id,
+                        "instrument": setup.instrument,
+                        "reason": f"Price moved {price_diff_pct:.2%} from entry",
+                    })
+                except Exception:
+                    pass
+            if self.alert_manager:
+                try:
+                    await self.alert_manager.send_alert(
+                        "setup_expired",
+                        f"Setup Expired: {setup.instrument}",
+                        f"Your approved setup was not executed because price moved "
+                        f"{price_diff_pct:.2%} from the original entry "
+                        f"({setup.entry_price:.5f} -> {current_price:.5f}).",
+                        {"instrument": setup.instrument},
+                    )
+                except Exception:
+                    pass
             return
 
         # Build a TradeRisk from the pending setup

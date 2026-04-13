@@ -186,9 +186,10 @@ class TradeDatabase:
                 logger.info(f"  M2: fixed stuck trade {trade_id} -> {new_status}")
 
             valid = (
-                "'open','closed_tp','closed_sl','closed_manual','closed_be',"
+                "'open','closed_tp','closed_sl','closed_manual','closed_be','closed_external',"
                 "'closed_friday_sl','closed_friday_tp','closed_friday_sl+tp',"
-                "'closed_funded_overnight','closed_news','closed_tp_max','closed_emergency_exit'"
+                "'closed_funded_overnight','closed_news','closed_tp_max','closed_emergency_exit',"
+                "'closed_emergency_no_ema','closed_trailing_sl_hit'"
             )
             await self._db.execute(f"""
                 CREATE TABLE IF NOT EXISTS trades_new (

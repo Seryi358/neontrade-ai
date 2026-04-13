@@ -497,6 +497,9 @@ class PositionManager:
         Fallback: if no swing data is available, reduce risk by 50% of the
         original SL-to-entry distance (legacy behaviour).
         """
+        if pos.entry_price == 0:
+            logger.error(f"{pos.trade_id}: entry_price is 0 — skipping initial phase to avoid bogus transition")
+            return
         risk_distance = abs(pos.entry_price - pos.original_sl)
         current_profit = (
             (current_price - pos.entry_price) if pos.direction == "BUY"
@@ -600,6 +603,9 @@ class PositionManager:
         else:
             # Trading Plan PDF rule: BE at X% of distance to TP1
             be_threshold = distance_to_tp1 * settings.move_sl_to_be_pct_to_tp1
+        if be_threshold <= 0:
+            logger.warning(f"{pos.trade_id}: be_threshold is {be_threshold}, skipping BE transition")
+            return
         if current_profit >= be_threshold:
             # BE = entry price (+ small buffer for spread)
             spread_buffer = abs(pos.entry_price - pos.original_sl) * 0.02
@@ -998,6 +1004,9 @@ class PositionManager:
     async def _trail_with_percentage(self, pos: ManagedPosition, current_price: float, trail_pct: float):
         """Fallback trailing: move SL to lock in a percentage of unrealized profit. Syncs with broker."""
         distance_to_tp1 = abs(pos.take_profit_1 - pos.entry_price)
+        if distance_to_tp1 == 0:
+            logger.warning(f"{pos.trade_id}: take_profit_1 == entry_price — skipping percentage trail to avoid zero distance")
+            return
         current_profit = (
             (current_price - pos.entry_price) if pos.direction == "BUY"
             else (pos.entry_price - current_price)

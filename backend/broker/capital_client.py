@@ -124,6 +124,9 @@ class CapitalClient(BaseBroker):
 
             self._cst = resp.headers.get("CST")
             self._security_token = resp.headers.get("X-SECURITY-TOKEN")
+            if not self._cst or not self._security_token:
+                self._session_time = None
+                raise ConnectionError("Session tokens missing from response")
             self._session_time = datetime.now(timezone.utc)
 
             logger.info("Capital.com session created successfully")

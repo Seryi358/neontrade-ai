@@ -272,12 +272,14 @@ def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
 
     # Step 2 (CIERRE): Previous completed candle closed past the EMA
     close_candle = candles[-2]
-    close_price = close_candle["close"]
+    close_price = close_candle.get("close")
 
     # Step 3 (CONFIRMACIÓN): Current candle continues in the direction
     confirm_candle = candles[-1]
-    confirm_open = confirm_candle["open"]
-    confirm_current = confirm_candle["close"]  # Current price of forming candle
+    confirm_open = confirm_candle.get("open")
+    confirm_current = confirm_candle.get("close")  # Current price of forming candle
+    if close_price is None or confirm_open is None or confirm_current is None:
+        return False
 
     if direction == "BUY":
         step2 = close_price > ema_val  # Closed above EMA
@@ -397,7 +399,7 @@ def _check_weekly_ema8_filter(analysis, direction: str) -> bool:
     if ema_w8 is None:
         return False  # No weekly EMA8 data = block trade (fail-safe)
     current_price = analysis.current_price
-    if not current_price:
+    if current_price is None:
         return False  # No price data = block trade (fail-safe)
     if direction == "BUY":
         return current_price >= ema_w8
@@ -2686,7 +2688,7 @@ class PinkStrategy(BaseStrategy):
         if not pattern_near_completion:
             # If no chart_patterns data available, use price compression as proxy:
             # low distance to EMA and DOJIs indicate the pattern is narrowing
-            if doji_count >= 2 and dist < 0.3:
+            if doji_count >= 2 and dist < 0.5:
                 pattern_near_completion = True
                 confidence += 5.0
                 met.append(
@@ -3936,7 +3938,7 @@ class BlackStrategy(BaseStrategy):
                     f"BLACK setup skipped for {analysis.instrument}: "
                     f"EMA 50 4H unavailable (required for TP)"
                 )
-                return None
+                return {}
 
         # BLACK TP_max: Fibonacci 1.618 extension (projected Wave 1 target).
         # BLACK anticipates a trend reversal — if the reversal develops into a full
@@ -4449,13 +4451,13 @@ class GreenStrategy(BaseStrategy):
                 all_lows = swing_lows + supports
                 below = [s for s in all_lows if s < entry_price]
                 if below:
-                    return min(below)  # Widest SL = pattern minimum
+                    return min(below) * (1 - 0.002)  # Widest SL = pattern minimum + buffer
                 return entry_price * 0.99  # 1% fallback (wider than advanced)
             else:
                 all_highs = swing_highs + resistances
                 above = [s for s in all_highs if s > entry_price]
                 if above:
-                    return max(above)  # Widest SL = pattern maximum
+                    return max(above) * (1 + 0.002)  # Widest SL = pattern maximum + buffer
                 return entry_price * 1.01
 
         # Advanced mode (default): SL below last swing before diagonal

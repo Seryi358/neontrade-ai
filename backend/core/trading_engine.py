@@ -437,10 +437,15 @@ class TradingEngine:
                     if not self.risk_manager.can_take_trade(current_style, setup.instrument):
                         logger.warning(f"Setup {setup_id} rejected: max risk limit or scale-in rule")
                         return False
-                    setup.status = "approved"
-                    logger.info(f"Setup approved: {setup_id} | {setup.instrument} {setup.direction}")
-                    await self._execute_approved_setup(setup)
-                    return True
+                    try:
+                        setup.status = "approved"
+                        logger.info(f"Setup approved: {setup_id} | {setup.instrument} {setup.direction}")
+                        await self._execute_approved_setup(setup)
+                        return True
+                    except Exception as e:
+                        logger.error(f"Setup {setup_id} execution failed: {e}")
+                        setup.status = "pending"
+                        return False
             logger.warning(f"Setup not found or not pending: {setup_id}")
             return False
 
@@ -925,6 +930,10 @@ class TradingEngine:
 
             trade_id = getattr(trade, 'trade_id', None)
 
+            if not trade_id:
+                kept += 1
+                continue
+
             if should_close:
                 try:
                     ok = await self.broker.close_trade(trade_id)
@@ -1017,12 +1026,8 @@ class TradingEngine:
                     )
                     price_diff = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
                     pnl = price_diff * abs(pos.units) if pos.units != 0 else price_diff
-                    self.risk_manager.record_funded_pnl(pnl)
-                    # Record trade result for delta/reentry tracking
-                    balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
-                    self.risk_manager.record_trade_result(tid, pos.instrument, pnl / balance if balance > 0 else 0.0)
 
-                    # BUG-05 fix: close via broker FIRST, then update DB on success
+                    # Close via broker FIRST, then record PnL on success
                     try:
                         ok = await self.broker.close_trade(tid)
                         if not ok:
@@ -1031,6 +1036,11 @@ class TradingEngine:
                     except Exception as be:
                         logger.error(f"Broker close_trade failed for funded overnight {tid}: {be}")
                         continue
+
+                    self.risk_manager.record_funded_pnl(pnl)
+                    # Record trade result for delta/reentry tracking
+                    balance = getattr(self.risk_manager, '_current_balance', 0.0) or 1.0
+                    self.risk_manager.record_trade_result(tid, pos.instrument, pnl / balance if balance > 0 else 0.0)
 
                     if self._db:
                         await self._db.update_trade(tid, {
@@ -1295,11 +1305,14 @@ class TradingEngine:
                         )
 
                     if self._ws_broadcast:
-                        await self._ws_broadcast("trade_closed", {
-                            "trade_id": tid,
-                            "instrument": pos.instrument,
-                            "reason": "external",
-                        })
+                        try:
+                            await self._ws_broadcast("trade_closed", {
+                                "trade_id": tid,
+                                "instrument": pos.instrument,
+                                "reason": "external",
+                            })
+                        except Exception as e:
+                            logger.warning(f"WS broadcast trade_closed failed: {e}")
 
                     # Determine actual close reason from heuristic
                     if pos.direction == "BUY":

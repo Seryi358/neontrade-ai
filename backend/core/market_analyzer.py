@@ -688,8 +688,8 @@ class MarketAnalyzer:
         prev_dist = float((df["close"].iloc[-10:-5] - ema_50.iloc[-10:-5]).abs().mean())
 
         # Combine both metrics
-        body_expanding = avg_recent_body > avg_prev_body * 1.15  # 15% larger
-        body_contracting = avg_recent_body < avg_prev_body * 0.85  # 15% smaller
+        body_expanding = avg_prev_body > 0 and avg_recent_body > avg_prev_body * 1.15  # 15% larger
+        body_contracting = avg_prev_body > 0 and avg_recent_body < avg_prev_body * 0.85  # 15% smaller
         dist_expanding = recent_dist > prev_dist * 1.1  # moving away from EMA 50
         dist_contracting = recent_dist < prev_dist * 0.9  # approaching EMA 50
 
@@ -903,6 +903,8 @@ class MarketAnalyzer:
             # IFVG detection: inverted FVGs (FVG broken by candle body = flip direction)
             for fvg in fvg_zones:
                 if fvg.get("inverted"):
+                    continue
+                if fvg.get("filled"):
                     continue
                 fvg_idx = fvg["index"]
                 for j in range(fvg_idx + 1, len(h1)):

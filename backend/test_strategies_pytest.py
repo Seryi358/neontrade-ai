@@ -4,8 +4,25 @@ BUGFIX-001: Tests for BLUE (A/B/C), RED, PINK, WHITE, BLACK, GREEN
 """
 import sys
 import pytest
+from unittest.mock import patch
 
 sys.path.insert(0, ".")
+
+# Force day_trading style for strategy tests (EMA keys are H1/H4 based)
+@pytest.fixture(autouse=True)
+def _force_day_trading():
+    with patch("strategies.base.settings") as mock_s:
+        from config import Settings
+        real = Settings()
+        # Copy all attributes from real settings
+        for attr in dir(real):
+            if not attr.startswith('_'):
+                try:
+                    setattr(mock_s, attr, getattr(real, attr))
+                except Exception:
+                    pass
+        mock_s.trading_style = "day_trading"
+        yield mock_s
 
 from strategies.base import (
     BlueStrategy, RedStrategy, PinkStrategy,

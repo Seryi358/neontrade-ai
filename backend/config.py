@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     # NOTE: The 1% rule works at any capital level. Capital.com supports 0.001 lots
     # (1,000 units) which risks ~$0.20 per 20-pip SL — well within 1% of $190.
     # Alex started trading with 500 EUR. No minimum capital is specified in the mentorship.
-    trading_style: str = "day_trading"
+    trading_style: str = "scalping"  # Best for small accounts ($190) - tighter SLs, more frequent setups
 
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
@@ -247,7 +247,7 @@ class Settings(BaseSettings):
     # TradingLab: scalping is the RISKIEST style — master day trading first.
     # RED is the recommended strategy for scalping. Avoid BLUE in scalping
     # (15M-to-5M ratio is 3x, making ruptures too similar between timeframes).
-    scalping_enabled: bool = False
+    scalping_enabled: bool = True  # Enabled for small accounts - Workshop de Scalping
     # Atlas defaults (NOT from workshop — workshop defers DD limits)
     scalping_max_daily_dd: float = 0.05  # 5% max daily drawdown (app-added safety)
     scalping_max_total_dd: float = 0.10  # 10% max total drawdown (app-added safety)

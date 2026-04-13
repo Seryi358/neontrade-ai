@@ -661,7 +661,7 @@ class TestConfigValidation:
         assert s.min_rr_ratio == 1.5
         assert s.drawdown_method == "fixed_levels"  # Protects small accounts
         assert s.delta_enabled is False
-        assert s.trading_style == "day_trading"
+        assert s.trading_style == "scalping"  # Optimized for small accounts ($190)
 
     def test_settings_all_documented_drawdown_methods(self):
         """Verify all documented drawdown methods are valid strings."""

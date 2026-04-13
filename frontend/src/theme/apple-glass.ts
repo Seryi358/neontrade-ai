@@ -111,16 +111,16 @@ export const theme = {
   },
 
   fonts: {
-    // SF Pro Display — Apple's system font
-    primary: '-apple-system',
-    heading: '-apple-system',
-    medium: '-apple-system',
-    semibold: '-apple-system',
-    light: '-apple-system',
-    mono: 'SF Mono',
-    bold: '-apple-system',
-    fallback: "-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif",
-    monoFallback: "'SF Mono', 'Menlo', 'Courier New', monospace",
+    // SF Pro Display — bundled, works on ALL platforms
+    primary: 'SFProDisplay-Regular',
+    heading: 'SFProDisplay-Bold',
+    medium: 'SFProDisplay-Medium',
+    semibold: 'SFProDisplay-Semibold',
+    light: 'SFProDisplay-Light',
+    mono: 'SFProDisplay-Regular',
+    bold: 'SFProDisplay-Bold',
+    fallback: "'SFProDisplay-Regular', -apple-system, 'Helvetica Neue', sans-serif",
+    monoFallback: "'SFProDisplay-Regular', 'Menlo', 'Courier New', monospace",
   },
 
   typography: {
@@ -281,9 +281,9 @@ export const cssTheme = `
     --glass-shadow: 0 8px 32px rgba(0,0,0,0.06);
     --glass-inner: inset 0 1px 0 rgba(255,255,255,0.8);
 
-    --font-primary: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
-    --font-heading: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
-    --font-mono: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    --font-primary: 'SFProDisplay-Regular', -apple-system, 'Helvetica Neue', sans-serif;
+    --font-heading: 'SFProDisplay-Bold', -apple-system, 'Helvetica Neue', sans-serif;
+    --font-mono: 'SFProDisplay-Regular', 'Menlo', 'Courier New', monospace;
 
     --radius-sm: ${theme.borderRadius.sm}px;
     --radius-md: ${theme.borderRadius.md}px;

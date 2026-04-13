@@ -322,16 +322,11 @@ const Tab = createBottomTabNavigator();
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    'Rajdhani': require('./src/assets/fonts/Rajdhani-Regular.ttf'),
-    'Rajdhani-Light': require('./src/assets/fonts/Rajdhani-Light.ttf'),
-    'Rajdhani-Medium': require('./src/assets/fonts/Rajdhani-Medium.ttf'),
-    'Rajdhani-SemiBold': require('./src/assets/fonts/Rajdhani-SemiBold.ttf'),
-    'Rajdhani-Bold': require('./src/assets/fonts/Rajdhani-Bold.ttf'),
-    'TerminessNerdFont': require('./src/assets/fonts/TerminessNerdFont-Regular.ttf'),
-    'TerminessNerdFont-Bold': require('./src/assets/fonts/TerminessNerdFont-Bold.ttf'),
-    'TerminessNerdFont-Italic': require('./src/assets/fonts/TerminessNerdFont-Italic.ttf'),
-    'TerminessNerdFont-BoldItalic': require('./src/assets/fonts/TerminessNerdFont-BoldItalic.ttf'),
-    'Terminess Nerd Font': require('./src/assets/fonts/TerminessNerdFont-Regular.ttf'),
+    'SFProDisplay-Regular': require('./src/assets/fonts/SFProDisplay-Regular.otf'),
+    'SFProDisplay-Light': require('./src/assets/fonts/SFProDisplay-Light.otf'),
+    'SFProDisplay-Medium': require('./src/assets/fonts/SFProDisplay-Medium.otf'),
+    'SFProDisplay-Semibold': require('./src/assets/fonts/SFProDisplay-Semibold.otf'),
+    'SFProDisplay-Bold': require('./src/assets/fonts/SFProDisplay-Bold.otf'),
   });
 
   if (!fontsLoaded) {

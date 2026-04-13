@@ -31,7 +31,7 @@ from broker.base import (
 GRANULARITY_MAP = {
     # Our standard names -> Capital.com resolution
     "M1": "MINUTE",
-    "M2": "MINUTE_2",
+    "M2": "MINUTE",      # Capital.com has no MINUTE_2; use M1 as proxy (market_analyzer derives M2 from M1)
     "M3": "MINUTE_3",
     "M5": "MINUTE_5",
     "M10": "MINUTE_10",

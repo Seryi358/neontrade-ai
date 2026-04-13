@@ -146,9 +146,9 @@ class MarketAnalyzer:
             "H1": 200,   # ~8 days of 1H
             "M15": 200,  # ~2 days of 15m
             "M5": 200,   # ~17 hours of 5m
-            "M1": 200,   # ~3.3 hours, needed for scalping position management
-            "M2": 200,   # ~6.6 hours of 2m, needed for CPA Day Trading (Alex: "2 minutos")
-            # NOTE: M1 must be fetched BEFORE M2 so the M2→M1 fallback works
+            "M1": 200,   # ~3.3 hours, needed for scalping + CPA position management
+            # NOTE: M2 is NOT fetched from broker (Capital.com has no MINUTE_2 resolution)
+            # M2 data is derived from M1 below for CPA trailing EMA computation
         }
 
         for tf, count in timeframes.items():
@@ -156,17 +156,15 @@ class MarketAnalyzer:
                 raw = await self.broker.get_candles(instrument, tf, count)
                 candles[tf] = self._candles_to_dataframe(raw)
             except Exception as e:
-                # M2 is expected to fail on Capital.com (no MINUTE_2 resolution)
-                # Use debug level to avoid flooding logs with known 404s
-                if tf == "M2":
-                    logger.debug(f"M2 candles unavailable for {instrument} (expected, using M1 fallback)")
-                else:
-                    logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
+                logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
                 candles[tf] = pd.DataFrame()
 
-                # M2 fallback: use M1 candles for M2 EMA computation
-                if tf == "M2" and "M1" in candles and not candles["M1"].empty:
-                    candles["M2"] = candles["M1"].copy()
+        # Derive M2 from M1 candles (Capital.com has no MINUTE_2 resolution)
+        # M2 EMAs are used for CPA day trading trailing (Alex: "2 minutos")
+        if "M1" in candles and not candles["M1"].empty:
+            candles["M2"] = candles["M1"].copy()
+        else:
+            candles["M2"] = pd.DataFrame()
             # Throttle between timeframe fetches to avoid broker rate limits
             await asyncio.sleep(0.3)
 

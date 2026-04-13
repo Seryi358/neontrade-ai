@@ -830,6 +830,14 @@ class OpenAIAnalyzer:
             )
             return validated
 
+        except json.JSONDecodeError as jde:
+            logger.warning("AI response truncated (increase max_tokens) for {}: {}", setup_signal.instrument, jde)
+            return {
+                "ai_score": 0,
+                "ai_recommendation": "SKIP",
+                "ai_reasoning": "AI response truncated (increase max_tokens). Cannot validate — BLOCKED.",
+                "suggested_adjustments": {},
+            }
         except Exception as e:
             logger.warning("AI validation failed for {} — BLOCKING (cannot validate = cannot proceed): {}", setup_signal.instrument, e)
             # TradingLab rule: AI validation is BLOCKING — only TAKE setups proceed.
@@ -1063,6 +1071,16 @@ Respond in JSON format:
             )
             return result
 
+        except json.JSONDecodeError as jde:
+            logger.warning("AI response truncated (increase max_tokens) for {}: {}", instrument, jde)
+            return {
+                "score": 0,
+                "recommendation": "SKIP",
+                "strategy_detected": "NONE",
+                "reasoning": "AI response truncated (increase max_tokens).",
+                "adjustments": {},
+                "risk_flags": ["AI response truncated"],
+            }
         except Exception as e:
             logger.error("OpenAI analysis failed: {}", e)
             return {

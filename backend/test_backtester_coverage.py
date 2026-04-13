@@ -617,7 +617,7 @@ class TestCalcSortino:
             t.entry_time = f"2025-01-{i + 1:02d}T10:00:00"
             trades.append(t)
         sortino = Backtester._calc_sortino(trades)
-        assert sortino == float("inf")
+        assert sortino == 999.0  # capped for JSON safety
 
     def test_mixed_returns(self):
         trades = []

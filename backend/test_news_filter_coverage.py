@@ -142,7 +142,7 @@ class TestHasUpcomingNews:
         nf._cache_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         has_news, desc = await nf.has_upcoming_news()
         assert has_news is False
-        assert desc is None
+        assert desc == ""
 
     @pytest.mark.asyncio
     async def test_low_impact_ignored(self, nf):

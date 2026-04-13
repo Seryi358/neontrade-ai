@@ -35,6 +35,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
+from config import settings
 from broker.base import CandleData
 from core.market_analyzer import (
     AnalysisResult,
@@ -1277,7 +1278,7 @@ class Backtester:
         downside = [r for r in returns if r < 0]
 
         if not downside:
-            return float("inf") if mean_ret > 0 else 0.0
+            return 999.0 if mean_ret > 0 else 0.0
 
         downside_std = np.std(downside, ddof=1)
         if downside_std == 0:

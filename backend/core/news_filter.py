@@ -226,7 +226,7 @@ class NewsFilter:
                 )
                 return True, desc
 
-        return False, None
+        return False, ""
 
     # ------------------------------------------------------------------
     # Style-specific advice string

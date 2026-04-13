@@ -803,7 +803,6 @@ class CapitalClient(BaseBroker):
         if broker_circuit_breaker.is_open:
             return OrderResult(success=False, trade_id=None, units=units, error="Circuit breaker OPEN — broker unavailable")
 
-        await self._ensure_session()
         epic = await self._resolve_epic(instrument)
         direction = "BUY" if units > 0 else "SELL"
         size = abs(units)
@@ -827,6 +826,9 @@ class CapitalClient(BaseBroker):
 
         try:
             # Single attempt only - retrying POST can duplicate orders
+            await self._ensure_session()
+            if broker_circuit_breaker.is_open:
+                raise ConnectionError("Circuit breaker OPEN")
             resp = await self._client.post(
                 "/api/v1/workingorders",
                 headers=self._auth_headers(),
@@ -1007,6 +1009,12 @@ class CapitalClient(BaseBroker):
             await self._delete(f"/api/v1/positions/{trade_id}")
             logger.info(f"Position {trade_id} closed")
             return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"Trade {trade_id} already closed (404)")
+                return True
+            logger.error(f"Failed to close position {trade_id}: {e}")
+            return False
         except Exception as e:
             logger.error(f"Failed to close position {trade_id}: {e}")
             return False

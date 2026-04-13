@@ -1140,13 +1140,10 @@ class TradingEngine:
             try:
                 await self.alert_manager.send_trade_closed(
                     instrument=instrument,
-                    direction=direction,
-                    entry=entry_price,
-                    exit_price=exit_price,
                     pnl=pnl_dollars,
                     pips=0,
-                    strategy=strategy,
                     reason=reason,
+                    strategy=strategy_variant,
                 )
             except Exception as e:
                 logger.warning(f"Alert send_trade_closed failed for {trade_id}: {e}")
@@ -3015,8 +3012,9 @@ class TradingEngine:
                 }
                 for inst, result in dict(self._last_scan_results).items()
             },
-            "positions": {
-                tid: {
+            "positions": [
+                {
+                    "trade_id": tid,
                     "instrument": pos.instrument,
                     "direction": pos.direction,
                     "entry": pos.entry_price,
@@ -3025,7 +3023,7 @@ class TradingEngine:
                     "phase": pos.phase.value,
                 }
                 for tid, pos in self.position_manager.positions.items()
-            },
+            ],
             "latest_explanations": {
                 inst: {
                     "overall_bias": expl.overall_bias,

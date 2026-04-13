@@ -573,7 +573,7 @@ def _load_risk_overrides():
         "risk_day_trading":       (0.001, 0.10),
         "risk_scalping":          (0.001, 0.05),
         "risk_swing":             (0.005, 0.10),
-        "max_total_risk":         (0.01,  0.25),
+        "max_total_risk":         (0.01,  0.10),  # Hard cap 10% (matches API)
         "correlated_risk_pct":    (0.001, 0.05),
         "min_rr_ratio":           (0.5,   5.0),
         "move_sl_to_be_pct_to_tp1": (0.1, 0.9),

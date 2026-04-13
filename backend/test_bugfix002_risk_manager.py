@@ -112,6 +112,10 @@ class TestPositionSizing:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.leverage_forex = 100
+        mock_settings.leverage_crypto = 20
+        mock_settings.leverage_commodities = 100
+        mock_settings.leverage_indices = 100
 
         # BUY: entry=1.1000, SL=1.0950, distance=0.005
         # Risk = 10000 * 0.01 = 100, Units = int(100 / 0.005) ≈ 19999-20000 (float truncation)
@@ -130,6 +134,10 @@ class TestPositionSizing:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.leverage_forex = 100
+        mock_settings.leverage_crypto = 20
+        mock_settings.leverage_commodities = 100
+        mock_settings.leverage_indices = 100
 
         # SELL: entry=1.0950, SL=1.1000 → entry < SL → units negative
         units = run(rm.calculate_position_size("EUR_USD", TradingStyle.DAY_TRADING, 1.0950, 1.1000))
@@ -168,6 +176,10 @@ class TestPositionSizing:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.leverage_forex = 100
+        mock_settings.leverage_crypto = 20
+        mock_settings.leverage_commodities = 100
+        mock_settings.leverage_indices = 100
 
         # Risk = 1M * 0.01 = 10000, SL distance = 0.00001 → Units = 1B → capped to 10M
         units = run(r.calculate_position_size("EUR_USD", TradingStyle.DAY_TRADING, 1.10000, 1.09999))

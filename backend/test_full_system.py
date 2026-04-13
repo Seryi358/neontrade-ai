@@ -546,7 +546,7 @@ def test_d_risk_manager():
     print(f"  [PASS] D1a: Day trading risk = {risk:.2%}")
 
     risk_scalp = rm.get_risk_for_style(TradingStyle.SCALPING)
-    assert risk_scalp == 0.01, f"Expected 0.01, got {risk_scalp}"  # TradingLab: 1% universal
+    assert risk_scalp == 0.005, f"Expected 0.005, got {risk_scalp}"  # 0.5% scalping risk
     print(f"  [PASS] D1b: Scalping risk = {risk_scalp:.2%}")
 
     # D2: Position size calculation

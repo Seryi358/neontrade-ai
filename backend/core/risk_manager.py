@@ -112,6 +112,21 @@ class RiskManager:
         self._reentry_timestamps: Dict[str, str] = {}  # instrument -> last stop-out ISO timestamp
         self._deal_size_cache: Dict[str, tuple] = {}  # instrument -> (min_size, increment)
 
+    # ── Leverage by Asset Class ───────────────────────────────────────
+
+    def _get_leverage_for_instrument(self, instrument: str) -> int:
+        """Return the leverage ratio for an instrument based on its asset class."""
+        from strategies.base import _is_crypto_instrument
+        inst = instrument.upper()
+        if _is_crypto_instrument(instrument):
+            return settings.leverage_crypto
+        elif inst.startswith("XAU") or inst.startswith("XAG") or inst.startswith("XPT") or inst.startswith("XPD"):
+            return settings.leverage_commodities
+        elif any(inst.startswith(x) for x in ("US500", "US100", "US30", "UK100", "DE40", "FR40", "JP225", "HK50")):
+            return settings.leverage_indices
+        else:
+            return settings.leverage_forex  # Default: forex pairs
+
     # ── Deal Size Rules (from broker API) ────────────────────────────
 
     async def _get_deal_size_rules(self, instrument: str) -> tuple:
@@ -580,6 +595,27 @@ class RiskManager:
                 f"Need at least {min_units} units to trade this instrument."
             )
             return 0
+
+        # Margin check: verify position doesn't exceed available margin with leverage
+        leverage = self._get_leverage_for_instrument(instrument)
+        margin_required = abs(units) * entry_price / leverage
+        available_margin = balance * 0.90  # keep 10% margin buffer
+        if margin_required > available_margin:
+            # Reduce units to fit within margin
+            max_units_by_margin = (available_margin * leverage) / entry_price
+            if size_increment > 0:
+                max_units_by_margin = int(max_units_by_margin / size_increment) * size_increment
+            if max_units_by_margin < min_units:
+                logger.warning(
+                    f"Insufficient margin for {instrument}: need ${margin_required:.2f}, "
+                    f"available ${available_margin:.2f} (leverage {leverage}:1)"
+                )
+                return 0
+            logger.info(
+                f"Position size reduced by margin constraint: {units} -> {max_units_by_margin} "
+                f"(margin ${margin_required:.2f} > available ${available_margin:.2f})"
+            )
+            units = max_units_by_margin
 
         # Cap maximum position size to prevent broker rejections
         MAX_UNITS = 10_000_000

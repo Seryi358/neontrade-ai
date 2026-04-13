@@ -777,9 +777,9 @@ def test_block_7_config():
     # Trading style
     check("trading_style default", settings.trading_style == "day_trading")
     check("risk_day_trading 1%", settings.risk_day_trading == 0.01)
-    check("risk_scalping 1%", settings.risk_scalping == 0.01)
+    check("risk_scalping 0.5%", settings.risk_scalping == 0.005)
     check("risk_swing 1%", settings.risk_swing == 0.01)
-    check("max_total_risk 3%", settings.max_total_risk == 0.03)
+    check("max_total_risk 7%", settings.max_total_risk == 0.07)
     check("correlated_risk_pct 0.75", settings.correlated_risk_pct == 0.0075)
 
     # EMAs
@@ -798,7 +798,7 @@ def test_block_7_config():
     # Watchlist
     check("forex_watchlist non-empty", len(settings.forex_watchlist) > 20)
     check("EUR_USD in watchlist", "EUR_USD" in settings.forex_watchlist)
-    check("XAU_USD in watchlist", "XAU_USD" in settings.forex_watchlist)
+    check("XAU_USD not in watchlist", "XAU_USD" not in settings.forex_watchlist)
 
     # Active categories
     check("active_watchlist_categories forex only", settings.active_watchlist_categories == ["forex"])

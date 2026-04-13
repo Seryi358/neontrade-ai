@@ -174,8 +174,8 @@ def test_02_config_fields():
     for f in required:
         check(f"Config has {f}", hasattr(settings, f))
     check("risk_day_trading is 1%", abs(settings.risk_day_trading - 0.01) < 1e-9)
-    check("risk_scalping is 1%", abs(settings.risk_scalping - 0.01) < 1e-9)
-    check("max_total_risk is 3%", abs(settings.max_total_risk - 0.03) < 1e-9)
+    check("risk_scalping is 0.5%", abs(settings.risk_scalping - 0.005) < 1e-9)
+    check("max_total_risk is 7%", abs(settings.max_total_risk - 0.07) < 1e-9)
 
 
 def test_03_market_analyzer_init():

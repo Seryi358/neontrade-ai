@@ -23,6 +23,7 @@ ASR (Auto Self Review) fields (from 04_Avanzado/03_Documentación/03_ASR):
 import json
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional
 from loguru import logger
 
@@ -36,8 +37,9 @@ class TradeJournal:
 
     def __init__(self, initial_capital: float):
         self._initial_capital = initial_capital
-        self._data_path = os.path.join("data", "trade_journal.json")
-        self._missed_trades_path = os.path.join("data", "missed_trades.json")
+        _BASE = Path(__file__).resolve().parent.parent
+        self._data_path = str(_BASE / "data" / "trade_journal.json")
+        self._missed_trades_path = str(_BASE / "data" / "missed_trades.json")
         self._trades: List[Dict] = []
         self._missed_trades: List[Dict] = []
         self._current_balance = initial_capital

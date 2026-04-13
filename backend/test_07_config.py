@@ -35,8 +35,8 @@ print("\n[7.2] Key config fields and defaults")
 check("active_broker default", settings.active_broker == "capital")
 check("trading_style default", settings.trading_style == "day_trading")
 check("risk_day_trading default 1%", settings.risk_day_trading == 0.01)
-check("risk_scalping default 1%", settings.risk_scalping == 0.01)
-check("max_total_risk default 3%", settings.max_total_risk == 0.03)
+check("risk_scalping default 0.5%", settings.risk_scalping == 0.005)
+check("max_total_risk default 7%", settings.max_total_risk == 0.07)
 check("min_rr_ratio default", settings.min_rr_ratio == 1.5)
 check("min_rr_black default", settings.min_rr_black == 2.0)
 check("min_rr_green default", settings.min_rr_green == 2.0)
@@ -62,7 +62,7 @@ check("active_watchlist_categories default ['forex']",
 
 # --- Capital allocation ---
 print("\n[7.5] Capital allocation")
-check("allocation_trading_pct 70%", settings.allocation_trading_pct == 0.70)
+check("allocation_trading_pct 80%", settings.allocation_trading_pct == 0.80)
 check("allocation_crypto_pct 10%", settings.allocation_crypto_pct == 0.10)
 check("allocation_investment_pct 20%", settings.allocation_investment_pct == 0.20)
 

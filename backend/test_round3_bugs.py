@@ -657,7 +657,7 @@ class TestConfigValidation:
         from config import Settings
         s = Settings()
         assert s.risk_day_trading == 0.01
-        assert s.max_total_risk == 0.03  # Conservative for small accounts
+        assert s.max_total_risk == 0.07  # 7%
         assert s.min_rr_ratio == 1.5
         assert s.drawdown_method == "fixed_levels"  # Protects small accounts
         assert s.delta_enabled is False

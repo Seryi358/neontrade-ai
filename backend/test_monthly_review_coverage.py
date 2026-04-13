@@ -27,7 +27,7 @@ def _trade(
     emotional_notes_pre="", emotional_notes_post="",
     rr_achieved=2.0, dd_level_hit=None, delta_adjustment=False,
     correlated_pair=None, simultaneous_risk=0.0,
-    asr_completed=False, **asr_fields,
+    asr_completed=False, month="2025-03", **asr_fields,
 ):
     """Helper to build a trade dict."""
     t = {
@@ -37,6 +37,7 @@ def _trade(
         "strategy": strategy,
         "instrument": instrument,
         "open_time": open_time,
+        "month": month,
         "is_discretionary": is_discretionary,
         "discretionary_notes": discretionary_notes,
         "emotional_notes_pre": emotional_notes_pre,
@@ -564,8 +565,8 @@ class TestPersistence:
         assert gen.load_report("2099-01") is None
 
     def test_list_reports(self, gen):
-        gen.generate_report([_trade()], "2025-01")
-        gen.generate_report([_trade()], "2025-02")
+        gen.generate_report([_trade(month="2025-01")], "2025-01")
+        gen.generate_report([_trade(month="2025-02")], "2025-02")
         reports = gen.list_reports()
         assert "2025-01" in reports
         assert "2025-02" in reports

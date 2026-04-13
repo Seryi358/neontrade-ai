@@ -1208,6 +1208,11 @@ class TradingEngine:
                         units=trade.units or 0,
                         style=settings.trading_style,
                     )
+                    # Infer correct phase from SL position relative to entry
+                    if pos.direction == "BUY" and pos.current_sl >= pos.entry_price:
+                        pos.phase = PositionPhase.BREAK_EVEN
+                    elif pos.direction == "SELL" and pos.current_sl <= pos.entry_price:
+                        pos.phase = PositionPhase.BREAK_EVEN
                     self.position_manager.positions[trade.trade_id] = pos
                     # Use correct risk for current trading style
                     style_risk_map = {
@@ -1728,9 +1733,6 @@ class TradingEngine:
     async def _scan_for_setups_impl(self):
         """Internal scan implementation (protected by _scan_lock)."""
         self._daily_scan_count += 1
-        # Reset circuit breaker at start of each scan cycle
-        if broker_circuit_breaker.is_open:
-            broker_circuit_breaker.reset()
 
         # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
         # "sobreoperar después de una pérdida" — top-5 failure mode per mentorship

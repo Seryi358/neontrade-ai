@@ -359,17 +359,17 @@ export const STRATEGY_COLORS: Record<string, string> = {
 
 export function getScoreColor(score: number | null): string {
   if (score == null) return '#a1a9b1';  // Muted — no AI score yet
-  if (score >= 80) return '#2ed88c';    // Bitpunk green
-  if (score >= 60) return '#f3e600';    // Bitpunk yellow
-  if (score >= 40) return '#ff6b35';    // Warning orange
-  return '#ff4a57';                     // Bitpunk red
+  if (score >= 80) return '#34C759';    // Apple green
+  if (score >= 60) return '#FFCC00';    // Apple yellow
+  if (score >= 40) return '#FF9500';    // Apple orange
+  return '#FF3B30';                     // Apple red
 }
 
 export function getTrendColor(trend: string): string {
   const upper = trend?.toUpperCase() || '';
-  if (upper.includes('BULL')) return '#2ed88c';  // Bitpunk green
-  if (upper.includes('BEAR')) return '#ff4a57';  // Bitpunk red
-  return '#7a6b9a';
+  if (upper.includes('BULL')) return '#34C759';  // Apple green
+  if (upper.includes('BEAR')) return '#FF3B30';  // Apple red
+  return '#8E8E93';  // Apple gray
 }
 
 export function getTrendIcon(trend: string): string {

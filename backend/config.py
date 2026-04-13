@@ -83,9 +83,19 @@ class Settings(BaseSettings):
 
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
-    risk_scalping: float = 0.01           # TradingLab: 1% universal (users can lower for extra safety)
-    risk_swing: float = 0.01             # 1% universal per TradingLab mentorship
-    max_total_risk: float = 0.03          # 3% max simultaneous open risk (conservative for <$500 accounts)
+    risk_scalping: float = 0.005          # Trading Plan PDF: 0.50% for scalping
+    risk_swing: float = 0.01             # Trading Plan PDF: 3% for swing, but capped to 1% for $190 capital safety
+    max_total_risk: float = 0.07          # Trading Plan PDF: 7% max simultaneous open risk
+
+    # Leverage ratios by asset class (Capital.com defaults for retail accounts)
+    # Position sizing uses these to verify margin availability before placing orders.
+    # Mentorship ch18.4: "el apalancamiento nos ayuda a poder operar con menos capital"
+    leverage_forex: int = 100        # 100:1 for major/minor forex pairs
+    leverage_indices: int = 100      # 100:1 for indices
+    leverage_commodities: int = 100  # 100:1 for commodities (gold, silver, oil)
+    leverage_stocks: int = 20        # 20:1 for individual stocks
+    leverage_crypto: int = 20        # 20:1 for cryptocurrencies
+    leverage_bonds: int = 200        # 200:1 for bonds and interest rates
 
     # Correlated pairs risk reduction (ch18.3)
     # Mentorship: "entrar con el 0,75% de riesgo en cada uno"
@@ -128,7 +138,7 @@ class Settings(BaseSettings):
     #     Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
     # For a 2:1 R:R trade at 1% risk, both methods coincide (1% profit = 50% to TP1).
     # For other R:R ratios, "risk_distance" is simpler and matches Alex's oral instruction.
-    be_trigger_method: str = "risk_distance"
+    be_trigger_method: str = "pct_to_tp1"  # Trading Plan PDF: "mitad del beneficio hasta el TP1"
     move_sl_to_be_pct_to_tp1: float = 0.50  # Only used when be_trigger_method="pct_to_tp1"
 
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
@@ -298,8 +308,9 @@ class Settings(BaseSettings):
         "USD_CHF", "NZD_USD",
         # High-volume crosses — reasonable spreads
         "EUR_GBP", "EUR_JPY", "GBP_JPY",
-        # Gold — trades well on Capital.com with small lots
-        "XAU_USD",
+        # Gold — minimum 1 unit at ~$2300, needs $23 margin. At $190 with 1% risk ($1.91)
+        # and typical 10-point SL, units = 0.19 which is below minimum. Disabled for <$500.
+        # "XAU_USD",
         # Additional pairs (wider spreads, disabled for <$500 accounts)
         # Uncomment when account grows past $500:
         # "EUR_AUD", "EUR_CHF", "EUR_NZD", "EUR_CAD",
@@ -517,15 +528,16 @@ class Settings(BaseSettings):
     # Options: forex, forex_exotic, commodities, indices, equities, crypto
     active_watchlist_categories: List[str] = ["forex"]
 
-    # ── Capital Allocation (ch18.5 Reparto del capital) ──────────────
-    # Mentoría: 70% trading, 20% stocks/ETFs, 10% crypto largo plazo
-    # Within trading: 70% forex, 20% other (indices/commodities/metals), 10% crypto
-    allocation_trading_pct: float = 0.70     # 70% in trading accounts (mentorship class)
-    allocation_forex_pct: float = 0.70       # 70% forex (within trading)
-    allocation_other_pct: float = 0.20       # 20% other: indices, commodities, metals (within trading)
-    allocation_crypto_pct: float = 0.10      # 10% crypto (within trading)
-    allocation_investment_pct: float = 0.20  # 20% long-term stocks/ETFs (70% VT/S&P500, 30% sectors)
-    allocation_crypto_longterm_pct: float = 0.10  # 10% crypto long-term (70% BTC, 20% ETH, 10% alts)
+    # ── Capital Allocation (Trading Plan PDF) ──────────────
+    # Trading Plan: 80% trading, 20% long-term investment
+    # Within trading: 90% traditional (forex/indices/metals), 10% crypto
+    # Within investment: 80% stocks, 20% crypto
+    allocation_trading_pct: float = 0.80     # 80% in trading accounts (Trading Plan PDF)
+    allocation_forex_pct: float = 0.90       # 90% traditional assets within trading (Trading Plan PDF)
+    allocation_other_pct: float = 0.00       # included in forex_pct above
+    allocation_crypto_pct: float = 0.10      # 10% crypto within trading (Trading Plan PDF)
+    allocation_investment_pct: float = 0.20  # 20% long-term investment (Trading Plan PDF)
+    allocation_crypto_longterm_pct: float = 0.04  # 20% of 20% investment = 4% total in crypto long-term
 
     # Extended crypto correlation groups (mentoría: most cryptos move together)
     crypto_correlation_groups: List[List[str]] = [

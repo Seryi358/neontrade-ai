@@ -129,9 +129,11 @@ class ExplanationEngine:
 
         # Convergence check
         convergence = analysis_result.htf_ltf_convergence
-        overall_bias = "ALCISTA" if analysis_result.htf_trend.value == "bullish" else (
-            "BAJISTA" if analysis_result.htf_trend.value == "bearish" else "NEUTRAL"
-        )
+        overall_bias = "NEUTRAL"
+        if analysis_result.htf_trend:
+            overall_bias = "ALCISTA" if analysis_result.htf_trend.value == "bullish" else (
+                "BAJISTA" if analysis_result.htf_trend.value == "bearish" else "NEUTRAL"
+            )
 
         # Strategy detection explanation
         conditions_met = []

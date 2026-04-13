@@ -646,7 +646,7 @@ class AlertManager:
     async def _send_gmail(self, title: str, body: str):
         """Send an email via Gmail API using OAuth2 refresh token."""
         cfg = self._config
-        if not cfg.gmail_refresh_token or not cfg.gmail_client_id:
+        if not cfg.gmail_refresh_token or not cfg.gmail_client_id or not cfg.gmail_client_secret:
             logger.warning("Gmail alert skipped – missing OAuth2 credentials")
             return
         if not cfg.gmail_sender or not cfg.gmail_recipient:

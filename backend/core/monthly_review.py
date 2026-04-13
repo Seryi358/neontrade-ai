@@ -162,9 +162,7 @@ class MonthlyReviewGenerator:
                 t_opened = t.get("opened_at", "") or ""
                 if str(t_month).startswith(month) or str(t_opened).startswith(month):
                     filtered.append(t)
-            # Only filter if we got results; if no trades match, keep all (backward compat)
-            if filtered:
-                trades = filtered
+            trades = filtered  # Empty is valid for an empty month
 
         if not trades:
             report.recommendations.append(

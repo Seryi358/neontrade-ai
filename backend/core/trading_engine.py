@@ -1135,7 +1135,23 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"WS broadcast trade_closed failed: {e}")
 
-        # 7. Screenshot on trade close
+        # 7. Email notification on trade close
+        if self.alert_manager:
+            try:
+                await self.alert_manager.send_trade_closed(
+                    instrument=instrument,
+                    direction=direction,
+                    entry=entry_price,
+                    exit_price=exit_price,
+                    pnl=pnl_dollars,
+                    pips=0,
+                    strategy=strategy,
+                    reason=reason,
+                )
+            except Exception as e:
+                logger.warning(f"Alert send_trade_closed failed for {trade_id}: {e}")
+
+        # 8. Screenshot on trade close
         if self.screenshot_generator:
             try:
                 pnl_pct = round((exit_price - entry_price if direction == "BUY" else entry_price - exit_price) / entry_price * 100, 2) if entry_price else 0
@@ -1402,8 +1418,42 @@ class TradingEngine:
                     if swing_highs or swing_lows:
                         self.position_manager.set_swing_values(inst, swing_highs, swing_lows)
 
+            # Capture phase state before update to detect transitions
+            pre_phases = {
+                tid: pos.phase.name for tid, pos in self.position_manager.positions.items()
+            }
+            pre_sls = {
+                tid: pos.current_sl for tid, pos in self.position_manager.positions.items()
+            }
+
             prices = await self.broker.get_prices_bulk(instruments)
             await self.position_manager.update_all_positions(prices)
+
+            # Notify on phase transitions and SL moves
+            if self.alert_manager:
+                for tid, pos in self.position_manager.positions.items():
+                    old_phase = pre_phases.get(tid)
+                    old_sl = pre_sls.get(tid)
+                    if old_phase and pos.phase.name != old_phase:
+                        try:
+                            await self.alert_manager.send_position_update(
+                                instrument=pos.instrument,
+                                phase=pos.phase.name,
+                                current_sl=pos.current_sl,
+                                entry_price=pos.entry_price,
+                            )
+                        except Exception as e:
+                            logger.warning(f"Position update alert failed: {e}")
+                    elif old_sl and pos.current_sl != old_sl:
+                        try:
+                            await self.alert_manager.send_position_update(
+                                instrument=pos.instrument,
+                                phase=f"{pos.phase.name} (SL moved)",
+                                current_sl=pos.current_sl,
+                                entry_price=pos.entry_price,
+                            )
+                        except Exception as e:
+                            logger.warning(f"SL move alert failed: {e}")
 
             # CPA auto-trigger checks (TradingLab: double pattern, news, Friday, indecision)
             self._check_cpa_auto_triggers(prices)

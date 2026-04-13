@@ -1152,7 +1152,7 @@ def test_crypto_config_journal():
     check("T221: risk_day_trading default 1%", settings.risk_day_trading == 0.01)
     check("T222: risk_scalping default 0.5%", settings.risk_scalping == 0.005)
     check("T223: risk_swing default 1%", settings.risk_swing == 0.01)
-    check("T224: max_total_risk default 7%", settings.max_total_risk == 0.07)
+    check("T224: max_total_risk default 3%", settings.max_total_risk == 0.03)
     check("T225: min_rr_ratio default 2.0", settings.min_rr_ratio == 1.5)
     check("T226: trading_style default day_trading", settings.trading_style == "day_trading")
     check("T227: funded_account_mode default False", settings.funded_account_mode is False)

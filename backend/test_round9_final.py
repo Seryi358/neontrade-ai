@@ -779,7 +779,7 @@ def test_block_7_config():
     check("risk_day_trading 1%", settings.risk_day_trading == 0.01)
     check("risk_scalping 0.5%", settings.risk_scalping == 0.005)
     check("risk_swing 1%", settings.risk_swing == 0.01)
-    check("max_total_risk 7%", settings.max_total_risk == 0.07)
+    check("max_total_risk 3%", settings.max_total_risk == 0.03)
     check("correlated_risk_pct 0.75", settings.correlated_risk_pct == 0.0075)
 
     # EMAs

@@ -108,7 +108,7 @@ def test_config_default_risk_values():
     from config import settings
     assert settings.risk_day_trading == 0.01  # 1%
     assert settings.risk_swing == 0.01  # 1%
-    assert settings.max_total_risk == 0.07  # 7%
+    assert settings.max_total_risk == 0.03  # 3%
     assert settings.correlated_risk_pct == 0.0075  # 0.75%
     assert settings.min_rr_ratio == 1.5
     assert settings.min_rr_black == 2.0

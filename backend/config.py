@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # Trading Plan PDF: 0.50% for scalping
     risk_swing: float = 0.01             # Trading Plan PDF: 3% for swing, but capped to 1% for $190 capital safety
-    max_total_risk: float = 0.07          # Trading Plan PDF: 7% max simultaneous open risk
+    max_total_risk: float = 0.03          # 3% for scalping with $190 (max 3 trades x 0.5% + buffer)
 
     # Leverage ratios by asset class (Capital.com defaults for retail accounts)
     # Position sizing uses these to verify margin availability before placing orders.
@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     # Trading Plan PDF: Alex uses 0.80:1 minimum to TP1 (with 61% win rate)
     # Default 1.5:1 is more conservative for users with unknown win rate.
     # Adjust down to 0.80 once you achieve 60%+ win rate over 100+ trades.
-    min_rr_ratio: float = 1.5
+    min_rr_ratio: float = 1.5            # Scalping can achieve 7:1-8:1 R:R per Workshop RED
     min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R (mentoría explícita)
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R (mentoría explícita)
     min_rr_blue_c: float = 2.0  # Blue C requires min 2:1 R:R (mentorship: "minimo 2 a 1, incluso 3 a 1")
@@ -146,9 +146,9 @@ class Settings(BaseSettings):
     # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
     # Mentorship: "sobreoperar después de una pérdida" is a top-5 failure mode.
     # These limits protect against emotional trading during drawdowns.
-    max_trades_per_day: int = 3           # Max 3 trades/day for small accounts (preserves capital)
+    max_trades_per_day: int = 5           # Scalping allows more trades/day (shorter duration)
     cooldown_after_consecutive_losses: int = 2  # After 2 consecutive losses, enforce cooldown
-    cooldown_minutes: int = 120           # 2 hours cooldown (extra caution with small capital)
+    cooldown_minutes: int = 60            # 1 hour cooldown (scalping trades are shorter)
 
     # Re-entry risk reduction (configurable per trader's plan)
     # Mentorship: "Cada uno pone sus normas" — these are DEFAULTS, not hard rules.
@@ -258,7 +258,7 @@ class Settings(BaseSettings):
     # "fixed_tp" = Method 1 (hold until TP, safest, instructor default)
     # "fast" = Method 2 (M1 EMA 50 trailing)
     # "slow" = Method 3 (M5 EMA 50 trailing)
-    scalping_exit_method: str = "fixed_tp"
+    scalping_exit_method: str = "fixed_tp"  # Method 1: safest, Alex's default for scalping
 
     # Funded account mode (Workshop de Cuentas Fondeadas)
     # Only enable after 3 consecutive months of profitability

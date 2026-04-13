@@ -1309,8 +1309,7 @@ export default function SettingsScreen() {
         <HUDDivider />
 
         {/* Version */}
-        <HUDStatRow label="Version" value="Atlas v1.0" valueColor={theme.colors.textMuted} />
-        <HUDStatRow label="Theme" value="Liquid Glass Light" valueColor={theme.colors.textSecondary} />
+        <HUDStatRow label="Version" value="Atlas v3.0" valueColor={theme.colors.textMuted} />
       </HUDCard>
 
       <View style={styles.bottomSpacer} />

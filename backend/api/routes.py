@@ -486,10 +486,9 @@ async def get_watchlist():
         }
         if instrument in engine.last_scan_results:
             analysis = engine.last_scan_results[instrument]
-            # Only show AI-validated score, not the raw technical score
-            # The score field is set to ai_score in _detect_setup when AI validates
-            ai_validated = getattr(analysis, '_ai_validated', False)
-            entry["score"] = analysis.score if ai_validated else None
+            # Always show technical score so the UI has data to display
+            # When AI validates a setup, the score is overwritten with the AI score
+            entry["score"] = analysis.score
             entry["trend"] = analysis.htf_trend.value
             entry["convergence"] = analysis.htf_ltf_convergence
             entry["patterns"] = analysis.candlestick_patterns

@@ -2782,14 +2782,14 @@ class MarketAnalyzer:
                 # Negative correlation: divergence = both moving same way
                 # Bearish SMT: instrument HH AND correlated also HH (should be LL)
                 if made_higher_high and corr_made_higher_high:
-                    logger.warning(
+                    logger.info(
                         f"SMT Divergence BEARISH (neg-corr): {instrument} HH "
                         f"and {corr_inst} also HH (should diverge)"
                     )
                     return "bearish"
                 # Bullish SMT: instrument LL AND correlated also LL (should be HH)
                 if made_lower_low and corr_made_lower_low:
-                    logger.warning(
+                    logger.info(
                         f"SMT Divergence BULLISH (neg-corr): {instrument} LL "
                         f"and {corr_inst} also LL (should diverge)"
                     )

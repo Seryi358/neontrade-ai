@@ -266,7 +266,8 @@ class TradingEngine:
         self.scalping_analyzer: Optional['ScalpingAnalyzer'] = None
         if settings.scalping_enabled and _SCALPING_AVAILABLE:
             self.scalping_analyzer = ScalpingAnalyzer(self.broker)
-            logger.info("Scalping module ENABLED — compressed timeframes active")
+            self._scan_interval = 30  # 30s for scalping (faster than 120s day trading)
+            logger.info(f"Scalping module ENABLED — scan interval {self._scan_interval}s, compressed timeframes active")
         elif settings.scalping_enabled and not _SCALPING_AVAILABLE:
             logger.warning("Scalping enabled in config but module not available")
 
@@ -600,6 +601,7 @@ class TradingEngine:
             logger.error(f"Initial scan failed (non-critical): {e}")
 
         # Main loop
+        logger.info(f"Main loop starting — scan every {self._scan_interval}s")
         while self._running:
             try:
                 await self._tick()

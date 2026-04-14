@@ -602,11 +602,15 @@ class TradingEngine:
 
         # Main loop
         logger.info(f"Main loop starting — scan every {self._scan_interval}s")
+        tick_count = 0
         while self._running:
+            tick_count += 1
             try:
-                await self._tick()
+                await asyncio.wait_for(self._tick(), timeout=300)  # 5 min timeout per tick
+            except asyncio.TimeoutError:
+                logger.error(f"Tick #{tick_count} TIMED OUT after 300s — skipping to next cycle")
             except Exception as e:
-                logger.error(f"Error in main loop: {e}")
+                logger.error(f"Error in main loop tick #{tick_count}: {e}")
                 if self._ws_broadcast:
                     try:
                         await self._ws_broadcast("engine_error", {"error": str(e)})

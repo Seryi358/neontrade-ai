@@ -638,6 +638,7 @@ class TradingEngine:
         """One iteration of the main trading loop."""
         now = datetime.now(timezone.utc)
         market_open = self._is_market_open(now)
+        logger.info(f"Tick at {now.strftime('%H:%M:%S')} UTC | market_open={market_open} | weekday={now.weekday()} | hour={now.hour}")
 
         # Reset daily counters at midnight UTC
         self._reset_daily_counters()
@@ -684,7 +685,9 @@ class TradingEngine:
                     return
 
             # Check economic calendar for upcoming news
+            logger.debug("Checking news filter...")
             has_news, news_desc = await self.news_filter.has_upcoming_news()
+            logger.info(f"News check: has_news={has_news} desc={news_desc[:50] if news_desc else 'none'}")
             self._news_active = has_news  # Cache for CPA auto-trigger check
             if has_news:
                 # Funded account: block ALL trades during news, not just execution

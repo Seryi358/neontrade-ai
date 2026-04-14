@@ -33,8 +33,8 @@ def _event(minutes_from_now=0, currency="USD", impact="high", title="CPI"):
 
 class TestNewsWindows:
     def test_scalping_window(self):
-        """Scalping: 60 min before, 60 min after."""
-        assert NEWS_WINDOWS[TradingStyle.SCALPING] == (60, 60)
+        """Scalping: 30 min before, 15 min after (same as day trading)."""
+        assert NEWS_WINDOWS[TradingStyle.SCALPING] == (30, 15)
 
     def test_day_trading_window(self):
         """Day trading: 30 min before, 15 min after."""
@@ -107,8 +107,8 @@ class TestInit:
 
     def test_scalping_window(self):
         nf = NewsFilter(trading_style=TradingStyle.SCALPING)
-        assert nf.minutes_before == 60
-        assert nf.minutes_after == 60
+        assert nf.minutes_before == 30
+        assert nf.minutes_after == 15
 
     def test_custom_override(self):
         """Explicit minutes should override style defaults."""
@@ -170,16 +170,16 @@ class TestHasUpcomingNews:
 
     @pytest.mark.asyncio
     async def test_style_override_scalping(self, nf):
-        """Scalping override should use 60min window (vs day_trading 30min)."""
-        # Event 45 min away — outside day_trading window but inside scalping
-        nf._cached_events = [_event(minutes_from_now=45)]
+        """Scalping uses same 30min window as day_trading."""
+        # Event 20 min away — inside both windows
+        nf._cached_events = [_event(minutes_from_now=20)]
         nf._cache_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        # Default day_trading style — should not block
+        # Default day_trading style — should block (20 < 30)
         has_news_dt, _ = await nf.has_upcoming_news()
-        assert has_news_dt is False
+        assert has_news_dt is True
 
-        # Override to scalping — should block
+        # Override to scalping — should also block (20 < 30)
         has_news_sc, desc = await nf.has_upcoming_news(trading_style=TradingStyle.SCALPING)
         assert has_news_sc is True
         assert "SCALPING" in desc

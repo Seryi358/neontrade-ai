@@ -820,14 +820,14 @@ class TestNewsFilterBlocking:
         from core.news_filter import NewsFilter, NEWS_WINDOWS, TradingStyle as NfTradingStyle
 
         # Verify window sizes per style
-        assert NEWS_WINDOWS[NfTradingStyle.SCALPING] == (60, 60)
+        assert NEWS_WINDOWS[NfTradingStyle.SCALPING] == (30, 15)
         assert NEWS_WINDOWS[NfTradingStyle.DAY_TRADING] == (30, 15)
         assert NEWS_WINDOWS[NfTradingStyle.SWING] == (15, 5)
 
         # Verify filters are created with correct windows
         nf_scalping = NewsFilter(trading_style=NfTradingStyle.SCALPING)
-        assert nf_scalping.minutes_before == 60
-        assert nf_scalping.minutes_after == 60
+        assert nf_scalping.minutes_before == 30
+        assert nf_scalping.minutes_after == 15
 
         nf_day = NewsFilter(trading_style=NfTradingStyle.DAY_TRADING)
         assert nf_day.minutes_before == 30

@@ -43,8 +43,9 @@ class TradingStyle(str, Enum):
 
 # Per-style danger windows (minutes_before, minutes_after)
 NEWS_WINDOWS: Dict[TradingStyle, Tuple[int, int]] = {
-    # Mentorship: "Do NOT trade during news. Period." for scalping
-    TradingStyle.SCALPING: (60, 60),
+    # Scalping: 30 min before, 15 min after (same as day trading)
+    # 60/60 was too restrictive — blocked the entire last hour of trading daily
+    TradingStyle.SCALPING: (30, 15),
     # Mentorship: Don't open new positions; move existing to break-even
     TradingStyle.DAY_TRADING: (30, 15),
     # Mentorship: Exercise extreme caution but can potentially execute

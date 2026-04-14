@@ -982,6 +982,42 @@ async def get_notifications():
     return []
 
 
+# ── Engine Logs (last N lines from loguru file) ────────────────
+
+@router.get("/logs")
+async def get_engine_logs(lines: int = Query(100, ge=10, le=500)):
+    """Get the last N lines of engine logs for debugging."""
+    import os
+    from datetime import datetime
+    today = datetime.now().strftime("%Y-%m-%d")
+    log_dirs = ["logs", "/app/logs"]
+    # Search for today's log file (loguru format: atlas_YYYY-MM-DD.log)
+    for log_dir in log_dirs:
+        if not os.path.isdir(log_dir):
+            continue
+        # Try today's log, then any .log file
+        candidates = [
+            os.path.join(log_dir, f"atlas_{today}.log"),
+        ]
+        # Also find any recent .log file
+        try:
+            for f in sorted(os.listdir(log_dir), reverse=True):
+                if f.endswith(".log"):
+                    candidates.append(os.path.join(log_dir, f))
+        except Exception:
+            pass
+        for lp in candidates:
+            if os.path.isfile(lp):
+                try:
+                    with open(lp, "r") as f:
+                        all_lines = f.readlines()
+                        return {"file": lp, "total_lines": len(all_lines), "lines": [l.rstrip() for l in all_lines[-lines:]]}
+                except Exception as e:
+                    return {"error": str(e), "file": lp}
+
+    return {"error": "No log file found", "searched": log_dirs}
+
+
 # ── Economic Calendar ───────────────────────────────────────────
 
 @router.get("/calendar")

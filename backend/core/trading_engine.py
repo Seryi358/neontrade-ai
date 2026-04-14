@@ -145,7 +145,8 @@ class TradingEngine:
         self.explanation_engine = ExplanationEngine()
         # R30 fix: scan lock prevents overlapping scan cycles (duplicate trades)
         self._scan_lock = asyncio.Lock()
-        news_style = "scalping" if settings.scalping_enabled else "day_trading"
+        from core.news_filter import TradingStyle as NFTradingStyle
+        news_style = NFTradingStyle.SCALPING if settings.scalping_enabled else NFTradingStyle.DAY_TRADING
         self.news_filter = NewsFilter(
             trading_style=news_style,
             finnhub_key=getattr(settings, 'finnhub_api_key', ''),

@@ -597,6 +597,11 @@ class ScalpingAnalyzer:
             last_candles=last_candles,
             current_price=current_price,
             session=base_analysis.session,
+            # Pass through weekly EMA8 from base analysis (needed by strategy filters)
+            ema_w8=base_analysis.ema_w8,
+            swing_highs=base_analysis.swing_highs,
+            swing_lows=base_analysis.swing_lows,
+            elliott_wave=base_analysis.elliott_wave,
         )
 
         return scalp_result

@@ -988,15 +988,18 @@ async def get_notifications():
 async def get_economic_calendar():
     """Get today's economic events that affect trading."""
     from main import engine
-    if hasattr(engine, 'news_filter'):
-        events = await engine.news_filter.get_todays_events()
-        has_news, desc = await engine.news_filter.has_upcoming_news()
-        return {
-            "events": events,
-            "news_active": has_news,
-            "current_warning": desc,
-        }
-    return {"events": [], "news_active": False, "current_warning": None}
+    try:
+        if hasattr(engine, 'news_filter') and engine.news_filter:
+            events = await engine.news_filter.get_todays_events()
+            has_news, desc = await engine.news_filter.has_upcoming_news()
+            return {
+                "events": events,
+                "news_active": has_news,
+                "current_warning": desc or "",
+            }
+    except Exception as e:
+        logger.warning(f"Calendar endpoint error: {e}")
+    return {"events": [], "news_active": False, "current_warning": ""}
 
 
 # ── News Headlines ─────────────────────────────────────────────

@@ -79,13 +79,13 @@ class Settings(BaseSettings):
     # NOTE: The 1% rule works at any capital level. Capital.com supports 0.001 lots
     # (1,000 units) which risks ~$0.20 per 20-pip SL — well within 1% of $190.
     # Alex started trading with 500 EUR. No minimum capital is specified in the mentorship.
-    trading_style: str = "scalping"  # Best for small accounts ($190) - tighter SLs, more frequent setups
+    trading_style: str = "day_trading"  # Alex: "el mejor estilo es Day Trading independientemente de la situación"
 
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # Trading Plan PDF: 0.50% for scalping
     risk_swing: float = 0.01             # Trading Plan PDF: 3% for swing, but capped to 1% for $190 capital safety
-    max_total_risk: float = 0.03          # 3% for scalping with $190 (max 3 trades x 0.5% + buffer)
+    max_total_risk: float = 0.05          # 5% max simultaneous (mentorship: conservative for $190)
 
     # Leverage ratios by asset class (Capital.com defaults for retail accounts)
     # Position sizing uses these to verify margin availability before placing orders.
@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     # Trading Plan PDF: Alex uses 0.80:1 minimum to TP1 (with 61% win rate)
     # Default 1.5:1 is more conservative for users with unknown win rate.
     # Adjust down to 0.80 once you achieve 60%+ win rate over 100+ trades.
-    min_rr_ratio: float = 1.5            # Scalping can achieve 7:1-8:1 R:R per Workshop RED
+    min_rr_ratio: float = 1.5            # Mentorship: 2.5:1 reference with 30% WR; 1.5 conservative default
     min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R (mentoría explícita)
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R (mentoría explícita)
     min_rr_blue_c: float = 2.0  # Blue C requires min 2:1 R:R (mentorship: "minimo 2 a 1, incluso 3 a 1")
@@ -138,7 +138,7 @@ class Settings(BaseSettings):
     #     Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
     # For a 2:1 R:R trade at 1% risk, both methods coincide (1% profit = 50% to TP1).
     # For other R:R ratios, "risk_distance" is simpler and matches Alex's oral instruction.
-    be_trigger_method: str = "pct_to_tp1"  # Trading Plan PDF: "mitad del beneficio hasta el TP1"
+    be_trigger_method: str = "risk_distance"  # Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"
     move_sl_to_be_pct_to_tp1: float = 0.50  # Only used when be_trigger_method="pct_to_tp1"
 
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
@@ -146,9 +146,9 @@ class Settings(BaseSettings):
     # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
     # Mentorship: "sobreoperar después de una pérdida" is a top-5 failure mode.
     # These limits protect against emotional trading during drawdowns.
-    max_trades_per_day: int = 5           # Scalping allows more trades/day (shorter duration)
+    max_trades_per_day: int = 3           # Day trading: fewer, higher-quality trades (mentorship: quality over quantity)
     cooldown_after_consecutive_losses: int = 2  # After 2 consecutive losses, enforce cooldown
-    cooldown_minutes: int = 60            # 1 hour cooldown (scalping trades are shorter)
+    cooldown_minutes: int = 120           # 2 hour cooldown for day trading (more time between setups)
 
     # Re-entry risk reduction (configurable per trader's plan)
     # Mentorship: "Cada uno pone sus normas" — these are DEFAULTS, not hard rules.
@@ -247,7 +247,7 @@ class Settings(BaseSettings):
     # TradingLab: scalping is the RISKIEST style — master day trading first.
     # RED is the recommended strategy for scalping. Avoid BLUE in scalping
     # (15M-to-5M ratio is 3x, making ruptures too similar between timeframes).
-    scalping_enabled: bool = True  # Enabled for small accounts - Workshop de Scalping
+    scalping_enabled: bool = False  # Disabled: mentorship says master day trading FIRST before scalping
     # Atlas defaults (NOT from workshop — workshop defers DD limits)
     scalping_max_daily_dd: float = 0.05  # 5% max daily drawdown (app-added safety)
     scalping_max_total_dd: float = 0.10  # 10% max total drawdown (app-added safety)

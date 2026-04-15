@@ -229,7 +229,10 @@ def _is_at_key_level(analysis: AnalysisResult, direction: str) -> Tuple[bool, fl
     if current_price is None:
         return False, 0.0, "No se puede determinar precio actual"
 
-    tolerance = current_price * 0.003  # 0.3% de tolerancia
+    # Scalping uses wider tolerance (H1 S/R levels are broader than daily)
+    style = _get_trading_style()
+    tol_pct = 0.008 if style == "scalping" else 0.003  # 0.8% scalping, 0.3% day/swing
+    tolerance = current_price * tol_pct
 
     if direction == "BUY":
         for s in sorted(supports, reverse=True):
@@ -264,7 +267,12 @@ def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
     parts = ema_key.split("_")
     candle_tf = parts[1] if len(parts) >= 3 else "M5"
     candles = getattr(analysis, 'last_candles', {}).get(candle_tf, [])
-    # Fallback to M5 if the requested timeframe has no candles
+    # Fallback: use exec TF candles (style-adaptive, not hardcoded M5)
+    if len(candles) < 3:
+        style = _get_trading_style()
+        _exec_fallback = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
+        fallback_tf = _exec_fallback.get(style, "M5")
+        candles = getattr(analysis, 'last_candles', {}).get(fallback_tf, [])
     if len(candles) < 3:
         candles = getattr(analysis, 'last_candles', {}).get("M5", [])
     if len(candles) < 3:
@@ -353,8 +361,9 @@ def _get_current_price_proxy(analysis: AnalysisResult) -> Optional[float]:
     # 1. Use actual current price from market_analyzer (M5 latest close)
     if analysis.current_price and analysis.current_price > 0:
         return analysis.current_price
-    # 2. Fall back to shortest-period EMAs as proxy
-    for key in ("EMA_M5_2", "EMA_M5_5", "EMA_M5_20", "EMA_H1_50"):
+    # 2. Fall back to shortest-period EMAs as proxy (includes scalping M1/M5 keys)
+    for key in ("EMA_M1_50", "EMA_M5_2", "EMA_M5_5", "EMA_M5_50", "EMA_M5_20",
+                "EMA_M15_50", "EMA_H1_50"):
         v = _ema_val(analysis, key)
         if v is not None:
             return v
@@ -1111,7 +1120,8 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
     B: Simple impulse-pullback with no prior reversal pattern (neutral, no bonus)
     C: Breaks 1H EMA 50 but rejects 4H EMA 50 BEFORE pullback (most restrictive, LOWEST confidence -5)
     """
-    ema_4h_50 = _ema_val(analysis, "EMA_H4_50")
+    confirm_ema_key = _tf_ema("confirm", 50)
+    ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
 
     # Variante A: structural double bottom/top detection
     # TradingLab: "doble suelo" or "minimo creciente" - two swing lows/highs
@@ -1160,13 +1170,16 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
             )):
                 return "BLUE_A"
 
-    # Variante C: price REJECTED from 4H EMA50 (bounced off, not just proximity)
-    # TradingLab: Blue C means price approached 4H EMA, showed reversal candle, then pulled back.
+    # Variante C: price REJECTED from confirm-TF EMA50 (bounced off, not just proximity)
+    # TradingLab: Blue C means price approached confirm EMA, showed reversal candle, then pulled back.
     # This is a REJECTION check, not a proximity check.
     price = _get_current_price_proxy(analysis)
     if price and ema_4h_50:
-        # Check for rejection: price approached EMA 4H and bounced away
-        m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
+        # Check for rejection: price approached confirm EMA and bounced away
+        # Style-adaptive candle source: day=M5, scalping=M5, swing=H1
+        _variant_tf = {"day_trading": "M5", "swing": "H1", "scalping": "M5"}
+        variant_candle_tf = _variant_tf.get(_get_trading_style(), "M5")
+        m5_candles = getattr(analysis, 'last_candles', {}).get(variant_candle_tf, [])
         if len(m5_candles) >= 3:
             # Look for a candle that wicked through EMA 4H but closed on the other side (rejection)
             ema_tolerance = ema_4h_50 * 0.002  # 0.2% tolerance zone
@@ -2045,14 +2058,21 @@ class RedStrategy(BaseStrategy):
         # TradingLab: be "permisivos" with the setup EMA break during pullback,
         # BUT if the break is "uncontrolled" (price continues strongly through
         # with large bodies, no pullback), it's NOT a RED - it's just momentum.
-        # Style-adaptive: day=H1, swing=D, scalping=M5
         setup_ema_key = _tf_ema("setup", 50)
         confirm_ema_key = _tf_ema("confirm", 50)
-        ema_1h_val = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
-        m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
-        if ema_1h_val and len(m5_candles) >= 3:
+        ema_setup_val = _ema_val(analysis, setup_ema_key)
+        # Style-adaptive candle timeframe and lookback for uncontrolled break check
+        style = _get_trading_style()
+        _uncontrolled_tf = {"day_trading": "M5", "swing": "H1", "scalping": "M5"}
+        _uncontrolled_lookback = {"day_trading": 3, "swing": 3, "scalping": 5}
+        _uncontrolled_threshold = {"day_trading": 2, "swing": 2, "scalping": 3}
+        uc_tf = _uncontrolled_tf.get(style, "M5")
+        uc_lookback = _uncontrolled_lookback.get(style, 3)
+        uc_threshold = _uncontrolled_threshold.get(style, 2)
+        uc_candles = getattr(analysis, 'last_candles', {}).get(uc_tf, [])
+        if ema_setup_val and len(uc_candles) >= uc_lookback:
             aggressive_count = 0
-            for candle in m5_candles[-3:]:
+            for candle in uc_candles[-uc_lookback:]:
                 body_size = abs(candle.get("close", 0) - candle.get("open", 0))
                 candle_range = candle.get("high", 0) - candle.get("low", 0)
                 if candle_range > 0:
@@ -2064,16 +2084,16 @@ class RedStrategy(BaseStrategy):
                             aggressive_count += 1
                         elif direction == "SELL" and candle.get("close", 0) < candle.get("open", 0):
                             aggressive_count += 1
-            if aggressive_count >= 2:
-                # Uncontrolled break: 2+ aggressive candles = REJECT
+            if aggressive_count >= uc_threshold:
+                # Uncontrolled break: too many aggressive candles = REJECT
                 # Alex says "fuera" (out) at uncontrolled break — not just a penalty
                 failed.append(
-                    f"Rompimiento EMA 1H NO controlado ({aggressive_count} velas agresivas "
-                    f"consecutivas) - no es pullback, es momentum puro — RECHAZADO"
+                    f"Rompimiento EMA setup NO controlado ({aggressive_count} velas agresivas "
+                    f"de {uc_lookback}) - no es pullback, es momentum puro — RECHAZADO"
                 )
                 logger.debug(
-                    f"[RED] Uncontrolled 1H EMA break on {analysis.instrument}: "
-                    f"{aggressive_count} aggressive candles - rejecting (Alex: 'fuera')"
+                    f"[RED] Uncontrolled {uc_tf} EMA break on {analysis.instrument}: "
+                    f"{aggressive_count}/{uc_threshold} aggressive candles - rejecting (Alex: 'fuera')"
                 )
                 return None
 

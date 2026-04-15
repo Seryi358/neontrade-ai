@@ -634,11 +634,11 @@ class ScalpingAnalyzer:
                 elif prev["close"] > prev["open"] and last["close"] < last["open"]:
                     h1_candle_patterns.append("ENGULFING_BEARISH")
 
-        # Last candles: set native timeframe keys for scalping
+        # Last candles: set native timeframe keys for scalping (10 candles for RCC/deceleration)
         last_candles = dict(base_analysis.last_candles)
         m5_candles_df = candles.get("M5", pd.DataFrame())
-        if not m5_candles_df.empty and len(m5_candles_df) >= 3:
-            tail = m5_candles_df.tail(3)
+        if not m5_candles_df.empty and len(m5_candles_df) >= 10:
+            tail = m5_candles_df.tail(10)
             m5_candle_list = [
                 {"open": row["open"], "high": row["high"],
                  "low": row["low"], "close": row["close"],
@@ -648,8 +648,8 @@ class ScalpingAnalyzer:
             last_candles["M5"] = m5_candle_list    # Native M5 key
             last_candles["H1"] = m5_candle_list    # Legacy slot (setup TF)
         m1_candles_df = candles.get("M1", pd.DataFrame())
-        if not m1_candles_df.empty and len(m1_candles_df) >= 3:
-            tail = m1_candles_df.tail(3)
+        if not m1_candles_df.empty and len(m1_candles_df) >= 10:
+            tail = m1_candles_df.tail(10)
             m1_candle_list = [
                 {"open": row["open"], "high": row["high"],
                  "low": row["low"], "close": row["close"],

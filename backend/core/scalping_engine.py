@@ -478,11 +478,13 @@ class ScalpingAnalyzer:
         """
         Build a synthetic AnalysisResult with scalping timeframe mappings.
 
-        Maps:
-        - HTF trend from H1 (not Weekly as in day trading)
-        - LTF trend from M5 (not H1 as in day trading)
-        - EMA values remapped: H4 EMAs -> M15 EMAs, H1 EMAs -> M5 EMAs
-        - MACD values remapped similarly
+        Strategy code uses _tf_ema() which returns NATIVE scalping keys:
+          _tf_ema("direction", 50) = "EMA_H1_50"  -> H1 EMA 50
+          _tf_ema("confirm", 50)   = "EMA_M15_50" -> M15 EMA 50
+          _tf_ema("setup", 50)     = "EMA_M5_50"  -> M5 EMA 50
+          _tf_ema("exec", 50)      = "EMA_M1_50"  -> M1 EMA 50
+
+        We must set these native keys so the strategy reads the correct data.
         """
         candles = scalp_data.candles
 
@@ -511,39 +513,40 @@ class ScalpingAnalyzer:
 
         convergence = (htf_trend == ltf_trend and htf_trend != Trend.RANGING)
 
-        # Build EMA values remapped for scalping:
-        # Strategies look at "EMA_H4_50", "EMA_H1_50", "EMA_D_50", etc.
-        # We remap: D -> H1, H4 -> M15, H1 -> M5, M5 -> M1
+        # Build EMA values with NATIVE scalping keys for _tf_ema() lookups
         ema_values = dict(base_analysis.ema_values)  # start with base
 
-        # Scalping remaps
         if scalp_data.ema50_h1 is not None:
-            ema_values["EMA_D_50"] = scalp_data.ema50_h1    # H1 -> Daily slot
-            ema_values["EMA_D_20"] = scalp_data.ema50_h1    # fallback
+            ema_values["EMA_H1_50"] = scalp_data.ema50_h1    # _tf_ema("direction") = EMA_H1_50
+            ema_values["EMA_D_50"] = scalp_data.ema50_h1     # Legacy day-trading slot
+            ema_values["EMA_D_20"] = scalp_data.ema50_h1     # fallback
         if scalp_data.ema50_m15 is not None:
-            ema_values["EMA_H4_50"] = scalp_data.ema50_m15  # M15 -> H4 slot
+            ema_values["EMA_M15_50"] = scalp_data.ema50_m15  # _tf_ema("confirm") = EMA_M15_50
+            ema_values["EMA_H4_50"] = scalp_data.ema50_m15   # Legacy day-trading slot
         if scalp_data.ema50_m5 is not None:
-            ema_values["EMA_H1_50"] = scalp_data.ema50_m5   # M5 -> H1 slot
+            ema_values["EMA_M5_50"] = scalp_data.ema50_m5    # _tf_ema("setup") = EMA_M5_50
+            ema_values["EMA_M5_20"] = scalp_data.ema50_m5    # fallback for setup TF
+            ema_values["EMA_M5_5"] = scalp_data.ema50_m5     # price proxy for setup TF
         if scalp_data.ema50_m1 is not None:
-            ema_values["EMA_M5_50"] = scalp_data.ema50_m1   # M1 EMA 50 -> M5 EMA 50 slot (execution)
-            ema_values["EMA_M5_20"] = scalp_data.ema50_m1   # Also set M5_20 as fallback
-            ema_values["EMA_M5_5"] = scalp_data.ema50_m1    # Also set M5_5 for price proxy
+            ema_values["EMA_M1_50"] = scalp_data.ema50_m1    # _tf_ema("exec") = EMA_M1_50
 
-        # Build MACD values remapped for scalping
+        # Build MACD values with native scalping timeframe keys
         macd_values = dict(base_analysis.macd_values)
         if scalp_data.macd_h1:
-            macd_values["D"] = scalp_data.macd_h1    # H1 MACD -> Daily slot
+            macd_values["H1"] = scalp_data.macd_h1    # H1 direction MACD
+            macd_values["D"] = scalp_data.macd_h1     # Legacy day-trading slot
         if scalp_data.macd_m5:
-            macd_values["H1"] = scalp_data.macd_m5   # M5 MACD -> H1 slot
+            macd_values["M5"] = scalp_data.macd_m5    # M5 setup MACD
         if scalp_data.macd_m1:
-            macd_values["M5"] = scalp_data.macd_m1   # M1 MACD -> M5 slot
+            macd_values["M1"] = scalp_data.macd_m1    # M1 execution MACD
 
-        # SMA values remapped
+        # SMA values — H1 SMA 200 as long-term filter
         sma_values = dict(base_analysis.sma_values)
         if scalp_data.sma200_h1 is not None:
-            sma_values["SMA_D_200"] = scalp_data.sma200_h1  # H1 SMA -> Daily slot
+            sma_values["SMA_D_200"] = scalp_data.sma200_h1  # Legacy slot (used directly)
+            sma_values["SMA_H1_200"] = scalp_data.sma200_h1 # Native key
 
-        # Volume analysis remapped
+        # Volume analysis
         volume_analysis = dict(base_analysis.volume_analysis)
         if scalp_data.volume_m5:
             volume_analysis["M5"] = scalp_data.volume_m5
@@ -551,24 +554,113 @@ class ScalpingAnalyzer:
         # Current price from M1
         current_price = scalp_data.close_m1 or scalp_data.close_m5
 
-        # Detect condition from H1 (replaces Daily condition)
+        # ── Detect H1 condition (replaces Daily condition) ──
+        # Check for deceleration patterns on H1 candles instead of hardcoding NEUTRAL
         htf_condition = MarketCondition.NEUTRAL
+        if not h1_df.empty and len(h1_df) >= 5:
+            last_5 = h1_df.tail(5)
+            bodies = abs(last_5["close"] - last_5["open"])
+            if len(bodies) >= 3:
+                recent_body = float(bodies.iloc[-1])
+                prev_avg_body = float(bodies.iloc[-4:-1].mean())
+                # Shrinking candle bodies = deceleration
+                if prev_avg_body > 0 and recent_body < prev_avg_body * 0.5:
+                    htf_condition = MarketCondition.DECELERATING
 
-        # Last candles: remap M5 -> H1 slot, M1 -> M5 slot
+        # ── Compute H1 key levels from swing highs/lows ──
+        # Daily S/R levels are too far from scalping entries; use H1 swings
+        key_levels = dict(base_analysis.key_levels)
+        if not h1_df.empty and len(h1_df) >= 10:
+            h1_supports = []
+            h1_resistances = []
+            lookback = min(50, len(h1_df) - 2)
+            lows = h1_df["low"].values
+            highs = h1_df["high"].values
+            for i in range(len(h1_df) - lookback, len(h1_df) - 1):
+                if i < 1:
+                    continue
+                if lows[i] < lows[i - 1] and lows[i] < lows[i + 1]:
+                    h1_supports.append(float(lows[i]))
+                if highs[i] > highs[i - 1] and highs[i] > highs[i + 1]:
+                    h1_resistances.append(float(highs[i]))
+            # Merge with base levels (H1 levels take precedence by being closer to price)
+            base_supports = key_levels.get("supports", [])
+            base_resistances = key_levels.get("resistances", [])
+            if h1_supports:
+                key_levels["supports"] = sorted(set(h1_supports + base_supports))
+            if h1_resistances:
+                key_levels["resistances"] = sorted(set(h1_resistances + base_resistances))
+
+        # ── Compute H1 swing highs/lows for strategy use ──
+        h1_swing_highs = []
+        h1_swing_lows = []
+        if not h1_df.empty and len(h1_df) >= 10:
+            lookback = min(50, len(h1_df) - 2)
+            for i in range(len(h1_df) - lookback, len(h1_df) - 1):
+                if i < 1:
+                    continue
+                if lows[i] < lows[i - 1] and lows[i] < lows[i + 1]:
+                    h1_swing_lows.append(float(lows[i]))
+                if highs[i] > highs[i - 1] and highs[i] > highs[i + 1]:
+                    h1_swing_highs.append(float(highs[i]))
+
+        # ── Detect H1 candlestick patterns for deceleration ──
+        h1_candle_patterns = list(base_analysis.candlestick_patterns)
+        if not h1_df.empty and len(h1_df) >= 3:
+            last = h1_df.iloc[-1]
+            prev = h1_df.iloc[-2]
+            body = abs(last["close"] - last["open"])
+            upper_wick = last["high"] - max(last["open"], last["close"])
+            lower_wick = min(last["open"], last["close"]) - last["low"]
+            candle_range = last["high"] - last["low"]
+
+            if candle_range > 0:
+                body_ratio = body / candle_range
+                # Doji: very small body relative to range
+                if body_ratio < 0.15:
+                    h1_candle_patterns.append("DOJI")
+                # Low test (hammer): long lower wick, small upper wick
+                elif lower_wick > body * 2 and upper_wick < body:
+                    h1_candle_patterns.append("LOW_TEST")
+                # High test (shooting star): long upper wick, small lower wick
+                elif upper_wick > body * 2 and lower_wick < body:
+                    h1_candle_patterns.append("HIGH_TEST")
+
+            # Engulfing patterns
+            prev_body = abs(prev["close"] - prev["open"])
+            if prev_body > 0 and body > prev_body * 1.2:
+                if prev["close"] < prev["open"] and last["close"] > last["open"]:
+                    h1_candle_patterns.append("ENGULFING_BULLISH")
+                elif prev["close"] > prev["open"] and last["close"] < last["open"]:
+                    h1_candle_patterns.append("ENGULFING_BEARISH")
+
+        # Last candles: set native timeframe keys for scalping
         last_candles = dict(base_analysis.last_candles)
-        m5_candles = candles.get("M5", pd.DataFrame())
-        if not m5_candles.empty and len(m5_candles) >= 3:
-            tail = m5_candles.tail(3)
-            last_candles["H1"] = [
+        m5_candles_df = candles.get("M5", pd.DataFrame())
+        if not m5_candles_df.empty and len(m5_candles_df) >= 3:
+            tail = m5_candles_df.tail(3)
+            m5_candle_list = [
                 {"open": row["open"], "high": row["high"],
                  "low": row["low"], "close": row["close"],
                  "volume": row.get("volume", 0)}
                 for _, row in tail.iterrows()
             ]
-        m1_candles = candles.get("M1", pd.DataFrame())
-        if not m1_candles.empty and len(m1_candles) >= 3:
-            tail = m1_candles.tail(3)
-            last_candles["M5"] = [
+            last_candles["M5"] = m5_candle_list    # Native M5 key
+            last_candles["H1"] = m5_candle_list    # Legacy slot (setup TF)
+        m1_candles_df = candles.get("M1", pd.DataFrame())
+        if not m1_candles_df.empty and len(m1_candles_df) >= 3:
+            tail = m1_candles_df.tail(3)
+            m1_candle_list = [
+                {"open": row["open"], "high": row["high"],
+                 "low": row["low"], "close": row["close"],
+                 "volume": row.get("volume", 0)}
+                for _, row in tail.iterrows()
+            ]
+            last_candles["M1"] = m1_candle_list    # Native M1 key
+        h1_candles_df = candles.get("H1", pd.DataFrame())
+        if not h1_candles_df.empty and len(h1_candles_df) >= 3:
+            tail = h1_candles_df.tail(3)
+            last_candles["H1_raw"] = [
                 {"open": row["open"], "high": row["high"],
                  "low": row["low"], "close": row["close"],
                  "volume": row.get("volume", 0)}
@@ -581,10 +673,10 @@ class ScalpingAnalyzer:
             htf_condition=htf_condition,
             ltf_trend=ltf_trend,
             htf_ltf_convergence=convergence,
-            key_levels=base_analysis.key_levels,
+            key_levels=key_levels,
             ema_values=ema_values,
             fibonacci_levels=base_analysis.fibonacci_levels,
-            candlestick_patterns=base_analysis.candlestick_patterns,
+            candlestick_patterns=h1_candle_patterns,
             chart_patterns=base_analysis.chart_patterns,
             macd_values=macd_values,
             sma_values=sma_values,
@@ -599,8 +691,8 @@ class ScalpingAnalyzer:
             session=base_analysis.session,
             # Pass through weekly EMA8 from base analysis (needed by strategy filters)
             ema_w8=base_analysis.ema_w8,
-            swing_highs=base_analysis.swing_highs,
-            swing_lows=base_analysis.swing_lows,
+            swing_highs=h1_swing_highs if h1_swing_highs else base_analysis.swing_highs,
+            swing_lows=h1_swing_lows if h1_swing_lows else base_analysis.swing_lows,
             elliott_wave=base_analysis.elliott_wave,
         )
 

@@ -1464,7 +1464,14 @@ async def run_backtest(request: BacktestRequest):
         except asyncio.TimeoutError:
             raise HTTPException(408, "Backtest timed out after 120 seconds. Try a shorter period.")
         import math
-        _safe = lambda v: 0.0 if (isinstance(v, float) and (math.isinf(v) or math.isnan(v))) else v
+        def _safe(v):
+            if isinstance(v, float) and (math.isinf(v) or math.isnan(v)):
+                return 0.0
+            if isinstance(v, dict):
+                return {k: _safe(vv) for k, vv in v.items()}
+            if isinstance(v, list):
+                return [_safe(vv) for vv in v]
+            return v
         return {
             "total_trades": result.total_trades,
             "winning_trades": result.winning_trades,
@@ -1478,7 +1485,7 @@ async def run_backtest(request: BacktestRequest):
             "avg_rr_achieved": _safe(result.avg_rr_achieved),
             "final_balance": _safe(result.final_balance),
             "equity_curve": result.equity_curve,
-            "by_strategy": result.by_strategy,
+            "by_strategy": _safe(result.by_strategy),
             "trades": [
                 {
                     "instrument": t.instrument,

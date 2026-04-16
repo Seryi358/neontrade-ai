@@ -148,13 +148,23 @@ class AlertManager:
             logger.warning("Could not load alert config: {}", exc)
 
     def _save_config(self):
-        """Persist current config to JSON."""
+        """Persist current config to JSON atomically."""
         try:
+            import os, tempfile
             CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            CONFIG_PATH.write_text(
-                json.dumps(asdict(self._config), indent=2),
-                encoding="utf-8",
-            )
+            payload = json.dumps(asdict(self._config), indent=2)
+            dir_name = str(CONFIG_PATH.parent)
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(payload)
+                os.replace(tmp_path, str(CONFIG_PATH))
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
             logger.debug("Alert config saved to {}", CONFIG_PATH)
         except Exception as exc:
             logger.warning("Could not save alert config: {}", exc)

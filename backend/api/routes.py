@@ -605,13 +605,17 @@ async def emergency_close_all():
         rm = engine.risk_manager
         pm = engine.position_manager
         balance = getattr(rm, '_current_balance', 1.0) or 1.0
-        for trade_id, risk_pct in list(rm._active_risks.items()):
-            parts = trade_id.split(":")
-            inst = parts[0] if len(parts) > 1 else "unknown"
+        for composite_key, risk_pct in list(rm._active_risks.items()):
+            # _active_risks is keyed as "instrument:trade_id"; split to recover both
+            parts = composite_key.split(":", 1)
+            if len(parts) == 2:
+                inst, real_trade_id = parts[0], parts[1]
+            else:
+                inst, real_trade_id = "unknown", composite_key
             try:
                 # Compute actual PnL from position entry price and last known price
                 pnl_pct = 0.0
-                pos = pm.positions.get(trade_id)
+                pos = pm.positions.get(real_trade_id)
                 if pos is not None:
                     try:
                         price_data = await broker.get_current_price(pos.instrument)
@@ -620,10 +624,10 @@ async def emergency_close_all():
                         pnl_dollars = pnl_per_unit * abs(pos.units) if pos.units else 0.0
                         pnl_pct = pnl_dollars / balance if balance > 0 else 0.0
                     except Exception as pe:
-                        logger.warning(f"Could not compute PnL for {trade_id}: {pe}")
-                rm.record_trade_result(trade_id, inst, pnl_pct)
+                        logger.warning(f"Could not compute PnL for {real_trade_id}: {pe}")
+                rm.record_trade_result(real_trade_id, inst, pnl_pct)
             except Exception as e:
-                logger.warning(f"Failed to record emergency close for {trade_id}: {e}")
+                logger.warning(f"Failed to record emergency close for {composite_key}: {e}")
 
     # Re-sync state from broker instead of blindly clearing
     try:

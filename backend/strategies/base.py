@@ -2402,7 +2402,13 @@ class RedStrategy(BaseStrategy):
             analysis.fibonacci_levels.get("ext_bull_1.618") if direction == "BUY"
             else analysis.fibonacci_levels.get("ext_bear_1.618")
         )
-        fib_100 = analysis.fibonacci_levels.get("ext_1.0")
+        # ext_1.0 is a bearish-only alias (price below swing_low). Use the
+        # explicit directional keys so BUY setups can target the 1.0 extension
+        # ABOVE swing_high.
+        fib_100 = (
+            analysis.fibonacci_levels.get("ext_bull_1.0") if direction == "BUY"
+            else analysis.fibonacci_levels.get("ext_bear_1.0")
+        )
 
         # Wave 3 with strong daily setup: aggressive TP, target 1.618 extension
         # Alex: "le añado un último condicional, y es que si entre el punto de entrada

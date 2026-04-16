@@ -350,43 +350,105 @@ export default function App() {
     }
   }, []);
 
-  // Auto dark/light mode based on time of day (6PM-6AM = dark, 6AM-6PM = light)
-  // React Native Web uses class-based styles (r-*), so we override colors at runtime
+  // Auto dark/light mode + iOS 26 Liquid Glass effect
+  // Transforms React Native Web white cards into translucent glass panels
   useEffect(() => {
     if (Platform.OS !== 'web') return;
 
-    // Color mapping: light -> dark
-    const COLOR_MAP: Record<string, string> = {
-      'rgb(29, 29, 31)': '#f5f5f7',     // textPrimary -> light
-      'rgb(134, 134, 139)': '#a1a1a6',  // textSecondary -> light
-      'rgb(174, 174, 178)': '#636366',  // textMuted -> light
-      'rgb(242, 242, 247)': '#000000',  // background -> black
-      'rgb(255, 255, 255)': '#1c1c1e',  // white -> dark card
+    // Dark mode color map
+    const DARK_COLOR_MAP: Record<string, string> = {
+      'rgb(29, 29, 31)': '#f5f5f7',
+      'rgb(134, 134, 139)': '#a1a1a6',
+      'rgb(174, 174, 178)': '#636366',
+      'rgb(242, 242, 247)': '#000000',
     };
 
-    let originalStyles = new WeakMap<HTMLElement, {color?: string; bg?: string}>();
+    // Cards/white backgrounds to transform (both modes get glass)
+    const CARD_BG_LIGHT = 'rgb(255, 255, 255)';
+    const GROUPED_BG_LIGHT = 'rgb(242, 242, 247)';
 
-    const applyDarkMode = () => {
+    let originalStyles = new WeakMap<HTMLElement, {
+      color?: string; bg?: string; backdrop?: string;
+      border?: string; boxShadow?: string; backgroundImage?: string;
+    }>();
+
+    const saveOriginal = (el: HTMLElement) => {
+      if (!originalStyles.has(el)) {
+        originalStyles.set(el, {
+          color: el.style.color,
+          bg: el.style.backgroundColor,
+          backdrop: (el.style as any).backdropFilter,
+          border: el.style.border,
+          boxShadow: el.style.boxShadow,
+          backgroundImage: el.style.backgroundImage,
+        });
+      }
+    };
+
+    const applyLiquidGlass = (isDark: boolean) => {
+      // Root background gradient (iOS 26 style)
+      if (isDark) {
+        document.body.style.setProperty('background',
+          'radial-gradient(ellipse at top, #1a1a2e 0%, #000000 60%, #000000 100%)',
+          'important');
+        document.body.style.setProperty('min-height', '100vh', 'important');
+      } else {
+        document.body.style.setProperty('background',
+          'radial-gradient(ellipse at top, #f5f5f7 0%, #e8e8f0 100%)',
+          'important');
+      }
+
       const all = document.querySelectorAll('*') as NodeListOf<HTMLElement>;
       all.forEach(el => {
+        saveOriginal(el);
         const cs = getComputedStyle(el);
         const color = cs.color;
         const bg = cs.backgroundColor;
+        const rect = el.getBoundingClientRect();
+        const isLarge = rect.width > 100 && rect.height > 40;
 
-        if (!originalStyles.has(el)) {
-          originalStyles.set(el, { color: el.style.color, bg: el.style.backgroundColor });
+        // Dark mode: invert text colors
+        if (isDark && DARK_COLOR_MAP[color]) {
+          el.style.setProperty('color', DARK_COLOR_MAP[color], 'important');
         }
 
-        if (COLOR_MAP[color]) {
-          el.style.setProperty('color', COLOR_MAP[color], 'important');
+        // Liquid Glass transformation for card-like elements (white bg + large size)
+        if (bg === CARD_BG_LIGHT && isLarge) {
+          if (isDark) {
+            // Dark glass: translucent dark with saturated blur
+            el.style.setProperty('background',
+              'linear-gradient(135deg, rgba(44,44,46,0.72) 0%, rgba(28,28,30,0.48) 100%)',
+              'important');
+            el.style.setProperty('backdrop-filter', 'blur(40px) saturate(200%)', 'important');
+            (el.style as any).webkitBackdropFilter = 'blur(40px) saturate(200%)';
+            el.style.setProperty('border', '1px solid rgba(255,255,255,0.12)', 'important');
+            el.style.setProperty('box-shadow',
+              '0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
+              'important');
+          } else {
+            // Light glass: translucent white with blur
+            el.style.setProperty('background',
+              'linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.55) 100%)',
+              'important');
+            el.style.setProperty('backdrop-filter', 'blur(40px) saturate(180%)', 'important');
+            (el.style as any).webkitBackdropFilter = 'blur(40px) saturate(180%)';
+            el.style.setProperty('border', '1px solid rgba(255,255,255,0.6)', 'important');
+            el.style.setProperty('box-shadow',
+              '0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+              'important');
+          }
         }
-        if (COLOR_MAP[bg]) {
-          el.style.setProperty('background-color', COLOR_MAP[bg], 'important');
+
+        // Background layer (grouped background → black in dark mode)
+        if (bg === GROUPED_BG_LIGHT && isDark) {
+          el.style.setProperty('background-color', 'transparent', 'important');
         }
       });
     };
 
-    const removeDarkMode = () => {
+    const removeAllStyles = () => {
+      document.body.style.removeProperty('background');
+      document.body.style.removeProperty('min-height');
       const all = document.querySelectorAll('*') as NodeListOf<HTMLElement>;
       all.forEach(el => {
         const orig = originalStyles.get(el);
@@ -395,29 +457,40 @@ export default function App() {
           else el.style.removeProperty('color');
           if (orig.bg !== undefined) el.style.backgroundColor = orig.bg;
           else el.style.removeProperty('background-color');
+          if (orig.backgroundImage !== undefined) el.style.backgroundImage = orig.backgroundImage;
+          else el.style.removeProperty('background-image');
+          if (orig.backdrop !== undefined) (el.style as any).backdropFilter = orig.backdrop;
+          else el.style.removeProperty('backdrop-filter');
+          (el.style as any).webkitBackdropFilter = '';
+          if (orig.border !== undefined) el.style.border = orig.border;
+          else el.style.removeProperty('border');
+          if (orig.boxShadow !== undefined) el.style.boxShadow = orig.boxShadow;
+          else el.style.removeProperty('box-shadow');
         }
       });
       originalStyles = new WeakMap();
     };
 
     let observer: MutationObserver | null = null;
-    let currentIsDark = false;
+    let currentMode: 'dark' | 'light' | null = null;
 
     const updateTheme = () => {
       const hour = new Date().getHours();
       const isDark = hour >= 18 || hour < 6;
+      const newMode = isDark ? 'dark' : 'light';
       document.body.classList.toggle('dark-mode', isDark);
 
-      if (isDark && !currentIsDark) {
-        currentIsDark = true;
-        applyDarkMode();
-        // Observe DOM changes to re-apply dark mode to new elements
-        observer = new MutationObserver(() => applyDarkMode());
-        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
-      } else if (!isDark && currentIsDark) {
-        currentIsDark = false;
+      if (newMode !== currentMode) {
         if (observer) { observer.disconnect(); observer = null; }
-        removeDarkMode();
+        if (currentMode !== null) removeAllStyles();
+        currentMode = newMode;
+        applyLiquidGlass(isDark);
+        // MutationObserver re-applies to new elements
+        observer = new MutationObserver(() => applyLiquidGlass(isDark));
+        observer.observe(document.body, {
+          childList: true, subtree: true,
+          attributes: true, attributeFilter: ['style', 'class']
+        });
       }
     };
 

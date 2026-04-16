@@ -1615,11 +1615,17 @@ class ScalpingAnalyzer:
         signal_line = macd_line.ewm(span=signal, adjust=False).mean()
         histogram = macd_line - signal_line
 
+        macd_last = macd_line.iloc[-1]
+        signal_last = signal_line.iloc[-1]
+        hist_last = histogram.iloc[-1]
+        if pd.isna(macd_last) or pd.isna(signal_last) or pd.isna(hist_last):
+            return None
+
         return {
-            "macd": float(macd_line.iloc[-1]),
-            "signal": float(signal_line.iloc[-1]),
-            "histogram": float(histogram.iloc[-1]),
-            "bullish": bool(macd_line.iloc[-1] > signal_line.iloc[-1]),
+            "macd": float(macd_last),
+            "signal": float(signal_last),
+            "histogram": float(hist_last),
+            "bullish": bool(macd_last > signal_last),
         }
 
     def _candles_to_dataframe(self, candles) -> pd.DataFrame:

@@ -1412,6 +1412,17 @@ class BacktestRequest(BaseModel):
 async def run_backtest(request: BacktestRequest):
     """Run a backtest on historical data for a specific instrument."""
     from main import engine
+    from datetime import datetime
+
+    # Validate date format before running backtest (returns 422 instead of 500)
+    try:
+        start_dt = datetime.strptime(request.start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(request.end_date, "%Y-%m-%d")
+        if end_dt <= start_dt:
+            raise HTTPException(422, "end_date must be after start_date")
+    except ValueError as ve:
+        raise HTTPException(422, f"Invalid date format (expected YYYY-MM-DD): {ve}")
+
     try:
         from core.backtester import Backtester, BacktestConfig
     except ImportError as e:

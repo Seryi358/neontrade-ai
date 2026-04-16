@@ -835,18 +835,18 @@ class OpenAIAnalyzer:
             return {
                 "ai_score": 0,
                 "ai_recommendation": "SKIP",
-                "ai_reasoning": "AI response truncated (increase max_tokens). Cannot validate — BLOCKED.",
+                "ai_reasoning": "AI response truncated (informational only). Trade proceeds per mentorship rules.",
                 "suggested_adjustments": {},
             }
         except Exception as e:
-            logger.warning("AI validation failed for {} — BLOCKING (cannot validate = cannot proceed): {}", setup_signal.instrument, e)
-            # TradingLab rule: AI validation is BLOCKING — only TAKE setups proceed.
-            # If AI is unavailable, we cannot validate → must reject.
-            # The trading_engine.py also blocks on exceptions as a safety net.
+            logger.warning("AI validation failed for {} (informational only, trade still proceeds): {}", setup_signal.instrument, e)
+            # AI is INFORMATIONAL ONLY per user decision — technical analysis
+            # decides whether to trade. AI opinion is surfaced in emails/UI for
+            # learning context but never blocks or modifies a setup.
             return {
                 "ai_score": 0,
                 "ai_recommendation": "SKIP",
-                "ai_reasoning": f"AI unavailable ({str(e)[:80]}). Cannot validate — BLOCKED per TradingLab rules.",
+                "ai_reasoning": f"AI unavailable ({str(e)[:80]}). Informational opinion skipped — trade proceeds per mentorship 0% discretion rule.",
                 "suggested_adjustments": {},
             }
 

@@ -339,11 +339,17 @@ async def _handle_ws_command(websocket: WebSocket, data: dict):
     elif action == "reject":
         setup_id = data.get("setup_id")
         if setup_id and hasattr(engine, 'reject_setup'):
-            engine.reject_setup(setup_id)
-            await ws_manager.send_personal(websocket, "setup_response", {
-                "setup_id": setup_id,
-                "rejected": True,
-            })
+            try:
+                engine.reject_setup(setup_id)
+                await ws_manager.send_personal(websocket, "setup_response", {
+                    "setup_id": setup_id,
+                    "rejected": True,
+                })
+            except Exception as e:
+                logger.error(f"WS reject_setup failed for {setup_id}: {e}")
+                await ws_manager.send_personal(websocket, "error", {
+                    "message": f"Reject failed: {e}",
+                })
 
     elif action == "set_mode":
         mode = data.get("mode", "AUTO").upper()

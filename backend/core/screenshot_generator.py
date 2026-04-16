@@ -280,6 +280,21 @@ class TradeScreenshotGenerator:
         candles = candles[-100:]
 
         fig, ax = plt.subplots(1, 1, figsize=(14, 8), facecolor=THEME["bg"])
+        try:
+            self._render_candlestick_inner(fig, ax, filepath, candles, levels, trade_info, ema_values)
+        finally:
+            plt.close(fig)
+
+    def _render_candlestick_inner(
+        self,
+        fig,
+        ax,
+        filepath: str,
+        candles: list[dict],
+        levels: dict,
+        trade_info: dict,
+        ema_values: dict | None = None,
+    ):
         ax.set_facecolor(THEME["bg"])
 
         # Draw candlesticks
@@ -379,7 +394,6 @@ class TradeScreenshotGenerator:
 
         plt.tight_layout()
         fig.savefig(filepath, dpi=150, facecolor=THEME["bg"], bbox_inches="tight")
-        plt.close(fig)
 
     def _draw_candlesticks(self, ax, candles: list[dict]):
         """Draw OHLC candlesticks on the axes."""
@@ -590,6 +604,12 @@ class TradeScreenshotGenerator:
     def _generate_info_card(self, filepath: str, trade_info: dict):
         """Generate a simple info card when candle data is not available."""
         fig, ax = plt.subplots(1, 1, figsize=(10, 6), facecolor=THEME["bg"])
+        try:
+            self._render_info_card_inner(fig, ax, filepath, trade_info)
+        finally:
+            plt.close(fig)
+
+    def _render_info_card_inner(self, fig, ax, filepath: str, trade_info: dict):
         ax.set_facecolor(THEME["bg"])
         ax.set_xlim(0, 10)
         ax.set_ylim(0, 10)
@@ -680,4 +700,3 @@ class TradeScreenshotGenerator:
         )
 
         fig.savefig(filepath, dpi=150, facecolor=THEME["bg"], bbox_inches="tight")
-        plt.close(fig)

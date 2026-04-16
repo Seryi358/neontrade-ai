@@ -363,9 +363,18 @@ export default function App() {
       'rgb(242, 242, 247)': '#000000',
     };
 
-    // Cards/white backgrounds to transform (both modes get glass)
-    const CARD_BG_LIGHT = 'rgb(255, 255, 255)';
-    const GROUPED_BG_LIGHT = 'rgb(242, 242, 247)';
+    // Card backgrounds to detect (RN Web renders cards as white variants)
+    const isCardBg = (bg: string): boolean => {
+      return bg === 'rgb(255, 255, 255)' ||
+             bg === 'rgba(255, 255, 255, 0.75)' ||
+             bg === 'rgba(255, 255, 255, 0.92)' ||
+             bg === 'rgba(255, 255, 255, 0.85)' ||
+             bg === 'rgb(242, 242, 242)' ||
+             bg.startsWith('rgba(255, 255, 255, 0.');
+    };
+    const isGroupedBg = (bg: string): boolean => {
+      return bg === 'rgb(242, 242, 247)';
+    };
 
     let originalStyles = new WeakMap<HTMLElement, {
       color?: string; bg?: string; backdrop?: string;
@@ -412,8 +421,8 @@ export default function App() {
           el.style.setProperty('color', DARK_COLOR_MAP[color], 'important');
         }
 
-        // Liquid Glass transformation for card-like elements (white bg + large size)
-        if (bg === CARD_BG_LIGHT && isLarge) {
+        // Liquid Glass transformation for card-like elements (white/translucent bg + large size)
+        if (isCardBg(bg) && isLarge) {
           if (isDark) {
             // Dark glass: translucent dark with saturated blur
             el.style.setProperty('background',
@@ -439,8 +448,8 @@ export default function App() {
           }
         }
 
-        // Background layer (grouped background → black in dark mode)
-        if (bg === GROUPED_BG_LIGHT && isDark) {
+        // Background layer (grouped background → transparent so body gradient shows)
+        if (isGroupedBg(bg)) {
           el.style.setProperty('background-color', 'transparent', 'important');
         }
       });

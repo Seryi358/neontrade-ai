@@ -104,6 +104,8 @@ export default function ExamScreen() {
       const blob = new Blob([reportHtml], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
+      // Release the blob after the new tab has had time to load it
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }
   };
 

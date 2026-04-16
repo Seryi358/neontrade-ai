@@ -64,16 +64,31 @@ class SecurityConfig:
             logger.warning("Could not load security config: {}", exc)
 
     def save(self):
-        """Persist security config to disk."""
+        """Persist security config to disk atomically."""
         try:
+            import tempfile
             SECURITY_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            SECURITY_CONFIG_PATH.write_text(json.dumps({
+            payload = json.dumps({
                 "api_keys": self.api_keys,
                 "ip_whitelist": self.ip_whitelist,
                 "rate_limit_rpm": self.rate_limit_rpm,
                 "rate_limit_enabled": self.rate_limit_enabled,
                 "auth_enabled": self.auth_enabled,
-            }, indent=2), "utf-8")
+            }, indent=2)
+            # Atomic write: tmpfile + rename so a crash cannot leave the
+            # security config partial/corrupt (which would break auth).
+            dir_name = str(SECURITY_CONFIG_PATH.parent)
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(payload)
+                os.replace(tmp_path, str(SECURITY_CONFIG_PATH))
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
         except Exception as exc:
             logger.warning("Could not save security config: {}", exc)
 

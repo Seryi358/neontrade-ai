@@ -538,6 +538,14 @@ class TradingEngine:
 
     async def start(self):
         """Start the trading engine."""
+        # Prevent parallel start() calls from creating duplicate broker
+        # connections or contesting risk_manager initialization. The /engine
+        # /start HTTP endpoint already guards via 'if not engine.running',
+        # but start() can also be re-invoked from lifespan or tests.
+        if self._running:
+            logger.warning("Trading engine already running — start() call ignored")
+            return
+
         logger.info("=" * 60)
         logger.info("  Atlas - Trading Engine Starting")
         logger.info(f"  Mode: {self.mode.value}")

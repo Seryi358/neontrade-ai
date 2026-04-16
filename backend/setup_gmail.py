@@ -45,6 +45,9 @@ def main():
         print("ERROR: GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET must be set in .env")
         sys.exit(1)
 
+    # OAuth port must match redirect_uris exactly or Google rejects the callback.
+    OAUTH_PORT = 8090
+
     # Build OAuth2 client config from environment variables
     client_config = {
         "installed": {
@@ -52,7 +55,7 @@ def main():
             "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": ["http://localhost"],
+            "redirect_uris": [f"http://localhost:{OAUTH_PORT}"],
         }
     }
 
@@ -66,7 +69,7 @@ def main():
     print()
 
     flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
-    creds = flow.run_local_server(port=8090, prompt="consent")
+    creds = flow.run_local_server(port=OAUTH_PORT, prompt="consent")
 
     # Save full token for local use
     TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)

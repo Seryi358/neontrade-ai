@@ -416,7 +416,7 @@ export default function DashboardScreen() {
               <Text style={[styles.activityValue, { color: theme.colors.textSecondary }]}>
                 {activity.setups_skipped_ai}
               </Text>
-              <Text style={styles.activityLabel}>AI notes</Text>
+              <Text style={styles.activityLabel}>Filtered &lt;50</Text>
             </View>
           </View>
           {activity.scans_completed > 0 && (

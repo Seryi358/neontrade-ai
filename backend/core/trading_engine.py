@@ -399,12 +399,15 @@ class TradingEngine:
 
     def toggle_scalping(self, enabled: bool):
         """Enable or disable scalping mode at runtime."""
+        was_enabled = self._scan_interval == self._scalping_scan_interval
         settings.scalping_enabled = enabled
         if enabled and _SCALPING_AVAILABLE:
             if self.scalping_analyzer is None:
                 self.scalping_analyzer = ScalpingAnalyzer(self.broker)
-            # Save current interval before switching to scalping speed
-            self._pre_scalping_interval = self._scan_interval
+            # Only save the pre-scalping interval on an actual off->on transition,
+            # otherwise a no-op toggle-on would overwrite it with the scalping value.
+            if not was_enabled:
+                self._pre_scalping_interval = self._scan_interval
             self._scan_interval = self._scalping_scan_interval
             logger.info(
                 f"Scalping ENABLED — scan interval set to {self._scalping_scan_interval}s"

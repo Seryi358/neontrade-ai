@@ -115,17 +115,37 @@ class RiskManager:
     # ── Leverage by Asset Class ───────────────────────────────────────
 
     def _get_leverage_for_instrument(self, instrument: str) -> int:
-        """Return the leverage ratio for an instrument based on its asset class."""
+        """Return the leverage ratio for an instrument based on its asset class.
+
+        Capital.com defaults for the user's retail account:
+        forex 100:1, indices 100:1, commodities 100:1,
+        stocks 20:1, crypto 20:1, bonds/rates 200:1.
+        """
         from strategies.base import _is_crypto_instrument
         inst = instrument.upper()
         if _is_crypto_instrument(instrument):
             return settings.leverage_crypto
-        elif inst.startswith("XAU") or inst.startswith("XAG") or inst.startswith("XPT") or inst.startswith("XPD"):
+        # Commodities (metals)
+        if inst.startswith(("XAU", "XAG", "XPT", "XPD")):
             return settings.leverage_commodities
-        elif any(inst.startswith(x) for x in ("US500", "US100", "US30", "UK100", "DE40", "FR40", "JP225", "HK50")):
+        # Indices (common Capital.com tickers)
+        if any(inst.startswith(x) for x in ("US500", "US100", "US30", "UK100", "DE40", "FR40", "JP225", "HK50", "SPX", "NDX", "DJI", "NAS100", "SPX500")):
             return settings.leverage_indices
-        else:
-            return settings.leverage_forex  # Default: forex pairs
+        # Bonds / rates — US Treasury ETFs and bond futures symbols
+        if inst in {"TLT", "IEF", "SHY", "TBT", "TMF", "AGG", "BND", "LQD", "HYG"} or inst.startswith(("BUND", "UB_", "ZB_", "ZN_", "ZF_", "ZT_")):
+            return settings.leverage_bonds
+        # Forex: classic A_B pattern (EUR_USD) or 6-letter ticker (EURUSD)
+        if "_" in inst:
+            parts = inst.split("_")
+            if len(parts) == 2 and all(len(p) == 3 and p.isalpha() for p in parts):
+                return settings.leverage_forex
+        if len(inst) == 6 and inst.isalpha():
+            return settings.leverage_forex
+        # Individual stocks / equity ETFs: alphabetic ticker 1-5 chars
+        if inst.isalpha() and 1 <= len(inst) <= 5:
+            return settings.leverage_stocks
+        # Unknown class — fall back to forex default
+        return settings.leverage_forex
 
     # ── Deal Size Rules (from broker API) ────────────────────────────
 

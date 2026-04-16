@@ -642,6 +642,7 @@ def get_active_watchlist() -> list:
         "indices": settings.indices_watchlist,
         "equities": settings.equities_watchlist,
         "crypto": settings.crypto_watchlist,
+        "market_view": settings.market_view_symbols,
     }
     combined = []
     for cat in settings.active_watchlist_categories:

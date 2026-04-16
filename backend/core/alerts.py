@@ -436,7 +436,7 @@ class AlertManager:
             f"<b>Scan cycles completed:</b> {scans}\n"
             f"<b>Setups found by strategies:</b> {setups_found}\n"
             f"<b>Setups executed:</b> {setups_executed}\n"
-            f"<b>Setups rejected by AI:</b> {setups_skipped}\n"
+            f"<b>Setups filtered (score &lt; 50):</b> {setups_skipped}\n"
             f"<b>Scan errors:</b> {scan_errors}\n\n"
             f"<i>If scans > 0, the engine was alive and scanning all day.</i>"
         )

@@ -2270,6 +2270,7 @@ class TradingEngine:
         # that even the technical analysis says "no operar"
         min_score = 50  # Minimum analysis score to be considered operable
         if analysis.score < min_score:
+            self._daily_setups_skipped_ai += 1  # reused counter tracks quality-gate filters
             logger.info(
                 f"Setup {setup.instrument} {setup.direction} filtered: "
                 f"score {analysis.score:.0f} < {min_score} minimum — not operable"

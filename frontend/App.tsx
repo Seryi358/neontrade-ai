@@ -6,7 +6,7 @@
  * TRADE/MARKET/LOG tabs use internal sub-navigation (state-based)
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -17,6 +17,7 @@ import {
   Animated,
   ScrollView,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { useFonts } from 'expo-font';
 import { theme } from './src/theme/apple-glass';
@@ -329,7 +330,14 @@ export default function App() {
     'SFProDisplay-Bold': require('./src/assets/fonts/SFProDisplay-Bold.otf'),
   });
 
-  if (!fontsLoaded) {
+  // Timeout: load app after 3s even if fonts fail (web fallback to system fonts)
+  const [fontTimeout, setFontTimeout] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setFontTimeout(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!fontsLoaded && !fontTimeout) {
     return <BootScreen />;
   }
 

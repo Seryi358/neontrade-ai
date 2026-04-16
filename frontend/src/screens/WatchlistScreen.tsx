@@ -27,6 +27,12 @@ import {
 import StrategyBadge, { ConfidenceBadge } from '../components/StrategyBadge';
 import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
 
+interface StrategyChecklistEntry {
+  strategy: string;
+  htf_passed: boolean;
+  setup_found: boolean;
+}
+
 interface WatchlistItem {
   instrument: string;
   score: number;
@@ -36,6 +42,7 @@ interface WatchlistItem {
   condition?: string;
   strategy_detected?: string | null;
   confidence_level?: string;
+  strategy_checklist?: StrategyChecklistEntry[];
 }
 
 const SUB_NAV_OPTIONS = [

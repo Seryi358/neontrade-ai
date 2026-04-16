@@ -48,6 +48,9 @@ interface HistoryStats {
   total_pnl: number;
   best_trade: number;
   worst_trade: number;
+  avg_risk_reward?: number;
+  winning_trades?: number;
+  losing_trades?: number;
 }
 
 const STRATEGY_FILTERS = [

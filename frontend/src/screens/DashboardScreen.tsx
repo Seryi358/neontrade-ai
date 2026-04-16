@@ -41,6 +41,8 @@ interface AccountData {
   unrealized_pnl: number;
   open_trade_count: number;
   currency: string;
+  margin_available?: number;
+  margin_used?: number;
 }
 
 interface RiskStatus {

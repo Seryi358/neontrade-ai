@@ -795,11 +795,22 @@ class MonthlyReviewGenerator:
     # ──────────────────────────────────────────────────────────────────────
 
     def _save_report(self, report: MonthlyReport) -> None:
-        """Persist the report as a JSON file."""
+        """Persist the report as a JSON file (atomic write)."""
         path = os.path.join(self.reports_dir, f"review_{report.month}.json")
         try:
-            with open(path, "w") as f:
-                json.dump(report.to_dict(), f, indent=2, default=str)
+            import tempfile
+            dir_name = os.path.dirname(path)
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(report.to_dict(), f, indent=2, default=str)
+                os.replace(tmp_path, path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
             logger.info(f"Monthly report saved: {path}")
         except Exception as e:
             logger.error(f"Failed to save monthly report: {e}")

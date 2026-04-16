@@ -101,7 +101,7 @@ export default function WatchlistScreen() {
             <Text style={[styles.scoreNumber, { color: getScoreColor(item.score) }]}>
               {safe(item.score, 0)}
             </Text>
-            <Text style={styles.scoreLabel}>{item.score != null ? 'AI SCORE' : 'SCORE'}</Text>
+            <Text style={styles.scoreLabel}>SCORE</Text>
           </View>
         </View>
 

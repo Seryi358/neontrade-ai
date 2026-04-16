@@ -358,7 +358,7 @@ export const STRATEGY_COLORS: Record<string, string> = {
 };
 
 export function getScoreColor(score: number | null): string {
-  if (score == null) return '#a1a9b1';  // Muted — no AI score yet
+  if (score == null) return '#a1a9b1';  // Muted — no score yet
   if (score >= 80) return '#34C759';    // Apple green
   if (score >= 60) return '#FFCC00';    // Apple yellow
   if (score >= 40) return '#FF9500';    // Apple orange

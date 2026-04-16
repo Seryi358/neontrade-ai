@@ -411,10 +411,10 @@ export default function DashboardScreen() {
               <Text style={styles.activityLabel}>Executed</Text>
             </View>
             <View style={styles.activityCell}>
-              <Text style={[styles.activityValue, { color: theme.colors.loss }]}>
+              <Text style={[styles.activityValue, { color: theme.colors.textSecondary }]}>
                 {activity.setups_skipped_ai}
               </Text>
-              <Text style={styles.activityLabel}>AI rejects</Text>
+              <Text style={styles.activityLabel}>AI notes</Text>
             </View>
           </View>
           {activity.scans_completed > 0 && (

@@ -4,7 +4,7 @@
  * Apple Liquid Glass Light design.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -124,7 +124,7 @@ export default function AnalysisScreen() {
   }, []);
 
   // Fetch analysis for the selected instrument
-  const fetchAnalysis = async () => {
+  const fetchAnalysis = useCallback(async () => {
     if (!selectedInstrument) return;
     setLoading(true);
     setError(null);
@@ -146,14 +146,14 @@ export default function AnalysisScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedInstrument]);
 
   useEffect(() => {
     if (!selectedInstrument) return;
     fetchAnalysis();
     const interval = setInterval(fetchAnalysis, 15000);
     return () => clearInterval(interval);
-  }, [selectedInstrument]);
+  }, [selectedInstrument, fetchAnalysis]);
 
   const onRefresh = async () => {
     setRefreshing(true);

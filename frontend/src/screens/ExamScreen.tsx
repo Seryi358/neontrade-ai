@@ -49,6 +49,9 @@ export default function ExamScreen() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportHtml, setReportHtml] = useState<string | null>(null);
+  // Track blob URLs so we can revoke on unmount (avoid memory leaks if user
+  // navigates away before the 60s timeout fires).
+  const blobUrlsRef = React.useRef<string[]>([]);
 
   const fetchTrades = useCallback(async () => {
     try {
@@ -63,7 +66,16 @@ export default function ExamScreen() {
     }
   }, []);
 
-  useEffect(() => { fetchTrades(); }, []);
+  useEffect(() => { fetchTrades(); }, [fetchTrades]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of blobUrlsRef.current) {
+        try { URL.revokeObjectURL(url); } catch {}
+      }
+      blobUrlsRef.current = [];
+    };
+  }, []);
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -103,9 +115,13 @@ export default function ExamScreen() {
     if (reportHtml && Platform.OS === 'web') {
       const blob = new Blob([reportHtml], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
+      blobUrlsRef.current.push(url);
       window.open(url, '_blank');
       // Release the blob after the new tab has had time to load it
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setTimeout(() => {
+        try { URL.revokeObjectURL(url); } catch {}
+        blobUrlsRef.current = blobUrlsRef.current.filter(u => u !== url);
+      }, 60_000);
     }
   };
 

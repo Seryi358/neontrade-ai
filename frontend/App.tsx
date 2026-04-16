@@ -350,6 +350,19 @@ export default function App() {
     }
   }, []);
 
+  // Auto dark/light mode based on time of day (6PM-6AM = dark, 6AM-6PM = light)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const updateTheme = () => {
+      const hour = new Date().getHours();
+      const isDark = hour >= 18 || hour < 6;
+      document.body.classList.toggle('dark-mode', isDark);
+    };
+    updateTheme();
+    const interval = setInterval(updateTheme, 60000); // check every minute
+    return () => clearInterval(interval);
+  }, []);
+
   if (!fontsLoaded && !fontTimeout) {
     return <BootScreen />;
   }

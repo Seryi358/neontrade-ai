@@ -547,6 +547,87 @@ export const cssTheme = `
   ::selection {
     background: rgba(0, 122, 255, 0.2);
   }
+
+  /* ═══════════════════════════════════════════════════════════
+     iOS 26 LIQUID GLASS - DARK MODE (auto by time of day)
+     Dark: 6PM-6AM local time | Light: 6AM-6PM local time
+     ═══════════════════════════════════════════════════════════ */
+
+  /* Dark mode variables - applied by JS based on time */
+  body.dark-mode {
+    --bg-primary: #000000;
+    --bg-dark: #1c1c1e;
+    --bg-light: #1c1c1e;
+    --bg-card: #1c1c1e;
+    --text-primary: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-muted: #636366;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-active: #0a84ff;
+    --profit: #30d158;
+    --loss: #ff453a;
+    --glass-bg: rgba(44, 44, 46, 0.75);
+    --glass-bg-opaque: rgba(44, 44, 46, 0.88);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    --glass-inner: inset 0 1px 0 rgba(255,255,255,0.08);
+    --neon-cyan: #0a84ff;
+    --neon-green: #30d158;
+    --neon-red: #ff453a;
+    --neon-orange: #ff9f0a;
+    background-color: #000000 !important;
+    color: #f5f5f7 !important;
+  }
+
+  /* Dark mode glass cards - iOS 26 Liquid Glass on dark */
+  body.dark-mode .glass-card,
+  body.dark-mode [style*="backgroundColor: rgb(255, 255, 255)"],
+  body.dark-mode [style*="background-color: #ffffff"] {
+    background: linear-gradient(135deg, rgba(58,58,60,0.65), rgba(44,44,46,0.35)) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  }
+
+  /* Dark mode tab bar */
+  body.dark-mode .glass-tab-bar,
+  body.dark-mode [style*="backgroundColor: rgba(255,255,255"] {
+    background: rgba(28, 28, 30, 0.8) !important;
+    border-top-color: rgba(255,255,255,0.06) !important;
+  }
+
+  /* Dark mode text overrides */
+  body.dark-mode [style*="color: rgb(29, 29, 31)"],
+  body.dark-mode [style*="color: #1d1d1f"] {
+    color: #f5f5f7 !important;
+  }
+  body.dark-mode [style*="color: rgb(134, 134, 139)"],
+  body.dark-mode [style*="color: #86868b"] {
+    color: #a1a1a6 !important;
+  }
+
+  /* Dark mode backgrounds */
+  body.dark-mode [style*="backgroundColor: #f2f2f7"],
+  body.dark-mode [style*="background-color: #f2f2f7"] {
+    background-color: #000000 !important;
+  }
+  body.dark-mode [style*="backgroundColor: #ffffff"],
+  body.dark-mode [style*="background-color: #ffffff"],
+  body.dark-mode [style*="backgroundColor: rgb(255, 255, 255)"] {
+    background-color: #1c1c1e !important;
+  }
+
+  /* Dark mode scrollbar */
+  body.dark-mode ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+  }
+  body.dark-mode ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.3);
+  }
+
+  /* Smooth transition between modes */
+  body {
+    transition: background-color 0.5s ease, color 0.5s ease;
+  }
 `;
 
 // Divider and status CSS

@@ -351,16 +351,82 @@ export default function App() {
   }, []);
 
   // Auto dark/light mode based on time of day (6PM-6AM = dark, 6AM-6PM = light)
+  // React Native Web uses class-based styles (r-*), so we override colors at runtime
   useEffect(() => {
     if (Platform.OS !== 'web') return;
+
+    // Color mapping: light -> dark
+    const COLOR_MAP: Record<string, string> = {
+      'rgb(29, 29, 31)': '#f5f5f7',     // textPrimary -> light
+      'rgb(134, 134, 139)': '#a1a1a6',  // textSecondary -> light
+      'rgb(174, 174, 178)': '#636366',  // textMuted -> light
+      'rgb(242, 242, 247)': '#000000',  // background -> black
+      'rgb(255, 255, 255)': '#1c1c1e',  // white -> dark card
+    };
+
+    let originalStyles = new WeakMap<HTMLElement, {color?: string; bg?: string}>();
+
+    const applyDarkMode = () => {
+      const all = document.querySelectorAll('*') as NodeListOf<HTMLElement>;
+      all.forEach(el => {
+        const cs = getComputedStyle(el);
+        const color = cs.color;
+        const bg = cs.backgroundColor;
+
+        if (!originalStyles.has(el)) {
+          originalStyles.set(el, { color: el.style.color, bg: el.style.backgroundColor });
+        }
+
+        if (COLOR_MAP[color]) {
+          el.style.setProperty('color', COLOR_MAP[color], 'important');
+        }
+        if (COLOR_MAP[bg]) {
+          el.style.setProperty('background-color', COLOR_MAP[bg], 'important');
+        }
+      });
+    };
+
+    const removeDarkMode = () => {
+      const all = document.querySelectorAll('*') as NodeListOf<HTMLElement>;
+      all.forEach(el => {
+        const orig = originalStyles.get(el);
+        if (orig) {
+          if (orig.color !== undefined) el.style.color = orig.color;
+          else el.style.removeProperty('color');
+          if (orig.bg !== undefined) el.style.backgroundColor = orig.bg;
+          else el.style.removeProperty('background-color');
+        }
+      });
+      originalStyles = new WeakMap();
+    };
+
+    let observer: MutationObserver | null = null;
+    let currentIsDark = false;
+
     const updateTheme = () => {
       const hour = new Date().getHours();
       const isDark = hour >= 18 || hour < 6;
       document.body.classList.toggle('dark-mode', isDark);
+
+      if (isDark && !currentIsDark) {
+        currentIsDark = true;
+        applyDarkMode();
+        // Observe DOM changes to re-apply dark mode to new elements
+        observer = new MutationObserver(() => applyDarkMode());
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+      } else if (!isDark && currentIsDark) {
+        currentIsDark = false;
+        if (observer) { observer.disconnect(); observer = null; }
+        removeDarkMode();
+      }
     };
+
     updateTheme();
-    const interval = setInterval(updateTheme, 60000); // check every minute
-    return () => clearInterval(interval);
+    const interval = setInterval(updateTheme, 60000);
+    return () => {
+      clearInterval(interval);
+      if (observer) observer.disconnect();
+    };
   }, []);
 
   if (!fontsLoaded && !fontTimeout) {

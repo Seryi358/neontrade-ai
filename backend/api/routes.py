@@ -806,11 +806,12 @@ async def set_broker(request: BrokerSelectionRequest):
     """Switch the active broker. Requires restart to take effect."""
     supported = {"capital", "ibkr"}
     if request.broker.lower() not in supported:
+        # 400 Bad Request: client sent a value outside the supported set.
+        # 501 is for missing server implementations, not input validation.
         raise HTTPException(
-            501,
-            f"Broker '{request.broker}' aún no está implementado. "
-            f"Disponibles: Capital.com, IBKR. "
-            f"IC Markets y Pepperstone estarán disponibles próximamente.",
+            400,
+            f"Broker '{request.broker}' no soportado. "
+            f"Disponibles: capital, ibkr.",
         )
     return {
         "broker": request.broker,

@@ -164,6 +164,9 @@ class TradingEngine:
             email_recip = getattr(settings, 'alert_email_recipient', '')
             gmail_refresh = getattr(settings, 'gmail_refresh_token', '')
             gmail_cid = getattr(settings, 'gmail_client_id', '')
+            gmail_secret = getattr(settings, 'gmail_client_secret', '')
+            gmail_sender = getattr(settings, 'gmail_sender', '')
+            gmail_recipient = getattr(settings, 'gmail_recipient', '') or gmail_sender
 
             alert_cfg = AlertConfig(
                 telegram_enabled=bool(tg_token and tg_chat),
@@ -177,11 +180,13 @@ class TradingEngine:
                 email_username=email_user,
                 email_password=email_pass,
                 email_recipient=email_recip,
-                gmail_enabled=bool(gmail_refresh and gmail_cid),
-                gmail_sender=getattr(settings, 'gmail_sender', ''),
-                gmail_recipient=getattr(settings, 'gmail_recipient', '') or getattr(settings, 'gmail_sender', ''),
+                # Require ALL 5 OAuth fields so _send_gmail() never reaches the "skipped"
+                # warning at runtime for a partially-configured channel.
+                gmail_enabled=bool(gmail_refresh and gmail_cid and gmail_secret and gmail_sender and gmail_recipient),
+                gmail_sender=gmail_sender,
+                gmail_recipient=gmail_recipient,
                 gmail_client_id=gmail_cid,
-                gmail_client_secret=getattr(settings, 'gmail_client_secret', ''),
+                gmail_client_secret=gmail_secret,
                 gmail_refresh_token=gmail_refresh,
             )
             self.alert_manager = AlertManager(alert_cfg)

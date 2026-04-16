@@ -141,7 +141,7 @@ export default function ExamScreen() {
           </TouchableOpacity>
         </View>
         <HUDCard title="Preview">
-          <Text style={styles.previewText}>Report generated. Open it in the browser. Open it in the browser to view the full analysis with charts.</Text>
+          <Text style={styles.previewText}>Report generated. Open it in the browser to view the full analysis with charts.</Text>
         </HUDCard>
       </View>
     );

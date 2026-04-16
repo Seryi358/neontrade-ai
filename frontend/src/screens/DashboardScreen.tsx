@@ -256,7 +256,7 @@ export default function DashboardScreen() {
         />
         <HUDStatRow
           label="Available margin"
-          value={account ? formatCurrency(account.margin_available ?? account.equity) : '---'}
+          value={account && account.margin_available != null ? formatCurrency(account.margin_available) : '---'}
           valueColor="#007AFF"
         />
       </HUDCard>

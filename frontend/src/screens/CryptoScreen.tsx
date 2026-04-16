@@ -135,11 +135,13 @@ export default function CryptoScreen() {
         authFetch(`${API_URL}/api/v1/crypto/cycle`).catch(() => null),
         authFetch(`${API_URL}/api/v1/crypto/allocation`).catch(() => null),
       ]);
-      if (cycleRes?.ok) {
-        setCycle(await cycleRes.json());
-      }
-      if (allocRes?.ok) {
-        setAllocation(await allocRes.json());
+      const cycleOk = !!cycleRes?.ok;
+      const allocOk = !!allocRes?.ok;
+      if (cycleOk) setCycle(await cycleRes!.json());
+      if (allocOk) setAllocation(await allocRes!.json());
+      // Surface error only when BOTH requests failed (partial success = no alert)
+      if (!cycleOk && !allocOk) {
+        setError('No se pudo cargar datos crypto (conexión o servidor)');
       }
     } catch (err) {
       setError('Error al cargar datos crypto');

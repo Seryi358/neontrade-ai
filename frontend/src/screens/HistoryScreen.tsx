@@ -86,7 +86,7 @@ export default function HistoryScreen() {
       const strategyParam = activeFilter !== 'ALL' ? `&strategy=${activeFilter}` : '';
       const [tradesRes, statsRes] = await Promise.all([
         authFetch(`${API_URL}/api/v1/history?limit=200${strategyParam}`),
-        authFetch(`${API_URL}/api/v1/history/stats?days=90`),
+        authFetch(`${API_URL}/api/v1/history/stats?days=30`),
       ]);
 
       if (!tradesRes.ok || !statsRes.ok) {

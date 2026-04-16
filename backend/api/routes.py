@@ -844,8 +844,14 @@ async def get_candles(
         raise HTTPException(503, f"Broker desconectado: {str(e)}")
     except Exception as e:
         error_msg = str(e)
-        if "auth" in error_msg.lower() or "session" in error_msg.lower():
+        lower = error_msg.lower()
+        if "auth" in lower or "session" in lower:
             raise HTTPException(503, f"Error de autenticación con broker: {error_msg}")
+        # Invalid instrument → 404
+        not_found_indicators = ['not found', 'invalid', 'unknown', 'no such', 'epic',
+                                '404', 'does not exist', 'bad request', '400']
+        if any(ind in lower for ind in not_found_indicators):
+            raise HTTPException(404, f"Instrument '{instrument}' not found")
         raise HTTPException(500, f"Error al obtener velas: {error_msg}")
 
 

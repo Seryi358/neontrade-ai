@@ -2120,7 +2120,9 @@ class TradingEngine:
             f"{signal.direction} | Confidence: {signal.confidence:.0f}%"
         )
 
-        # AI validation: ask OpenAI to validate the setup before proceeding
+        # AI enrichment: generate explanation and opinion (INFORMATIONAL ONLY)
+        # Per TradingLab mentorship: 0% discretion for beginners. Technical analysis
+        # decides, AI does NOT block or modify trades. AI provides context for learning.
         if self.ai_analyzer:
             try:
                 ai_result = await self.ai_analyzer.validate_setup_with_ai(signal, analysis)
@@ -2128,88 +2130,23 @@ class TradingEngine:
                 ai_rec = ai_result.get("ai_recommendation", "SKIP")
                 ai_reason = ai_result.get("ai_reasoning", "")
                 logger.info(
-                    f"AI validation for {signal.instrument}: "
+                    f"AI opinion for {signal.instrument}: "
                     f"Score={ai_score} Rec={ai_rec} — {ai_reason}"
                 )
-                # Unify scores: update the analysis result score with AI score
-                # so the UI shows the AI-validated score, not just the technical score
-                if signal.instrument in self._last_scan_results:
-                    self._last_scan_results[signal.instrument].score = float(ai_score)
-                    self._last_scan_results[signal.instrument]._ai_validated = True
-                # Filter by AI score: >= 65 passes, < 65 blocked
-                # AI TAKE/SKIP is binary and too strict (never says TAKE in practice).
-                # Score-based filtering is more practical: 65+ are decent setups,
-                # < 65 have real issues (wrong Fibonacci zone, no convergence, etc.)
-                if ai_rec != "TAKE":
-                    logger.info(f"AI says {ai_rec} for {signal.instrument} (score={ai_score}) — blocked (only TAKE proceeds)")
-                    self._daily_setups_skipped_ai += 1
-                    # Notify user so they know a setup was found but rejected
-                    if self.alert_manager:
-                        try:
-                            await self.alert_manager.send_setup_rejected(
-                                instrument=signal.instrument,
-                                direction=signal.direction,
-                                strategy=signal.strategy_variant or '',
-                                ai_score=ai_score,
-                                ai_recommendation=ai_rec,
-                                ai_reasoning=ai_reason,
-                            )
-                        except Exception as ae:
-                            logger.warning(f"AI rejection alert failed: {ae}")
-                    return None
-                # Store AI opinion for downstream use (email, UI)
+                # Store AI opinion for emails/UI (informational, not gating)
                 signal._ai_score = ai_score
                 signal._ai_recommendation = ai_rec
                 signal._ai_reasoning = ai_reason
-                # Apply AI-suggested SL/TP adjustments if provided
-                adjustments = ai_result.get("suggested_adjustments", {})
-                if adjustments:
-                    new_sl = adjustments.get("suggested_sl")
-                    new_tp = adjustments.get("suggested_tp1")
-                    new_tp_max = adjustments.get("suggested_tp_max")
-                    if new_sl and isinstance(new_sl, (int, float)) and new_sl > 0:
-                        # Validate SL is on the correct side of entry
-                        sl_valid = (
-                            (signal.direction == "BUY" and new_sl < signal.entry_price) or
-                            (signal.direction == "SELL" and new_sl > signal.entry_price)
-                        )
-                        if sl_valid:
-                            signal.stop_loss = float(new_sl)
-                        else:
-                            logger.warning(
-                                f"AI suggested invalid SL {new_sl} for {signal.direction} "
-                                f"entry {signal.entry_price} — ignoring (wrong side)"
-                            )
-                    if new_tp and isinstance(new_tp, (int, float)) and new_tp > 0:
-                        # Validate TP is on the correct side of entry
-                        tp_valid = (
-                            (signal.direction == "BUY" and new_tp > signal.entry_price) or
-                            (signal.direction == "SELL" and new_tp < signal.entry_price)
-                        )
-                        if tp_valid:
-                            signal.take_profit_1 = float(new_tp)
-                        else:
-                            logger.warning(
-                                f"AI suggested invalid TP1 {new_tp} for {signal.direction} "
-                                f"entry {signal.entry_price} — ignoring (wrong side)"
-                            )
-                    if new_tp_max and isinstance(new_tp_max, (int, float)) and new_tp_max > 0:
-                        # Validate TP_max is on the correct side of entry
-                        tp_max_valid = (
-                            (signal.direction == "BUY" and new_tp_max > signal.entry_price) or
-                            (signal.direction == "SELL" and new_tp_max < signal.entry_price)
-                        )
-                        if tp_max_valid:
-                            signal.take_profit_max = float(new_tp_max)
-                        else:
-                            logger.warning(
-                                f"AI suggested invalid TP_max {new_tp_max} for {signal.direction} "
-                                f"entry {signal.entry_price} — ignoring (wrong side)"
-                            )
+                # NOTE: AI does NOT block trades. Technical analysis is the sole decision maker.
+                # AI does NOT modify SL/TP. Fibonacci and EMA rules from mentorship are final.
+                if ai_rec != "TAKE":
+                    logger.info(
+                        f"AI says {ai_rec} for {signal.instrument} (score={ai_score}) "
+                        f"— LOGGED ONLY, trade proceeds per mentorship 0% discretion rule"
+                    )
             except Exception as e:
-                logger.warning(f"AI validation failed — BLOCKING (cannot validate = cannot proceed): {e}")
-                self._daily_setups_skipped_ai += 1
-                return None
+                logger.warning(f"AI enrichment failed (non-blocking): {e}")
+                # AI failure does NOT block the trade
 
         # Validate risk management (strategy-specific R:R minimums)
         if not self.risk_manager.validate_reward_risk(

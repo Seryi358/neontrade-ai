@@ -357,11 +357,22 @@ class TradingEngine:
         return dict(self._DEFAULT_STRATEGY_CONFIG)
 
     def _save_strategy_config(self):
-        """Persist strategy config to JSON file."""
+        """Persist strategy config to JSON file (atomic write)."""
         try:
-            os.makedirs(os.path.dirname(self._strategy_config_path), exist_ok=True)
-            with open(self._strategy_config_path, "w") as f:
-                json.dump(self._enabled_strategies, f, indent=2)
+            import tempfile
+            dir_name = os.path.dirname(self._strategy_config_path)
+            os.makedirs(dir_name, exist_ok=True)
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(self._enabled_strategies, f, indent=2)
+                os.replace(tmp_path, self._strategy_config_path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
             logger.info(f"Strategy config saved: {self._enabled_strategies}")
         except Exception as e:
             logger.error(f"Failed to save strategy config: {e}")

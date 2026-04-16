@@ -6,7 +6,7 @@ Supports: Auto/Manual modes, trade history, explanations, broker selection.
 
 from fastapi import APIRouter, HTTPException, Query
 from typing import Dict, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
 from loguru import logger
 
@@ -1410,13 +1410,13 @@ async def test_alert_channel(channel: str):
 # ── Backtesting ────────────────────────────────────────────────
 
 class BacktestRequest(BaseModel):
-    instrument: str
+    instrument: str = Field(..., min_length=1, max_length=32)
     start_date: str  # ISO format YYYY-MM-DD
     end_date: str    # ISO format YYYY-MM-DD
-    initial_balance: float = 10000.0
-    risk_per_trade: float = 0.01
-    slippage_pips: float = 0.5
-    spread_pips: float = 1.0
+    initial_balance: float = Field(10000.0, gt=0, le=1_000_000_000)
+    risk_per_trade: float = Field(0.01, gt=0, le=0.10)
+    slippage_pips: float = Field(0.5, ge=0, le=50)
+    spread_pips: float = Field(1.0, ge=0, le=50)
     enabled_strategies: Optional[Dict[str, bool]] = None
 
 

@@ -886,18 +886,33 @@ def apply_trading_profile(profile_id: str) -> dict:
     }
     risk_updates = {k: v for k, v in applied.items() if k in risk_keys}
     if risk_updates:
+        import tempfile
         _config_dir = os.path.dirname(os.path.abspath(__file__))
         config_path = os.path.join(_config_dir, "data", "risk_config.json")
         existing = {}
         if os.path.exists(config_path):
             try:
                 with open(config_path) as f:
-                    existing = json.load(f)
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    existing = loaded
             except Exception:
-                pass
+                # Don't wipe other keys on parse error — skip persistence this time
+                return applied
         existing.update(risk_updates)
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
-        with open(config_path, "w") as f:
-            json.dump(existing, f, indent=2)
+        # Atomic write: tmpfile + rename so a crash mid-write cannot corrupt the config
+        dir_name = os.path.dirname(config_path)
+        fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(existing, f, indent=2)
+            os.replace(tmp_path, config_path)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     return applied

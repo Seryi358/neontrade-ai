@@ -2262,6 +2262,17 @@ class TradingEngine:
         explanation: StrategyExplanation,
     ):
         """Route a detected setup based on the current trading mode."""
+        # Quality gate: only send operable setups to email/queue
+        # Per mentorship: 0% discretion, but don't waste time on low-quality setups
+        # that even the technical analysis says "no operar"
+        min_score = 50  # Minimum analysis score to be considered operable
+        if analysis.score < min_score:
+            logger.info(
+                f"Setup {setup.instrument} {setup.direction} filtered: "
+                f"score {analysis.score:.0f} < {min_score} minimum — not operable"
+            )
+            return
+
         reasoning = self._build_setup_reasoning(setup, analysis, explanation)
 
         # Attach strategy name from explanation to setup for later use

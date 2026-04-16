@@ -2222,6 +2222,10 @@ class MarketAnalyzer:
         # Use the single previous completed daily candle (iloc[-2] since -1 is current incomplete day)
         candle = df.iloc[-2]
         h, l, c = float(candle["high"]), float(candle["low"]), float(candle["close"])
+        # Guard against NaN in OHLC (missing bars) — pivot arithmetic would
+        # propagate NaN into the API response and break JSON serialization.
+        if pd.isna(h) or pd.isna(l) or pd.isna(c):
+            return {}
         p = (h + l + c) / 3.0
 
         # Mentorship: Alex only uses P, S1, R1 (S2/R2 optional, not displayed)

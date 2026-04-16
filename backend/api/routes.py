@@ -1811,6 +1811,15 @@ async def update_trade_asr(trade_id: str, req: ASRRequest):
     if engine is None or not hasattr(engine, 'trade_journal') or engine.trade_journal is None:
         raise HTTPException(503, "Trade journal not initialized")
 
+    # Reject empty payloads with 400 — prevents false completions
+    if all(
+        v is None
+        for v in (req.htf_correct, req.ltf_correct, req.strategy_correct,
+                  req.sl_correct, req.tp_correct, req.management_correct,
+                  req.would_enter_again, req.lessons)
+    ):
+        raise HTTPException(400, "ASR payload is empty — provide at least one field")
+
     success = engine.trade_journal.update_asr(
         trade_id=trade_id,
         htf_correct=req.htf_correct,

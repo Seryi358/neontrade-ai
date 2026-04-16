@@ -20,7 +20,7 @@ import {
   Platform,
 } from 'react-native';
 import { useFonts } from 'expo-font';
-import { theme } from './src/theme/apple-glass';
+import { theme, cssTheme } from './src/theme/apple-glass';
 
 // ── Error Boundary ──────────────────────────────────────
 
@@ -335,6 +335,19 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => setFontTimeout(true), 3000);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Inject CSS theme with @font-face for SF Pro Display on web
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const existing = document.getElementById('atlas-theme-css');
+      if (!existing) {
+        const style = document.createElement('style');
+        style.id = 'atlas-theme-css';
+        style.textContent = cssTheme;
+        document.head.appendChild(style);
+      }
+    }
   }, []);
 
   if (!fontsLoaded && !fontTimeout) {

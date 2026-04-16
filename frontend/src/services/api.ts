@@ -393,7 +393,10 @@ class WebSocketManager {
 
   connect() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
-    this.reconnectAttempts = 0;  // Reset on fresh connect attempt
+    // Note: do NOT reset reconnectAttempts here — _scheduleReconnect calls
+    // connect() after failures, and resetting would make the
+    // maxReconnectAttempts cap unreachable (infinite retry loop).
+    // The counter is cleared on successful connection in onopen.
 
     try {
       // BUG-08 fix: authenticate via first message, not URL query param

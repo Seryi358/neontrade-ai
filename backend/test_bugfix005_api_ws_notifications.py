@@ -518,7 +518,9 @@ class TestBroker:
     def test_set_broker_unsupported(self, client):
         resp = client.post("/api/v1/broker",
                            json={"broker": "binance"})
-        assert resp.status_code == 501
+        # 400 Bad Request for unsupported broker name (was 501 before — 501
+        # is for missing server implementations, this is input validation).
+        assert resp.status_code == 400
 
 
 class TestCandles:

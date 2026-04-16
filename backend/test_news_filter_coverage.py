@@ -33,8 +33,9 @@ def _event(minutes_from_now=0, currency="USD", impact="high", title="CPI"):
 
 class TestNewsWindows:
     def test_scalping_window(self):
-        """Scalping: 30 min before, 15 min after (same as day trading)."""
-        assert NEWS_WINDOWS[TradingStyle.SCALPING] == (30, 15)
+        """Scalping: 45 min before, 30 min after (mentorship 60/60 reduced to
+        compromise — original 60/60 blocked the last hour daily)."""
+        assert NEWS_WINDOWS[TradingStyle.SCALPING] == (45, 30)
 
     def test_day_trading_window(self):
         """Day trading: 30 min before, 15 min after."""
@@ -107,8 +108,8 @@ class TestInit:
 
     def test_scalping_window(self):
         nf = NewsFilter(trading_style=TradingStyle.SCALPING)
-        assert nf.minutes_before == 30
-        assert nf.minutes_after == 15
+        assert nf.minutes_before == 45
+        assert nf.minutes_after == 30
 
     def test_custom_override(self):
         """Explicit minutes should override style defaults."""

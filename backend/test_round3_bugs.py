@@ -657,11 +657,13 @@ class TestConfigValidation:
         from config import Settings
         s = Settings()
         assert s.risk_day_trading == 0.01
-        assert s.max_total_risk == 0.03  # 3%
+        assert s.max_total_risk == 0.05  # 5% mentorship-tuned for $190 capital
         assert s.min_rr_ratio == 1.5
         assert s.drawdown_method == "fixed_levels"  # Protects small accounts
         assert s.delta_enabled is False
-        assert s.trading_style == "scalping"  # Optimized for small accounts ($190)
+        # Day Trading per mentorship for $190 (scalping deprecated for small
+        # accounts — "master day trading FIRST before scalping").
+        assert s.trading_style == "day_trading"
 
     def test_settings_all_documented_drawdown_methods(self):
         """Verify all documented drawdown methods are valid strings."""

@@ -104,11 +104,12 @@ def test_funded_1phase_auto_dd():
 
 
 def test_config_default_risk_values():
-    """Verify default risk values match mentorship."""
+    """Verify default risk values match mentorship for small-capital account."""
     from config import settings
     assert settings.risk_day_trading == 0.01  # 1%
     assert settings.risk_swing == 0.01  # 1%
-    assert settings.max_total_risk == 0.03  # 3%
+    # 5% max simultaneous risk — mentorship-tuned for $190 capital (was 3% earlier).
+    assert settings.max_total_risk == 0.05
     assert settings.correlated_risk_pct == 0.0075  # 0.75%
     assert settings.min_rr_ratio == 1.5
     assert settings.min_rr_black == 2.0

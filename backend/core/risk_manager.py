@@ -1003,6 +1003,10 @@ class RiskManager:
 
         # Recovery math
         recovery_pct = self.calculate_recovery_pct(dd_pct)
+        # Clamp inf (dd_pct >= 100% case) to a large but JSON-safe number
+        import math
+        if isinstance(recovery_pct, float) and (math.isinf(recovery_pct) or math.isnan(recovery_pct)):
+            recovery_pct = 99999.0
         dd_alert = self.get_dd_alert_level()
         loss_dollars = round(self._peak_balance - self._current_balance, 2) if self._peak_balance > 0 else 0.0
 

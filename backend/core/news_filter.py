@@ -305,13 +305,19 @@ class NewsFilter:
         parts = instrument.replace("/", "_").split("_")
         return {p.upper() for p in parts if len(p) == 3}
 
-    async def get_todays_events(self) -> List[dict]:
-        """Get all events for today (for the frontend calendar view)."""
+    async def get_todays_events(self, include_past: bool = False) -> List[dict]:
+        """Get today's events, sorted chronologically. By default only upcoming."""
         now = datetime.now(timezone.utc)
         today = now.strftime("%Y-%m-%d")
         if self._cache_date != today:
             await self._refresh_calendar(now)
             self._cache_date = today
+
+        events = self._cached_events
+        if not include_past:
+            events = [e for e in events if e.time >= now]
+        # Chronological sort so frontend shows next event first
+        events = sorted(events, key=lambda e: e.time)
 
         return [
             {
@@ -320,7 +326,7 @@ class NewsFilter:
                 "impact": e.impact,
                 "title": e.title,
             }
-            for e in self._cached_events
+            for e in events
         ]
 
     async def get_news_headlines(self, limit: int = 10) -> List[dict]:

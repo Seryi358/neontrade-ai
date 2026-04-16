@@ -160,9 +160,13 @@ export default function ManualModeScreen() {
               });
               if (res.ok) {
                 setSetups([]);
+              } else {
+                const detail = await res.text();
+                Alert.alert('Error', `No se pudieron aprobar: HTTP ${res.status} ${detail.slice(0, 100)}`);
               }
             } catch (err) {
               console.error('Failed to approve all:', err);
+              Alert.alert('Error', 'Fallo de conexión al aprobar todas');
             } finally {
               setActionLoading(null);
             }
@@ -189,9 +193,13 @@ export default function ManualModeScreen() {
               });
               if (res.ok) {
                 setSetups([]);
+              } else {
+                const detail = await res.text();
+                Alert.alert('Error', `No se pudieron rechazar: HTTP ${res.status} ${detail.slice(0, 100)}`);
               }
             } catch (err) {
               console.error('Failed to reject all:', err);
+              Alert.alert('Error', 'Fallo de conexión al rechazar todas');
             } finally {
               setActionLoading(null);
             }

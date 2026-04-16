@@ -1484,7 +1484,7 @@ async def run_backtest(request: BacktestRequest):
             "profit_factor": _safe(result.profit_factor),
             "avg_rr_achieved": _safe(result.avg_rr_achieved),
             "final_balance": _safe(result.final_balance),
-            "equity_curve": result.equity_curve,
+            "equity_curve": _safe(result.equity_curve),
             "by_strategy": _safe(result.by_strategy),
             "trades": [
                 {

@@ -865,8 +865,10 @@ async def get_price(instrument: str):
         }
     except Exception as e:
         err_msg = str(e).lower()
-        # Not found errors → 404
-        if 'not found' in err_msg or 'invalid' in err_msg or 'unknown' in err_msg or 'no such' in err_msg or 'epic' in err_msg:
+        # Not found errors → 404 (detect various patterns)
+        not_found_indicators = ['not found', 'invalid', 'unknown', 'no such', 'epic',
+                                '404', 'does not exist', 'bad request', '400']
+        if any(ind in err_msg for ind in not_found_indicators):
             raise HTTPException(404, f"Instrument '{instrument}' not found")
         raise HTTPException(500, f"Error al obtener precio: {str(e)}")
 

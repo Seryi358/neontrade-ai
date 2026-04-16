@@ -1900,8 +1900,8 @@ async def update_watchlist_categories(req: WatchlistCategoriesRequest):
         if cat not in valid:
             raise HTTPException(400, f"Invalid category: {cat}. Valid: {', '.join(valid)}")
     settings.active_watchlist_categories = req.categories
-    # Persist to risk_config.json
-    import json, os
+    # Persist to risk_config.json atomically — preserves other keys on JSON errors
+    import json, os, tempfile
     _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     risk_path = os.path.join(_backend_dir, "data", "risk_config.json")
     overrides = {}
@@ -1909,12 +1909,26 @@ async def update_watchlist_categories(req: WatchlistCategoriesRequest):
         try:
             with open(risk_path) as f:
                 overrides = json.load(f)
-        except Exception:
-            pass
+            if not isinstance(overrides, dict):
+                overrides = {}
+        except Exception as e:
+            # Keep existing file untouched on parse error — don't wipe other keys
+            logger.warning(f"risk_config.json unreadable ({e}); aborting watchlist save to avoid data loss")
+            raise HTTPException(500, "Config file corrupted — manual fix required before saving")
     overrides["active_watchlist_categories"] = req.categories
     os.makedirs(os.path.dirname(risk_path), exist_ok=True)
-    with open(risk_path, "w") as f:
-        json.dump(overrides, f, indent=2)
+    dir_name = os.path.dirname(risk_path)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(overrides, f, indent=2)
+        os.replace(tmp_path, risk_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
     return {"status": "updated", "active_categories": req.categories}
 
 

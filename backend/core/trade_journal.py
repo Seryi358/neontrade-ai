@@ -501,6 +501,18 @@ class TradeJournal:
         Alex: "correcto o incorrecto no viene relacionado con el resultado
         del trade, viene relacionado con vuestro plan de trading"
         """
+        # Require at least one real field — prevents "empty" ASR completions
+        if all(
+            v is None
+            for v in (
+                htf_correct, ltf_correct, strategy_correct,
+                sl_correct, tp_correct, management_correct,
+                would_enter_again, lessons, error_type,
+            )
+        ):
+            logger.warning(f"ASR update for {trade_id} skipped: all fields are None")
+            return False
+
         for trade in self._trades:
             if trade["trade_id"] == trade_id:
                 if htf_correct is not None:

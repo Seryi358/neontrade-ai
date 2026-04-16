@@ -27,6 +27,13 @@ COPY backend/ .
 # Copy pre-built frontend into /app/static
 COPY --from=frontend-build /frontend/dist /app/static
 
+# Copy SF Pro Display fonts to static directory (not included by Expo web export)
+COPY --from=frontend-build /frontend/src/assets/fonts/SFProDisplay-Regular.otf /app/static/assets/fonts/
+COPY --from=frontend-build /frontend/src/assets/fonts/SFProDisplay-Light.otf /app/static/assets/fonts/
+COPY --from=frontend-build /frontend/src/assets/fonts/SFProDisplay-Medium.otf /app/static/assets/fonts/
+COPY --from=frontend-build /frontend/src/assets/fonts/SFProDisplay-Semibold.otf /app/static/assets/fonts/
+COPY --from=frontend-build /frontend/src/assets/fonts/SFProDisplay-Bold.otf /app/static/assets/fonts/
+
 # Create directories
 RUN mkdir -p logs data
 

@@ -241,6 +241,43 @@ export type Theme = typeof theme;
 
 // CSS variables version for web/electron
 export const cssTheme = `
+  /* SF Pro Display — Apple's system font, loaded from server */
+  @font-face {
+    font-family: 'SFProDisplay-Regular';
+    src: url('/assets/fonts/SFProDisplay-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'SFProDisplay-Light';
+    src: url('/assets/fonts/SFProDisplay-Light.otf') format('opentype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'SFProDisplay-Medium';
+    src: url('/assets/fonts/SFProDisplay-Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'SFProDisplay-Semibold';
+    src: url('/assets/fonts/SFProDisplay-Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'SFProDisplay-Bold';
+    src: url('/assets/fonts/SFProDisplay-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+
   :root {
     --bg-primary: ${theme.colors.background};
     --bg-dark: ${theme.colors.backgroundDark};

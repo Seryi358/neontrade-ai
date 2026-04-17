@@ -728,12 +728,19 @@ class RiskManager:
             )
         # Clean up BE tracking
         self._positions_at_be.discard(trade_id)
+        # Invalidate cached balance — a closed trade changed account balance;
+        # the next position_size call would otherwise use stale balance for
+        # up to 30s (TTL) and undersize the next trade.
+        balance_cache.invalidate("account_balance")
 
     def unregister_all_trades(self):
         """Remove all active trades from risk tracking (e.g., funded overnight close)."""
         count = len(self._active_risks)
         self._active_risks.clear()
         self._positions_at_be.clear()
+        # Same rationale as unregister_trade: bulk close drastically changes
+        # balance, cached value would be stale.
+        balance_cache.invalidate("account_balance")
         logger.info(f"All {count} trades unregistered. Total risk: 0.00%")
 
     # ── Funded Account Mode (Workshop Cuentas Fondeadas) ────────

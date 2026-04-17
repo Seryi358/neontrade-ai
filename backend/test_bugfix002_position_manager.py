@@ -118,8 +118,10 @@ class TestInstantiation:
         assert pm._base_ema_key == "EMA_H1_50"
 
     def test_cp_day_trading(self, broker):
+        # Iter-28 C2 fix: CP day trading trail is EMA_M5_5 (PDF pg.5 —
+        # "EMA2m y EMA5m para el Day trading"), previously EMA_M5_50.
         pm = PositionManager(broker, management_style="cp", trading_style="day_trading")
-        assert pm._base_ema_key == "EMA_M5_50"
+        assert pm._base_ema_key == "EMA_M5_5"
 
     def test_price_action_has_no_base_ema(self, broker):
         pm = PositionManager(broker, management_style="price_action", trading_style="swing")

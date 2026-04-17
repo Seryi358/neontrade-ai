@@ -550,20 +550,21 @@ def test_block_4_position_manager():
     check("LP+daytrading -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.DAY_TRADING)] == "EMA_H1_50")
     check("LP+scalping -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.LP, TradingStyle.SCALPING)] == "EMA_M5_50")
     check("CP+swing -> EMA_H1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SWING)] == "EMA_H1_50")
-    check("CP+daytrading -> EMA_M5_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M5_50")
+    # Iter-28 C2 fix: CP day trading trail is EMA_M5_5 per PDF pg.5 (previously EMA_M5_50)
+    check("CP+daytrading -> EMA_M5_5", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M5_5")
     check("CP+scalping -> EMA_M1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SCALPING)] == "EMA_M1_50")
     check("CPA+swing -> EMA_M15_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.SWING)] == "EMA_M15_50")
     check("CPA+daytrading -> EMA_M2_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.DAY_TRADING)] == "EMA_M2_50")
     check("CPA+scalping -> EMA_M1_50", _EMA_TIMEFRAME_GRID[(ManagementStyle.CPA, TradingStyle.SCALPING)] == "EMA_M1_50")
 
     # PositionManager initialization
-    # Forex grid: LP/day=EMA_H1_50, CPA/day=EMA_M2_50, CP/day=EMA_M5_50
+    # Forex grid: LP/day=EMA_H1_50, CPA/day=EMA_M2_50, CP/day=EMA_M5_5 (PDF pg.5)
     pm_lp = PositionManager(broker, management_style="lp", trading_style="day_trading")
     check("PM base_ema is EMA_H1_50 for LP+daytrading", pm_lp._base_ema_key == "EMA_H1_50")
     check("PM cpa_ema is EMA_M2_50 for CPA+daytrading", pm_lp._cpa_ema_key == "EMA_M2_50")
 
     pm_cp = PositionManager(broker, management_style="cp", trading_style="day_trading")
-    check("CP+daytrading base=EMA_M5_50", pm_cp._base_ema_key == "EMA_M5_50")
+    check("CP+daytrading base=EMA_M5_5", pm_cp._base_ema_key == "EMA_M5_5")
 
     pm_pa = PositionManager(broker, management_style="price_action", trading_style="day_trading")
     check("PRICE_ACTION base_ema is None", pm_pa._base_ema_key is None)

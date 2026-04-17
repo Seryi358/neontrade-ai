@@ -105,9 +105,15 @@ _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
     (ManagementStyle.DAILY, TradingStyle.SWING): "EMA_D_50",
     (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_H1_50",
     (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_M5_50",
-    # CP (Short-term): Swing=H1, Day=M5, Scalp=M1
+    # CP (Short-term): Swing=H1, Day=M5 EMA 5 (PDF pg.5), Scalp=M1
+    # Trading Plan PDF pg.5: "A partir de aquí usaré siempre las dos medias
+    # móviles más cortas en cada estilo de trading para gestionar mis
+    # posiciones (EMA2m y EMA5m para el Day trading)".
+    # -> Trail principal post-BE para CP/day_trading = EMA 5 en M5.
+    #    EMA 2 en M5 se consulta vía _get_aggressive_exit_ema_key() como
+    #    señal de emergency exit (la más corta de las dos cortas).
     (ManagementStyle.CP, TradingStyle.SWING): "EMA_H1_50",
-    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_50",
+    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_5",
     (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
     # CPA (Short-term Aggressive): Swing=M15, Day=M2, Scalp=M1
     # Alex: "el corto plazo agresivo son 2 minutos" for day trading
@@ -116,6 +122,33 @@ _EMA_TIMEFRAME_GRID: Dict[tuple, str] = {
     (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M2_50",
     (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M1_50",
 }
+
+# AGGRESSIVE EXIT EMA grid — PDF pg.5: "las dos medias móviles más cortas".
+# For day trading this means EMA 2 in M5 (the shorter of the two "dos más
+# cortas" pair EMA 2 + EMA 5). Used in AGGRESSIVE/BEYOND_TP1 phase as the
+# emergency-exit signal: a ruptura of EMA 2 closes the trade even if the
+# trail EMA 5 is still intact.
+# For styles where "dos más cortas" is not explicitly defined in the PDF
+# we approximate by using the shortest structurally-shorter EMA available.
+_AGGRESSIVE_EXIT_EMA_GRID: Dict[tuple, str] = {
+    # Day trading (PDF pg.5 explicit): EMA 2 en M5
+    (ManagementStyle.LP, TradingStyle.DAY_TRADING): "EMA_M5_2",
+    (ManagementStyle.DAILY, TradingStyle.DAY_TRADING): "EMA_M5_2",
+    (ManagementStyle.CP, TradingStyle.DAY_TRADING): "EMA_M5_2",
+    (ManagementStyle.CPA, TradingStyle.DAY_TRADING): "EMA_M5_2",
+    # Swing and scalping: fall back to CPA EMA (existing behaviour);
+    # PDF doesn't specify an EMA 2 equivalent for these styles, so we keep
+    # the legacy CPA EMA 50 as the aggressive-exit signal.
+    (ManagementStyle.LP, TradingStyle.SWING): "EMA_M15_50",
+    (ManagementStyle.CP, TradingStyle.SWING): "EMA_M15_50",
+    (ManagementStyle.DAILY, TradingStyle.SWING): "EMA_M15_50",
+    (ManagementStyle.CPA, TradingStyle.SWING): "EMA_M15_50",
+    (ManagementStyle.LP, TradingStyle.SCALPING): "EMA_M1_50",
+    (ManagementStyle.CP, TradingStyle.SCALPING): "EMA_M1_50",
+    (ManagementStyle.DAILY, TradingStyle.SCALPING): "EMA_M1_50",
+    (ManagementStyle.CPA, TradingStyle.SCALPING): "EMA_M1_50",
+}
+
 
 # CRYPTO — from Esp. Criptomonedas position management module
 # Crypto uses wider timeframes due to higher volatility:
@@ -366,6 +399,31 @@ class PositionManager:
         if self._is_crypto(instrument):
             return self._crypto_cpa_ema_key
         return self._cpa_ema_key
+
+    def _get_aggressive_exit_ema_key(self, instrument: str) -> str:
+        """Get the AGGRESSIVE EXIT EMA key — the "shortest of the two shortest"
+        EMA used to fire an emergency exit during the BEYOND_TP1/AGGRESSIVE phase.
+
+        PDF pg.5 (Trading Plan): for Day Trading this is EMA 2 on M5. A break
+        of this very-short EMA signals momentum loss and closes the trade
+        even if the longer trail EMA 5 is still intact.
+
+        Falls back to CPA EMA key when no explicit aggressive-exit mapping
+        exists for the (management_style, trading_style) pair — preserving
+        the legacy behaviour for styles the PDF doesn't address explicitly.
+        """
+        # Aggressive exit EMA is style-specific (not asset-specific). The
+        # PDF rule "dos medias más cortas" is an intraday-structure rule
+        # and applies regardless of whether the instrument is crypto or
+        # forex, since the underlying timeframe (M5) is the same.
+        key = _AGGRESSIVE_EXIT_EMA_GRID.get(
+            (self.management_style, self.trading_style)
+        )
+        if key is not None:
+            return key
+        # Fallback for management styles not in the grid (e.g. PRICE_ACTION):
+        # reuse the CPA EMA key for that asset.
+        return self._get_cpa_ema_key(instrument)
 
     def set_cpa_trigger(self, trade_id: str, reason: str, temporary: bool = False, revert_level: float = 0):
         """Signal that CPA (aggressive trailing) should activate for a position.
@@ -905,9 +963,14 @@ class PositionManager:
         # Resolve CPA EMA key based on instrument type (crypto uses different grid)
         cpa_key = self._get_cpa_ema_key(pos.instrument)
 
-        # Emergency exit: if both EMA M5 2-period and EMA M5 5-period broken against position
-        # NOTE: EMA_M5_2 and EMA_M5_5 may not be available; using CPA EMA as proxy.
-        # If dedicated M5 EMA 2 & 5 are added later, replace the proxy with actual values.
+        # Emergency exit — PDF pg.5 rule: "dos medias móviles más cortas".
+        # For day trading this means EMA 2 + EMA 5 on M5. The SHORTEST of the
+        # pair (EMA_M5_2 via _get_aggressive_exit_ema_key) is the primary
+        # emergency-exit signal: a clean break of the 2-period EMA against
+        # the position closes immediately. The 5-period EMA is the trail and
+        # is also checked as a confirmation — if both are broken, exit too.
+        aggressive_exit_key = self._get_aggressive_exit_ema_key(pos.instrument)
+        ema_aggressive_exit = self._get_trail_ema(pos.instrument, aggressive_exit_key)
         ema_m5_2 = self._get_trail_ema(pos.instrument, "EMA_M5_2")
         ema_m5_5 = self._get_trail_ema(pos.instrument, "EMA_M5_5")
 
@@ -920,7 +983,16 @@ class PositionManager:
             else:
                 both_broken = current_price > ema_m5_2 and current_price > ema_m5_5
 
-            if both_broken:
+            # Primary PDF-pg.5 signal: break of the shortest EMA (EMA_M5_2 for
+            # day trading) alone is enough to close.
+            aggressive_broken = False
+            if ema_aggressive_exit is not None:
+                if pos.direction == "BUY":
+                    aggressive_broken = current_price < ema_aggressive_exit
+                else:
+                    aggressive_broken = current_price > ema_aggressive_exit
+
+            if both_broken or aggressive_broken:
                 try:
                     ok = await self.broker.close_trade(pos.trade_id)
                     if not ok:
@@ -928,8 +1000,12 @@ class PositionManager:
                         return
                     pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
                     pnl = pnl_per_unit * abs(pos.units) if pos.units else 0.0
+                    reason_detail = (
+                        "both EMA M5 2 and EMA M5 5 broken" if both_broken
+                        else f"shortest EMA {aggressive_exit_key} broken (PDF pg.5)"
+                    )
                     logger.warning(
-                        f"{pos.trade_id}: EMERGENCY EXIT — both EMA M5 2 and EMA M5 5 broken "
+                        f"{pos.trade_id}: EMERGENCY EXIT — {reason_detail} "
                         f"against {pos.direction} at {current_price:.5f} | PnL=${pnl:.2f}"
                     )
                     if self.risk_manager:

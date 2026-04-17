@@ -754,7 +754,8 @@ def block_4_position_manager():
     check("B4-EMA LP/swing = D_50", pm_lp_swing._base_ema_key == "EMA_D_50")
 
     pm_cp_dt = PositionManager(broker, management_style="cp", trading_style="day_trading")
-    check("B4-EMA CP/day = M5_50", pm_cp_dt._base_ema_key == "EMA_M5_50")
+    # Iter-28 C2 fix: CP day trading base is EMA_M5_5 per PDF pg.5 (previously EMA_M5_50)
+    check("B4-EMA CP/day = M5_5", pm_cp_dt._base_ema_key == "EMA_M5_5")
 
     pm_cpa_scalp = PositionManager(broker, management_style="cpa", trading_style="scalping")
     check("B4-EMA CPA/scalp = M1_50", pm_cpa_scalp._base_ema_key == "EMA_M1_50")

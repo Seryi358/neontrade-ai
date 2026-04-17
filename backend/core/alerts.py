@@ -13,6 +13,7 @@ All sends are fire-and-forget so a notification failure never blocks trading.
 
 import asyncio
 import base64
+import html
 import json
 import smtplib
 import time
@@ -26,6 +27,18 @@ from typing import Dict, List, Optional
 
 import httpx
 from loguru import logger
+
+
+def _h(val) -> str:
+    """HTML-escape a value before interpolating into alert bodies.
+
+    User-injected fields (instrument, strategy, direction, reason,
+    ai_reasoning, setup_id) could contain &lt;, &gt;, &amp; or quotes that break
+    the email body or inject markup. None → empty string.
+    """
+    if val is None:
+        return ""
+    return html.escape(str(val), quote=True)
 
 # ── Constants ────────────────────────────────────────────────────
 
@@ -246,20 +259,22 @@ class AlertManager:
             return
 
         dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
-        # No emoji/icon prefix
-        title = f"TRADE EXECUTED // {instrument}"
+        _instr = _h(instrument)
+        _dir = _h(direction.upper())
+        _strat = _h(strategy)
+        title = f"TRADE EXECUTED // {_instr}"
         body = (
             f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
-            f'{instrument}</span>\n'
+            f'{_instr}</span>\n'
             f'<span style="color:{dir_color};font-size:16px;font-weight:600;">'
-            f'{direction.upper()}</span> '
-            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
+            f'{_dir}</span> '
+            f'<span style="color:#86868b;">// {_strat}</span>\n\n'
             f'<span style="color:#86868b;">ENTRY</span> '
-            f'<span style="color:#fcfcfc;font-weight:600;">{entry}</span>\n'
+            f'<span style="color:#1d1d1f;font-weight:600;">{entry}</span>\n'
             f'<span style="color:#FF3B30;">SL</span> '
-            f'<span style="color:#fcfcfc;">{sl}</span>\n'
+            f'<span style="color:#1d1d1f;">{sl}</span>\n'
             f'<span style="color:#34C759;">TP</span> '
-            f'<span style="color:#fcfcfc;">{tp}</span>\n'
+            f'<span style="color:#1d1d1f;">{tp}</span>\n'
             f'<span style="color:#86868b;">R:R</span> '
             f'<span style="color:#FF9500;font-weight:600;">{rr:.2f}:1</span>'
         )
@@ -291,16 +306,18 @@ class AlertManager:
         if not self._config.notify_setup_pending:
             return
 
-        title = f"SETUP DETECTED // {instrument}"
+        _instr = _h(instrument)
+        _dir = _h(direction.upper())
+        _strat = _h(strategy)
+        title = f"SETUP DETECTED // {_instr}"
         dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
-        # No emoji/icon prefix
 
         # Build rich email body with strategy details and AI opinion
         parts = [
             f'<b>PENDING APPROVAL</b>\n',
-            f'<b>{instrument}</b>',
-            f'<b>{direction.upper()}</b>\n',
-            f'<b>Estrategia:</b> {strategy}' if strategy else '',
+            f'<b>{_instr}</b>',
+            f'<b>{_dir}</b>\n',
+            f'<b>Estrategia:</b> {_strat}' if strategy else '',
             f'<b>Entry:</b> {entry:.5f}',
             f'<b>SL:</b> {sl:.5f}' if sl else '',
             f'<b>TP:</b> {tp:.5f}' if tp else '',
@@ -312,11 +329,11 @@ class AlertManager:
             ai_verdict = "TAKE" if ai_recommendation == "TAKE" else "SKIP"
             parts.append(f'<b>--- IA OPINION ---</b>')
             parts.append(f'<b>Score IA:</b> {ai_score}/100')
-            parts.append(f'<b>Recomendacion:</b> {ai_verdict}')
+            parts.append(f'<b>Recomendacion:</b> {_h(ai_verdict)}')
             if ai_reasoning:
                 # Truncate to 300 chars for email
                 reason_short = ai_reasoning[:300] + ('...' if len(ai_reasoning) > 300 else '')
-                parts.append(f'<b>Razon:</b> {reason_short}')
+                parts.append(f'<b>Razon:</b> {_h(reason_short)}')
             parts.append('')
 
         # Strategy checklist
@@ -324,7 +341,7 @@ class AlertManager:
             parts.append(f'<b>--- CHECKLIST ---</b>')
             for line in reasoning.split('\n'):
                 if line.strip():
-                    parts.append(line.strip())
+                    parts.append(_h(line.strip()))
             parts.append('')
 
         parts.append(f'<b>OPEN APP TO APPROVE OR REJECT</b>')
@@ -354,17 +371,21 @@ class AlertManager:
         if not self._config.notify_setup_rejected:
             return
 
-        # No emoji/icon prefix
-        title = f"SETUP REJECTED BY AI // {instrument}"
+        _instr = _h(instrument)
+        _dir = _h(direction.upper())
+        _strat = _h(strategy)
+        _ai_rec = _h(ai_recommendation)
+        _ai_reason = _h(ai_reasoning)
+        title = f"SETUP REJECTED BY AI // {_instr}"
         body = (
             f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
-            f'{instrument}</span>\n'
-            f'<span style="color:#86868b;">{direction.upper()}</span> '
-            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
-            f'<span style="color:#FF3B30;font-weight:600;">AI: {ai_recommendation}</span> '
+            f'{_instr}</span>\n'
+            f'<span style="color:#86868b;">{_dir}</span> '
+            f'<span style="color:#86868b;">// {_strat}</span>\n\n'
+            f'<span style="color:#FF3B30;font-weight:600;">AI: {_ai_rec}</span> '
             f'<span style="color:#86868b;">Score:</span> '
             f'<span style="color:#FF9500;font-weight:600;">{ai_score}/100</span>\n'
-            f'<span style="color:#86868b;">{ai_reasoning}</span>'
+            f'<span style="color:#86868b;">{_ai_reason}</span>'
         )
         data = {
             "instrument": instrument,
@@ -386,12 +407,15 @@ class AlertManager:
         """Notify user that a pending setup timed out without action."""
         if not self._config.notify_setup_pending:
             return
-        title = f"SETUP EXPIRED // {instrument}"
+        _instr = _h(instrument)
+        _dir = _h(direction.upper())
+        _strat = _h(strategy)
+        title = f"SETUP EXPIRED // {_instr}"
         body = (
             f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
-            f'{instrument}</span>\n'
-            f'<span style="color:#86868b;">{direction.upper()}</span> '
-            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
+            f'{_instr}</span>\n'
+            f'<span style="color:#86868b;">{_dir}</span> '
+            f'<span style="color:#86868b;">// {_strat}</span>\n\n'
             f'<span style="color:#FF9500;font-weight:600;">Expired</span> '
             f'<span style="color:#86868b;">after {expiry_minutes} min without approval</span>'
         )
@@ -418,18 +442,21 @@ class AlertManager:
         pnl_color = "#34C759" if pnl >= 0 else "#FF3B30"
         result_label = "WIN" if pnl > 0 else ("BREAK EVEN" if pnl == 0 else "LOSS")
         sign = "+" if pnl >= 0 else ""
-        title = f"TRADE CLOSED // {instrument}"
+        _instr = _h(instrument)
+        _strat = _h(strategy)
+        _reason = _h(reason)
+        title = f"TRADE CLOSED // {_instr}"
         body = (
             f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
-            f'{instrument}</span> '
-            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
+            f'{_instr}</span> '
+            f'<span style="color:#86868b;">// {_strat}</span>\n\n'
             f'<span style="color:{pnl_color};font-size:22px;font-weight:700;">'
             f'{sign}${pnl:.2f}</span> '
             f'<span style="color:{pnl_color};font-size:13px;">{result_label}</span>\n'
             f'<span style="color:#86868b;">PIPS</span> '
-            f'<span style="color:#fcfcfc;">{sign}{pips:.1f}</span>\n'
+            f'<span style="color:#1d1d1f;">{sign}{pips:.1f}</span>\n'
             f'<span style="color:#86868b;">REASON</span> '
-            f'<span style="color:#ee00ff;">{reason}</span>'
+            f'<span style="color:#1d1d1f;">{_reason}</span>'
         )
         data = {
             "instrument": instrument,

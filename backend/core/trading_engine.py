@@ -1429,15 +1429,19 @@ class TradingEngine:
                         )
 
                     if self._ws_broadcast:
-                        # Fire-and-forget: slow WS client shouldn't block sync
+                        # Fire-and-forget: slow WS client shouldn't block sync.
+                        # Payload shape mirrors the internal close path so any
+                        # consumer can read `pnl` unconditionally.
                         _ws_tid = tid
                         _ws_inst = pos.instrument
-                        async def _ws_ext_close(__tid=_ws_tid, __inst=_ws_inst):
+                        _ws_pnl = pnl_dollars
+                        async def _ws_ext_close(__tid=_ws_tid, __inst=_ws_inst, __pnl=_ws_pnl):
                             try:
                                 await self._ws_broadcast("trade_closed", {
                                     "trade_id": __tid,
                                     "instrument": __inst,
                                     "reason": "external",
+                                    "pnl": __pnl,
                                 })
                             except Exception as e:
                                 logger.warning(f"WS broadcast trade_closed failed: {e}")

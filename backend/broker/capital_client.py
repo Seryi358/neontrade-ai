@@ -766,7 +766,9 @@ class CapitalClient(BaseBroker):
         size = abs(units)
 
         expiry = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours))
-        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Capital.com spec: goodTillDate is YYYY-MM-DDTHH:MM:SS (UTC implicit).
+        # A trailing Z triggers error.invalid.daterange and rejects the order.
+        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%S")
 
         order_data: Dict[str, Any] = {
             "epic": epic,
@@ -850,7 +852,9 @@ class CapitalClient(BaseBroker):
         size = abs(units)
 
         expiry = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours))
-        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Capital.com spec: goodTillDate is YYYY-MM-DDTHH:MM:SS (UTC implicit).
+        # A trailing Z triggers error.invalid.daterange and rejects the order.
+        expiry_str = expiry.strftime("%Y-%m-%dT%H:%M:%S")
 
         order_data: Dict[str, Any] = {
             "epic": epic,

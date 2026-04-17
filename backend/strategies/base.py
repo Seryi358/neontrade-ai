@@ -406,7 +406,23 @@ def _check_weekly_ema8_filter(analysis, direction: str) -> bool:
     """
     TradingLab: EMA 8 Weekly is the long-term trend filter.
     BUY only if price > EMA 8 Weekly. SELL only if price < EMA 8 Weekly.
+
+    Mentoría TradingLab (audit C3): esta regla aparece SÓLO en
+    `Esp. Criptomonedas/01_Contenido/08_Indicadores cripto y su función/
+    03_EMA 8 semanal`. En Trading Mastery NO existe esta regla. Aplicarla
+    a forex/indices/commodities bloquea setups válidos y hace BLACK
+    (contratendencial) inoperable.
+
+    Por tanto:
+      - Crypto (BTC_USD, ETH_USD, ...): se evalúa el filter como antes.
+      - Resto (forex, índices, commodities): retorna True (pass-through).
     """
+    # Pass-through for non-crypto: the rule doesn't apply.
+    instrument = getattr(analysis, 'instrument', None)
+    if not _is_crypto_instrument(instrument):
+        return True
+
+    # Crypto-only branch: original fail-safe + direction check.
     ema_w8 = getattr(analysis, 'ema_w8', None)
     if ema_w8 is None:
         return False  # No weekly EMA8 data = block trade (fail-safe)
@@ -1843,12 +1859,14 @@ class BlueStrategy(BaseStrategy):
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float, variant: str = "BLUE_B") -> Dict[str, float]:
         """
-        BLUE TP levels per TradingLab mentorship:
-        - ALL variants (A/B/C): TP1 = confirm-TF EMA50 (4H for day trading)
-          "el take profit SIEMPRE media movil de 50 de 4 horas"
-        - BLUE_A: TP_max = Fib 1.272 or 1.618 extension (more aggressive)
-        - BLUE_B/C: TP_max = EMA 4H or next S/R (conservative)
-        Swing adaptation: TP1 = EMA 50 Weekly (not 4H) per mentorship.
+        BLUE TP levels per Trading Plan PDF pg.6 (autoritativo):
+          "Pondré SIEMPRE un Take Profit 1 que significará llevar el precio
+           hasta el máximo o mínimo anterior.
+           BLUE: EMA4H"
+        - ALL variants (A/B/C): TP1 = swing anterior (máximo/mínimo más cercano)
+        - BLUE_B/C: TP_max = EMA 4H 50 (regla del PDF)
+        - BLUE_A: TP_max = Fib 1.272 or 1.618 extension (más agresivo, doble suelo/techo)
+        Swing adaptation: TP_max scales up to EMA 50 Weekly for swing trading.
         """
         # Use style-adaptive confirm-timeframe EMA (4H for day, Weekly for swing, M15 for scalping)
         confirm_ema_key = _tf_ema("confirm", 50)
@@ -1860,26 +1878,38 @@ class BlueStrategy(BaseStrategy):
 
         result: Dict[str, float] = {}
 
-        # ALL BLUE variants: TP1 = confirm-TF EMA 50 (SIEMPRE per mentorship)
-        if ema_4h_50 and ema_4h_50 > 0:
+        # ALL BLUE variants: TP1 = swing anterior (máximo/mínimo más cercano)
+        # Trading Plan PDF pg.6: "Pondré SIEMPRE un Take Profit 1 que significará
+        # llevar el precio hasta el máximo o mínimo anterior."
+        if direction == "BUY":
+            valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
+            if valid_swing_highs:
+                result["tp1"] = min(valid_swing_highs)  # Nearest swing high = safest
+            else:
+                # Fallback: nearest resistance above entry
+                above = [r for r in resistances if r > entry_price]
+                if above:
+                    result["tp1"] = min(above)
+        else:
+            valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
+            if valid_swing_lows:
+                result["tp1"] = max(valid_swing_lows)  # Nearest swing low = safest
+            else:
+                # Fallback: nearest support below entry
+                below = [s for s in supports if s < entry_price]
+                if below:
+                    result["tp1"] = max(below)
+
+        # Final fallback: if no swing/S/R anterior, use EMA 4H 50 (same behaviour
+        # as old code when no structure data available — preserves R:R filtering).
+        if "tp1" not in result and ema_4h_50 and ema_4h_50 > 0:
             if direction == "BUY" and ema_4h_50 > entry_price:
                 result["tp1"] = ema_4h_50
             elif direction == "SELL" and ema_4h_50 < entry_price:
                 result["tp1"] = ema_4h_50
 
-        if "tp1" not in result:
-            # Fallback: resistencia/soporte mas cercano
-            if direction == "BUY":
-                above = [r for r in resistances if r > entry_price]
-                if above:
-                    result["tp1"] = min(above)
-            else:
-                below = [s for s in supports if s < entry_price]
-                if below:
-                    result["tp1"] = max(below)
-
         # BLUE_A variant: TP_max targets Fib 1.272 or 1.618 extension (more aggressive)
-        # BLUE_B/C variants: TP_max = EMA 4H only (conservative)
+        # BLUE_B/C variants: TP_max = EMA 4H (PDF pg.6 explicit rule)
         tp1 = result.get("tp1")
         if tp1 and variant == "BLUE_A":
             # TradingLab: Blue A (doble suelo/techo) can target Fib extensions
@@ -1911,14 +1941,13 @@ class BlueStrategy(BaseStrategy):
                     if below_tp1:
                         result["tp_max"] = below_tp1[0]
         elif tp1:
-            # BLUE_B/C: TP_max = EMA 4H (Trading Plan rule: "BLUE B/C: TP maximo = EMA 4H")
-            ema_h4 = _ema_val(analysis, "EMA_H4_50")
-            if ema_h4 and direction == "BUY" and ema_h4 > tp1:
-                result["tp_max"] = ema_h4
-            elif ema_h4 and direction == "SELL" and ema_h4 < tp1:
-                result["tp_max"] = ema_h4
+            # BLUE_B/C: TP_max = EMA 4H 50 (Trading Plan PDF pg.6 explicit rule)
+            if ema_4h_50 and direction == "BUY" and ema_4h_50 > tp1:
+                result["tp_max"] = ema_4h_50
+            elif ema_4h_50 and direction == "SELL" and ema_4h_50 < tp1:
+                result["tp_max"] = ema_4h_50
             else:
-                # Fallback to next S/R if EMA H4 not usable
+                # Fallback to next S/R if EMA 4H not usable (already crossed)
                 if direction == "BUY":
                     above_tp1 = sorted([r for r in resistances if r > tp1])
                     if above_tp1:
@@ -2413,20 +2442,43 @@ class RedStrategy(BaseStrategy):
             else analysis.fibonacci_levels.get("ext_bear_1.0")
         )
 
-        # Wave 3 with strong daily setup: aggressive TP, target 1.618 extension
+        # Wave 3 with HTF favor: default tp_max = Fib 1.0 extension (PDF pg.6)
+        # "RED (con HTF a favor): Extensión de Fibonacci de 1"
+        # Only scale to 1.272/1.618 if strong momentum is confirmed (HTF
+        # overbought/oversold AND deceleration) — Wave 3 extendida.
         # Alex: "le añado un último condicional, y es que si entre el punto de entrada
         # y el punto máximo hay un nivel de resistencia importante, me salgo antes"
         if wave_count == "3":
-            # Check if daily setup is strong (HTF overbought/oversold or deceleration)
-            daily_strong = (
+            # HTF favor = HTF/LTF convergence (PDF: "con HTF a favor")
+            htf_favor = bool(getattr(analysis, 'htf_ltf_convergence', False))
+            # Momentum confirmado = HTF overbought/oversold AND deceleration.
+            # Stricter than before (was OR): "Wave 3 extendida" requires strong
+            # directional signal + exhaustion pattern together.
+            momentum_confirmed = (
                 analysis.htf_condition in (MarketCondition.OVERBOUGHT, MarketCondition.OVERSOLD)
-                or _has_deceleration(analysis)
+                and _has_deceleration(analysis)
             )
-            if daily_strong and fib_1618_dir and tp1:
+
+            if htf_favor and not momentum_confirmed and fib_100 and tp1:
+                # PDF default: Fib 1.0 extension
+                valid = (fib_100 > tp1) if direction == "BUY" else (fib_100 < tp1)
+                if valid:
+                    # Check for intermediate resistance between tp1 and Fib 1.0
+                    intermediate_levels = []
+                    if direction == "BUY":
+                        intermediate_levels = sorted([r for r in resistances if tp1 < r < fib_100])
+                    else:
+                        intermediate_levels = sorted([s for s in supports if fib_100 < s < tp1], reverse=True)
+                    if intermediate_levels:
+                        result["tp_max"] = intermediate_levels[0]
+                    else:
+                        result["tp_max"] = fib_100
+
+            # Extended Wave 3 (with momentum confirmed) CAN scale to 1.618
+            # (then 1.272 as fallback).
+            if htf_favor and momentum_confirmed and fib_1618_dir and tp1 and "tp_max" not in result:
                 valid = (fib_1618_dir > tp1) if direction == "BUY" else (fib_1618_dir < tp1)
                 if valid:
-                    # Check for important intermediate resistance between tp1 and 1.618
-                    # Alex: if there's a key daily resistance in between, exit there instead
                     intermediate_levels = []
                     if direction == "BUY":
                         intermediate_levels = sorted([r for r in resistances if tp1 < r < fib_1618_dir])
@@ -2436,11 +2488,23 @@ class RedStrategy(BaseStrategy):
                         result["tp_max"] = intermediate_levels[0]
                     else:
                         result["tp_max"] = fib_1618_dir
-            # Fallback to 1.272 for Wave 3 without strong daily
-            if "tp_max" not in result and fib_1272_dir and tp1:
+            # Fallback to 1.272 for Wave 3 with momentum when 1.618 not usable
+            if htf_favor and momentum_confirmed and "tp_max" not in result and fib_1272_dir and tp1:
                 valid = (fib_1272_dir > tp1) if direction == "BUY" else (fib_1272_dir < tp1)
                 if valid:
                     result["tp_max"] = fib_1272_dir
+
+            # Without HTF favor: no Fib extensions (PDF rule is "con HTF a favor").
+            # tp_max defaults to next S/R (falls through to final fallback below).
+            if not htf_favor and "tp_max" not in result and tp1:
+                if direction == "BUY":
+                    further = sorted([r for r in resistances if r > tp1])
+                    if further:
+                        result["tp_max"] = further[0]
+                else:
+                    further = sorted([s for s in supports if s < tp1], reverse=True)
+                    if further:
+                        result["tp_max"] = further[0]
 
         elif wave_count == "5":
             # Wave 5: conservative - stick to recent high/low only, no extensions

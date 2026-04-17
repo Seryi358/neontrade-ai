@@ -347,8 +347,16 @@ def test_block_2_strategies():
     check("no RSI divergence for SELL with bullish div", not no_div)
 
     # Weekly EMA8 filter
-    check("weekly EMA8 BUY ok price>ema", _check_weekly_ema8_filter(analysis, "BUY"))
-    check("weekly EMA8 SELL blocked price>ema", not _check_weekly_ema8_filter(analysis, "SELL"))
+    # Audit C3: EMA 8 Weekly filter SOLO aplica a crypto (Esp. Criptomonedas).
+    # Para forex/EUR_USD: pass-through (retorna True siempre).
+    check("weekly EMA8 BUY forex pass-through", _check_weekly_ema8_filter(analysis, "BUY"))
+    check("weekly EMA8 SELL forex pass-through (no es crypto)", _check_weekly_ema8_filter(analysis, "SELL"))
+    # Crypto: SI aplica la regla (BUY bloqueado si price < ema_w8, SELL bloqueado si price > ema_w8)
+    from core.market_analyzer import AnalysisResult
+    crypto_analysis = make_analysis(instrument="BTC_USD", ema_w8=60000.0, current_price=50000.0)
+    check("weekly EMA8 crypto BUY blocked price<ema", not _check_weekly_ema8_filter(crypto_analysis, "BUY"))
+    crypto_analysis2 = make_analysis(instrument="BTC_USD", ema_w8=60000.0, current_price=65000.0)
+    check("weekly EMA8 crypto SELL blocked price>ema", not _check_weekly_ema8_filter(crypto_analysis2, "SELL"))
 
     # Premium/discount zone
     ok_pd, desc_pd = _check_premium_discount_zone(analysis, "BUY")

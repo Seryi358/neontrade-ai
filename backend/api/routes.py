@@ -576,7 +576,10 @@ async def start_engine():
     import asyncio
     if not engine.running:
         engine.startup_error = ""  # Clear previous error
-        asyncio.create_task(engine.start())
+        # Use the engine's GC-safe registry so the start task can't be
+        # collected mid-run under memory pressure (Python event loops hold
+        # only weak refs to tasks).
+        engine._spawn_bg(engine.start(), name="engine_start")
         return {"status": "starting", "message": "Motor de trading iniciando..."}
     return {"status": "already_running", "message": "El motor ya está en ejecución"}
 
@@ -2499,6 +2502,29 @@ async def generate_exam_report(req: ExamRequest):
             if chosen:
                 screenshot_b64 = base64.b64encode(chosen.read_bytes()).decode()
 
+        # Compute derived metrics the mentorship exam wants to see
+        _entry = trade.get("entry_price") or 0
+        _exit = trade.get("exit_price") or 0
+        _sl = trade.get("stop_loss") or 0
+        _tp = trade.get("take_profit") or 0
+        _dir = (trade.get("direction") or "").upper()
+        _risk_dist = abs(_entry - _sl) if (_entry and _sl) else 0
+        _rr_planned = 0.0
+        if _risk_dist > 0 and _tp and _entry:
+            tp_dist = abs(_tp - _entry)
+            _rr_planned = round(tp_dist / _risk_dist, 2)
+        _rr_achieved = 0.0
+        if _risk_dist > 0 and _exit and _entry:
+            if _dir == "BUY":
+                realized = _exit - _entry
+            else:
+                realized = _entry - _exit
+            _rr_achieved = round(realized / _risk_dist, 2)
+        # Risk-in-dollars: if units and SL distance are known. We don't have
+        # per-trade account balance at the time of open, so Risk % is
+        # expressed vs. the recorded pnl magnitude.
+        _risk_dollars = _risk_dist * abs(trade.get("units") or 0)
+
         # Build trade analysis for exam
         exam_trade = {
             "trade_id": tid,
@@ -2506,15 +2532,19 @@ async def generate_exam_report(req: ExamRequest):
             "direction": trade.get("direction", "Unknown"),
             "strategy": trade.get("strategy", "Unknown"),
             "strategy_variant": trade.get("strategy_variant", ""),
-            "entry_price": trade.get("entry_price", 0),
-            "exit_price": trade.get("exit_price", 0),
-            "stop_loss": trade.get("stop_loss", 0),
-            "take_profit": trade.get("take_profit", 0),
+            "entry_price": _entry,
+            "exit_price": _exit,
+            "stop_loss": _sl,
+            "take_profit": _tp,
             "pnl": trade.get("pnl", 0),
             "status": trade.get("status", ""),
             "opened_at": trade.get("opened_at", ""),
             "closed_at": trade.get("closed_at", ""),
             "units": trade.get("units", 0),
+            "risk_reward_ratio": trade.get("risk_reward_ratio") or _rr_planned,
+            "rr_achieved": _rr_achieved,
+            "risk_dollars": round(_risk_dollars, 2) if _risk_dollars else 0,
+            "confidence": trade.get("confidence") or 0,
             "ai_analysis": trade.get("ai_analysis", ""),
             "screenshot_b64": screenshot_b64,
             "htf_analysis": None,
@@ -2556,14 +2586,32 @@ def _build_exam_html(trades: list) -> str:
 
     ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
 
+    def _fmt_price(v: float, inst: str) -> str:
+        # JPY pairs use 3 decimals; crypto/indices can be >0.01 per tick
+        # so 2 decimals is fine; default 5 decimals for forex majors.
+        if not v:
+            return "—"
+        upper = (inst or "").upper()
+        if "JPY" in upper:
+            return f"{v:.3f}"
+        if any(k in upper for k in ("BTC", "ETH", "XAU", "SPX", "NAS", "US30", "GER40", "UK100")):
+            return f"{v:,.2f}"
+        return f"{v:.5f}"
+
     trade_sections = ""
     for i, t in enumerate(trades, 1):
         pnl = t.get("pnl", 0) or 0
         pnl_color = "#34C759" if pnl >= 0 else "#FF3B30"
         pnl_sign = "+" if pnl >= 0 else ""
-        status = t.get("status", "").replace("closed_", "").upper()
+        raw_status = (t.get("status", "") or "").replace("closed_", "").upper()
+        status = raw_status or "CLOSED"
         direction = t.get("direction", "")
         dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
+        inst = t.get("instrument", "")
+        rr_planned = t.get("risk_reward_ratio", 0) or 0
+        rr_achieved = t.get("rr_achieved", 0) or 0
+        risk_dollars = t.get("risk_dollars", 0) or 0
+        confidence = t.get("confidence") or 0
 
         # Screenshot image
         img_html = ""
@@ -2608,15 +2656,15 @@ def _build_exam_html(trades: list) -> str:
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
                 <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
                     <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">ENTRY</div>
-                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{t.get("entry_price", 0)}</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{_fmt_price(t.get("entry_price", 0), inst)}</div>
                 </div>
                 <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
                     <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">SL</div>
-                    <div style="font-size:14px;font-weight:600;color:#FF3B30;">{t.get("stop_loss", 0)}</div>
+                    <div style="font-size:14px;font-weight:600;color:#FF3B30;">{_fmt_price(t.get("stop_loss", 0), inst)}</div>
                 </div>
                 <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
                     <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">TP</div>
-                    <div style="font-size:14px;font-weight:600;color:#34C759;">{t.get("take_profit", 0)}</div>
+                    <div style="font-size:14px;font-weight:600;color:#34C759;">{_fmt_price(t.get("take_profit", 0), inst)}</div>
                 </div>
                 <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
                     <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">P&amp;L</div>
@@ -2624,12 +2672,31 @@ def _build_exam_html(trades: list) -> str:
                 </div>
             </div>
 
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">R:R PLAN</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{rr_planned:.2f}:1</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">R:R HECHO</div>
+                    <div style="font-size:14px;font-weight:600;color:{'#34C759' if rr_achieved>=0 else '#FF3B30'};">{rr_achieved:+.2f}R</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">RIESGO</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">${risk_dollars:,.2f}</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">CONFIANZA</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{(confidence*100 if 0<=confidence<=1 else confidence):.0f}%</div>
+                </div>
+            </div>
+
             {htf_html}
             {ltf_html}
 
             <div style="margin-top:8px;">
-                <span style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;">RISK MANAGEMENT</span><br>
-                <span style="font-size:14px;color:#1d1d1f;">Units: {t.get("units", 0)} | Opened: {t.get("opened_at", "N/A")} | Closed: {t.get("closed_at", "N/A")}</span>
+                <span style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;">GESTIÓN</span><br>
+                <span style="font-size:14px;color:#1d1d1f;">Units: {t.get("units", 0)} &middot; Abierto: {t.get("opened_at", "—")} &middot; Cerrado: {t.get("closed_at", "—")}</span>
             </div>
 
             {f'<div style="margin-top:12px;background:#f9f9f9;border-radius:10px;padding:12px;"><span style="font-size:12px;font-weight:600;color:#86868b;">AI ANALYSIS</span><br><span style="font-size:13px;color:#86868b;line-height:1.6;">{t.get("ai_analysis", "")}</span></div>' if t.get("ai_analysis") else ""}

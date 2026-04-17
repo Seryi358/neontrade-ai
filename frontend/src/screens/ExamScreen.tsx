@@ -77,12 +77,16 @@ export default function ExamScreen() {
     };
   }, []);
 
+  // Mentorship needs 3 trades; backend accepts up to 5 so the user can pick
+  // their best variants. Match that bound here instead of silently blocking
+  // the 4th/5th tap.
+  const MAX_EXAM_TRADES = 5;
   const toggleSelect = (id: string) => {
     setSelected(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-      } else if (next.size < 3) {
+      } else if (next.size < MAX_EXAM_TRADES) {
         next.add(id);
       }
       return next;

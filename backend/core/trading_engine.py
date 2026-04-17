@@ -1578,9 +1578,11 @@ class TradingEngine:
             prices = await self.broker.get_prices_bulk(instruments)
             await self.position_manager.update_all_positions(prices)
 
-            # Notify on phase transitions and SL moves
+            # Notify on phase transitions and SL moves. Iterate a snapshot so
+            # concurrent close callbacks (which pop from self.positions) don't
+            # mutate the dict mid-iteration across the inner awaits.
             if self.alert_manager:
-                for tid, pos in self.position_manager.positions.items():
+                for tid, pos in list(self.position_manager.positions.items()):
                     old_phase = pre_phases.get(tid)
                     old_sl = pre_sls.get(tid)
                     if old_phase and pos.phase.name != old_phase:
@@ -1620,11 +1622,20 @@ class TradingEngine:
         if not self.news_filter or not self.position_manager.positions:
             return
         for trade_id, pos in list(self.position_manager.positions.items()):
+            # Idempotency: if another path (tick-driven close, broker-sync close,
+            # emergency close) has already claimed this position, skip the news-
+            # close flow to prevent double DB writes / double-credit on delta
+            # algorithm / duplicate journal + email.
+            if getattr(pos, "_closing", False):
+                continue
             try:
                 should_close, reason = await self.news_filter.should_close_for_news(pos.instrument)
                 if should_close:
+                    pos._closing = True
                     ok = await self.broker.close_trade(pos.trade_id)
                     if not ok:
+                        # Release the claim so a future close path can retry.
+                        pos._closing = False
                         logger.error(f"News close: broker.close_trade({pos.trade_id}) returned False — position remains tracked")
                         continue
                     # Record trade result before removing
@@ -2902,12 +2913,16 @@ class TradingEngine:
                     account = await self.broker.get_account_summary()
                 except Exception:
                     pass
+                # Snapshot scan results so a concurrent scan writing to
+                # _last_scan_results can't raise "dict changed size during
+                # iteration" while we build the dict-comp.
+                _scan_snapshot = dict(self._last_scan_results)
                 report = await self.ai_analyzer.generate_daily_report(
                     trades_today=today_trades,
                     account_summary={"balance": account.balance, "currency": account.currency} if account else {},
                     scan_results={
                         inst: {"score": r.score, "htf_trend": r.htf_trend.value if hasattr(r.htf_trend, 'value') else str(r.htf_trend)}
-                        for inst, r in self._last_scan_results.items()
+                        for inst, r in _scan_snapshot.items()
                     },
                     pending_setups=[],
                 )

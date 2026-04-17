@@ -12,10 +12,14 @@ def test_position_manager_forex_lp_grid():
 
 
 def test_position_manager_forex_cp_grid():
-    """CP Day should be M5 (EMA_M5_50), not M15."""
+    """CP Day should be M5 EMA 5 (PDF pg.5: 'dos medias móviles más cortas').
+
+    Iter-28 C2 fix: changed from EMA_M5_50 (legacy) to EMA_M5_5 per Trading
+    Plan PDF pg.5 — "EMA2m y EMA5m para el Day trading".
+    """
     from core.position_manager import _EMA_TIMEFRAME_GRID, ManagementStyle, TradingStyle
     assert _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SWING)] == "EMA_H1_50"
-    assert _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M5_50"
+    assert _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.DAY_TRADING)] == "EMA_M5_5"
     assert _EMA_TIMEFRAME_GRID[(ManagementStyle.CP, TradingStyle.SCALPING)] == "EMA_M1_50"
 
 

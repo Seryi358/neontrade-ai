@@ -284,9 +284,9 @@ def client(mock_engine, mock_db):
                     except json.JSONDecodeError:
                         await test_ws_manager.send_personal(websocket, "error", {"message": "Invalid JSON"})
             except WebSocketDisconnect:
-                test_ws_manager.disconnect(websocket)
+                await test_ws_manager.disconnect(websocket)
             except Exception:
-                test_ws_manager.disconnect(websocket)
+                await test_ws_manager.disconnect(websocket)
 
         async def _test_handle_ws_cmd(websocket, mgr, eng, data):
             action = data.get("action")

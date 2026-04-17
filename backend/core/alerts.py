@@ -375,6 +375,35 @@ class AlertManager:
         }
         await self.send_alert("setup_rejected", title, body, data)
 
+    async def send_setup_expired(
+        self,
+        instrument: str,
+        direction: str,
+        strategy: str = "",
+        setup_id: str = "",
+        expiry_minutes: int = 0,
+    ):
+        """Notify user that a pending setup timed out without action."""
+        if not self._config.notify_setup_pending:
+            return
+        title = f"SETUP EXPIRED // {instrument}"
+        body = (
+            f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
+            f'{instrument}</span>\n'
+            f'<span style="color:#86868b;">{direction.upper()}</span> '
+            f'<span style="color:#86868b;">// {strategy}</span>\n\n'
+            f'<span style="color:#FF9500;font-weight:600;">Expired</span> '
+            f'<span style="color:#86868b;">after {expiry_minutes} min without approval</span>'
+        )
+        data = {
+            "instrument": instrument,
+            "direction": direction,
+            "strategy": strategy,
+            "setup_id": setup_id,
+            "expiry_minutes": expiry_minutes,
+        }
+        await self.send_alert("setup_expired", title, body, data)
+
     async def send_trade_closed(
         self,
         instrument: str,
@@ -680,12 +709,27 @@ class AlertManager:
         if not access_token:
             raise RuntimeError("Failed to obtain Gmail access token")
 
-        # Send via Gmail API
+        # Send via Gmail API — retry once after forced refresh if token revoked (401/403)
         resp = await self._get_http().post(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
             headers={"Authorization": f"Bearer {access_token}"},
             json={"raw": raw_message},
         )
+        if resp.status_code in (401, 403):
+            logger.warning(
+                f"Gmail API returned {resp.status_code}; invalidating cached token and retrying"
+            )
+            # Force refresh on next _get_gmail_access_token call
+            self._gmail_access_token = None
+            self._gmail_token_expires_at = 0.0
+            access_token = await self._get_gmail_access_token()
+            if not access_token:
+                raise RuntimeError("Gmail token refresh failed after 401 — check refresh token")
+            resp = await self._get_http().post(
+                "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                headers={"Authorization": f"Bearer {access_token}"},
+                json={"raw": raw_message},
+            )
         if resp.status_code != 200:
             raise RuntimeError(
                 f"Gmail API returned {resp.status_code}"

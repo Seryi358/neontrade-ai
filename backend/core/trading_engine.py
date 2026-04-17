@@ -513,6 +513,7 @@ class TradingEngine:
     def _expire_old_setups(self):
         """Mark setups past their expiry time as expired, and prune old non-pending setups."""
         now = datetime.now(timezone.utc)
+        newly_expired = []
         for setup in self.pending_setups:
             if setup.status != "pending":
                 continue
@@ -525,6 +526,7 @@ class TradingEngine:
                     expires = now  # Force expiry on unparseable dates
                 if now >= expires:
                     setup.status = "expired"
+                    newly_expired.append(setup)
                     logger.info(
                         f"Setup expired: {setup.id} | {setup.instrument} "
                         f"(after {self._setup_expiry_minutes} min)"
@@ -533,6 +535,39 @@ class TradingEngine:
         pending = [s for s in self.pending_setups if s.status == "pending"]
         finished = [s for s in self.pending_setups if s.status != "pending"]
         self.pending_setups = pending + finished[-20:]
+
+        # Notify user about silently expired setups so MANUAL-mode users don't
+        # miss the window without warning. Fire-and-forget so the sync loop
+        # isn't blocked by gmail/WS latency.
+        if newly_expired and (self.alert_manager or self._ws_broadcast):
+            async def _notify_expired(items=newly_expired):
+                for s in items:
+                    if self.alert_manager:
+                        try:
+                            await self.alert_manager.send_setup_expired(
+                                instrument=s.instrument,
+                                direction=s.direction,
+                                strategy=getattr(s, "_strategy_name", "") or "",
+                                setup_id=s.id,
+                                expiry_minutes=self._setup_expiry_minutes,
+                            )
+                        except Exception as ae:
+                            logger.warning(f"Expired-setup alert failed for {s.id}: {ae}")
+                    if self._ws_broadcast:
+                        try:
+                            await self._ws_broadcast("setup_expired", {
+                                "setup_id": s.id,
+                                "instrument": s.instrument,
+                                "direction": s.direction,
+                                "reason": "expiry_timeout",
+                            })
+                        except Exception as we:
+                            logger.warning(f"WS broadcast setup_expired failed for {s.id}: {we}")
+            try:
+                asyncio.create_task(_notify_expired())
+            except RuntimeError:
+                # No running loop (called from sync context) — skip silently
+                pass
 
     # ── Main Loop ────────────────────────────────────────────────
 
@@ -1187,10 +1222,13 @@ class TradingEngine:
         # 7. Email notification on trade close (blocking — critical delivery path)
         if self.alert_manager:
             try:
+                from core.backtester import _pips as _pip_distance
+                price_diff = (exit_price - entry_price) if direction == "BUY" else (entry_price - exit_price)
+                pips = round(_pip_distance(instrument, price_diff), 1)
                 await self.alert_manager.send_trade_closed(
                     instrument=instrument,
                     pnl=pnl_dollars,
-                    pips=0,
+                    pips=pips,
                     reason=reason,
                     strategy=strategy_variant,
                 )
@@ -1450,10 +1488,13 @@ class TradingEngine:
                     # Send close alert
                     if self.alert_manager:
                         try:
+                            from core.backtester import _pips as _pip_distance
+                            _close_diff = (close_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - close_price)
+                            _close_pips = round(_pip_distance(pos.instrument, _close_diff), 1)
                             await self.alert_manager.send_trade_closed(
                                 instrument=pos.instrument,
                                 pnl=pnl_dollars,
-                                pips=0.0,
+                                pips=_close_pips,
                                 reason="Position closed externally (broker/SL/TP)",
                                 strategy=getattr(pos, 'strategy_variant', '') or '',
                             )
@@ -1598,10 +1639,13 @@ class TradingEngine:
                     # Send alert
                     if self.alert_manager:
                         try:
+                            from core.backtester import _pips as _pip_distance
+                            _news_diff = (news_exit_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - news_exit_price)
+                            _news_pips = round(_pip_distance(pos.instrument, _news_diff), 1)
                             await self.alert_manager.send_trade_closed(
                                 instrument=pos.instrument,
                                 pnl=pnl_val,
-                                pips=0.0,
+                                pips=_news_pips,
                                 reason=f"Closed before news: {reason}",
                                 strategy=getattr(pos, 'strategy_variant', '') or '',
                             )

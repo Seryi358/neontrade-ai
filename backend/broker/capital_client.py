@@ -347,6 +347,16 @@ class CapitalClient(BaseBroker):
                 return resp.json()
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
+                # Audit A9: permanent 4xx (400/403/404/422) must NOT be retried.
+                # Retrying 63 404s × 3 in 12 min wastes API quota and can
+                # trigger secondary 429s from Capital.com. Fail fast.
+                if self._is_permanent_error(e):
+                    broker_circuit_breaker.record_failure()
+                    logger.warning(
+                        f"[_get] {path}: {e.response.status_code} "
+                        f"(non-retriable, failing fast)"
+                    )
+                    raise
                 # Check for 429 Rate Limit — respect Retry-After header
                 retry_after = None
                 if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:

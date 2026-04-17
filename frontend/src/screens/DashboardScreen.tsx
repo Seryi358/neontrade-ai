@@ -58,13 +58,17 @@ interface RiskStatus {
 }
 
 interface Position {
+  trade_id?: string;
   instrument: string;
   direction: string;
   entry: number;
   current_sl: number;
   tp1: number;
+  tp_max?: number | null;
+  units?: number;
   phase: string;
   strategy?: string;
+  strategy_variant?: string | null;
   unrealized_pnl?: number;
 }
 

@@ -2575,49 +2575,55 @@ class TradingEngine:
                 self._daily_setups_executed += 1
                 logger.info(f"Trade {trade_id} opened and tracked")
 
-                # Broadcast trade_executed via WebSocket for real-time dashboard updates
+                # Broadcast trade_executed via WebSocket — fire-and-forget so
+                # a slow WS client can't block screenshot/alert dispatch.
                 if self._ws_broadcast:
-                    try:
-                        await self._ws_broadcast("trade_executed", {
-                            "trade_id": trade_id,
-                            "instrument": setup.instrument,
-                            "direction": setup.direction,
-                            "entry_price": fill_price,
-                            "stop_loss": setup.stop_loss,
-                            "take_profit": setup.take_profit_1,
-                            "units": setup.units,
-                            "risk_reward_ratio": setup.reward_risk_ratio,
-                            "risk_percent": setup.risk_percent,
-                            "strategy": getattr(setup, '_strategy_name', 'DETECTED'),
-                            "mode": self.mode.value,
-                        })
-                    except Exception as ws_err:
-                        logger.warning(f"WS broadcast trade_executed failed: {ws_err}")
+                    async def _ws_send():
+                        try:
+                            await self._ws_broadcast("trade_executed", {
+                                "trade_id": trade_id,
+                                "instrument": setup.instrument,
+                                "direction": setup.direction,
+                                "entry_price": fill_price,
+                                "stop_loss": setup.stop_loss,
+                                "take_profit": setup.take_profit_1,
+                                "units": setup.units,
+                                "risk_reward_ratio": setup.reward_risk_ratio,
+                                "risk_percent": setup.risk_percent,
+                                "strategy": getattr(setup, '_strategy_name', 'DETECTED'),
+                                "mode": self.mode.value,
+                            })
+                        except Exception as ws_err:
+                            logger.warning(f"WS broadcast trade_executed failed: {ws_err}")
+                    asyncio.create_task(_ws_send())
 
-                # Screenshot on trade open (Trading Plan rule)
+                # Screenshot on trade open (Trading Plan rule) — fire-and-forget.
                 if self.screenshot_generator:
-                    try:
-                        candles = None
-                        ema_vals = None
-                        if setup.instrument in self._last_scan_results:
-                            analysis = self._last_scan_results[setup.instrument]
-                            candles = getattr(analysis, 'candles_m5', None) or getattr(analysis, 'last_candles', {}).get('M5')
-                            ema_vals = getattr(analysis, 'ema_values', None)
-                        await self.screenshot_generator.capture_trade_open(
-                            trade_id=trade_id,
-                            instrument=setup.instrument,
-                            direction=setup.direction,
-                            entry_price=fill_price,
-                            sl=setup.stop_loss,
-                            tp1=setup.take_profit_1,
-                            tp_max=setup.take_profit_max,
-                            strategy=getattr(setup, '_strategy_name', 'DETECTED'),
-                            confidence=(getattr(setup, '_strategy_confidence', 0.0) or min(setup.reward_risk_ratio * 33, 100.0)) / 100.0,
-                            candles=candles,
-                            ema_values=ema_vals,
-                        )
-                    except Exception as ss_err:
-                        logger.warning(f"Screenshot capture failed (non-critical): {ss_err}")
+                    candles = None
+                    ema_vals = None
+                    if setup.instrument in self._last_scan_results:
+                        analysis = self._last_scan_results[setup.instrument]
+                        candles = getattr(analysis, 'candles_m5', None) or getattr(analysis, 'last_candles', {}).get('M5')
+                        ema_vals = getattr(analysis, 'ema_values', None)
+
+                    async def _capture():
+                        try:
+                            await self.screenshot_generator.capture_trade_open(
+                                trade_id=trade_id,
+                                instrument=setup.instrument,
+                                direction=setup.direction,
+                                entry_price=fill_price,
+                                sl=setup.stop_loss,
+                                tp1=setup.take_profit_1,
+                                tp_max=setup.take_profit_max,
+                                strategy=getattr(setup, '_strategy_name', 'DETECTED'),
+                                confidence=(getattr(setup, '_strategy_confidence', 0.0) or min(setup.reward_risk_ratio * 33, 100.0)) / 100.0,
+                                candles=candles,
+                                ema_values=ema_vals,
+                            )
+                        except Exception as ss_err:
+                            logger.warning(f"Screenshot capture failed (non-critical): {ss_err}")
+                    asyncio.create_task(_capture())
 
                 # TradingLab: Track reentry count
                 if setup.instrument in self._reentry_candidates:

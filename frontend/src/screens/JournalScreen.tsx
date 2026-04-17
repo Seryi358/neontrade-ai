@@ -362,7 +362,7 @@ export default function JournalScreen() {
           </View>
           <View style={styles.statCell}>
             <Text style={styles.statCellLabel}>ACUMULADOR</Text>
-            <Text style={[styles.statCellValue, stats.accumulator >= 0 ? styles.profit : styles.loss]}>
+            <Text style={[styles.statCellValue, stats.accumulator >= 1.0 ? styles.profit : styles.loss]}>
               {safe(stats.accumulator)}
             </Text>
           </View>

@@ -1186,12 +1186,22 @@ class TradingEngine:
         units: float,
         reason: str,
         strategy_variant: Optional[str] = None,
+        style: Optional[str] = None,
     ):
         """Called by PositionManager when it closes a trade (TP_max / emergency exit).
 
         Mirrors the DB + journal + consecutive-loss logic already used in
         _sync_positions_from_broker for externally-closed positions.
         """
+        # Scalping DD tracking — internal closes (TP_max / emergency exit /
+        # trailing SL hit) previously did NOT increment _scalping_daily_dd.
+        # Only the external-close path in _sync_positions_from_broker updated
+        # it, which meant the daily/total-DD pause gate almost never fired
+        # in normal flows. Increment here on losses; reset happens at SOD.
+        if style == "scalping" and pnl_dollars < 0:
+            balance = getattr(self.risk_manager, "_current_balance", 0.0) or 0.0
+            if balance > 0:
+                self._scalping_daily_dd += abs(pnl_dollars) / balance
         # 1. Persist to SQLite DB
         if self._db:
             try:

@@ -4,7 +4,7 @@
  * Apple Liquid Glass Light design.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -123,15 +123,25 @@ export default function AnalysisScreen() {
     loadWatchlist();
   }, []);
 
+  // Stale-response guard: rapid instrument switching + the 15s polling
+  // interval can let an earlier fetch resolve AFTER a newer one, overwriting
+  // the newer instrument's analysis. Tag each fetch with the instrument
+  // it was issued for and drop the response if the user has moved on.
+  const fetchRequestRef = useRef<string>('');
+
   // Fetch analysis for the selected instrument
   const fetchAnalysis = useCallback(async () => {
     if (!selectedInstrument) return;
+    const requestedFor = selectedInstrument;
+    fetchRequestRef.current = requestedFor;
     setLoading(true);
     setError(null);
     try {
-      const res = await authFetch(`${API_URL}/api/v1/analysis/${selectedInstrument}`);
+      const res = await authFetch(`${API_URL}/api/v1/analysis/${requestedFor}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      // Drop if user has switched instruments in the meantime.
+      if (fetchRequestRef.current !== requestedFor) return;
       // If backend returned a "no data yet" placeholder, show waiting message
       if (data.message && data.score === 0) {
         setAnalysis(null);
@@ -140,11 +150,14 @@ export default function AnalysisScreen() {
         setAnalysis(data);
       }
     } catch (err: any) {
+      if (fetchRequestRef.current !== requestedFor) return;
       console.error('Failed to fetch analysis:', err);
       setError(err.message || 'Error al cargar el analisis');
       setAnalysis(null);
     } finally {
-      setLoading(false);
+      if (fetchRequestRef.current === requestedFor) {
+        setLoading(false);
+      }
     }
   }, [selectedInstrument]);
 

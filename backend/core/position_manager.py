@@ -322,6 +322,20 @@ class PositionManager:
                 units=abs(pos.units) if pos.units else 0.0,
                 reason=reason,
                 strategy_variant=getattr(pos, "strategy_variant", None),
+                style=getattr(pos, "style", None),
+            )
+        except TypeError:
+            # Back-compat: callback may not accept `style` kwarg yet.
+            await self._on_trade_closed(
+                trade_id=pos.trade_id,
+                instrument=pos.instrument,
+                direction=pos.direction,
+                entry_price=pos.entry_price,
+                exit_price=exit_price,
+                pnl_dollars=pnl_dollars,
+                units=abs(pos.units) if pos.units else 0.0,
+                reason=reason,
+                strategy_variant=getattr(pos, "strategy_variant", None),
             )
         except Exception as cb_err:
             logger.warning(

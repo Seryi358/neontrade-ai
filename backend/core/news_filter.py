@@ -26,12 +26,24 @@ Most Important Events (highest impact):
 - Non-Farm Payrolls (monthly)
 """
 
+import json
+import os
+import tempfile
+from pathlib import Path
+
 import httpx
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 from loguru import logger
+
+# Audit A11: persist the last-successful calendar to disk so that transient
+# outages of FairEconomy + TradingEconomics don't collapse to 0 events (which
+# would allow trading during NFP/FOMC). Path lives next to the other backend
+# data files (security.json, trade_journal.json, etc.).
+NEWS_CACHE_PATH: Path = Path(__file__).resolve().parent.parent / "data" / "news_cache.json"
+NEWS_CACHE_MAX_AGE_HOURS: int = 48  # disk cache is reused only while fresh
 
 
 class TradingStyle(str, Enum):
@@ -358,7 +370,14 @@ class NewsFilter:
     # ------------------------------------------------------------------
 
     async def _refresh_calendar(self, now: datetime):
-        """Fetch today's economic calendar. Tries sources in priority order."""
+        """Fetch today's economic calendar. Tries sources in priority order.
+
+        Audit A11: when both external sources fail, we now fall back to a
+        disk-persisted calendar (cached from the last successful fetch) before
+        using the hardcoded recurring-events fallback. This prevents the
+        "0 events → allowed to trade NFP/FOMC" failure mode during a provider
+        outage.
+        """
         self._cached_events = []
 
         # 1) PRIMARY: FairEconomy (ForexFactory mirror — free, no key)
@@ -366,6 +385,7 @@ class NewsFilter:
             events = await self._fetch_from_faireconomy(now)
             if events:
                 self._cached_events = events
+                self._save_calendar_to_disk(events, now)
                 logger.info(f"Loaded {len(events)} news events from FairEconomy for today")
                 return
         except Exception as e:
@@ -376,14 +396,107 @@ class NewsFilter:
             events = await self._fetch_from_trading_economics(now)
             if events:
                 self._cached_events = events
+                self._save_calendar_to_disk(events, now)
                 logger.info(f"Loaded {len(events)} news events from Trading Economics for today")
                 return
         except Exception as e:
             logger.warning(f"Trading Economics calendar fetch failed: {e}")
 
-        # 3) FINAL FALLBACK: known recurring high-impact schedule
+        # 3) DISK CACHE: reuse the last successful fetch if it's fresh.
+        disk_events = self._load_calendar_from_disk(now)
+        if disk_events:
+            self._cached_events = disk_events
+            logger.warning(
+                f"External news sources failed — using disk-cached calendar "
+                f"({len(disk_events)} events) instead of hardcoded fallback"
+            )
+            return
+
+        # 4) FINAL FALLBACK: known recurring high-impact schedule
         self._cached_events = self._generate_known_events(now)
-        logger.info(f"Using {len(self._cached_events)} known recurring events as fallback")
+        logger.warning(
+            f"External news sources AND disk cache unavailable — using "
+            f"{len(self._cached_events)} hardcoded recurring events as last-resort fallback"
+        )
+
+    # ------------------------------------------------------------------
+    # Disk persistence (audit A11)
+    # ------------------------------------------------------------------
+
+    def _save_calendar_to_disk(self, events: List[NewsEvent], now: datetime) -> None:
+        """Persist successfully-fetched events to disk (atomic write).
+
+        Stores ``saved_at`` ISO-8601 timestamp + serialized event list so that
+        a later ``_load_calendar_from_disk`` call can reject stale caches.
+        """
+        try:
+            payload = {
+                "saved_at": now.isoformat(),
+                "events": [
+                    {
+                        "time": e.time.isoformat(),
+                        "currency": e.currency,
+                        "impact": e.impact,
+                        "title": e.title,
+                    }
+                    for e in events
+                ],
+            }
+            cache_path = NEWS_CACHE_PATH
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            # Atomic write so a crash mid-flush can't leave a truncated JSON
+            # that would prevent future reads.
+            fd, tmp_path = tempfile.mkstemp(dir=str(cache_path.parent), suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(payload, f)
+                os.replace(tmp_path, str(cache_path))
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
+        except Exception as exc:
+            logger.warning(f"Could not persist news calendar to disk: {exc}")
+
+    def _load_calendar_from_disk(self, now: datetime) -> List[NewsEvent]:
+        """Return events from the disk cache if fresh (<48h), else []."""
+        cache_path = NEWS_CACHE_PATH
+        if not cache_path.exists():
+            return []
+        try:
+            payload = json.loads(cache_path.read_text("utf-8"))
+            saved_at_str = payload.get("saved_at", "")
+            saved_at = datetime.fromisoformat(saved_at_str)
+            if saved_at.tzinfo is None:
+                saved_at = saved_at.replace(tzinfo=timezone.utc)
+            age_hours = (now - saved_at).total_seconds() / 3600
+            if age_hours > NEWS_CACHE_MAX_AGE_HOURS:
+                logger.info(
+                    f"Disk news cache is stale ({age_hours:.1f}h > "
+                    f"{NEWS_CACHE_MAX_AGE_HOURS}h), ignoring"
+                )
+                return []
+
+            events: List[NewsEvent] = []
+            for raw in payload.get("events", []):
+                try:
+                    event_time = datetime.fromisoformat(raw["time"])
+                    if event_time.tzinfo is None:
+                        event_time = event_time.replace(tzinfo=timezone.utc)
+                    events.append(NewsEvent(
+                        time=event_time,
+                        currency=raw.get("currency", ""),
+                        impact=raw.get("impact", "medium"),
+                        title=raw.get("title", "Unknown"),
+                    ))
+                except (KeyError, ValueError, TypeError):
+                    continue
+            return events
+        except Exception as exc:
+            logger.warning(f"Could not read disk news cache: {exc}")
+            return []
 
     # ------------------------------------------------------------------
     # Source 1: FairEconomy (primary — free, no API key)

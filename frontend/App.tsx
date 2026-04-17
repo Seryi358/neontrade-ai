@@ -8,7 +8,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useIsFocused } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   Text,
@@ -131,6 +131,35 @@ import JournalScreen from './src/screens/JournalScreen';
 import ExamScreen from './src/screens/ExamScreen';
 import CryptoScreen from './src/screens/CryptoScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+
+// ── FocusOnlyMount ──────────────────────────────────────
+// Unmounts children when the tab is blurred. On desktop (web),
+// @react-navigation keeps inactive screens mounted by default,
+// which multiplies polling (~20 redundant GETs). Mobile is fine.
+// This wrapper guarantees inactive tabs stop running effects.
+
+function FocusOnlyMount({ children }: { children: React.ReactNode }) {
+  const isFocused = useIsFocused();
+  const hasBeenFocused = useRef(false);
+  if (isFocused) hasBeenFocused.current = true;
+  // Mount only after first focus; unmount when blurred again.
+  if (!hasBeenFocused.current || !isFocused) {
+    return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
+  }
+  return <>{children}</>;
+}
+
+function withFocusOnlyMount<P extends object>(
+  Component: React.ComponentType<P>
+): React.FC<P> {
+  const Wrapped: React.FC<P> = (props) => (
+    <FocusOnlyMount>
+      <Component {...props} />
+    </FocusOnlyMount>
+  );
+  Wrapped.displayName = `FocusOnlyMount(${Component.displayName || Component.name || 'Component'})`;
+  return Wrapped;
+}
 
 // ── Sub-Tab Navigator Component ─────────────────────────
 // State-based sub-navigation for multi-screen tabs
@@ -318,6 +347,14 @@ const bootStyles = StyleSheet.create({
 });
 
 // ── Main Tab Navigator ──────────────────────────────────
+
+// Wrap tab-level screens so they only render while focused.
+// This prevents the 5 tab polling cycles from running in parallel on desktop.
+const DashboardScreenFocused = withFocusOnlyMount(DashboardScreen);
+const TradeScreenFocused = withFocusOnlyMount(TradeScreen);
+const MarketScreenFocused = withFocusOnlyMount(MarketScreen);
+const LogScreenFocused = withFocusOnlyMount(LogScreen);
+const SettingsScreenFocused = withFocusOnlyMount(SettingsScreen);
 
 const Tab = createBottomTabNavigator();
 
@@ -551,8 +588,11 @@ export default function App() {
         <NavigationContainer>
           <StatusBar style="dark" />
           <Tab.Navigator
+            detachInactiveScreens
             screenOptions={{
               headerShown: false,
+              lazy: true,
+              freezeOnBlur: true,
               tabBarStyle: {
                 backgroundColor: 'rgba(255,255,255,0.92)',
                 borderTopWidth: StyleSheet.hairlineWidth,
@@ -573,7 +613,7 @@ export default function App() {
           >
             <Tab.Screen
               name="Dashboard"
-              component={DashboardScreen}
+              component={DashboardScreenFocused}
               options={{
                 tabBarLabel: 'Home',
                 tabBarIcon: ({ focused }) => (
@@ -583,7 +623,7 @@ export default function App() {
             />
             <Tab.Screen
               name="Trade"
-              component={TradeScreen}
+              component={TradeScreenFocused}
               options={{
                 tabBarLabel: 'Trade',
                 tabBarIcon: ({ focused }) => (
@@ -593,7 +633,7 @@ export default function App() {
             />
             <Tab.Screen
               name="Market"
-              component={MarketScreen}
+              component={MarketScreenFocused}
               options={{
                 tabBarLabel: 'Market',
                 tabBarIcon: ({ focused }) => (
@@ -603,7 +643,7 @@ export default function App() {
             />
             <Tab.Screen
               name="Log"
-              component={LogScreen}
+              component={LogScreenFocused}
               options={{
                 tabBarLabel: 'Log',
                 tabBarIcon: ({ focused }) => (
@@ -613,7 +653,7 @@ export default function App() {
             />
             <Tab.Screen
               name="Settings"
-              component={SettingsScreen}
+              component={SettingsScreenFocused}
               options={{
                 tabBarLabel: 'Settings',
                 tabBarIcon: ({ focused }) => (

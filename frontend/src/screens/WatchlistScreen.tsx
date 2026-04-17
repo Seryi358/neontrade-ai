@@ -20,7 +20,6 @@ import {
   HUDStatRow,
   HUDBadge,
   HUDDivider,
-  SubNavPills,
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
@@ -44,11 +43,6 @@ interface WatchlistItem {
   confidence_level?: string;
   strategy_checklist?: StrategyChecklistEntry[];
 }
-
-const SUB_NAV_OPTIONS = [
-  { key: 'watchlist', label: 'WATCHLIST' },
-  { key: 'crypto', label: 'CRYPTO' },
-];
 
 export default function WatchlistScreen() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -172,13 +166,6 @@ export default function WatchlistScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Sub-navigation pills */}
-      <SubNavPills
-        options={SUB_NAV_OPTIONS}
-        activeKey="watchlist"
-        onSelect={() => {}}
-      />
-
       {/* Header stats */}
       <HUDCard accentColor={theme.colors.neonCyan}>
         <View style={styles.headerStatsRow}>

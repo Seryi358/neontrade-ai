@@ -496,7 +496,10 @@ describe('JournalScreen', () => {
   it('renders the journal screen header', async () => {
     const { getByText } = render(<JournalScreen />);
     await waitFor(() => {
-      expect(getByText('JOURNAL')).toBeTruthy();
+      // JournalScreen renders section titles; the sub-tab label "JOURNAL"
+      // is now provided by App.tsx's SubTabScreen wrapper, not the screen
+      // itself (audit A7 dedupe).
+      expect(getByText('ESTADISTICAS GENERALES')).toBeTruthy();
     });
   });
 

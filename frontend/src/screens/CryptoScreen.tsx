@@ -21,7 +21,6 @@ import {
   HUDStatRow,
   HUDBadge,
   HUDDivider,
-  SubNavPills,
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
@@ -117,11 +116,6 @@ const getHalvingLabel = (phase: string): string => {
   }
 };
 
-const SUB_NAV_OPTIONS = [
-  { key: 'watchlist', label: 'WATCHLIST' },
-  { key: 'crypto', label: 'CRYPTO' },
-];
-
 export default function CryptoScreen() {
   const [cycle, setCycle] = useState<CycleData | null>(null);
   const [allocation, setAllocation] = useState<AllocationData | null>(null);
@@ -174,15 +168,6 @@ export default function CryptoScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Sub-navigation pills */}
-      <View style={styles.topPadding}>
-        <SubNavPills
-          options={SUB_NAV_OPTIONS}
-          activeKey="crypto"
-          onSelect={() => {}}
-        />
-      </View>
-
       {error && <ErrorState message={error} />}
 
       {/* ── Market Phase Card ── */}

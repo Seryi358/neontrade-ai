@@ -23,7 +23,6 @@ import {
   HUDStatRow,
   HUDBadge,
   HUDDivider,
-  SubNavPills,
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
@@ -66,11 +65,6 @@ const STRATEGY_FILTERS = [
 const getStrategyDotColor = (color: string): string => {
   return STRATEGY_COLORS[color?.toUpperCase()] || theme.colors.textMuted;
 };
-
-const SUB_NAV_OPTIONS = [
-  { key: 'history', label: 'HISTORY' },
-  { key: 'journal', label: 'JOURNAL' },
-];
 
 export default function HistoryScreen() {
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -142,8 +136,8 @@ export default function HistoryScreen() {
         <HUDSectionTitle title="RENDIMIENTO (30 DIAS)" color={theme.colors.neonCyan} />
         <HUDStatRow
           label="TRADES"
-          value={stats.total_trades}
-          valueColor={theme.colors.textWhite}
+          value={stats.total_trades ?? 0}
+          valueColor={theme.colors.textPrimary}
         />
         <HUDStatRow
           label="WIN RATE"
@@ -170,6 +164,7 @@ export default function HistoryScreen() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.filterBar}
       contentContainerStyle={styles.filterScroll}
     >
       {STRATEGY_FILTERS.map((f) => (
@@ -256,7 +251,6 @@ export default function HistoryScreen() {
   if (error && trades.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <SubNavPills options={SUB_NAV_OPTIONS} activeKey="history" onSelect={() => {}} />
         <ErrorState message={error} onRetry={fetchData} />
       </View>
     );
@@ -264,9 +258,6 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Sub-navigation pills */}
-      <SubNavPills options={SUB_NAV_OPTIONS} activeKey="history" onSelect={() => {}} />
-
       {renderPerformanceSummary()}
       {renderFilterBar()}
 
@@ -313,16 +304,21 @@ const styles = StyleSheet.create({
   },
 
   // Filter bar
+  filterBar: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: theme.spacing.md,
+  },
   filterScroll: {
-    paddingBottom: theme.spacing.md,
+    alignItems: 'center',
     gap: 6,
   },
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 32,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.round,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: 5,

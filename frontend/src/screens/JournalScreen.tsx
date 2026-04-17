@@ -26,7 +26,6 @@ import {
   HUDStatRow,
   HUDBadge,
   HUDDivider,
-  SubNavPills,
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
@@ -116,11 +115,6 @@ const formatMonthKey = (key: string): string => {
   }
   return key;
 };
-
-const SUB_NAV_OPTIONS = [
-  { key: 'history', label: 'HISTORY' },
-  { key: 'journal', label: 'JOURNAL' },
-];
 
 export default function JournalScreen() {
   const [stats, setStats] = useState<JournalStats | null>(null);
@@ -721,7 +715,6 @@ export default function JournalScreen() {
   if (error && trades.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <SubNavPills options={SUB_NAV_OPTIONS} activeKey="journal" onSelect={() => {}} />
         <ErrorState message={error} onRetry={fetchData} />
       </View>
     );
@@ -749,9 +742,6 @@ export default function JournalScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Sub-navigation pills */}
-      <SubNavPills options={SUB_NAV_OPTIONS} activeKey="journal" onSelect={() => {}} />
-
       <FlatList
         data={trades}
         keyExtractor={(item) => item.trade_id}

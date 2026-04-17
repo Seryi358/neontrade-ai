@@ -170,6 +170,7 @@ export default function HistoryScreen() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.filterBar}
       contentContainerStyle={styles.filterScroll}
     >
       {STRATEGY_FILTERS.map((f) => (
@@ -313,16 +314,21 @@ const styles = StyleSheet.create({
   },
 
   // Filter bar
+  filterBar: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: theme.spacing.md,
+  },
   filterScroll: {
-    paddingBottom: theme.spacing.md,
+    alignItems: 'center',
     gap: 6,
   },
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 32,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.round,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: 5,

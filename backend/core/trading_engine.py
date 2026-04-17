@@ -1308,7 +1308,9 @@ class TradingEngine:
             new_ids = broker_ids - tracked_ids
             for trade in broker_trades:
                 if trade.trade_id in new_ids:
-                    from core.position_manager import ManagedPosition, PositionPhase
+                    # ManagedPosition + PositionPhase already imported at module level.
+                    # Previous local import shadowed the module-level binding and left
+                    # PositionPhase unbound when new_ids was empty but closed_ids was not.
                     # Skip adoption if missing critical fields
                     if not trade.stop_loss or not trade.entry_price:
                         logger.warning(
@@ -2849,7 +2851,10 @@ class TradingEngine:
         units = await self.risk_manager.calculate_position_size(
             setup.instrument, _style, current_price, setup.stop_loss
         )
-        if units <= 0:
+        # calculate_position_size returns 0 for "no trade" (e.g., insufficient margin)
+        # and signed units otherwise (positive for BUY, negative for SELL). Check
+        # magnitude, not sign — a negative value is a valid SELL, not an error.
+        if units == 0:
             logger.warning(
                 f"Approved setup {setup.id}: recalculated units=0 at "
                 f"current price {current_price:.5f} — marking expired"
@@ -2857,9 +2862,12 @@ class TradingEngine:
             setup.status = "expired"
             return
 
-        # SELL orders need negative units — broker interprets sign as direction
+        # Ensure sign matches direction (idempotent for correctly-signed values
+        # from calculate_position_size; defensive if caller constructs manually).
         if setup.direction == "SELL":
             units = -abs(units)
+        else:
+            units = abs(units)
 
         trade_risk = TradeRisk(
             instrument=setup.instrument,

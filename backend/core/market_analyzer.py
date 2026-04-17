@@ -2810,7 +2810,10 @@ class MarketAnalyzer:
                 # Positive correlation (original logic):
                 # Bearish SMT: instrument makes higher high but correlated doesn't
                 if made_higher_high and not corr_made_higher_high:
-                    logger.warning(
+                    # Audit M12: this fires on nearly every scan (~95.8% of
+                    # log noise) and is not actionable on its own; it is a
+                    # feature, not a risk event. Demote to DEBUG.
+                    logger.debug(
                         f"SMT Divergence BEARISH: {instrument} made HH but "
                         f"{corr_inst} did not"
                     )
@@ -2818,7 +2821,8 @@ class MarketAnalyzer:
 
                 # Bullish SMT: instrument makes lower low but correlated doesn't
                 if made_lower_low and not corr_made_lower_low:
-                    logger.warning(
+                    # Audit M12: same as above — DEBUG, not WARNING.
+                    logger.debug(
                         f"SMT Divergence BULLISH: {instrument} made LL but "
                         f"{corr_inst} did not"
                     )

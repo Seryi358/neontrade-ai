@@ -438,6 +438,57 @@ async def get_analysis(instrument: str):
     # Add detailed explanation if available
     if instrument in engine.latest_explanations:
         explanation = engine.latest_explanations[instrument]
+
+        # Map each per-TF string list ("levels") into the structured
+        # key_levels object the frontend expects. Levels read "Soporte en
+        # 1.0234" / "Resistencia en 1.0456" — we partition by keyword.
+        def _partition_levels(levels_list):
+            supports, resistances = [], []
+            for lvl in (levels_list or []):
+                if not isinstance(lvl, str):
+                    continue
+                lower = lvl.lower()
+                # Extract first numeric token
+                import re as _re
+                m = _re.search(r"[-+]?\d+\.?\d*", lvl)
+                if not m:
+                    continue
+                try:
+                    value = float(m.group())
+                except ValueError:
+                    continue
+                if "resist" in lower or "supply" in lower or "techo" in lower:
+                    resistances.append(value)
+                elif "sopor" in lower or "demand" in lower or "piso" in lower:
+                    supports.append(value)
+            return {"support": supports, "resistance": resistances}
+
+        # Frontend expects `strategy_steps` as {description, met}[]. Our
+        # generator produces flat strings — zip each step with the
+        # conditions_met list when possible (else default to True, since
+        # these are the steps that drove strategy_detected).
+        met_set = {s.strip().lower() for s in (explanation.conditions_met or []) if isinstance(s, str)}
+        steps_structured = []
+        for s in (explanation.strategy_steps or []):
+            if isinstance(s, dict):
+                steps_structured.append({
+                    "description": s.get("description", ""),
+                    "met": bool(s.get("met", True)),
+                })
+            else:
+                steps_structured.append({
+                    "description": str(s),
+                    "met": any(str(s).strip().lower() in m or m in str(s).strip().lower() for m in met_set) if met_set else True,
+                })
+
+        strategy_color_map = {
+            "BLUE": "BLUE", "BLUE_A": "BLUE", "BLUE_B": "BLUE", "BLUE_C": "BLUE",
+            "RED": "RED", "PINK": "PINK", "WHITE": "WHITE", "BLACK": "BLACK",
+            "GREEN": "GREEN",
+        }
+        strategy_name = explanation.strategy_detected or ""
+        strategy_color = strategy_color_map.get(strategy_name.upper().replace(" ", "_"), "")
+
         response["explanation"] = {
             "overall_bias": explanation.overall_bias,
             "confidence_level": explanation.confidence_level,
@@ -446,14 +497,17 @@ async def get_analysis(instrument: str):
                     "timeframe": tf.timeframe,
                     "trend": tf.trend,
                     "observations": tf.key_observations,
+                    # Keep legacy `levels` for any existing consumer, plus
+                    # the structured `key_levels` the frontend expects.
                     "levels": tf.levels,
+                    "key_levels": _partition_levels(tf.levels),
                     "patterns": tf.patterns,
                     "conclusion": tf.conclusion,
                 }
                 for tf in explanation.timeframe_analysis
             ],
             "strategy_detected": explanation.strategy_detected,
-            "strategy_steps": explanation.strategy_steps,
+            "strategy_steps": steps_structured,
             "conditions_met": explanation.conditions_met,
             "conditions_missing": explanation.conditions_missing,
             "entry_explanation": explanation.entry_explanation,
@@ -462,6 +516,20 @@ async def get_analysis(instrument: str):
             "risk_assessment": explanation.risk_assessment,
             "recommendation": explanation.recommendation,
         }
+        # Top-level convenience fields the frontend reads directly.
+        response["confidence"] = explanation.confidence_level
+        if strategy_name:
+            response["strategy"] = {
+                "name": strategy_name,
+                "color": strategy_color,
+                "steps": steps_structured,
+                "entry_explanation": explanation.entry_explanation,
+                "sl_explanation": explanation.sl_explanation,
+                "tp_explanation": explanation.tp_explanation,
+                "risk_assessment": explanation.risk_assessment,
+            }
+        else:
+            response["strategy"] = None
 
     return response
 

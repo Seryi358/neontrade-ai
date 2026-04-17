@@ -281,6 +281,29 @@ class CapitalClient(BaseBroker):
         broker_circuit_breaker.record_failure()
         raise last_exc
 
+    @staticmethod
+    def _parse_retry_after(e: Exception) -> Optional[float]:
+        """Return the Retry-After header value in seconds, if the error is a 429."""
+        if not isinstance(e, httpx.HTTPStatusError) or e.response.status_code != 429:
+            return None
+        hdr = e.response.headers.get("Retry-After")
+        if not hdr:
+            return None
+        try:
+            return float(hdr)
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _is_permanent_error(e: Exception) -> bool:
+        """Client-side errors (400/403/404/422) are permanent — retry wastes API
+        quota and can trigger secondary 429 throttles. 401 is handled separately
+        (session refresh). 429 + 5xx are retryable."""
+        if not isinstance(e, httpx.HTTPStatusError):
+            return False
+        code = e.response.status_code
+        return code in (400, 403, 404, 422)
+
     async def _post(self, path: str, json_data: Optional[Dict] = None) -> httpx.Response:
         """Authenticated POST request with retry and circuit breaker."""
         if broker_circuit_breaker.is_open:
@@ -297,6 +320,11 @@ class CapitalClient(BaseBroker):
                 return resp
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
+                # Permanent 4xx — don't retry, fail fast.
+                if self._is_permanent_error(e):
+                    broker_circuit_breaker.record_failure()
+                    raise
+                retry_after = self._parse_retry_after(e)
                 # Clear session on 401 so _ensure_session re-authenticates
                 if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 401:
                     self._cst = None
@@ -304,7 +332,7 @@ class CapitalClient(BaseBroker):
                     self._session_time = None
                     logger.warning(f"[_post] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
-                    delay = min(0.5 * (2 ** attempt), 10.0)
+                    delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 10.0)
                     logger.warning(f"[_post] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
                     await asyncio.sleep(delay)
                     await self._ensure_session()
@@ -330,13 +358,17 @@ class CapitalClient(BaseBroker):
                 return resp
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
+                if self._is_permanent_error(e):
+                    broker_circuit_breaker.record_failure()
+                    raise
+                retry_after = self._parse_retry_after(e)
                 if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 401:
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
                     logger.warning(f"[_put] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
-                    delay = min(0.5 * (2 ** attempt), 5.0)
+                    delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 5.0)
                     logger.warning(f"[_put] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
                     await asyncio.sleep(delay)
                     await self._ensure_session()
@@ -362,13 +394,20 @@ class CapitalClient(BaseBroker):
                 return resp
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
+                # 404 on DELETE usually means "already closed" — the caller
+                # (close_trade) handles that explicitly. Don't retry permanent
+                # 4xx here either.
+                if self._is_permanent_error(e):
+                    broker_circuit_breaker.record_failure()
+                    raise
+                retry_after = self._parse_retry_after(e)
                 if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 401:
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
                     logger.warning(f"[_delete] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
-                    delay = min(0.5 * (2 ** attempt), 5.0)
+                    delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 5.0)
                     logger.warning(f"[_delete] {path} attempt {attempt+1}/3 failed: {e}. Retry in {delay:.1f}s")
                     await asyncio.sleep(delay)
                     await self._ensure_session()

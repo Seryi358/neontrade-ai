@@ -406,7 +406,23 @@ def _check_weekly_ema8_filter(analysis, direction: str) -> bool:
     """
     TradingLab: EMA 8 Weekly is the long-term trend filter.
     BUY only if price > EMA 8 Weekly. SELL only if price < EMA 8 Weekly.
+
+    Mentoría TradingLab (audit C3): esta regla aparece SÓLO en
+    `Esp. Criptomonedas/01_Contenido/08_Indicadores cripto y su función/
+    03_EMA 8 semanal`. En Trading Mastery NO existe esta regla. Aplicarla
+    a forex/indices/commodities bloquea setups válidos y hace BLACK
+    (contratendencial) inoperable.
+
+    Por tanto:
+      - Crypto (BTC_USD, ETH_USD, ...): se evalúa el filter como antes.
+      - Resto (forex, índices, commodities): retorna True (pass-through).
     """
+    # Pass-through for non-crypto: the rule doesn't apply.
+    instrument = getattr(analysis, 'instrument', None)
+    if not _is_crypto_instrument(instrument):
+        return True
+
+    # Crypto-only branch: original fail-safe + direction check.
     ema_w8 = getattr(analysis, 'ema_w8', None)
     if ema_w8 is None:
         return False  # No weekly EMA8 data = block trade (fail-safe)

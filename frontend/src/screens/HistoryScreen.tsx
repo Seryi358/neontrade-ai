@@ -23,7 +23,6 @@ import {
   HUDStatRow,
   HUDBadge,
   HUDDivider,
-  SubNavPills,
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
@@ -66,11 +65,6 @@ const STRATEGY_FILTERS = [
 const getStrategyDotColor = (color: string): string => {
   return STRATEGY_COLORS[color?.toUpperCase()] || theme.colors.textMuted;
 };
-
-const SUB_NAV_OPTIONS = [
-  { key: 'history', label: 'HISTORY' },
-  { key: 'journal', label: 'JOURNAL' },
-];
 
 export default function HistoryScreen() {
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -257,7 +251,6 @@ export default function HistoryScreen() {
   if (error && trades.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <SubNavPills options={SUB_NAV_OPTIONS} activeKey="history" onSelect={() => {}} />
         <ErrorState message={error} onRetry={fetchData} />
       </View>
     );
@@ -265,9 +258,6 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Sub-navigation pills */}
-      <SubNavPills options={SUB_NAV_OPTIONS} activeKey="history" onSelect={() => {}} />
-
       {renderPerformanceSummary()}
       {renderFilterBar()}
 

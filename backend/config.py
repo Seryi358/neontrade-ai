@@ -883,7 +883,7 @@ def apply_trading_profile(profile_id: str) -> dict:
         "risk_day_trading", "risk_scalping", "risk_swing", "max_total_risk",
         "correlated_risk_pct", "min_rr_ratio", "move_sl_to_be_pct_to_tp1",
         "drawdown_method", "delta_enabled", "delta_parameter", "delta_max_risk",
-        "scale_in_require_be", "min_rr_black", "min_rr_green",
+        "scale_in_require_be", "min_rr_black", "min_rr_green", "min_rr_blue_c",
     }
     risk_updates = {k: v for k, v in applied.items() if k in risk_keys}
     if risk_updates:

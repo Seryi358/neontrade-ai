@@ -1843,12 +1843,14 @@ class BlueStrategy(BaseStrategy):
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float, variant: str = "BLUE_B") -> Dict[str, float]:
         """
-        BLUE TP levels per TradingLab mentorship:
-        - ALL variants (A/B/C): TP1 = confirm-TF EMA50 (4H for day trading)
-          "el take profit SIEMPRE media movil de 50 de 4 horas"
-        - BLUE_A: TP_max = Fib 1.272 or 1.618 extension (more aggressive)
-        - BLUE_B/C: TP_max = EMA 4H or next S/R (conservative)
-        Swing adaptation: TP1 = EMA 50 Weekly (not 4H) per mentorship.
+        BLUE TP levels per Trading Plan PDF pg.6 (autoritativo):
+          "Pondré SIEMPRE un Take Profit 1 que significará llevar el precio
+           hasta el máximo o mínimo anterior.
+           BLUE: EMA4H"
+        - ALL variants (A/B/C): TP1 = swing anterior (máximo/mínimo más cercano)
+        - BLUE_B/C: TP_max = EMA 4H 50 (regla del PDF)
+        - BLUE_A: TP_max = Fib 1.272 or 1.618 extension (más agresivo, doble suelo/techo)
+        Swing adaptation: TP_max scales up to EMA 50 Weekly for swing trading.
         """
         # Use style-adaptive confirm-timeframe EMA (4H for day, Weekly for swing, M15 for scalping)
         confirm_ema_key = _tf_ema("confirm", 50)
@@ -1860,26 +1862,38 @@ class BlueStrategy(BaseStrategy):
 
         result: Dict[str, float] = {}
 
-        # ALL BLUE variants: TP1 = confirm-TF EMA 50 (SIEMPRE per mentorship)
-        if ema_4h_50 and ema_4h_50 > 0:
+        # ALL BLUE variants: TP1 = swing anterior (máximo/mínimo más cercano)
+        # Trading Plan PDF pg.6: "Pondré SIEMPRE un Take Profit 1 que significará
+        # llevar el precio hasta el máximo o mínimo anterior."
+        if direction == "BUY":
+            valid_swing_highs = [sh for sh in swing_highs if sh > entry_price]
+            if valid_swing_highs:
+                result["tp1"] = min(valid_swing_highs)  # Nearest swing high = safest
+            else:
+                # Fallback: nearest resistance above entry
+                above = [r for r in resistances if r > entry_price]
+                if above:
+                    result["tp1"] = min(above)
+        else:
+            valid_swing_lows = [sl for sl in swing_lows if sl < entry_price]
+            if valid_swing_lows:
+                result["tp1"] = max(valid_swing_lows)  # Nearest swing low = safest
+            else:
+                # Fallback: nearest support below entry
+                below = [s for s in supports if s < entry_price]
+                if below:
+                    result["tp1"] = max(below)
+
+        # Final fallback: if no swing/S/R anterior, use EMA 4H 50 (same behaviour
+        # as old code when no structure data available — preserves R:R filtering).
+        if "tp1" not in result and ema_4h_50 and ema_4h_50 > 0:
             if direction == "BUY" and ema_4h_50 > entry_price:
                 result["tp1"] = ema_4h_50
             elif direction == "SELL" and ema_4h_50 < entry_price:
                 result["tp1"] = ema_4h_50
 
-        if "tp1" not in result:
-            # Fallback: resistencia/soporte mas cercano
-            if direction == "BUY":
-                above = [r for r in resistances if r > entry_price]
-                if above:
-                    result["tp1"] = min(above)
-            else:
-                below = [s for s in supports if s < entry_price]
-                if below:
-                    result["tp1"] = max(below)
-
         # BLUE_A variant: TP_max targets Fib 1.272 or 1.618 extension (more aggressive)
-        # BLUE_B/C variants: TP_max = EMA 4H only (conservative)
+        # BLUE_B/C variants: TP_max = EMA 4H (PDF pg.6 explicit rule)
         tp1 = result.get("tp1")
         if tp1 and variant == "BLUE_A":
             # TradingLab: Blue A (doble suelo/techo) can target Fib extensions
@@ -1911,14 +1925,13 @@ class BlueStrategy(BaseStrategy):
                     if below_tp1:
                         result["tp_max"] = below_tp1[0]
         elif tp1:
-            # BLUE_B/C: TP_max = EMA 4H (Trading Plan rule: "BLUE B/C: TP maximo = EMA 4H")
-            ema_h4 = _ema_val(analysis, "EMA_H4_50")
-            if ema_h4 and direction == "BUY" and ema_h4 > tp1:
-                result["tp_max"] = ema_h4
-            elif ema_h4 and direction == "SELL" and ema_h4 < tp1:
-                result["tp_max"] = ema_h4
+            # BLUE_B/C: TP_max = EMA 4H 50 (Trading Plan PDF pg.6 explicit rule)
+            if ema_4h_50 and direction == "BUY" and ema_4h_50 > tp1:
+                result["tp_max"] = ema_4h_50
+            elif ema_4h_50 and direction == "SELL" and ema_4h_50 < tp1:
+                result["tp_max"] = ema_4h_50
             else:
-                # Fallback to next S/R if EMA H4 not usable
+                # Fallback to next S/R if EMA 4H not usable (already crossed)
                 if direction == "BUY":
                     above_tp1 = sorted([r for r in resistances if r > tp1])
                     if above_tp1:

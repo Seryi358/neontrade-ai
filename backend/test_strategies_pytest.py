@@ -209,11 +209,23 @@ class TestBlueStrategy:
         assert sl > 1.1000, f"SL should be above entry, got {sl}"
 
     def test_tp_uses_ema_4h(self):
-        """TP1 = EMA 50 4H."""
-        analysis = make_analysis(ema_h4_50=1.1050)
+        """Trading Plan PDF pg.6: TP1 = swing/S/R anterior, TP_max = EMA 4H 50 (BLUE B/C)."""
+        # Provide a swing high between entry and EMA 4H so TP1 is the swing.
+        analysis = make_analysis(
+            ema_h4_50=1.1050,
+            swing_highs=[1.1020, 1.1080],  # 1.1020 > entry and < ema_h4
+        )
         tps = self.blue.get_tp_levels(analysis, "BUY", 1.1000)
-        if "tp1" in tps:
-            assert abs(tps["tp1"] - 1.1050) < 0.001
+        # PDF: TP1 = swing anterior (closest swing high above entry)
+        assert "tp1" in tps
+        assert abs(tps["tp1"] - 1.1020) < 0.001, (
+            f"TP1 debe ser swing high más cercano (1.1020), got {tps['tp1']}"
+        )
+        # PDF: TP_max = EMA 4H 50
+        assert "tp_max" in tps
+        assert abs(tps["tp_max"] - 1.1050) < 0.001, (
+            f"TP_max debe ser EMA 4H 50 (1.1050), got {tps['tp_max']}"
+        )
 
 
 # ── Section 3: RED strategy ──────────────────────────────────────────

@@ -2451,8 +2451,10 @@ async def generate_exam_report(req: ExamRequest):
 
     if db is None:
         raise HTTPException(503, "Database not available")
-    if len(req.trade_ids) < 1 or len(req.trade_ids) > 5:
-        raise HTTPException(400, "Between 1 and 5 trade IDs required for exam submission")
+    # Mentorship requires exactly 3 trades with screenshot + analysis.
+    # Allow up to 5 so users can pick their best three variants.
+    if len(req.trade_ids) < 3 or len(req.trade_ids) > 5:
+        raise HTTPException(400, "Between 3 and 5 trade IDs required for exam submission")
 
     trades = []
     for tid in req.trade_ids:
@@ -2468,15 +2470,29 @@ async def generate_exam_report(req: ExamRequest):
         # Get analysis data if available
         analysis = engine.last_scan_results.get(trade.get("instrument", ""), None)
 
-        # Get screenshot if exists
+        # Get screenshot if exists — prefer the close screenshot because it
+        # shows the trade outcome. Fall back to open screenshot if no close
+        # was captured. Use a trade_id-anchored glob (no leading wildcard)
+        # so a tid that's a prefix of another trade can't cross-match.
         screenshot_b64 = None
         screenshots_dir = Path("data/screenshots")
         if screenshots_dir.exists():
-            # Find screenshot for this trade
-            for f in screenshots_dir.glob(f"*{tid}*"):
-                if f.suffix == ".png":
-                    screenshot_b64 = base64.b64encode(f.read_bytes()).decode()
-                    break
+            candidates = [
+                f for f in screenshots_dir.glob(f"{tid}_*.png")
+                if f.suffix == ".png"
+            ]
+            # Prefer _close_ screenshots, fall back to _open_, then anything else
+            close_shots = [f for f in candidates if "_close_" in f.name]
+            open_shots = [f for f in candidates if "_open_" in f.name]
+            chosen = None
+            if close_shots:
+                chosen = sorted(close_shots, key=lambda p: p.stat().st_mtime)[-1]
+            elif open_shots:
+                chosen = sorted(open_shots, key=lambda p: p.stat().st_mtime)[-1]
+            elif candidates:
+                chosen = sorted(candidates, key=lambda p: p.stat().st_mtime)[-1]
+            if chosen:
+                screenshot_b64 = base64.b64encode(chosen.read_bytes()).decode()
 
         # Build trade analysis for exam
         exam_trade = {

@@ -983,24 +983,47 @@ class CapitalClient(BaseBroker):
 
         return result
 
-    async def modify_trade_sl(self, trade_id: str, stop_loss: float) -> bool:
-        """Move stop loss on an existing position."""
+    async def _fetch_position_levels(self, trade_id: str) -> tuple:
+        """Return (stopLevel, profitLevel) for a position, or (None, None) on miss."""
         try:
-            await self._put(f"/api/v1/positions/{trade_id}", json_data={
-                "stopLevel": stop_loss,
-            })
-            logger.info(f"Position {trade_id} SL moved to {stop_loss}")
+            data = await self._get(f"/api/v1/positions/{trade_id}")
+            pos = data.get("position", {}) if isinstance(data, dict) else {}
+            sl = pos.get("stopLevel")
+            tp = pos.get("profitLevel")
+            return (
+                float(sl) if sl is not None else None,
+                float(tp) if tp is not None else None,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to fetch current levels for {trade_id}: {e}")
+            return None, None
+
+    async def modify_trade_sl(self, trade_id: str, stop_loss: float) -> bool:
+        """Move stop loss on an existing position, preserving the current TP."""
+        try:
+            # Capital.com's PUT /positions/{dealId} replaces the level block.
+            # Always send both stopLevel and profitLevel to avoid accidentally
+            # clearing the unmodified side.
+            _sl_current, tp_current = await self._fetch_position_levels(trade_id)
+            body = {"stopLevel": stop_loss}
+            if tp_current is not None:
+                body["profitLevel"] = tp_current
+            await self._put(f"/api/v1/positions/{trade_id}", json_data=body)
+            logger.info(f"Position {trade_id} SL moved to {stop_loss} (TP preserved={tp_current})")
             return True
         except Exception as e:
             logger.error(f"Failed to modify SL for {trade_id}: {e}")
             return False
 
     async def modify_trade_tp(self, trade_id: str, take_profit: float) -> bool:
-        """Modify take profit on an existing position."""
+        """Modify take profit on an existing position, preserving the current SL."""
         try:
-            await self._put(f"/api/v1/positions/{trade_id}", json_data={
-                "profitLevel": take_profit,
-            })
+            sl_current, _tp_current = await self._fetch_position_levels(trade_id)
+            body = {"profitLevel": take_profit}
+            if sl_current is not None:
+                body["stopLevel"] = sl_current
+            await self._put(f"/api/v1/positions/{trade_id}", json_data=body)
+            logger.info(f"Position {trade_id} TP moved to {take_profit} (SL preserved={sl_current})")
             return True
         except Exception as e:
             logger.error(f"Failed to modify TP for {trade_id}: {e}")

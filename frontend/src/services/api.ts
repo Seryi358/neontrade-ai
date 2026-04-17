@@ -390,17 +390,21 @@ class WebSocketManager {
   private isConnected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 20;
+  // True once the server has delivered an authenticated message (engine_status
+  // is the first post-auth frame). Until this flips, a close is treated as a
+  // likely auth failure and we DO NOT reset the reconnect counter on open —
+  // otherwise a bad API key loops at 1s delay forever.
+  private authConfirmed = false;
+  // Stop retrying entirely after the server rejects with close code 4001.
+  private authRejected = false;
 
   connect() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
-    // Note: do NOT reset reconnectAttempts here — _scheduleReconnect calls
-    // connect() after failures, and resetting would make the
-    // maxReconnectAttempts cap unreachable (infinite retry loop).
-    // The counter is cleared on successful connection in onopen.
-
+    if (this.authRejected) return;
     try {
       // BUG-08 fix: authenticate via first message, not URL query param
       this.ws = new WebSocket(WS_URL);
+      this.authConfirmed = false;
 
       this.ws.onopen = () => {
         // Send auth as first message (keeps API key out of URLs/logs)
@@ -408,9 +412,8 @@ class WebSocketManager {
         if (apiKey && this.ws) {
           this.ws.send(JSON.stringify({ action: 'auth', api_key: apiKey }));
         }
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.emit('connection', { connected: true });
+        // Wait for first server message (engine_status) before declaring
+        // the connection "good" — a raw TCP/WS accept does NOT imply auth.
         if (this.reconnectTimer) {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
@@ -421,6 +424,13 @@ class WebSocketManager {
         try {
           const message = JSON.parse(event.data);
           if (message && typeof message.type === 'string') {
+            // First valid server message confirms auth succeeded.
+            if (!this.authConfirmed) {
+              this.authConfirmed = true;
+              this.isConnected = true;
+              this.reconnectAttempts = 0;
+              this.emit('connection', { connected: true });
+            }
             this.emit(message.type, message.data);
           }
         } catch {
@@ -428,9 +438,16 @@ class WebSocketManager {
         }
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (ev: CloseEvent) => {
         this.isConnected = false;
         this.emit('connection', { connected: false });
+        // 4001 = server rejected auth (main.py:287). Don't hammer the server;
+        // require user intervention (fix API key) and an explicit reconnect.
+        if (ev && (ev as any).code === 4001) {
+          this.authRejected = true;
+          this.emit('connection', { connected: false, error: 'auth_rejected' });
+          return;
+        }
         this._scheduleReconnect();
       };
 
@@ -440,6 +457,12 @@ class WebSocketManager {
     } catch {
       this._scheduleReconnect();
     }
+  }
+
+  /** Re-enable reconnect attempts after the user updates the API key. */
+  resetAuth() {
+    this.authRejected = false;
+    this.reconnectAttempts = 0;
   }
 
   private _scheduleReconnect() {

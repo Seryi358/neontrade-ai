@@ -218,6 +218,10 @@ class TradingEngine:
 
         # Internal state
         self._running = False
+        # Background-task registry: strong refs to fire-and-forget tasks so the
+        # event loop's weak references don't let them GC mid-run.
+        # Tasks auto-remove via add_done_callback.
+        self._background_tasks: set = set()
         self._scan_interval = 120  # seconds (2 minutes)
         self._pre_scalping_interval: int = self._scan_interval  # saved before scalping
         self._last_scan_results: Dict[str, AnalysisResult] = {}
@@ -510,6 +514,27 @@ class TradingEngine:
         logger.info(f"Approved and executed {count}/{len(pending)} pending setups")
         return count
 
+    def _spawn_bg(self, coro, name: str = "") -> None:
+        """Start a fire-and-forget coroutine with GC-safe strong reference.
+
+        Python's event loop only holds weak refs to tasks, so naked
+        asyncio.create_task(coro()) can be collected mid-run under memory
+        pressure. We hold a strong ref in self._background_tasks until the
+        task finishes, then remove it via done_callback.
+        """
+        try:
+            task = asyncio.create_task(coro, name=name) if name else asyncio.create_task(coro)
+        except RuntimeError:
+            # No running loop (called from sync context) — drop silently.
+            # The coroutine object won't be awaited; suppress the warning.
+            try:
+                coro.close()
+            except Exception:
+                pass
+            return
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
     def _expire_old_setups(self):
         """Mark setups past their expiry time as expired, and prune old non-pending setups."""
         now = datetime.now(timezone.utc)
@@ -563,11 +588,7 @@ class TradingEngine:
                             })
                         except Exception as we:
                             logger.warning(f"WS broadcast setup_expired failed for {s.id}: {we}")
-            try:
-                asyncio.create_task(_notify_expired())
-            except RuntimeError:
-                # No running loop (called from sync context) — skip silently
-                pass
+            self._spawn_bg(_notify_expired(), name="notify_expired_setups")
 
     # ── Main Loop ────────────────────────────────────────────────
 
@@ -717,7 +738,7 @@ class TradingEngine:
         if now.hour == settings.trading_end_hour + offset and now.minute < 10:
             if not hasattr(self, '_daily_summary_sent_date') or self._daily_summary_sent_date != now.date():
                 self._daily_summary_sent_date = now.date()
-                asyncio.create_task(self._send_daily_summary())
+                self._spawn_bg(self._send_daily_summary(), name="send_daily_summary")
 
         # Monthly ASR (After Session Review) on the 1st at ~08:00 UTC
         await self._maybe_send_monthly_asr(now)
@@ -1217,7 +1238,7 @@ class TradingEngine:
                     })
                 except Exception as e:
                     logger.warning(f"WS broadcast trade_closed failed: {e}")
-            asyncio.create_task(_ws_close())
+            self._spawn_bg(_ws_close(), name="ws_trade_closed")
 
         # 7. Email notification on trade close (blocking — critical delivery path)
         if self.alert_manager:
@@ -1251,7 +1272,7 @@ class TradingEngine:
                     )
                 except Exception as e:
                     logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
-            asyncio.create_task(_capture_close())
+            self._spawn_bg(_capture_close(), name="capture_trade_close")
 
     # ── Position Sync ────────────────────────────────────────────
 
@@ -1401,7 +1422,7 @@ class TradingEngine:
                                 })
                             except Exception as e:
                                 logger.warning(f"WS broadcast trade_closed failed: {e}")
-                        asyncio.create_task(_ws_ext_close())
+                        self._spawn_bg(_ws_ext_close(), name="ws_ext_close")
 
                     # Determine actual close reason from heuristic
                     if pos.direction == "BUY":
@@ -1483,7 +1504,7 @@ class TradingEngine:
                                 )
                             except Exception as e:
                                 logger.warning(f"Screenshot capture failed for {__tid}: {e}")
-                        asyncio.create_task(_capture_ext_close())
+                        self._spawn_bg(_capture_ext_close(), name="capture_ext_close")
 
                     # Send close alert
                     if self.alert_manager:
@@ -2665,7 +2686,7 @@ class TradingEngine:
                             })
                         except Exception as ws_err:
                             logger.warning(f"WS broadcast trade_executed failed: {ws_err}")
-                    asyncio.create_task(_ws_send())
+                    self._spawn_bg(_ws_send(), name="ws_trade_executed")
 
                 # Screenshot on trade open (Trading Plan rule) — fire-and-forget.
                 if self.screenshot_generator:
@@ -2693,7 +2714,7 @@ class TradingEngine:
                             )
                         except Exception as ss_err:
                             logger.warning(f"Screenshot capture failed (non-critical): {ss_err}")
-                    asyncio.create_task(_capture())
+                    self._spawn_bg(_capture(), name="capture_trade_open")
 
                 # TradingLab: Track reentry count
                 if setup.instrument in self._reentry_candidates:

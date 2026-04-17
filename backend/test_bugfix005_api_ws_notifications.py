@@ -215,6 +215,19 @@ def _make_mock_engine():
     engine.start = AsyncMock()
     engine.stop = AsyncMock()
 
+    # Audit M11: the real engine._spawn_bg schedules the coroutine on the
+    # event loop. A plain MagicMock would swallow the coroutine returned by
+    # `engine.start()` and trigger "coroutine was never awaited" warnings.
+    # We close the coroutine here so the AsyncMock is fully consumed.
+    def _spawn_bg_stub(coro, *, name: str = ""):
+        try:
+            coro.close()
+        except Exception:
+            pass
+        return MagicMock()
+
+    engine._spawn_bg = MagicMock(side_effect=_spawn_bg_stub)
+
     return engine
 
 
@@ -488,10 +501,15 @@ class TestEngineControl:
         assert resp.status_code == 200
         assert resp.json()["status"] == "starting"
 
-    def test_stop_engine(self, client):
+    def test_stop_engine(self, client, mock_engine):
+        # Audit M11: explicitly verify the AsyncMock for engine.stop was
+        # awaited end-to-end. Previously the test only checked the response
+        # body, so an unawaited AsyncMock on the hot path would have slipped
+        # through as a RuntimeWarning rather than a failure.
         resp = client.post("/api/v1/engine/stop")
         assert resp.status_code == 200
         assert resp.json()["status"] == "stopped"
+        mock_engine.stop.assert_awaited_once()
 
     def test_emergency_close_all(self, client):
         resp = client.post("/api/v1/emergency/close-all")

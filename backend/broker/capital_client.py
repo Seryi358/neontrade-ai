@@ -10,6 +10,9 @@ API Docs: https://open-api.capital.com/
 
 import httpx
 import asyncio
+import json
+import os
+import time
 from typing import Optional, Dict, List, Any
 from datetime import datetime, timezone, timedelta
 from loguru import logger
@@ -25,6 +28,17 @@ from broker.base import (
     AccountSummary,
     TradeInfo,
 )
+
+
+# ── Session cache (audit C5) ─────────────────────────────────────
+# Capital.com rate-limits ~10 logins/hour. With frequent redeploys we hit 429
+# on auth. Persist CST + X-SECURITY-TOKEN to a JSON file on the atlas-data
+# volume so newly-started processes can reuse a live session instead of
+# re-authenticating. TTL is 9 min (1 min buffer under Capital's 10-min expiry).
+SESSION_CACHE_PATH = os.environ.get(
+    "ATLAS_SESSION_CACHE", "/app/data/capital_session.json",
+)
+SESSION_TTL_SECONDS = 540  # 9 minutes — buffer from Capital's 10-min expiry
 
 
 # ── Granularity mapping (our format -> Capital.com format) ────
@@ -109,7 +123,22 @@ class CapitalClient(BaseBroker):
             await self._create_session()
 
     async def _create_session(self):
-        """Authenticate, get CST + X-SECURITY-TOKEN, and switch to the correct account."""
+        """Authenticate, get CST + X-SECURITY-TOKEN, and switch to the correct account.
+
+        Audit C5: before hitting the auth endpoint, try to reuse a cached
+        session from disk (TTL 9 min). This avoids re-auth on every restart
+        and keeps us under Capital.com's ~10 logins/hour rate limit.
+        """
+        # Fast path: reuse cached session if it's fresh and has both tokens.
+        cached = self._load_cached_session()
+        if cached and self._is_cache_fresh(cached):
+            self._cst = cached.get("cst")
+            self._security_token = cached.get("xst")
+            self._active_account_id = cached.get("account_id")
+            self._session_time = datetime.now(timezone.utc)
+            logger.info("Capital.com session reused from cache")
+            return
+
         try:
             resp = await self._client.post(
                 "/api/v1/session",
@@ -134,6 +163,9 @@ class CapitalClient(BaseBroker):
             # Switch to the correct account (avoid demo account)
             await self._select_account()
 
+            # Persist for reuse by the next process.
+            self._save_cached_session()
+
         except httpx.HTTPStatusError as e:
             # Clear stale tokens on auth failure
             self._cst = None
@@ -147,6 +179,69 @@ class CapitalClient(BaseBroker):
                 pass
             logger.error(f"Capital.com session failed: {error_msg}")
             raise ConnectionError(f"Capital.com auth failed: {error_msg}")
+
+    # ── Session cache helpers (audit C5) ──────────────────────────
+
+    @staticmethod
+    def _load_cached_session() -> Optional[Dict[str, Any]]:
+        """Load the cached session from disk, or None if missing/corrupt."""
+        try:
+            with open(SESSION_CACHE_PATH) as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                return None
+            # Require both tokens and a timestamp to consider the cache usable.
+            if not data.get("cst") or not data.get("xst"):
+                return None
+            if "timestamp" not in data:
+                return None
+            return data
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return None
+
+    @staticmethod
+    def _is_cache_fresh(cached: Dict[str, Any]) -> bool:
+        """True if the cached session is within the TTL window."""
+        try:
+            age = time.time() - float(cached.get("timestamp", 0))
+        except (TypeError, ValueError):
+            return False
+        return 0 <= age < SESSION_TTL_SECONDS
+
+    def _save_cached_session(self) -> None:
+        """Write the current session tokens to the cache file (mode 600)."""
+        try:
+            os.makedirs(os.path.dirname(SESSION_CACHE_PATH) or ".", exist_ok=True)
+            payload = {
+                "cst": self._cst,
+                "xst": self._security_token,
+                "account_id": self._active_account_id,
+                "timestamp": time.time(),
+            }
+            with open(SESSION_CACHE_PATH, "w") as f:
+                json.dump(payload, f)
+            # Tokens are sensitive — restrict to owner-read/write if the FS
+            # supports it (Linux containers). POSIX-only call; ignore errors
+            # on systems that don't support it.
+            try:
+                os.chmod(SESSION_CACHE_PATH, 0o600)
+            except OSError:
+                pass
+        except OSError as e:
+            # Cache write failures must NOT break auth — just log.
+            logger.warning(f"Could not persist Capital.com session cache: {e}")
+
+    @staticmethod
+    def _invalidate_cached_session() -> None:
+        """Remove the disk cache so the next _create_session re-auths.
+        Called when the broker returns 401 — the cached tokens are stale.
+        """
+        try:
+            os.remove(SESSION_CACHE_PATH)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.debug(f"Could not remove session cache: {e}")
 
     async def _select_account(self):
         """Select the correct trading account after login.
@@ -252,6 +347,16 @@ class CapitalClient(BaseBroker):
                 return resp.json()
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
+                # Audit A9: permanent 4xx (400/403/404/422) must NOT be retried.
+                # Retrying 63 404s × 3 in 12 min wastes API quota and can
+                # trigger secondary 429s from Capital.com. Fail fast.
+                if self._is_permanent_error(e):
+                    broker_circuit_breaker.record_failure()
+                    logger.warning(
+                        f"[_get] {path}: {e.response.status_code} "
+                        f"(non-retriable, failing fast)"
+                    )
+                    raise
                 # Check for 429 Rate Limit — respect Retry-After header
                 retry_after = None
                 if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
@@ -266,6 +371,7 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    self._invalidate_cached_session()
                     logger.warning(f"[_get] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 3:
                     delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 10.0)
@@ -330,6 +436,7 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    self._invalidate_cached_session()
                     logger.warning(f"[_post] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
                     delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 10.0)
@@ -366,6 +473,7 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    self._invalidate_cached_session()
                     logger.warning(f"[_put] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
                     delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 5.0)
@@ -405,6 +513,7 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    self._invalidate_cached_session()
                     logger.warning(f"[_delete] {path}: 401 Unauthorized — session invalidated, will re-auth")
                 if attempt < 2:
                     delay = retry_after + 0.5 if retry_after else min(0.5 * (2 ** attempt), 5.0)
@@ -738,6 +847,7 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    self._invalidate_cached_session()
                 try:
                     error_body = e.response.json()
                     error_msg = error_body.get("errorCode", error_msg)
@@ -821,6 +931,7 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    self._invalidate_cached_session()
                 try:
                     error_msg = e.response.json().get("errorCode", error_msg)
                 except Exception:
@@ -911,6 +1022,7 @@ class CapitalClient(BaseBroker):
                     self._cst = None
                     self._security_token = None
                     self._session_time = None
+                    self._invalidate_cached_session()
                 try:
                     error_msg = e.response.json().get("errorCode", error_msg)
                 except Exception:

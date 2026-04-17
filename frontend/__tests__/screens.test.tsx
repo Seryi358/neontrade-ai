@@ -117,7 +117,7 @@ const MOCK_STATUS = {
     scans_completed: 45,
     setups_found: 3,
     setups_executed: 2,
-    setups_skipped_ai: 1,
+    setups_filtered: 1,
     errors: 0,
   },
 };

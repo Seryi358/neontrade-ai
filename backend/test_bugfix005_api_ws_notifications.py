@@ -125,7 +125,7 @@ def _make_mock_engine():
             "scans_completed": 10,
             "setups_found": 3,
             "setups_executed": 1,
-            "setups_skipped_ai": 2,
+            "setups_filtered": 2,
             "errors": 0,
         },
         "last_scan": {"EUR_USD": {}, "GBP_USD": {}},

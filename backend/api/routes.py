@@ -119,7 +119,7 @@ async def get_daily_activity():
         "scans_completed": activity.get("scans_completed", 0),
         "setups_found": activity.get("setups_found", 0),
         "setups_executed": activity.get("setups_executed", 0),
-        "setups_skipped_ai": activity.get("setups_skipped_ai", 0),
+        "setups_filtered": activity.get("setups_filtered", 0),
         "errors": activity.get("errors", 0),
         "engine_running": status["running"],
         "pairs_analyzed": len(status.get("last_scan", {})),

@@ -76,7 +76,7 @@ interface DailyActivity {
   scans_completed: number;
   setups_found: number;
   setups_executed: number;
-  setups_skipped_ai: number;
+  setups_filtered: number;
   errors: number;
 }
 
@@ -422,9 +422,9 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.activityCell}>
               <Text style={[styles.activityValue, { color: theme.colors.textSecondary }]}>
-                {activity.setups_skipped_ai}
+                {activity.setups_filtered}
               </Text>
-              <Text style={styles.activityLabel}>Filtered &lt;50</Text>
+              <Text style={styles.activityLabel}>Filtered</Text>
             </View>
           </View>
           {activity.scans_completed > 0 && (

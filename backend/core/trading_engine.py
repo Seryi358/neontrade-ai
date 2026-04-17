@@ -264,7 +264,7 @@ class TradingEngine:
         self._daily_scan_count: int = 0
         self._daily_setups_found: int = 0
         self._daily_setups_executed: int = 0
-        self._daily_setups_skipped_ai: int = 0
+        self._daily_setups_filtered: int = 0
         self._daily_errors: int = 0
         self._daily_counter_date: str = ""  # YYYY-MM-DD of current counters
 
@@ -2421,7 +2421,9 @@ class TradingEngine:
         # that even the technical analysis says "no operar"
         min_score = 50  # Minimum analysis score to be considered operable
         if analysis.score < min_score:
-            self._daily_setups_skipped_ai += 1  # reused counter tracks quality-gate filters
+            # Quality-gate filter fired (R:R, cooldown, news blackout, scale-in, etc.).
+            # IA does NOT contribute to this counter — it only adds narrative analysis.
+            self._daily_setups_filtered += 1
             logger.info(
                 f"Setup {setup.instrument} {setup.direction} filtered: "
                 f"score {analysis.score:.0f} < {min_score} minimum — not operable"
@@ -2919,7 +2921,7 @@ class TradingEngine:
                     "scans_completed": self._daily_scan_count,
                     "setups_found": self._daily_setups_found,
                     "setups_executed": self._daily_setups_executed,
-                    "setups_skipped_ai": self._daily_setups_skipped_ai,
+                    "setups_filtered": self._daily_setups_filtered,
                     "scan_errors": self._daily_errors,
                 })
             except Exception as e:
@@ -3035,7 +3037,7 @@ class TradingEngine:
             self._daily_scan_count = 0
             self._daily_setups_found = 0
             self._daily_setups_executed = 0
-            self._daily_setups_skipped_ai = 0
+            self._daily_setups_filtered = 0
             self._daily_errors = 0
             self._consecutive_losses_today = 0
             self._last_loss_time = None
@@ -3165,7 +3167,7 @@ class TradingEngine:
                 "scans_completed": self._daily_scan_count,
                 "setups_found": self._daily_setups_found,
                 "setups_executed": self._daily_setups_executed,
-                "setups_skipped_ai": self._daily_setups_skipped_ai,
+                "setups_filtered": self._daily_setups_filtered,
                 "errors": self._daily_errors,
             },
             "last_scan": {

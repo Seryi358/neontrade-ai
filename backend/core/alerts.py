@@ -324,16 +324,17 @@ class AlertManager:
             f'<b>R:R:</b> {rr:.2f}:1\n',
         ]
 
-        # AI opinion section
+        # IA analysis section — INFORMATIVE ONLY.
+        # Per mentorship 0% discretion rule, technical analysis decides the trade.
+        # IA provides narrative context to aid your learning; it does NOT approve/reject.
         if ai_score or ai_reasoning:
-            ai_verdict = "TAKE" if ai_recommendation == "TAKE" else "SKIP"
-            parts.append(f'<b>--- IA OPINION ---</b>')
-            parts.append(f'<b>Score IA:</b> {ai_score}/100')
-            parts.append(f'<b>Recomendacion:</b> {_h(ai_verdict)}')
+            parts.append(f'<b>--- ANÁLISIS IA (informativo) ---</b>')
+            if ai_score:
+                parts.append(f'<b>Score IA:</b> {ai_score}/100')
             if ai_reasoning:
-                # Truncate to 300 chars for email
-                reason_short = ai_reasoning[:300] + ('...' if len(ai_reasoning) > 300 else '')
-                parts.append(f'<b>Razon:</b> {_h(reason_short)}')
+                # Truncate to 400 chars for email
+                reason_short = ai_reasoning[:400] + ('...' if len(ai_reasoning) > 400 else '')
+                parts.append(f'<b>Comentario IA:</b> {_h(reason_short)}')
             parts.append('')
 
         # Strategy checklist
@@ -367,24 +368,26 @@ class AlertManager:
         ai_recommendation: str = "",
         ai_reasoning: str = "",
     ):
-        """Notify user that a setup was found but rejected by AI validation."""
+        """Notify user that a setup was rejected (manually or by quality gates).
+
+        NOTE: As of 2026-04-17, IA does NOT reject setups (mentorship 0% discretion
+        rule). This channel is kept for future manual/admin rejections. ai_* params
+        are passed through as narrative context only, never as the reason.
+        """
         if not self._config.notify_setup_rejected:
             return
 
         _instr = _h(instrument)
         _dir = _h(direction.upper())
         _strat = _h(strategy)
-        _ai_rec = _h(ai_recommendation)
         _ai_reason = _h(ai_reasoning)
-        title = f"SETUP REJECTED BY AI // {_instr}"
+        title = f"SETUP REJECTED // {_instr}"
         body = (
             f'<span style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.3px;">'
             f'{_instr}</span>\n'
             f'<span style="color:#86868b;">{_dir}</span> '
             f'<span style="color:#86868b;">// {_strat}</span>\n\n'
-            f'<span style="color:#FF3B30;font-weight:600;">AI: {_ai_rec}</span> '
-            f'<span style="color:#86868b;">Score:</span> '
-            f'<span style="color:#FF9500;font-weight:600;">{ai_score}/100</span>\n'
+            f'<span style="color:#86868b;">Análisis IA (informativo):</span>\n'
             f'<span style="color:#86868b;">{_ai_reason}</span>'
         )
         data = {
@@ -486,7 +489,7 @@ class AlertManager:
         scans = stats.get("scans_completed", 0)
         setups_found = stats.get("setups_found", 0)
         setups_executed = stats.get("setups_executed", 0)
-        setups_skipped = stats.get("setups_skipped_ai", 0)
+        setups_skipped = stats.get("setups_filtered", stats.get("setups_skipped_ai", 0))
         scan_errors = stats.get("scan_errors", 0)
 
         body = (

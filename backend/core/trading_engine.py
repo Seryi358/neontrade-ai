@@ -1170,19 +1170,21 @@ class TradingEngine:
         if settings.funded_account_mode:
             self.risk_manager.record_funded_pnl(pnl_dollars)
 
-        # 6. WebSocket broadcast
+        # 6. WebSocket broadcast — fire-and-forget so slow WS client can't block alerts
         if self._ws_broadcast:
-            try:
-                await self._ws_broadcast("trade_closed", {
-                    "trade_id": trade_id,
-                    "instrument": instrument,
-                    "reason": reason,
-                    "pnl": pnl_dollars,
-                })
-            except Exception as e:
-                logger.warning(f"WS broadcast trade_closed failed: {e}")
+            async def _ws_close():
+                try:
+                    await self._ws_broadcast("trade_closed", {
+                        "trade_id": trade_id,
+                        "instrument": instrument,
+                        "reason": reason,
+                        "pnl": pnl_dollars,
+                    })
+                except Exception as e:
+                    logger.warning(f"WS broadcast trade_closed failed: {e}")
+            asyncio.create_task(_ws_close())
 
-        # 7. Email notification on trade close
+        # 7. Email notification on trade close (blocking — critical delivery path)
         if self.alert_manager:
             try:
                 await self.alert_manager.send_trade_closed(
@@ -1195,21 +1197,23 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"Alert send_trade_closed failed for {trade_id}: {e}")
 
-        # 8. Screenshot on trade close
+        # 8. Screenshot on trade close — fire-and-forget (non-critical)
         if self.screenshot_generator:
-            try:
-                pnl_pct = round((exit_price - entry_price if direction == "BUY" else entry_price - exit_price) / entry_price * 100, 2) if entry_price else 0
-                await self.screenshot_generator.capture_trade_close(
-                    trade_id=trade_id,
-                    instrument=instrument,
-                    direction=direction,
-                    entry_price=entry_price,
-                    close_price=exit_price,
-                    pnl_pct=pnl_pct,
-                    result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
-                )
-            except Exception as e:
-                logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
+            _pnl_pct_close = round((exit_price - entry_price if direction == "BUY" else entry_price - exit_price) / entry_price * 100, 2) if entry_price else 0
+            async def _capture_close():
+                try:
+                    await self.screenshot_generator.capture_trade_close(
+                        trade_id=trade_id,
+                        instrument=instrument,
+                        direction=direction,
+                        entry_price=entry_price,
+                        close_price=exit_price,
+                        pnl_pct=_pnl_pct_close,
+                        result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
+                    )
+                except Exception as e:
+                    logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
+            asyncio.create_task(_capture_close())
 
     # ── Position Sync ────────────────────────────────────────────
 
@@ -1347,14 +1351,19 @@ class TradingEngine:
                         )
 
                     if self._ws_broadcast:
-                        try:
-                            await self._ws_broadcast("trade_closed", {
-                                "trade_id": tid,
-                                "instrument": pos.instrument,
-                                "reason": "external",
-                            })
-                        except Exception as e:
-                            logger.warning(f"WS broadcast trade_closed failed: {e}")
+                        # Fire-and-forget: slow WS client shouldn't block sync
+                        _ws_tid = tid
+                        _ws_inst = pos.instrument
+                        async def _ws_ext_close(__tid=_ws_tid, __inst=_ws_inst):
+                            try:
+                                await self._ws_broadcast("trade_closed", {
+                                    "trade_id": __tid,
+                                    "instrument": __inst,
+                                    "reason": "external",
+                                })
+                            except Exception as e:
+                                logger.warning(f"WS broadcast trade_closed failed: {e}")
+                        asyncio.create_task(_ws_ext_close())
 
                     # Determine actual close reason from heuristic
                     if pos.direction == "BUY":
@@ -1406,20 +1415,37 @@ class TradingEngine:
                         except Exception as je:
                             logger.warning(f"Trade journal record failed for {tid}: {je}")
 
-                    # Screenshot on trade close
+                    # Screenshot on trade close — fire-and-forget, don't block sync loop
                     if self.screenshot_generator:
-                        try:
-                            await self.screenshot_generator.capture_trade_close(
-                                trade_id=tid,
-                                instrument=pos.instrument,
-                                direction=pos.direction,
-                                entry_price=pos.entry_price,
-                                close_price=close_price,
-                                pnl_pct=round((close_price - pos.entry_price if pos.direction == "BUY" else pos.entry_price - close_price) / pos.entry_price * 100, 2) if pos.entry_price else 0,
-                                result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
-                            )
-                        except Exception as e:
-                            logger.warning(f"Screenshot capture failed for {tid}: {e}")
+                        _ss_pnl_pct = round(
+                            (close_price - pos.entry_price if pos.direction == "BUY" else pos.entry_price - close_price)
+                            / pos.entry_price * 100,
+                            2,
+                        ) if pos.entry_price else 0
+                        _ss_result = "TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE")
+                        _ss_tid = tid
+                        _ss_inst = pos.instrument
+                        _ss_dir = pos.direction
+                        _ss_entry = pos.entry_price
+                        _ss_close = close_price
+                        async def _capture_ext_close(
+                            __tid=_ss_tid, __inst=_ss_inst, __dir=_ss_dir,
+                            __entry=_ss_entry, __close=_ss_close,
+                            __pct=_ss_pnl_pct, __res=_ss_result,
+                        ):
+                            try:
+                                await self.screenshot_generator.capture_trade_close(
+                                    trade_id=__tid,
+                                    instrument=__inst,
+                                    direction=__dir,
+                                    entry_price=__entry,
+                                    close_price=__close,
+                                    pnl_pct=__pct,
+                                    result=__res,
+                                )
+                            except Exception as e:
+                                logger.warning(f"Screenshot capture failed for {__tid}: {e}")
+                        asyncio.create_task(_capture_ext_close())
 
                     # Send close alert
                     if self.alert_manager:

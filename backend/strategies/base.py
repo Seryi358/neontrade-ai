@@ -2442,20 +2442,43 @@ class RedStrategy(BaseStrategy):
             else analysis.fibonacci_levels.get("ext_bear_1.0")
         )
 
-        # Wave 3 with strong daily setup: aggressive TP, target 1.618 extension
+        # Wave 3 with HTF favor: default tp_max = Fib 1.0 extension (PDF pg.6)
+        # "RED (con HTF a favor): Extensión de Fibonacci de 1"
+        # Only scale to 1.272/1.618 if strong momentum is confirmed (HTF
+        # overbought/oversold AND deceleration) — Wave 3 extendida.
         # Alex: "le añado un último condicional, y es que si entre el punto de entrada
         # y el punto máximo hay un nivel de resistencia importante, me salgo antes"
         if wave_count == "3":
-            # Check if daily setup is strong (HTF overbought/oversold or deceleration)
-            daily_strong = (
+            # HTF favor = HTF/LTF convergence (PDF: "con HTF a favor")
+            htf_favor = bool(getattr(analysis, 'htf_ltf_convergence', False))
+            # Momentum confirmado = HTF overbought/oversold AND deceleration.
+            # Stricter than before (was OR): "Wave 3 extendida" requires strong
+            # directional signal + exhaustion pattern together.
+            momentum_confirmed = (
                 analysis.htf_condition in (MarketCondition.OVERBOUGHT, MarketCondition.OVERSOLD)
-                or _has_deceleration(analysis)
+                and _has_deceleration(analysis)
             )
-            if daily_strong and fib_1618_dir and tp1:
+
+            if htf_favor and not momentum_confirmed and fib_100 and tp1:
+                # PDF default: Fib 1.0 extension
+                valid = (fib_100 > tp1) if direction == "BUY" else (fib_100 < tp1)
+                if valid:
+                    # Check for intermediate resistance between tp1 and Fib 1.0
+                    intermediate_levels = []
+                    if direction == "BUY":
+                        intermediate_levels = sorted([r for r in resistances if tp1 < r < fib_100])
+                    else:
+                        intermediate_levels = sorted([s for s in supports if fib_100 < s < tp1], reverse=True)
+                    if intermediate_levels:
+                        result["tp_max"] = intermediate_levels[0]
+                    else:
+                        result["tp_max"] = fib_100
+
+            # Extended Wave 3 (with momentum confirmed) CAN scale to 1.618
+            # (then 1.272 as fallback).
+            if htf_favor and momentum_confirmed and fib_1618_dir and tp1 and "tp_max" not in result:
                 valid = (fib_1618_dir > tp1) if direction == "BUY" else (fib_1618_dir < tp1)
                 if valid:
-                    # Check for important intermediate resistance between tp1 and 1.618
-                    # Alex: if there's a key daily resistance in between, exit there instead
                     intermediate_levels = []
                     if direction == "BUY":
                         intermediate_levels = sorted([r for r in resistances if tp1 < r < fib_1618_dir])
@@ -2465,11 +2488,23 @@ class RedStrategy(BaseStrategy):
                         result["tp_max"] = intermediate_levels[0]
                     else:
                         result["tp_max"] = fib_1618_dir
-            # Fallback to 1.272 for Wave 3 without strong daily
-            if "tp_max" not in result and fib_1272_dir and tp1:
+            # Fallback to 1.272 for Wave 3 with momentum when 1.618 not usable
+            if htf_favor and momentum_confirmed and "tp_max" not in result and fib_1272_dir and tp1:
                 valid = (fib_1272_dir > tp1) if direction == "BUY" else (fib_1272_dir < tp1)
                 if valid:
                     result["tp_max"] = fib_1272_dir
+
+            # Without HTF favor: no Fib extensions (PDF rule is "con HTF a favor").
+            # tp_max defaults to next S/R (falls through to final fallback below).
+            if not htf_favor and "tp_max" not in result and tp1:
+                if direction == "BUY":
+                    further = sorted([r for r in resistances if r > tp1])
+                    if further:
+                        result["tp_max"] = further[0]
+                else:
+                    further = sorted([s for s in supports if s < tp1], reverse=True)
+                    if further:
+                        result["tp_max"] = further[0]
 
         elif wave_count == "5":
             # Wave 5: conservative - stick to recent high/low only, no extensions

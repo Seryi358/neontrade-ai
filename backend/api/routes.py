@@ -4,6 +4,8 @@ REST endpoints for the frontend app.
 Supports: Auto/Manual modes, trade history, explanations, broker selection.
 """
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Query
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
@@ -1074,10 +1076,14 @@ async def get_notifications():
 
 @router.get("/logs")
 async def get_engine_logs(lines: int = Query(100, ge=10, le=500)):
-    """Get the last N lines of engine logs for debugging."""
+    """Get the last N lines of engine logs for debugging.
+
+    Audit M8: use UTC when building today's filename so it matches loguru's
+    ``{time:YYYY-MM-DD}`` rotation (UTC in containers). Using local time
+    caused off-by-one misses across the midnight boundary.
+    """
     import os
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     log_dirs = ["logs", "/app/logs"]
     # Search for today's log file (loguru format: atlas_YYYY-MM-DD.log)
     for log_dir in log_dirs:

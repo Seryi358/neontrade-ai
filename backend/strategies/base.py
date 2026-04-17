@@ -193,13 +193,16 @@ def _has_reversal_pattern(analysis: AnalysisResult, direction: str) -> Tuple[boo
     direction: 'BUY' (buscamos reversal alcista) o 'SELL' (reversal bajista).
     Includes all patterns from Formación de Velas PDF.
     """
+    # HAMMER/SHOOTING_STAR intentionally omitted — market_analyzer treats
+    # them as synonyms of LOW_TEST/HIGH_TEST (mentorship terminology) and
+    # only emits the latter names (see market_analyzer.py:1284).
     bullish_reversals = {
         "LOW_TEST", "ENGULFING_BULLISH", "MORNING_STAR",
-        "TWEEZER_BOTTOM", "INSIDE_BAR_BULLISH", "HAMMER",
+        "TWEEZER_BOTTOM", "INSIDE_BAR_BULLISH",
     }
     bearish_reversals = {
         "HIGH_TEST", "ENGULFING_BEARISH", "EVENING_STAR",
-        "TWEEZER_TOP", "INSIDE_BAR_BEARISH", "SHOOTING_STAR",
+        "TWEEZER_TOP", "INSIDE_BAR_BEARISH",
     }
     patterns = set(analysis.candlestick_patterns)
 

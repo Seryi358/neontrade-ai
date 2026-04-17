@@ -469,7 +469,13 @@ class TradingEngine:
                         return True
                     except Exception as e:
                         logger.error(f"Setup {setup_id} execution failed: {e}")
-                        setup.status = "pending"
+                        # Preserve terminal states (expired, rejected, error,
+                        # executed). Only revert if _execute_approved_setup
+                        # left the status at "approved" — i.e., broker call
+                        # itself raised before the inner flow marked a
+                        # concrete terminal state.
+                        if setup.status == "approved":
+                            setup.status = "pending"
                         return False
             logger.warning(f"Setup not found or not pending: {setup_id}")
             return False
@@ -510,7 +516,10 @@ class TradingEngine:
                 count += 1
             except Exception as e:
                 logger.error(f"Failed to execute approved setup {setup.id}: {e}")
-                setup.status = "pending"  # Revert on failure
+                # Only revert if inner flow hadn't already set a terminal
+                # state (expired/rejected/error/executed).
+                if setup.status == "approved":
+                    setup.status = "pending"
         logger.info(f"Approved and executed {count}/{len(pending)} pending setups")
         return count
 

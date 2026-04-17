@@ -169,6 +169,13 @@ class ManagedPosition:
     cpa_revert_level: float = 0   # Key level that triggered temporary CPA; if price breaks through cleanly, revert
     pre_cpa_phase: Optional[str] = None  # Phase before CPA was triggered (for reverting)
     _half_risk_applied: bool = False  # Track 50% risk reduction step before BE
+    # Idempotency guards: flipped True the moment this position enters any
+    # close path (tick-driven or broker-sync-driven). Later tick/sync passes
+    # check this before duplicating DB writes, journal entries, WS broadcasts,
+    # and email alerts.
+    _closing: bool = False
+    _tp1_partial_done: bool = False  # Prevent repeat partial-close on retry ticks
+    no_ema_ticks: int = 0            # Consecutive ticks missing EMA data (emergency threshold)
 
 
 class PositionManager:
@@ -290,7 +297,18 @@ class PositionManager:
 
         Errors are logged as WARNING (CLAUDE.md Rule 6) but never propagate
         — a failed DB/journal write must not prevent position cleanup.
+
+        Idempotency: once any path (tick-driven or sync-driven) has claimed
+        this position for close, refuse to re-dispatch — prevents double DB
+        updates, duplicate journal entries, duplicate WS/email alerts, and
+        double record_trade_result (delta algorithm would double-credit).
         """
+        if getattr(pos, "_closing", False):
+            logger.debug(
+                f"_notify_trade_closed suppressed for {pos.trade_id}: already closed by another path"
+            )
+            return
+        pos._closing = True
         if self._on_trade_closed is None:
             return
         try:
@@ -712,16 +730,22 @@ class PositionManager:
                 # The position will only exit via trailing SL hit (EMA 50 break).
                 # Fall through to the normal trailing logic below.
             else:
-                # Standard behavior: partial profit at TP1 + switch to aggressive trailing
-                if self.allow_partial_profits and pos.units != 0:
+                # Standard behavior: partial profit at TP1 + switch to aggressive trailing.
+                # Idempotency guard: if the partial for this TP1 already fired on
+                # an earlier tick (or a retry), DO NOT partial again — would
+                # close 50% of the remainder each tick.
+                if (
+                    self.allow_partial_profits
+                    and pos.units != 0
+                    and not getattr(pos, "_tp1_partial_done", False)
+                ):
                     partial_units = pos.units / 2  # Close half (use true division for crypto fractional units)
                     if partial_units != 0:
                         try:
-                            # Bug fix R26: use close_trade_partial (not close_trade with units=)
-                            # close_trade() signature is (trade_id) only — no units param
                             ok = await self.broker.close_trade_partial(pos.trade_id, percent=50)
                             if ok:
                                 pos.units -= partial_units
+                                pos._tp1_partial_done = True
                                 # Rule #4: record partial close PnL for delta/reentry tracking
                                 if self.risk_manager:
                                     pnl_per_unit = (current_price - pos.entry_price) if pos.direction == "BUY" else (pos.entry_price - current_price)
@@ -735,9 +759,19 @@ class PositionManager:
                                     f"remaining {pos.units} units"
                                 )
                             else:
-                                logger.warning(f"{pos.trade_id}: Partial close returned False")
+                                # Broker doesn't support partial (or rejected it).
+                                # Hold position, do NOT transition to aggressive —
+                                # otherwise we'd switch to tight CPA trailing on
+                                # the full size, which is not what partial_profits
+                                # users intend.
+                                logger.warning(
+                                    f"{pos.trade_id}: Partial close returned False — "
+                                    f"holding full size, NOT transitioning to AGGRESSIVE"
+                                )
+                                return
                         except Exception as e:
                             logger.error(f"{pos.trade_id}: Failed partial close at TP1: {e}")
+                            return
 
                 cpa_key = self._get_cpa_ema_key(pos.instrument)
                 pos.phase = PositionPhase.BEYOND_TP1

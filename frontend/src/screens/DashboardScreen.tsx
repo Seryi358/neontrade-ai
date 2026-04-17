@@ -88,7 +88,11 @@ interface EngineStatus {
   pending_setups: number;
   total_risk: number;
   watchlist_count: number;
-  positions: Record<string, Position>;
+  // Backend returns an array of position dicts (each has a `trade_id`),
+  // not a keyed map. Keep the type honest so consumers iterate with
+  // `.map(p => p.trade_id)` instead of Object.entries() (which would
+  // return ["0", pos] index-string keys).
+  positions: Position[];
   daily_activity?: DailyActivity;
   startup_error?: string;
 }
@@ -208,7 +212,7 @@ export default function DashboardScreen() {
 
   const totalRiskPct = status ? status.total_risk * 100 : 0;
   const maxRiskPct = maxTotalRisk != null ? maxTotalRisk * 100 : 6;
-  const positions = status?.positions ? Object.entries(status.positions) : [];
+  const positions: Position[] = Array.isArray(status?.positions) ? status!.positions : [];
   const activity = status?.daily_activity;
 
   return (
@@ -365,8 +369,8 @@ export default function DashboardScreen() {
         />
 
         {positions.length > 0 ? (
-          positions.map(([id, pos]) => (
-            <View key={id} style={styles.positionRow}>
+          positions.map((pos) => (
+            <View key={pos.trade_id ?? `${pos.instrument}-${pos.entry}`} style={styles.positionRow}>
               <View style={styles.positionLeft}>
                 <Text style={styles.positionPair}>{pos.instrument}</Text>
                 <HUDBadge

@@ -481,15 +481,18 @@ class TestElliottWavePriority:
 # ── Section 9: Reversal pattern detection ─────────────────────────────
 
 class TestReversalPatterns:
-    def test_hammer_bullish(self):
-        analysis = make_analysis(candlestick_patterns=["HAMMER"])
+    def test_low_test_bullish(self):
+        # market_analyzer merges HAMMER into LOW_TEST (same concept per
+        # mentorship terminology) — only LOW_TEST is emitted.
+        analysis = make_analysis(candlestick_patterns=["LOW_TEST"])
         found, desc = _has_reversal_pattern(analysis, "BUY")
-        assert found, "HAMMER should be bullish reversal"
+        assert found, "LOW_TEST should be bullish reversal"
 
-    def test_shooting_star_bearish(self):
-        analysis = make_analysis(candlestick_patterns=["SHOOTING_STAR"])
+    def test_high_test_bearish(self):
+        # market_analyzer merges SHOOTING_STAR into HIGH_TEST.
+        analysis = make_analysis(candlestick_patterns=["HIGH_TEST"])
         found, desc = _has_reversal_pattern(analysis, "SELL")
-        assert found, "SHOOTING_STAR should be bearish reversal"
+        assert found, "HIGH_TEST should be bearish reversal"
 
     def test_engulfing_bullish(self):
         analysis = make_analysis(candlestick_patterns=["ENGULFING_BULLISH"])

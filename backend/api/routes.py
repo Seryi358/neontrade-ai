@@ -2474,14 +2474,19 @@ async def generate_exam_report(req: ExamRequest):
         # shows the trade outcome. Fall back to open screenshot if no close
         # was captured. Use a trade_id-anchored glob (no leading wildcard)
         # so a tid that's a prefix of another trade can't cross-match.
+        # Screenshots are saved as: {instrument}_{trade_id}_{open|close}_{ts}.png
+        # (see core/screenshot_generator.py:119,199). Previous glob
+        # f"{tid}_*.png" anchored trade_id at the start, so it never matched.
+        # Use substring match to find the trade_id in the filename.
         screenshot_b64 = None
         screenshots_dir = Path("data/screenshots")
         if screenshots_dir.exists():
             candidates = [
-                f for f in screenshots_dir.glob(f"{tid}_*.png")
-                if f.suffix == ".png"
+                f for f in screenshots_dir.glob("*.png")
+                if f"_{tid}_" in f.name
             ]
-            # Prefer _close_ screenshots, fall back to _open_, then anything else
+            # Prefer _close_ screenshots (show outcome), fall back to _open_,
+            # then anything else. Newest by mtime.
             close_shots = [f for f in candidates if "_close_" in f.name]
             open_shots = [f for f in candidates if "_open_" in f.name]
             chosen = None

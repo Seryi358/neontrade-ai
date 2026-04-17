@@ -136,8 +136,8 @@ export default function HistoryScreen() {
         <HUDSectionTitle title="RENDIMIENTO (30 DIAS)" color={theme.colors.neonCyan} />
         <HUDStatRow
           label="TRADES"
-          value={stats.total_trades}
-          valueColor={theme.colors.textWhite}
+          value={stats.total_trades ?? 0}
+          valueColor={theme.colors.textPrimary}
         />
         <HUDStatRow
           label="WIN RATE"

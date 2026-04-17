@@ -40,12 +40,17 @@ class TestSecurityConfig:
         config.auth_enabled = False
         assert config.validate_key("anything") is True
 
-    def test_no_keys_always_validates(self):
-        """First run with no keys = open access."""
+    def test_no_keys_fails_closed(self):
+        """Audit A5: no keys + auth_enabled=True → fail-closed (reject).
+
+        Previous behavior returned True (open-access). The security module now
+        rejects requests when no API keys are configured, to prevent
+        accidental open-access deployments.
+        """
         config = SecurityConfig.__new__(SecurityConfig)
         config.api_keys = {}
         config.auth_enabled = True
-        assert config.validate_key("anything") is True
+        assert config.validate_key("anything") is False
 
     def test_revoke_key(self):
         config = SecurityConfig.__new__(SecurityConfig)

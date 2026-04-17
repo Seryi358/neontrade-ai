@@ -55,10 +55,19 @@ MAX_WS_CONNECTIONS = 50
 
 
 class ConnectionManager:
-    """Manages WebSocket connections and broadcasts events."""
+    """Manages WebSocket connections and broadcasts events.
+
+    Audit M7: the previous implementation had a TOCTOU race between the
+    capacity check and the `append()` call — an `await websocket.accept()`
+    sits between them, during which the scheduler can interleave other
+    ``connect()`` coroutines and exceed ``MAX_WS_CONNECTIONS``. An
+    ``asyncio.Lock`` now serializes the check-and-append so that exactly
+    ``MAX_WS_CONNECTIONS`` clients are accepted under burst load.
+    """
 
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        self._lock = asyncio.Lock()
 
     @property
     def is_full(self) -> bool:
@@ -66,18 +75,20 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket) -> bool:
         """Accept and register a WebSocket. Returns False if limit reached."""
-        if len(self.active_connections) >= MAX_WS_CONNECTIONS:
-            await websocket.close(code=4003, reason="Connection limit reached")
-            logger.warning(f"WS connection rejected: limit of {MAX_WS_CONNECTIONS} reached")
-            return False
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        logger.info(f"WS client connected. Total: {len(self.active_connections)}")
-        return True
+        async with self._lock:
+            if len(self.active_connections) >= MAX_WS_CONNECTIONS:
+                await websocket.close(code=4003, reason="Connection limit reached")
+                logger.warning(f"WS connection rejected: limit of {MAX_WS_CONNECTIONS} reached")
+                return False
+            await websocket.accept()
+            self.active_connections.append(websocket)
+            logger.info(f"WS client connected. Total: {len(self.active_connections)}")
+            return True
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+    async def disconnect(self, websocket: WebSocket):
+        async with self._lock:
+            if websocket in self.active_connections:
+                self.active_connections.remove(websocket)
         logger.info(f"WS client disconnected. Total: {len(self.active_connections)}")
 
     async def broadcast(self, event_type: str, data: dict):
@@ -91,7 +102,7 @@ class ConnectionManager:
                 logger.warning(f"WS broadcast failed for a client ({e!r}), removing dead connection")
                 disconnected.append(connection)
         for conn in disconnected:
-            self.disconnect(conn)
+            await self.disconnect(conn)
 
     async def send_personal(self, websocket: WebSocket, event_type: str, data: dict):
         """Send a typed event to a specific client."""
@@ -103,7 +114,7 @@ class ConnectionManager:
                 await websocket.close()
             except Exception:
                 pass
-            self.disconnect(websocket)
+            await self.disconnect(websocket)
 
 
 ws_manager = ConnectionManager()
@@ -285,7 +296,7 @@ async def websocket_endpoint(websocket: WebSocket):
         if not security_config.validate_key(api_key):
             await ws_manager.send_personal(websocket, "error", {"message": "Authentication required"})
             await websocket.close(code=4001, reason="Invalid API key")
-            ws_manager.disconnect(websocket)
+            await ws_manager.disconnect(websocket)
             return
 
     try:
@@ -307,10 +318,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     websocket, "error", {"message": "Invalid JSON"}
                 )
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket)
         try:
             await websocket.close(code=1011, reason="Internal error")
         except Exception as e:

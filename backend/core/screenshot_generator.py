@@ -11,6 +11,7 @@ Uses matplotlib with Agg backend (non-interactive, server-safe).
 Falls back gracefully if matplotlib is not installed.
 """
 
+import asyncio
 import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -146,12 +147,21 @@ class TradeScreenshotGenerator:
                 "current_price": entry_price,
             }
 
+            # Audit M9: matplotlib rendering can take hundreds of ms and blocks
+            # the event loop. Offload to a thread so the trading engine's
+            # broker / WS heartbeats / setup polling don't stall during chart
+            # generation.
+            loop = asyncio.get_event_loop()
             if candles and len(candles) > 0:
-                self._generate_candlestick_chart(
-                    filepath, candles, levels, trade_info, ema_values
+                await loop.run_in_executor(
+                    None,
+                    self._generate_candlestick_chart,
+                    filepath, candles, levels, trade_info, ema_values,
                 )
             else:
-                self._generate_info_card(filepath, trade_info)
+                await loop.run_in_executor(
+                    None, self._generate_info_card, filepath, trade_info,
+                )
 
             logger.info(
                 f"Trade screenshot saved: {filepath} "
@@ -228,12 +238,19 @@ class TradeScreenshotGenerator:
                 "current_price": close_price,
             }
 
+            # Audit M9: offload matplotlib rendering to a thread so we don't
+            # block the event loop while the trade-close screenshot generates.
+            loop = asyncio.get_event_loop()
             if candles and len(candles) > 0:
-                self._generate_candlestick_chart(
-                    filepath, candles, levels, trade_info, ema_values=None
+                await loop.run_in_executor(
+                    None,
+                    self._generate_candlestick_chart,
+                    filepath, candles, levels, trade_info, None,
                 )
             else:
-                self._generate_info_card(filepath, trade_info)
+                await loop.run_in_executor(
+                    None, self._generate_info_card, filepath, trade_info,
+                )
 
             logger.info(
                 f"Trade screenshot saved: {filepath} "

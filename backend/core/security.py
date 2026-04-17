@@ -102,17 +102,24 @@ class SecurityConfig:
         return raw_key
 
     def validate_key(self, raw_key: str) -> bool:
-        """Check if a raw API key matches any stored hash."""
+        """Check if a raw API key matches any stored hash.
+
+        Fail-closed (audit A5): when auth is enabled but no API keys are
+        configured, reject all requests. Previously returned True, leaving the
+        app open-access if someone forgot to provision keys. Operators who
+        genuinely want open access must set ``auth_enabled=False`` explicitly.
+        """
         if not self.auth_enabled:
             return True
         if not self.api_keys:
-            # BUG-09 fix: make open-access mode extremely visible
-            logger.error(
-                "!!! SECURITY WARNING !!! No API keys configured — ALL requests are allowed. "
-                "Generate an API key immediately for production use. "
-                "This is only acceptable during initial development setup."
+            # Audit A5 fix: fail closed instead of open-access. Log CRITICAL
+            # so operators notice immediately that auth is misconfigured.
+            logger.critical(
+                "!!! SECURITY FAIL-CLOSED !!! auth_enabled=True but no API keys configured. "
+                "Rejecting request. Generate an API key (or set auth_enabled=False for dev). "
+                "Previously this returned True (open-access); now it returns False."
             )
-            return True  # No keys configured = open access (first run)
+            return False
         key_hash = self._hash_key(raw_key)
         return any(hmac.compare_digest(key_hash, h) for h in self.api_keys)
 

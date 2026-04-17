@@ -202,6 +202,18 @@ class ManagedPosition:
     cpa_revert_level: float = 0   # Key level that triggered temporary CPA; if price breaks through cleanly, revert
     pre_cpa_phase: Optional[str] = None  # Phase before CPA was triggered (for reverting)
     _half_risk_applied: bool = False  # Track 50% risk reduction step before BE
+    # Iter-29 / Audit A4: the swing level that price must break through after BE
+    # before trailing is activated. Captured when the position reaches BE and
+    # pulled from `_latest_swings` (BUY: nearest swing high above entry;
+    # SELL: nearest swing low below entry). None = no swing data at BE time
+    # (legacy behaviour — trailing activates as soon as EMA is favorable).
+    #
+    # Mentorship "Trading Mastery Short Term":
+    #   "ahí tenemos ya el 1%, break-even... a partir de aquí vamos a esperar
+    #    y empezaremos a gestionar con la media móvil... Hasta que no se rompa,
+    #    evidentemente, este máximo anterior, no vamos a utilizarla"
+    swing_to_break: Optional[float] = None
+    swing_broken: bool = False  # Latches True once price has broken swing_to_break
     # Idempotency guards: flipped True the moment this position enters any
     # close path (tick-driven or broker-sync-driven). Later tick/sync passes
     # check this before duplicating DB writes, journal entries, WS broadcasts,
@@ -706,31 +718,131 @@ class PositionManager:
 
             if await self._update_sl(pos, new_sl):
                 pos.phase = PositionPhase.BREAK_EVEN
-                logger.info(f"{pos.trade_id}: Phase -> BREAK_EVEN")
+                # Iter-29 / Audit A4: capture the swing high/low that price
+                # must break through before trailing is activated. Once BE
+                # fires, `swing_to_break` is frozen for the life of the trade.
+                # If no swing data is available at this moment we leave it as
+                # None and the legacy EMA-favorable gate will take over.
+                if pos.swing_to_break is None:
+                    pos.swing_to_break = self._pick_swing_to_break(
+                        pos, current_price
+                    )
+                if pos.swing_to_break is not None:
+                    logger.info(
+                        f"{pos.trade_id}: Phase -> BREAK_EVEN — "
+                        f"awaiting swing break at {pos.swing_to_break:.5f}"
+                    )
+                else:
+                    logger.info(
+                        f"{pos.trade_id}: Phase -> BREAK_EVEN "
+                        f"(no swing data — legacy EMA-favorable trailing gate)"
+                    )
                 # Notify risk manager for scale-in rule
                 if self.risk_manager is not None:
                     self.risk_manager.mark_position_at_be(pos.trade_id)
+
+    def _pick_swing_to_break(
+        self,
+        pos: ManagedPosition,
+        current_price: float,
+    ) -> Optional[float]:
+        """Pick the swing high/low that price must break before trailing starts.
+
+        Mentorship (Trading Mastery Short Term): after BE, we wait for price
+        to take out the previous swing high (BUY) or swing low (SELL) before
+        switching to EMA trailing.
+
+        For BUY: the NEAREST swing high that still sits ABOVE current_price
+        (i.e. the next resistance level to be taken out).
+        For SELL: the NEAREST swing low that still sits BELOW current_price.
+
+        Returns None if no swing data is available.
+        """
+        swings = self._latest_swings.get(pos.instrument, {})
+        if not swings:
+            return None
+
+        if pos.direction == "BUY":
+            highs = [sh for sh in swings.get("highs", []) if sh > current_price]
+            if not highs:
+                return None
+            # Nearest above = lowest of the highs above current_price
+            return min(highs)
+
+        # SELL
+        lows = [sl for sl in swings.get("lows", []) if sl < current_price]
+        if not lows:
+            return None
+        # Nearest below = highest of the lows below current_price
+        return max(lows)
+
+    def _swing_break_confirmed(
+        self,
+        pos: ManagedPosition,
+        current_price: float,
+    ) -> bool:
+        """Return True if the swing that was awaited at BE has been broken.
+
+        Once confirmed, latches `pos.swing_broken = True` so subsequent ticks
+        don't re-evaluate (and don't lose the condition if the swing level is
+        re-tested later).
+        """
+        if pos.swing_broken:
+            return True
+        if pos.swing_to_break is None:
+            # No swing data was recorded at BE — fall back to legacy EMA gate.
+            return False
+        if pos.direction == "BUY":
+            broken = current_price > pos.swing_to_break
+        else:
+            broken = current_price < pos.swing_to_break
+        if broken:
+            pos.swing_broken = True
+            logger.info(
+                f"{pos.trade_id}: swing broken at {current_price:.5f} "
+                f"(level={pos.swing_to_break:.5f}) — trailing gate opens"
+            )
+        return broken
 
     async def _handle_be_phase(self, pos: ManagedPosition, current_price: float):
         """
         Phase 3: After BE, transition to EMA trailing.
         Trading Plan PDF: "A partir de aqui usaré siempre las dos medias móviles más cortas"
 
-        Transition happens as soon as the management-timeframe EMA 50 is
-        available and favorable (above entry for BUY, below entry for SELL).
-        No additional profit buffer is required — the mentorship says
-        trailing starts right after Break Even.
+        Iter-29 / Audit A4 — Trading Mastery Short Term says trailing does
+        NOT activate immediately at BE; we must first wait for price to
+        break the previous swing high (BUY) or swing low (SELL):
+          "Hasta que no se rompa, evidentemente, este máximo anterior,
+           no vamos a utilizarla"
+
+        Gate ordering:
+          1. If `swing_to_break` was captured at BE time, require price to
+             break it before transitioning to trailing (primary gate).
+          2. If no swing data exists, fall back to the legacy EMA-favorable
+             gate (prevents the position from getting stuck in BE when
+             upstream swing data is unavailable).
         """
         base_key = self._get_base_ema_key(pos.instrument)
 
-        # For PRICE_ACTION style there is no base EMA — transition immediately
+        # For PRICE_ACTION style there is no base EMA — but we STILL honour
+        # the swing-break gate if present (the mentorship rule is style-
+        # independent). If no swing data, transition immediately as before.
         if base_key is None:
+            if pos.swing_to_break is not None and not self._swing_break_confirmed(
+                pos, current_price
+            ):
+                return  # still waiting for swing break
             pos.phase = PositionPhase.TRAILING_TO_TP1
             logger.info(
                 f"{pos.trade_id}: Phase -> TRAILING_TO_TP1 "
                 f"(style={self.management_style.value}, ema=PRICE_ACTION)"
             )
             return
+
+        # Primary gate (PDF / Short Term mentorship): swing must break first.
+        if pos.swing_to_break is not None:
+            if not self._swing_break_confirmed(pos, current_price):
+                return  # hold in BE until swing taken out
 
         ema_value = self._get_trail_ema(pos.instrument, base_key)
 

@@ -3043,7 +3043,10 @@ class TradingEngine:
                     "entry": pos.entry_price,
                     "current_sl": pos.current_sl,
                     "tp1": pos.take_profit_1,
+                    "tp_max": pos.take_profit_max,
+                    "units": pos.units,
                     "phase": pos.phase.value,
+                    "strategy_variant": pos.strategy_variant,
                 }
                 for tid, pos in self.position_manager.positions.items()
             ],

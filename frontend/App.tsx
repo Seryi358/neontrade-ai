@@ -482,6 +482,31 @@ export default function App() {
 
     let observer: MutationObserver | null = null;
     let currentMode: 'dark' | 'light' | null = null;
+    // Re-entry guard: applyLiquidGlass mutates inline styles, which the
+    // MutationObserver would re-observe and re-fire forever. We also watch
+    // only `class` + `childList` (not `style`) and debounce to rAF so that
+    // rapid React renders coalesce into a single re-apply.
+    let applying = false;
+    let rafHandle: number | null = null;
+
+    const safeApply = (isDark: boolean) => {
+      if (applying) return;
+      applying = true;
+      try {
+        if (observer) observer.disconnect();
+        applyLiquidGlass(isDark);
+      } finally {
+        if (observer) {
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class'],
+          });
+        }
+        applying = false;
+      }
+    };
 
     const updateTheme = () => {
       const hour = new Date().getHours();
@@ -493,13 +518,17 @@ export default function App() {
         if (observer) { observer.disconnect(); observer = null; }
         if (currentMode !== null) removeAllStyles();
         currentMode = newMode;
-        applyLiquidGlass(isDark);
-        // MutationObserver re-applies to new elements
-        observer = new MutationObserver(() => applyLiquidGlass(isDark));
-        observer.observe(document.body, {
-          childList: true, subtree: true,
-          attributes: true, attributeFilter: ['style', 'class']
+        // Coalesced rAF re-apply: batches many React DOM mutations into one
+        // full-tree style pass instead of paying O(N) per mutation event.
+        observer = new MutationObserver(() => {
+          if (applying) return;
+          if (rafHandle !== null) return;
+          rafHandle = requestAnimationFrame(() => {
+            rafHandle = null;
+            safeApply(isDark);
+          });
         });
+        safeApply(isDark);
       }
     };
 
@@ -507,6 +536,7 @@ export default function App() {
     const interval = setInterval(updateTheme, 60000);
     return () => {
       clearInterval(interval);
+      if (rafHandle !== null) cancelAnimationFrame(rafHandle);
       if (observer) observer.disconnect();
     };
   }, []);

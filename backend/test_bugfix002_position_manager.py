@@ -468,7 +468,14 @@ class TestAggressivePhase:
         pos.current_sl = 1.1050
         pm.track_position(pos)
 
-        # No EMA data → BUG-03 fix: emergency close to protect capital
+        # Transient EMA-feed gaps must NOT flat-close a trade. Only after N
+        # consecutive ticks with no EMA is the emergency exit triggered.
+        threshold = int(getattr(pm, "_emergency_no_ema_ticks", 5))
+        for _ in range(threshold - 1):
+            run(pm._handle_aggressive_phase(pos, 1.1150))
+        assert len(broker.closed) == 0, "should hold while EMA feed is transiently absent"
+
+        # Nth consecutive tick crosses the threshold → emergency exit fires.
         run(pm._handle_aggressive_phase(pos, 1.1150))
         assert len(broker.closed) == 1
         assert broker.closed[0][0] == "test-001"

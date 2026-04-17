@@ -4,6 +4,7 @@ SQLite models using aiosqlite for async trade history,
 analysis logs, pending approvals, and daily stats.
 """
 
+import asyncio
 import json
 import sqlite3
 import uuid
@@ -19,6 +20,12 @@ class TradeDatabase:
     def __init__(self, db_path: str = "data/atlas.db"):
         self.db_path = db_path
         self._db: Optional[aiosqlite.Connection] = None
+        # Single-connection aiosqlite serializes per-statement, but caller-level
+        # `execute(...)` followed later by `commit()` can interleave across
+        # concurrent coroutines (engine tick + close-callback + news-close +
+        # periodic cleanup). We hold this lock around execute+commit pairs in
+        # the write methods so each logical transaction stays atomic.
+        self._write_lock = asyncio.Lock()
 
     # ── Connection Management ─────────────────────────────────────
 
@@ -238,34 +245,35 @@ class TradeDatabase:
         now = datetime.now(timezone.utc).isoformat()
 
         try:
-            await self._db.execute(
-                """
-                INSERT INTO trades (
-                    id, instrument, strategy, strategy_variant, direction,
-                    units, entry_price, stop_loss, take_profit,
-                    status, mode, confidence, risk_reward_ratio, reasoning,
-                    opened_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    trade_id,
-                    trade_data["instrument"],
-                    trade_data.get("strategy"),
-                    trade_data.get("strategy_variant"),
-                    trade_data["direction"],
-                    trade_data["units"],
-                    trade_data["entry_price"],
-                    trade_data["stop_loss"],
-                    trade_data["take_profit"],
-                    trade_data.get("status", "open"),
-                    trade_data.get("mode", "AUTO"),
-                    trade_data.get("confidence"),
-                    trade_data.get("risk_reward_ratio"),
-                    trade_data.get("reasoning"),
-                    trade_data.get("opened_at", now),
-                ),
-            )
-            await self._db.commit()
+            async with self._write_lock:
+                await self._db.execute(
+                    """
+                    INSERT INTO trades (
+                        id, instrument, strategy, strategy_variant, direction,
+                        units, entry_price, stop_loss, take_profit,
+                        status, mode, confidence, risk_reward_ratio, reasoning,
+                        opened_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        trade_id,
+                        trade_data["instrument"],
+                        trade_data.get("strategy"),
+                        trade_data.get("strategy_variant"),
+                        trade_data["direction"],
+                        trade_data["units"],
+                        trade_data["entry_price"],
+                        trade_data["stop_loss"],
+                        trade_data["take_profit"],
+                        trade_data.get("status", "open"),
+                        trade_data.get("mode", "AUTO"),
+                        trade_data.get("confidence"),
+                        trade_data.get("risk_reward_ratio"),
+                        trade_data.get("reasoning"),
+                        trade_data.get("opened_at", now),
+                    ),
+                )
+                await self._db.commit()
         except sqlite3.IntegrityError as e:
             error_msg = str(e).lower()
             if "unique" in error_msg or "primary" in error_msg:
@@ -297,11 +305,12 @@ class TradeDatabase:
         set_clause = ", ".join(f"{col} = ?" for col in filtered)
         values = list(filtered.values()) + [trade_id]
 
-        cursor = await self._db.execute(
-            f"UPDATE trades SET {set_clause} WHERE id = ?",
-            values,
-        )
-        await self._db.commit()
+        async with self._write_lock:
+            cursor = await self._db.execute(
+                f"UPDATE trades SET {set_clause} WHERE id = ?",
+                values,
+            )
+            await self._db.commit()
         updated = cursor.rowcount > 0
         if updated:
             logger.info(f"Trade updated: {trade_id} | {filtered}")
@@ -548,26 +557,27 @@ class TradeDatabase:
         if isinstance(explanation_json, dict):
             explanation_json = json.dumps(explanation_json, ensure_ascii=False)
 
-        await self._db.execute(
-            """
-            INSERT INTO analysis_log (
-                id, instrument, timestamp, htf_trend, ltf_trend,
-                convergence, score, strategy_detected, explanation_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                analysis_id,
-                analysis_data["instrument"],
-                analysis_data.get("timestamp", datetime.now(timezone.utc).isoformat()),
-                analysis_data.get("htf_trend"),
-                analysis_data.get("ltf_trend"),
-                1 if analysis_data.get("convergence") else 0,
-                analysis_data.get("score"),
-                analysis_data.get("strategy_detected"),
-                explanation_json,
-            ),
-        )
-        await self._db.commit()
+        async with self._write_lock:
+            await self._db.execute(
+                """
+                INSERT INTO analysis_log (
+                    id, instrument, timestamp, htf_trend, ltf_trend,
+                    convergence, score, strategy_detected, explanation_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    analysis_id,
+                    analysis_data["instrument"],
+                    analysis_data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                    analysis_data.get("htf_trend"),
+                    analysis_data.get("ltf_trend"),
+                    1 if analysis_data.get("convergence") else 0,
+                    analysis_data.get("score"),
+                    analysis_data.get("strategy_detected"),
+                    explanation_json,
+                ),
+            )
+            await self._db.commit()
         return analysis_id
 
     # ── Pending Approvals ─────────────────────────────────────────
@@ -577,29 +587,30 @@ class TradeDatabase:
         setup_id = setup.get("id", str(uuid.uuid4()))
         now = datetime.now(timezone.utc).isoformat()
 
-        await self._db.execute(
-            """
-            INSERT INTO pending_approvals (
-                id, instrument, strategy, direction, entry_price,
-                stop_loss, take_profit, confidence, reasoning,
-                status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                setup_id,
-                setup["instrument"],
-                setup.get("strategy"),
-                setup["direction"],
-                setup["entry_price"],
-                setup["stop_loss"],
-                setup["take_profit"],
-                setup.get("confidence"),
-                setup.get("reasoning"),
-                "pending",
-                setup.get("created_at", now),
-            ),
-        )
-        await self._db.commit()
+        async with self._write_lock:
+            await self._db.execute(
+                """
+                INSERT INTO pending_approvals (
+                    id, instrument, strategy, direction, entry_price,
+                    stop_loss, take_profit, confidence, reasoning,
+                    status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    setup_id,
+                    setup["instrument"],
+                    setup.get("strategy"),
+                    setup["direction"],
+                    setup["entry_price"],
+                    setup["stop_loss"],
+                    setup["take_profit"],
+                    setup.get("confidence"),
+                    setup.get("reasoning"),
+                    "pending",
+                    setup.get("created_at", now),
+                ),
+            )
+            await self._db.commit()
         logger.info(f"Pending approval added: {setup_id} | {setup['instrument']} {setup['direction']}")
         return setup_id
 
@@ -610,15 +621,16 @@ class TradeDatabase:
             return False
 
         now = datetime.now(timezone.utc).isoformat()
-        cursor = await self._db.execute(
-            """
-            UPDATE pending_approvals
-            SET status = ?, resolved_at = ?
-            WHERE id = ? AND status = 'pending'
-            """,
-            (status, now, setup_id),
-        )
-        await self._db.commit()
+        async with self._write_lock:
+            cursor = await self._db.execute(
+                """
+                UPDATE pending_approvals
+                SET status = ?, resolved_at = ?
+                WHERE id = ? AND status = 'pending'
+                """,
+                (status, now, setup_id),
+            )
+            await self._db.commit()
         resolved = cursor.rowcount > 0
         if resolved:
             logger.info(f"Pending setup {setup_id} -> {status}")
@@ -648,15 +660,16 @@ class TradeDatabase:
     ) -> None:
         """Insert an equity snapshot for tracking the equity curve."""
         now = datetime.now(timezone.utc).isoformat()
-        await self._db.execute(
-            """
-            INSERT INTO equity_snapshots
-                (timestamp, balance, equity, unrealized_pnl, open_positions, total_risk)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (now, balance, equity, unrealized_pnl, open_positions, total_risk),
-        )
-        await self._db.commit()
+        async with self._write_lock:
+            await self._db.execute(
+                """
+                INSERT INTO equity_snapshots
+                    (timestamp, balance, equity, unrealized_pnl, open_positions, total_risk)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (now, balance, equity, unrealized_pnl, open_positions, total_risk),
+            )
+            await self._db.commit()
         logger.debug(f"Equity snapshot recorded: balance={balance}, equity={equity}")
 
     async def get_equity_curve(self, days: int = 30) -> List[dict]:
@@ -681,24 +694,26 @@ class TradeDatabase:
         """Delete analysis_log and equity_snapshots older than N days."""
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        await self._db.execute(
-            "DELETE FROM analysis_log WHERE timestamp < ?", (cutoff,)
-        )
-        await self._db.execute(
-            "DELETE FROM equity_snapshots WHERE timestamp < ?", (cutoff,)
-        )
-        await self._db.commit()
+        async with self._write_lock:
+            await self._db.execute(
+                "DELETE FROM analysis_log WHERE timestamp < ?", (cutoff,)
+            )
+            await self._db.execute(
+                "DELETE FROM equity_snapshots WHERE timestamp < ?", (cutoff,)
+            )
+            await self._db.commit()
         logger.info(f"Cleaned up analysis_log and equity_snapshots older than {days} days")
 
     # ── Trade Notes ──────────────────────────────────────────────
 
     async def update_trade_notes(self, trade_id: str, notes: str) -> bool:
         """Update the notes field for a specific trade."""
-        cursor = await self._db.execute(
-            "UPDATE trades SET notes = ? WHERE id = ?",
-            (notes, trade_id),
-        )
-        await self._db.commit()
+        async with self._write_lock:
+            cursor = await self._db.execute(
+                "UPDATE trades SET notes = ? WHERE id = ?",
+                (notes, trade_id),
+            )
+            await self._db.commit()
         updated = cursor.rowcount > 0
         if updated:
             logger.info(f"Trade notes updated: {trade_id}")

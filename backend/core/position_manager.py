@@ -864,6 +864,9 @@ class PositionManager:
         ema_m5_5 = self._get_trail_ema(pos.instrument, "EMA_M5_5")
 
         if ema_m5_2 is not None and ema_m5_5 is not None:
+            # EMA data is present — reset the no-EMA tick counter.
+            if hasattr(pos, "no_ema_ticks") and pos.no_ema_ticks:
+                pos.no_ema_ticks = 0
             if pos.direction == "BUY":
                 both_broken = current_price < ema_m5_2 and current_price < ema_m5_5
             else:
@@ -907,10 +910,22 @@ class PositionManager:
                         f"Consider closing. (Limitation: EMA_M5_2/EMA_M5_5 not available)"
                     )
             else:
-                # BUG-03 fix: no EMA data at all — force emergency close to protect capital
-                logger.warning(
-                    f"{pos.trade_id}: EMERGENCY — no EMA data available for {pos.instrument}. "
-                    f"Closing position as safety measure."
+                # A transient feed gap (one missed scan tick) must NOT flat-close
+                # a profitable trade. The position still has its current_sl at
+                # the broker. Only escalate to emergency close after N consecutive
+                # scan ticks with no EMA data, so a brief outage doesn't panic-
+                # exit the trade. The stop loss still guards the downside.
+                pos.no_ema_ticks = getattr(pos, "no_ema_ticks", 0) + 1
+                threshold = int(getattr(self, "_emergency_no_ema_ticks", 5))
+                if pos.no_ema_ticks < threshold:
+                    logger.warning(
+                        f"{pos.trade_id}: AGGRESSIVE phase — no EMA data for {pos.instrument} "
+                        f"(tick {pos.no_ema_ticks}/{threshold}); holding existing SL, skipping trail update."
+                    )
+                    return
+                logger.error(
+                    f"{pos.trade_id}: EMERGENCY — no EMA data for {pos.instrument} "
+                    f"on {pos.no_ema_ticks} consecutive ticks. Closing as safety measure."
                 )
                 try:
                     ok = await self.broker.close_trade(pos.trade_id)

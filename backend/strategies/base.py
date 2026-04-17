@@ -4543,19 +4543,25 @@ class GreenStrategy(BaseStrategy):
                 if len(below) > 1:
                     result["tp_max"] = below[1]  # Segundo nivel diario S/R (daily previous low)
 
-        # Tambien considerar extensiones Fibonacci para TP_max
-        fib_1272 = analysis.fibonacci_levels.get("ext_1.272")
-        fib_1618 = analysis.fibonacci_levels.get("ext_1.618")
+        # Tambien considerar extensiones Fibonacci para TP_max. Use directional
+        # keys (ext_bull_* for BUY, ext_bear_* for SELL) — the legacy non-
+        # directional ext_1.272/ext_1.618 aliases are bearish-only in
+        # market_analyzer, so using them for BUY silently no-ops.
         if direction == "BUY":
-            # Para BUY, las extensiones superiores
+            fib_ext1 = analysis.fibonacci_levels.get("ext_bull_1.272")
+            fib_ext2 = analysis.fibonacci_levels.get("ext_bull_1.618")
             fib_0 = analysis.fibonacci_levels.get("0.0")  # swing high
-            if fib_0 and fib_0 > entry_price:
-                if "tp_max" not in result or fib_0 > result.get("tp_max", 0):
-                    result["tp_max"] = fib_0
+            for candidate in (fib_ext1, fib_ext2, fib_0):
+                if candidate and candidate > entry_price:
+                    if "tp_max" not in result or candidate > result.get("tp_max", 0):
+                        result["tp_max"] = candidate
         else:
-            if fib_1618 and fib_1618 < entry_price:
-                if "tp_max" not in result or fib_1618 < result.get("tp_max", float("inf")):
-                    result["tp_max"] = fib_1618
+            fib_ext1 = analysis.fibonacci_levels.get("ext_bear_1.272")
+            fib_ext2 = analysis.fibonacci_levels.get("ext_bear_1.618")
+            for candidate in (fib_ext1, fib_ext2):
+                if candidate and candidate < entry_price:
+                    if "tp_max" not in result or candidate < result.get("tp_max", float("inf")):
+                        result["tp_max"] = candidate
 
         return result
 

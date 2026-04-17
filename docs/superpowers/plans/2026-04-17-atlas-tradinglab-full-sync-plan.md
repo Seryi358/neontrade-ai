@@ -168,7 +168,7 @@ Prompt del subagente:
 >
 > **Acceso a EasyPanel:**
 > - URL: `https://zb12wf.easypanel.host`
-> - Auth: POST a `/api/trpc/auth.login?batch=1` con body `{"0":{"json":{"email":"scastellanos@phinodia.com","password":"Gordis.358"}}}`
+> - Auth: POST a `/api/trpc/auth.login?batch=1` con body `{"0":{"json":{"email":"scastellanos@phinodia.com","password":"<REDACTED>"}}}` (password from personal password manager, never commit)
 > - Token devuelto se usa como `Authorization: Bearer <token>`
 > - Proyecto: `n8n`, servicio: `neontrade_ai`
 > - tRPC para logs: probar `projects.inspectProject`, `services.app.getLogs` o `services.app.inspect` (explorar tRPC discovery si es necesario)
@@ -1322,7 +1322,7 @@ Usar credenciales del memory `reference_phinodia_credentials.md`:
 # Auth tRPC EasyPanel
 curl -X POST "https://zb12wf.easypanel.host/api/trpc/auth.login?batch=1" \
   -H "Content-Type: application/json" \
-  -d '{"0":{"json":{"email":"scastellanos@phinodia.com","password":"Gordis.358"}}}'
+  -d '{"0":{"json":{"email":"scastellanos@phinodia.com","password":"<REDACTED>"}}}'
 # Extraer token, luego:
 curl -H "Authorization: Bearer <TOKEN>" \
   "https://zb12wf.easypanel.host/api/trpc/services.app.inspectService?...&serviceName=neontrade_ai"

@@ -80,7 +80,7 @@ Canonical source: Trading Plan PDF (Alex Ruiz). Oral instructions in `TradingLab
 ## Infra / ops
 
 - **Prod URL:** `https://n8n-neontrade-ai.zb12wf.easypanel.host/`
-- **EasyPanel:** `https://zb12wf.easypanel.host` (login: `scastellanos@phinodia.com` / `Gordis.358`)
+- **EasyPanel:** `https://zb12wf.easypanel.host` (login: `scastellanos@phinodia.com`; password in personal password manager — DO NOT commit)
   - project `n8n` / service `neontrade_ai`
   - tRPC auth: `POST /api/trpc/auth.login?batch=1` body `{"0":{"json":{"email":"...","password":"..."}}}` → Bearer token
   - logs: `/ws/serviceLogs` (container live buffer ~30 min) or `/ws/containerShell` + `base64` for rotated `/app/logs/atlas_YYYY-MM-DD.log`

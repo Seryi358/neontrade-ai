@@ -64,7 +64,7 @@ App de trading automatizado basada en la mentoría **TradingLab** (Alex Ruiz). S
 - **Modo:** solo-lectura (API EasyPanel + tRPC); puede escribir solo su reporte en `docs/superpowers/audits/`
 - **Input:**
   - Logs de EasyPanel (últimas 48h via tRPC `services.app.getLogs` o similar)
-  - Credenciales: scastellanos@phinodia.com / `Gordis.358` (memory `reference_phinodia_credentials.md`)
+  - Credenciales: scastellanos@phinodia.com (password in personal manager — NEVER commit; see Claude memory `reference_phinodia_credentials.md`)
   - Volúmenes `atlas-logs` si son accesibles vía EasyPanel API
 - **Tarea:** detectar errores, warnings repetidos, excepciones no capturadas, patrones sospechosos (401/429 de broker, timeouts, OOM, crashes de WebSocket)
 - **Output:** `docs/superpowers/audits/2026-04-17-log-analysis.md` con: `{timestamp, severidad, mensaje, frecuencia, diagnóstico probable, acción recomendada}`

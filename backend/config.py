@@ -84,8 +84,10 @@ class Settings(BaseSettings):
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # Trading Plan PDF: 0.50% for scalping
-    risk_swing: float = 0.01             # Trading Plan PDF: 3% for swing, but capped to 1% for $190 capital safety
-    max_total_risk: float = 0.05          # 5% max simultaneous (mentorship: conservative for $190)
+    # Intentional app caps for small-capital ($190) safety — NOT from mentorship.
+    # Trading Plan PDF pg.3: risk_swing=3%, max_total_risk=7%. We cap below that.
+    risk_swing: float = 0.01             # 1% cap for <$500 accounts (PDF says 3%)
+    max_total_risk: float = 0.05          # 5% cap for <$500 accounts (PDF says 7%)
 
     # Leverage ratios by asset class (Capital.com defaults for retail accounts)
     # Position sizing uses these to verify margin availability before placing orders.
@@ -131,15 +133,16 @@ class Settings(BaseSettings):
     position_management_style: str = "cp"
 
     # Break Even trigger method:
-    #   "risk_distance" (Alex's preference): BE when profit >= 1x risk distance
+    #   "pct_to_tp1" (default, Trading Plan PDF pg.5 — authoritative):
+    #     "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
+    #     Robust across all R:R ratios; never over- or under-triggers.
+    #   "risk_distance" (Alex oral): BE when profit >= 1x risk distance
     #     Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"
-    #     For 1% risk, this means BE at 1% profit (R:R 1:1 point)
-    #   "pct_to_tp1": BE at a percentage of distance to TP1
-    #     Trading Plan PDF: "Cuando estemos por la mitad del beneficio hasta el TP1, pondré el BE"
-    # For a 2:1 R:R trade at 1% risk, both methods coincide (1% profit = 50% to TP1).
-    # For other R:R ratios, "risk_distance" is simpler and matches Alex's oral instruction.
-    be_trigger_method: str = "risk_distance"  # Alex: "cuando ya tengo un 1% de ganancia, pongo el break-even"
-    move_sl_to_be_pct_to_tp1: float = 0.50  # Only used when be_trigger_method="pct_to_tp1"
+    #     For a 2:1 R:R trade at 1% risk, this coincides with pct_to_tp1 (1% profit = 50% to TP1).
+    #     For R:R < 2:1 (e.g. TP1 at swing high with 1:1), risk_distance equals "reach TP1" → never triggers.
+    # The PDF is the canonical written plan of Alex; oral instruction is a shortcut that only works at R:R 2:1.
+    be_trigger_method: str = "pct_to_tp1"  # PDF pg.5 authoritative
+    move_sl_to_be_pct_to_tp1: float = 0.50  # Half-way to TP1 (PDF pg.5)
 
     scale_in_require_be: bool = True  # No new trade unless BE on existing (non-negotiable)
 
@@ -213,7 +216,7 @@ class Settings(BaseSettings):
     close_before_friday_hour: int = 20  # Close positions before Friday 20:00 UTC
     no_new_trades_friday_hour: int = 18  # No NEW trades after Friday 18:00 UTC (Trading Plan)
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
-    avoid_news_minutes_after: int = 15   # Don't trade 15 min after major news
+    avoid_news_minutes_after: int = 30   # 30 min post-release — covers NFP/CPI/FOMC volatility window (audit §M5)
     # Swing trading: Alex says "podemos llegar a ejecutar incluso" during news
     # Relaxed buffers for swing style (mentorship: swing is less affected by news)
     avoid_news_minutes_before_swing: int = 15  # Relaxed: 15 min before for swing (matches NewsFilter)
@@ -687,8 +690,8 @@ TRADING_PROFILES = {
             # Risk management — Alex's exact values
             "risk_day_trading": 0.01,       # 1% per trade
             "risk_scalping": 0.005,         # 0.5%
-            "risk_swing": 0.01,             # 1% — NON-NEGOTIABLE
-            "max_total_risk": 0.07,         # 7% max simultaneous
+            "risk_swing": 0.01,             # Alex's personal preference (oral). PDF pg.3 says 3%
+            "max_total_risk": 0.07,         # 7% max simultaneous (Trading Plan PDF pg.3)
             "correlated_risk_pct": 0.0075,  # 0.75% per correlated pair
             "min_rr_ratio": 1.5,            # 1.5:1 minimum R:R
             "min_rr_black": 2.0,            # BLACK counter-trend
@@ -735,7 +738,7 @@ TRADING_PROFILES = {
             # Risk management — lower risk for beginners
             "risk_day_trading": 0.01,
             "risk_scalping": 0.005,
-            "risk_swing": 0.01,             # 1% — NON-NEGOTIABLE per mentorship
+            "risk_swing": 0.01,             # Conservador para principiantes (PDF pg.3 original: 3%)
             "max_total_risk": 0.05,          # 5% max (stricter)
             "correlated_risk_pct": 0.005,    # 0.5% per correlated pair
             "min_rr_ratio": 2.0,             # Higher minimum R:R for beginners

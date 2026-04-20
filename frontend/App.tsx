@@ -21,6 +21,8 @@ import {
 } from 'react-native';
 import { useFonts } from 'expo-font';
 import { theme, cssTheme } from './src/theme/apple-glass';
+import EngineDot from './src/components/visual/EngineDot';
+import { useEngineState } from './src/hooks/useEngineState';
 
 // ── Error Boundary ──────────────────────────────────────
 
@@ -173,6 +175,7 @@ interface SubTab {
 function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
   const [activeTab, setActiveTab] = React.useState(0);
   const ActiveComponent = tabs[activeTab].component;
+  const { state: engineState } = useEngineState(10_000);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -194,6 +197,9 @@ function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
               </Text>
             );
           })}
+          <View style={subTabStyles.engineSlot}>
+            <EngineDot state={engineState} size={10} />
+          </View>
         </View>
       </SafeAreaView>
       <ActiveComponent />
@@ -227,6 +233,12 @@ const subTabStyles = StyleSheet.create({
   tabActive: {
     color: '#007AFF',
     borderBottomColor: '#007AFF',
+  },
+  engineSlot: {
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 4,
   },
 });
 

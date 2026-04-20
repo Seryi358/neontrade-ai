@@ -27,7 +27,9 @@ import {
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
-import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
+import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon, wsManager } from '../services/api';
+import SetupAlertCard, { SetupPayload } from '../components/visual/SetupAlertCard';
+import { fireSetupAlertDirect } from '../hooks/useAlertSounds';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +106,62 @@ export default function AnalysisScreen() {
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [expandedTimeframes, setExpandedTimeframes] = useState<Record<string, boolean>>({});
+  const [pendingSetups, setPendingSetups] = useState<SetupPayload[]>([]);
+
+  // V7: Pending setups — WS primary, 10s polling fallback
+  useEffect(() => {
+    let mounted = true;
+    const loadPending = async () => {
+      try {
+        const res = await authFetch(`${API_URL}/api/v1/pending-setups`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!mounted) return;
+        setPendingSetups(Array.isArray(data) ? data.slice(0, 5) : []);
+      } catch {
+        /* ignore */
+      }
+    };
+    loadPending();
+    const interval = setInterval(loadPending, 10_000);
+
+    wsManager.connect();
+    const unsub = wsManager.on('setup_pending', (payload: any) => {
+      if (!mounted) return;
+      if (payload && typeof payload === 'object') {
+        setPendingSetups((prev) => {
+          const exists = prev.some((s) => s.id && s.id === payload.id);
+          if (exists) return prev;
+          return [payload as SetupPayload, ...prev].slice(0, 5);
+        });
+        fireSetupAlertDirect();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      unsub();
+    };
+  }, []);
+
+  const handleApprove = useCallback(async (id: string) => {
+    try {
+      await authFetch(`${API_URL}/api/v1/pending-setups/${id}/approve`, { method: 'POST' });
+      setPendingSetups((prev) => prev.filter((s) => s.id !== id));
+    } catch (e) {
+      console.error('Approve failed', e);
+    }
+  }, []);
+
+  const handleReject = useCallback(async (id: string) => {
+    try {
+      await authFetch(`${API_URL}/api/v1/pending-setups/${id}/reject`, { method: 'POST' });
+      setPendingSetups((prev) => prev.filter((s) => s.id !== id));
+    } catch (e) {
+      console.error('Reject failed', e);
+    }
+  }, []);
 
   // Fetch watchlist for the instrument picker (runs once)
   useEffect(() => {
@@ -549,6 +607,20 @@ export default function AnalysisScreen() {
         }
         contentContainerStyle={styles.scrollContentInner}
       >
+        {/* V7 Setup alerts (slide-in on new pending setups).
+            Filter only payloads with the expected visual-alert shape so
+            the legacy Manual Mode pipeline (entry_price/stop_loss) stays
+            on its own screen. */}
+        {pendingSetups
+          .filter((s) => s && (s.entry != null || s.sl != null || s.tp1 != null))
+          .map((s, idx) => (
+            <SetupAlertCard
+              key={s.id ?? `${s.instrument}-${idx}`}
+              setup={s}
+              onApprove={s.id ? handleApprove : undefined}
+              onReject={s.id ? handleReject : undefined}
+            />
+          ))}
         {loading && !analysis ? (
           <LoadingState message={`Analizando ${selectedInstrument.replace('_', '/')}...`} />
         ) : error ? (

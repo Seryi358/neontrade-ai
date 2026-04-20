@@ -32,6 +32,14 @@ import {
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
+import NewsBanner from '../components/visual/NewsBanner';
+import EngineDot from '../components/visual/EngineDot';
+import SessionTimeline from '../components/visual/SessionTimeline';
+import RiskBudgetBar from '../components/visual/RiskBudgetBar';
+import ActivityDonut from '../components/visual/ActivityDonut';
+import ScoreGaugeRadial from '../components/visual/ScoreGaugeRadial';
+import NextNewsCountdown from '../components/visual/NextNewsCountdown';
+import { useEngineState } from '../hooks/useEngineState';
 
 // ── Types ───────────────────────────────────────────────
 
@@ -103,19 +111,31 @@ export default function DashboardScreen() {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [status, setStatus] = useState<EngineStatus | null>(null);
   const [maxTotalRisk, setMaxTotalRisk] = useState<number | null>(null);
+  const [riskDayTrading, setRiskDayTrading] = useState<number | null>(null);
   const [riskStatus, setRiskStatus] = useState<RiskStatus | null>(null);
+  const [dailyActivity, setDailyActivity] = useState<DailyActivity | null>(null);
+  const [topAnalysis, setTopAnalysis] = useState<{ instrument: string; score: number } | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { state: engineState } = useEngineState(10_000);
+
   const fetchData = async () => {
     try {
       setError(null);
-      const [accountRes, statusRes, riskRes, riskStatusRes] = await Promise.all([
+      const [
+        accountRes, statusRes, riskRes, riskStatusRes,
+        dailyActivityRes, analysisRes, calendarRes,
+      ] = await Promise.all([
         authFetch(`${API_URL}/api/v1/account`).catch(() => null),
         authFetch(`${API_URL}/api/v1/status`).catch(() => null),
         authFetch(`${API_URL}/api/v1/risk-config`).catch(() => null),
         authFetch(`${API_URL}/api/v1/risk-status`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/daily-activity`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/analysis`).catch(() => null),
+        authFetch(`${API_URL}/api/v1/calendar`).catch(() => null),
       ]);
 
       if (statusRes?.ok) {
@@ -135,12 +155,34 @@ export default function DashboardScreen() {
         if (riskData?.max_total_risk != null) {
           setMaxTotalRisk(riskData.max_total_risk);
         }
+        if (riskData?.risk_day_trading != null) {
+          setRiskDayTrading(riskData.risk_day_trading);
+        }
       }
       if (riskStatusRes?.ok) {
         const rsData = await riskStatusRes.json();
         if (rsData && !rsData.error) {
           setRiskStatus(rsData);
         }
+      }
+      if (dailyActivityRes?.ok) {
+        const activityData = await dailyActivityRes.json();
+        if (activityData) setDailyActivity(activityData);
+      }
+      if (analysisRes?.ok) {
+        const analyses = await analysisRes.json();
+        if (Array.isArray(analyses) && analyses.length) {
+          const sorted = [...analyses].sort((a, b) => (b?.score ?? 0) - (a?.score ?? 0));
+          setTopAnalysis({
+            instrument: sorted[0]?.instrument ?? '—',
+            score: Number(sorted[0]?.score ?? 0),
+          });
+        }
+      }
+      if (calendarRes?.ok) {
+        const cal = await calendarRes.json();
+        const events = Array.isArray(cal) ? cal : cal?.events ?? [];
+        setCalendarEvents(Array.isArray(events) ? events : []);
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -227,14 +269,41 @@ export default function DashboardScreen() {
         />
       }
     >
-      {/* ── HUD Header ─────────────────────────────────── */}
-      <HUDHeader title="Dashboard" subtitle={
-        `${new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC`
-      } />
+      {/* ── HUD Header with Engine State Dot ───────────── */}
+      <HUDHeader
+        title="Dashboard"
+        subtitle={
+          `${new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC`
+        }
+        rightElement={<EngineDot state={engineState} size={12} />}
+      />
+
+      {/* ── V1 Pause/News Banner ──────────────────────── */}
+      <NewsBanner state={engineState} />
 
       {/* Error banner */}
       {error && (
         <ErrorState message={error} onRetry={fetchData} />
+      )}
+
+      {/* ── V3 Session Timeline + V9 Next News ────────── */}
+      <HUDCard>
+        <HUDSectionTitle title="Sesión actual" icon="\u25A3" />
+        <SessionTimeline
+          nowUtc={engineState?.now_utc}
+          tradingHoursUtc={engineState?.trading_hours_utc}
+          calendar={calendarEvents}
+        />
+        <View style={{ height: 12 }} />
+        <NextNewsCountdown event={engineState?.news?.next ?? null} />
+      </HUDCard>
+
+      {/* ── V8 Score Gauge (top instrument) ───────────── */}
+      {topAnalysis && (
+        <HUDCard>
+          <HUDSectionTitle title="Score líder" icon="\u25C8" />
+          <ScoreGaugeRadial score={topAnalysis.score} label={topAnalysis.instrument.replace('_', '/')} />
+        </HUDCard>
       )}
 
       {/* ── Account Overview ───────────────────────────── */}
@@ -332,6 +401,29 @@ export default function DashboardScreen() {
 
         <HUDDivider />
 
+        {/* V5 Risk Budget Bar */}
+        <RiskBudgetBar
+          currentRiskDollars={
+            account?.balance != null && status
+              ? status.total_risk * account.balance
+              : 0
+          }
+          maxRiskDollars={
+            account?.balance != null && maxTotalRisk != null
+              ? maxTotalRisk * account.balance
+              : 0
+          }
+          dayRiskPct={riskDayTrading}
+          maxTotalPct={maxTotalRisk}
+          executedToday={
+            (engineState?.setups_executed_today ??
+              dailyActivity?.setups_executed ?? 0) as number
+          }
+          maxTrades={engineState?.max_trades_per_day ?? 3}
+        />
+
+        <HUDDivider />
+
         {riskStatus && (
           <>
             <HUDStatRow
@@ -401,35 +493,49 @@ export default function DashboardScreen() {
         )}
       </HUDCard>
 
-      {/* ── Daily Activity Grid ────────────────────────── */}
-      {activity && (
+      {/* ── Daily Activity Grid + V6 Donut ─────────────── */}
+      {(activity || dailyActivity) && (
         <HUDCard>
           <HUDSectionTitle title="Daily activity" icon="\u25C7" />
-          <View style={styles.activityGrid}>
-            <View style={styles.activityCell}>
-              <Text style={styles.activityValue}>{activity.scans_completed}</Text>
-              <Text style={styles.activityLabel}>Scans</Text>
-            </View>
-            <View style={styles.activityCell}>
-              <Text style={styles.activityValue}>{activity.setups_found}</Text>
-              <Text style={styles.activityLabel}>Setups</Text>
-            </View>
-            <View style={styles.activityCell}>
-              <Text style={[styles.activityValue, { color: theme.colors.profit }]}>
-                {activity.setups_executed}
-              </Text>
-              <Text style={styles.activityLabel}>Executed</Text>
-            </View>
-            <View style={styles.activityCell}>
-              <Text style={[styles.activityValue, { color: theme.colors.textSecondary }]}>
-                {activity.setups_filtered}
-              </Text>
-              <Text style={styles.activityLabel}>Filtered</Text>
-            </View>
-          </View>
-          {activity.scans_completed > 0 && (
-            <Text style={styles.engineActive}>Engine active</Text>
-          )}
+          <ActivityDonut
+            scansCompleted={(dailyActivity?.scans_completed ?? activity?.scans_completed ?? 0)}
+            setupsFound={(dailyActivity?.setups_found ?? activity?.setups_found ?? 0)}
+            setupsExecuted={(dailyActivity?.setups_executed ?? activity?.setups_executed ?? 0)}
+            setupsFiltered={(dailyActivity?.setups_filtered ?? activity?.setups_filtered ?? 0)}
+          />
+          {(() => {
+            const a = dailyActivity ?? activity!;
+            return (
+              <>
+                <HUDDivider />
+                <View style={styles.activityGrid}>
+                  <View style={styles.activityCell}>
+                    <Text style={styles.activityValue}>{a.scans_completed}</Text>
+                    <Text style={styles.activityLabel}>Scans</Text>
+                  </View>
+                  <View style={styles.activityCell}>
+                    <Text style={styles.activityValue}>{a.setups_found}</Text>
+                    <Text style={styles.activityLabel}>Setups</Text>
+                  </View>
+                  <View style={styles.activityCell}>
+                    <Text style={[styles.activityValue, { color: theme.colors.profit }]}>
+                      {a.setups_executed}
+                    </Text>
+                    <Text style={styles.activityLabel}>Executed</Text>
+                  </View>
+                  <View style={styles.activityCell}>
+                    <Text style={[styles.activityValue, { color: theme.colors.textSecondary }]}>
+                      {a.setups_filtered}
+                    </Text>
+                    <Text style={styles.activityLabel}>Filtered</Text>
+                  </View>
+                </View>
+                {a.scans_completed > 0 && (
+                  <Text style={styles.engineActive}>Engine active</Text>
+                )}
+              </>
+            );
+          })()}
         </HUDCard>
       )}
 

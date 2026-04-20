@@ -11,8 +11,11 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { theme } from '../theme/apple-glass';
+import InstrumentChip from '../components/visual/InstrumentChip';
+import { useWatchlistStatus } from '../hooks/useWatchlistStatus';
 const safe = (v: any, d = 2): string => (v == null || isNaN(v)) ? '---' : Number(v).toFixed(d);
 import {
   HUDCard,
@@ -47,6 +50,8 @@ interface WatchlistItem {
 export default function WatchlistScreen() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const { items: statusItems, refresh: refreshStatus } = useWatchlistStatus(20_000);
 
   useEffect(() => {
     const fetchWatchlist = async () => {
@@ -185,6 +190,16 @@ export default function WatchlistScreen() {
 
       {error && <ErrorState message={error} />}
 
+      {/* V4 Status chips (new condensed row) */}
+      {statusItems.length > 0 && (
+        <View style={styles.chipsBlock}>
+          <Text style={styles.chipsTitle}>PIPELINE</Text>
+          {statusItems.slice(0, 6).map((s) => (
+            <InstrumentChip key={s.instrument} item={s} />
+          ))}
+        </View>
+      )}
+
       {/* Instrument list */}
       <FlatList
         data={watchlist}
@@ -192,6 +207,17 @@ export default function WatchlistScreen() {
         renderItem={renderItem}
         style={styles.list}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshStatus();
+              setRefreshing(false);
+            }}
+            tintColor="#007AFF"
+          />
+        }
       />
     </View>
   );
@@ -301,5 +327,17 @@ const styles = StyleSheet.create({
     width: 1,
     height: 30,
     backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  chipsBlock: {
+    marginBottom: 16,
+  },
+  chipsTitle: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    marginLeft: 4,
   },
 });

@@ -3220,3 +3220,176 @@ class TradingEngine:
             },
             "journal": self.trade_journal.get_stats() if self.trade_journal else {},
         }
+
+    # ──────────────────────────────────────────────────────────────────
+    # Visual dashboard helpers (for V1-V10 UI features)
+    # ──────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _current_session(now: datetime, offset: int) -> str:
+        """Return trading session for the given UTC time.
+
+        Sessions (approx UTC, DST-adjusted):
+          london:             08:00-13:00
+          london_ny_overlap:  13:00-17:00   (best liquidity)
+          ny:                 17:00-22:00
+          asia:               23:00-07:00
+          quiet:              07:00-08:00 (pre-london, low volume)
+        """
+        h = now.hour
+        lon_start = 8 + offset
+        lon_end = 17 + offset
+        ny_start = 13 + offset
+        ny_end = 22 + offset
+        if lon_start <= h < ny_start:
+            return "london"
+        if ny_start <= h < lon_end:
+            return "london_ny_overlap"
+        if lon_end <= h < ny_end:
+            return "ny"
+        if h >= 23 or h < 7 + offset:
+            return "asia"
+        return "quiet"
+
+    def _next_trading_open_iso(self, now: datetime, offset: int) -> str:
+        """Compute ISO datetime of the next trading window open."""
+        next_open = now.replace(hour=settings.trading_start_hour + offset,
+                                minute=0, second=0, microsecond=0)
+        if next_open <= now:
+            next_open += timedelta(days=1)
+        # Skip weekend
+        while next_open.weekday() >= 5:
+            next_open += timedelta(days=1)
+        return next_open.isoformat()
+
+    def get_engine_state(self) -> Dict:
+        """UI-friendly consolidated state: why the engine is/isn't taking trades.
+
+        Used by /api/v1/engine-state to power V1 (news banner), V2 (engine dot),
+        V3 (session timeline), V9 (next-news countdown).
+        """
+        now = datetime.now(timezone.utc)
+        offset = self._dst_offset(now)
+        hour = now.hour
+
+        # News state (active + next) from filter cache
+        try:
+            news_state = self.news_filter.get_active_and_upcoming()
+        except Exception:
+            news_state = {"active": None, "next": None}
+
+        session = self._current_session(now, offset)
+
+        reason: Optional[str] = None
+        text = "Activo — escaneando cada 120s"
+        resumes_at: Optional[str] = None
+
+        # Priority order: out-of-hours > funded weekend > friday cutoff >
+        # news blackout > max trades reached > cooldown after losses
+        if hour < settings.trading_start_hour + offset or hour >= settings.trading_end_hour + offset:
+            reason = "out_of_hours"
+            text = (
+                f"Engine opera {settings.trading_start_hour:02d}:00–"
+                f"{settings.trading_end_hour:02d}:00 UTC. "
+                f"Ahora {hour:02d}:{now.minute:02d} UTC."
+            )
+            resumes_at = self._next_trading_open_iso(now, offset)
+        elif now.weekday() == 4 and hour >= settings.close_before_friday_hour + offset:
+            reason = "friday_close"
+            text = (
+                f"Viernes post-{settings.close_before_friday_hour:02d}:00 UTC — "
+                f"cerrando la semana. Reanuda el lunes."
+            )
+            resumes_at = self._next_trading_open_iso(now, offset)
+        elif now.weekday() == 4 and hour >= settings.no_new_trades_friday_hour + offset:
+            reason = "friday_no_new_trades"
+            text = (
+                f"Viernes post-{settings.no_new_trades_friday_hour:02d}:00 UTC — "
+                f"sin nuevos trades. Posiciones abiertas siguen gestionadas."
+            )
+            resumes_at = self._next_trading_open_iso(now, offset)
+        elif news_state.get("active"):
+            e = news_state["active"]
+            reason = "news_blackout"
+            hhmm = e["ends_at_utc"][11:16]
+            text = (
+                f"News: {e['currency']} {e['title']} — "
+                f"sin nuevos trades hasta {hhmm} UTC."
+            )
+            resumes_at = e["ends_at_utc"]
+        elif self._daily_setups_executed >= settings.max_trades_per_day:
+            reason = "max_trades_reached"
+            text = (
+                f"Límite de {settings.max_trades_per_day} trades/día alcanzado. "
+                f"Reanuda mañana."
+            )
+            resumes_at = self._next_trading_open_iso(now, offset)
+        elif (self._consecutive_losses_today >= settings.cooldown_after_consecutive_losses
+              and self._last_loss_time is not None):
+            cooldown_end = self._last_loss_time + timedelta(minutes=settings.cooldown_minutes)
+            if now < cooldown_end:
+                reason = "cooldown_after_losses"
+                text = (
+                    f"Cooldown post {self._consecutive_losses_today} pérdidas — "
+                    f"reanuda {cooldown_end.strftime('%H:%M')} UTC."
+                )
+                resumes_at = cooldown_end.isoformat()
+
+        return {
+            "running": self._running,
+            "paused_reason": reason,
+            "paused_reason_text": text,
+            "resumes_at_utc": resumes_at,
+            "session": session,
+            "news": news_state,
+            "consecutive_losses_today": self._consecutive_losses_today,
+            "setups_executed_today": self._daily_setups_executed,
+            "max_trades_per_day": settings.max_trades_per_day,
+            "now_utc": now.isoformat(),
+            "trading_hours_utc": f"{settings.trading_start_hour:02d}:00-{settings.trading_end_hour:02d}:00",
+        }
+
+    def get_watchlist_status(self) -> List[Dict]:
+        """Per-instrument visual status for V4 (status chips in Market tab).
+
+        Derives status from last scan + pending setups queue.
+        """
+        pending_instruments = {s.instrument for s in self.pending_setups if s.status == "pending"}
+        out: List[Dict] = []
+        for inst, result in dict(self._last_scan_results).items():
+            score = float(getattr(result, "score", 0) or 0)
+            convergence = bool(getattr(result, "htf_ltf_convergence", False))
+            htf = getattr(result, "htf_trend", "")
+            ltf = getattr(result, "ltf_trend", "")
+            htf_str = htf.value if hasattr(htf, "value") else str(htf)
+            ltf_str = ltf.value if hasattr(ltf, "value") else str(ltf)
+
+            if inst in pending_instruments:
+                status = "setup_queued"
+                status_text = "Setup en cola — pendiente de aprobación"
+            elif score >= 75 and convergence:
+                status = "ready_waiting"
+                status_text = "HTF alineado, score alto — esperando patrón de entrada"
+            elif score >= 55:
+                status = "forming"
+                status_text = "Condiciones formándose — aún sin patrón claro"
+            elif score >= 30:
+                status = "weak"
+                status_text = "Condiciones débiles — baja probabilidad"
+            else:
+                status = "no_pattern"
+                status_text = "Sin alineación HTF/LTF ni confluencia"
+
+            out.append({
+                "instrument": inst,
+                "score": round(score, 1),
+                "htf_trend": htf_str,
+                "ltf_trend": ltf_str,
+                "convergence": convergence,
+                "status": status,
+                "status_text": status_text,
+            })
+        # Sort by score descending so the best candidates show first
+        out.sort(key=lambda d: d["score"], reverse=True)
+        return out
+

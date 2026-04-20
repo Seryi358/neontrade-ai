@@ -132,6 +132,35 @@ async def get_daily_activity():
     }
 
 
+# ── Visual Dashboard (V1-V10) ──────────────────────────────────────
+
+@router.get("/engine-state")
+async def get_engine_state():
+    """Consolidated visual state for UI (news banner, engine dot, timeline, countdown).
+
+    Returns:
+      - running, paused_reason (str|None), paused_reason_text, resumes_at_utc
+      - session: "london" | "london_ny_overlap" | "ny" | "asia" | "quiet"
+      - news: {active: {...}|null, next: {...}|null}
+      - consecutive_losses_today, setups_executed_today, max_trades_per_day
+      - now_utc, trading_hours_utc
+    """
+    from main import engine
+    return engine.get_engine_state()
+
+
+@router.get("/watchlist-status")
+async def get_watchlist_status():
+    """Per-instrument status chips for the Market tab (V4).
+
+    Each entry has: instrument, score, htf_trend, ltf_trend, convergence,
+    status (setup_queued | ready_waiting | forming | weak | no_pattern),
+    status_text. Sorted by score desc.
+    """
+    from main import engine
+    return engine.get_watchlist_status()
+
+
 # ── Broker Diagnostic ──────────────────────────────────────────────
 
 @router.get("/diagnostic")

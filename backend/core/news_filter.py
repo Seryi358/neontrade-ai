@@ -242,6 +242,61 @@ class NewsFilter:
         return False, ""
 
     # ------------------------------------------------------------------
+    # Visual dashboard helpers
+    # ------------------------------------------------------------------
+
+    def get_active_and_upcoming(self) -> dict:
+        """Return structured active + next-upcoming events for UI.
+
+        Shape:
+        {
+          "active":  {"title", "currency", "impact", "time_utc",
+                      "ends_at_utc", "minutes_remaining"} | None,
+          "next":    {"title", "currency", "impact", "time_utc",
+                      "minutes_until"} | None
+        }
+        """
+        now = datetime.now(timezone.utc)
+        win_before, win_after = self.minutes_before, self.minutes_after
+
+        active = None
+        next_ev = None
+        next_ev_time = None
+
+        for event in self._cached_events:
+            if event.impact not in ("high", "medium"):
+                continue
+            time_until_min = (event.time - now).total_seconds() / 60
+            if -win_after <= time_until_min <= win_before:
+                ends_at = event.time + timedelta(minutes=win_after)
+                mins_remaining = max(0, int((ends_at - now).total_seconds() / 60))
+                # Keep the closest-to-now active event if multiple overlap
+                if active is None or abs(time_until_min) < abs((active["_ref_time"] - now).total_seconds() / 60):
+                    active = {
+                        "title": event.title,
+                        "currency": event.currency,
+                        "impact": event.impact,
+                        "time_utc": event.time.isoformat(),
+                        "ends_at_utc": ends_at.isoformat(),
+                        "minutes_remaining": mins_remaining,
+                        "_ref_time": event.time,
+                    }
+            elif event.time > now:
+                if next_ev_time is None or event.time < next_ev_time:
+                    next_ev_time = event.time
+                    next_ev = {
+                        "title": event.title,
+                        "currency": event.currency,
+                        "impact": event.impact,
+                        "time_utc": event.time.isoformat(),
+                        "minutes_until": int((event.time - now).total_seconds() / 60),
+                    }
+
+        if active is not None:
+            active.pop("_ref_time", None)
+        return {"active": active, "next": next_ev}
+
+    # ------------------------------------------------------------------
     # Style-specific advice string
     # ------------------------------------------------------------------
 

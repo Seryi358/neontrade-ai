@@ -31,6 +31,7 @@ import {
   ErrorState,
 } from '../components/HUDComponents';
 import { api, API_URL, authFetch, setBackendUrl, resetBackendUrl, setApiKey, clearApiKey } from '../services/api';
+import { useAlertSounds } from '../hooks/useAlertSounds';
 
 // ── Types ──────────────────────────────────────────────
 
@@ -278,6 +279,7 @@ export default function SettingsScreen() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [riskConfig, setRiskConfig] = useState<Record<string, number>>({});
   const [alertConfig, setAlertConfig] = useState<Record<string, any>>({});
+  const { soundEnabled, hapticEnabled, setSoundEnabled, setHapticEnabled } = useAlertSounds();
   const [editingRisk, setEditingRisk] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [scalpingEnabled, setScalpingEnabled] = useState(false);
@@ -1110,6 +1112,24 @@ export default function SettingsScreen() {
             />
           </>
         )}
+
+        <HUDDivider />
+        <HUDSectionTitle title="ALERTAS LOCALES (SETUP)" color={theme.colors.neonMagenta} />
+
+        <View style={styles.localAlertRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.localAlertLabel}>Sonido en setup</Text>
+            <Text style={styles.localAlertHint}>Chime corto al llegar un setup nuevo</Text>
+          </View>
+          <IOSSwitch value={soundEnabled} onValueChange={setSoundEnabled} />
+        </View>
+        <View style={styles.localAlertRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.localAlertLabel}>Vibración en setup</Text>
+            <Text style={styles.localAlertHint}>Háptica doble al detectar setup</Text>
+          </View>
+          <IOSSwitch value={hapticEnabled} onValueChange={setHapticEnabled} />
+        </View>
       </CollapsibleSection>
 
       {/* ═══ 11. Engine Control Card ═════════════════════ */}
@@ -1377,6 +1397,26 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 32,
+  },
+
+  // ── Local alert rows (sound + haptic) ─────────────
+  localAlertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+  },
+  localAlertLabel: {
+    fontFamily: theme.fonts.semibold,
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+  },
+  localAlertHint: {
+    fontFamily: theme.fonts.primary,
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
   },
 
   // ── Collapsible ────────────────────────────────────

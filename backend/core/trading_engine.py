@@ -1342,10 +1342,35 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"Alert send_trade_closed failed for {trade_id}: {e}")
 
-        # 8. Screenshot on trade close — fire-and-forget (non-critical)
+        # 8. Screenshot on trade close — fire-and-forget (non-critical).
+        # Pull fresh candles + EMAs from last_scan_results so the chart
+        # actually renders (without these the screenshot fell back to a
+        # text-only "No chart data available" placeholder, which is useless
+        # for the TradingLab mentorship deliverable).
         if self.screenshot_generator:
             _pnl_pct_close = round((exit_price - entry_price if direction == "BUY" else entry_price - exit_price) / entry_price * 100, 2) if entry_price else 0
+            close_candles = None
+            close_ema = None
+            if instrument in self._last_scan_results:
+                _ana = self._last_scan_results[instrument]
+                close_candles = (
+                    getattr(_ana, 'last_candles', {}).get('M5')
+                    or getattr(_ana, 'last_candles', {}).get('H1')
+                    or getattr(_ana, 'candles_m5', None)
+                )
+                close_ema = getattr(_ana, 'ema_values', None)
+            # If still no candles, try fetching fresh from broker
             async def _capture_close():
+                _candles = close_candles
+                if not _candles:
+                    try:
+                        raw = await self.broker.get_candles(instrument, "H1", 100)
+                        _candles = [
+                            {"time": c.time, "open": c.open, "high": c.high, "low": c.low, "close": c.close}
+                            for c in (raw or [])
+                        ]
+                    except Exception as e:
+                        logger.debug(f"Screenshot close: fresh candles fetch failed for {instrument}: {e}")
                 try:
                     await self.screenshot_generator.capture_trade_close(
                         trade_id=trade_id,
@@ -1355,6 +1380,7 @@ class TradingEngine:
                         close_price=exit_price,
                         pnl_pct=_pnl_pct_close,
                         result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
+                        candles=_candles,
                     )
                 except Exception as e:
                     logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
@@ -2628,7 +2654,7 @@ class TradingEngine:
             id=str(uuid.uuid4()),
             timestamp=now.isoformat(),
             instrument=setup.instrument,
-            strategy=getattr(setup, '_strategy_name', 'DETECTED'),
+            strategy=(setup.strategy_variant or getattr(setup, '_strategy_name', None) or 'UNKNOWN'),
             direction=setup.direction,
             entry_price=setup.entry_price,
             stop_loss=setup.stop_loss,
@@ -2855,7 +2881,7 @@ class TradingEngine:
                         await self._db.record_trade({
                             "id": trade_id,
                             "instrument": setup.instrument,
-                            "strategy": getattr(setup, '_strategy_name', 'DETECTED'),
+                            "strategy": (setup.strategy_variant or getattr(setup, '_strategy_name', None) or 'UNKNOWN'),
                             "strategy_variant": setup.strategy_variant or getattr(setup, '_strategy_name', 'DETECTED'),
                             "direction": setup.direction,
                             "units": abs(setup.units),
@@ -2897,7 +2923,7 @@ class TradingEngine:
                                 "units": setup.units,
                                 "risk_reward_ratio": setup.reward_risk_ratio,
                                 "risk_percent": setup.risk_percent,
-                                "strategy": getattr(setup, '_strategy_name', 'DETECTED'),
+                                "strategy": (setup.strategy_variant or getattr(setup, '_strategy_name', None) or 'UNKNOWN'),
                                 "mode": self.mode.value,
                             })
                         except Exception as ws_err:
@@ -2905,15 +2931,32 @@ class TradingEngine:
                     self._spawn_bg(_ws_send(), name="ws_trade_executed")
 
                 # Screenshot on trade open (Trading Plan rule) — fire-and-forget.
+                # Pull candles + EMAs from the scan cache; fall back to fresh
+                # broker fetch if cache is empty (mentorship deliverable
+                # requires a chart with >= 50 candles, NOT the placeholder).
                 if self.screenshot_generator:
-                    candles = None
-                    ema_vals = None
+                    cache_candles = None
+                    cache_ema = None
                     if setup.instrument in self._last_scan_results:
                         analysis = self._last_scan_results[setup.instrument]
-                        candles = getattr(analysis, 'candles_m5', None) or getattr(analysis, 'last_candles', {}).get('M5')
-                        ema_vals = getattr(analysis, 'ema_values', None)
+                        cache_candles = (
+                            getattr(analysis, 'last_candles', {}).get('M5')
+                            or getattr(analysis, 'last_candles', {}).get('H1')
+                            or getattr(analysis, 'candles_m5', None)
+                        )
+                        cache_ema = getattr(analysis, 'ema_values', None)
 
                     async def _capture():
+                        _candles = cache_candles
+                        if not _candles:
+                            try:
+                                raw = await self.broker.get_candles(setup.instrument, "H1", 100)
+                                _candles = [
+                                    {"time": c.time, "open": c.open, "high": c.high, "low": c.low, "close": c.close}
+                                    for c in (raw or [])
+                                ]
+                            except Exception as e:
+                                logger.debug(f"Screenshot open: fresh candles fetch failed for {setup.instrument}: {e}")
                         try:
                             await self.screenshot_generator.capture_trade_open(
                                 trade_id=trade_id,
@@ -2923,10 +2966,10 @@ class TradingEngine:
                                 sl=setup.stop_loss,
                                 tp1=setup.take_profit_1,
                                 tp_max=setup.take_profit_max,
-                                strategy=getattr(setup, '_strategy_name', 'DETECTED'),
+                                strategy=(setup.strategy_variant or getattr(setup, '_strategy_name', None) or 'UNKNOWN'),
                                 confidence=(getattr(setup, '_strategy_confidence', 0.0) or min(setup.reward_risk_ratio * 33, 100.0)) / 100.0,
-                                candles=candles,
-                                ema_values=ema_vals,
+                                candles=_candles,
+                                ema_values=cache_ema,
                             )
                         except Exception as ss_err:
                             logger.warning(f"Screenshot capture failed (non-critical): {ss_err}")
@@ -2952,7 +2995,7 @@ class TradingEngine:
                             sl=setup.stop_loss,
                             tp=setup.take_profit_1,
                             rr=setup.reward_risk_ratio,
-                            strategy=getattr(setup, '_strategy_name', 'DETECTED'),
+                            strategy=(setup.strategy_variant or getattr(setup, '_strategy_name', None) or 'UNKNOWN'),
                         )
                     except Exception as ae:
                         logger.warning(f"Alert send failed (non-critical): {ae}")

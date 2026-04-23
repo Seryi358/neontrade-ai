@@ -1775,22 +1775,52 @@ class ScalpingToggleRequest(BaseModel):
 async def toggle_scalping(request: ScalpingToggleRequest):
     """Enable or disable scalping mode.
 
-    When enabled:
-    - Scan interval drops to 30s (from 120s)
-    - Strategies use compressed timeframes (H1/M15/M5/M1)
-    - Risk per trade is 0.5%
-    - Max daily DD: 5%, max total DD: 10%
+    Persists the choice to ``data/risk_config.json`` so it survives container
+    restarts (added 2026-04-23 after a redeploy reverted scalping_enabled
+    silently — _load_risk_overrides already accepts the key in
+    _ALLOWED_RISK_KEYS but the previous endpoint only mutated memory).
     """
     from main import engine
-    if hasattr(engine, 'toggle_scalping'):
-        engine.toggle_scalping(request.enabled)
-        status = "activado" if request.enabled else "desactivado"
-        return {
-            "scalping_enabled": request.enabled,
-            "scan_interval": engine.scan_interval,
-            "message": f"Modo scalping {status}",
-        }
-    raise HTTPException(501, "Scalping module not available")
+    from config import settings as _s
+    if not hasattr(engine, 'toggle_scalping'):
+        raise HTTPException(501, "Scalping module not available")
+    engine.toggle_scalping(request.enabled)
+    _s.scalping_enabled = request.enabled
+
+    # Persist to risk_config.json (atomic, preserves other keys)
+    import json, os, tempfile
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    risk_path = os.path.join(backend_dir, "data", "risk_config.json")
+    overrides: dict = {}
+    if os.path.exists(risk_path):
+        try:
+            with open(risk_path) as f:
+                overrides = json.load(f)
+            if not isinstance(overrides, dict):
+                overrides = {}
+        except Exception as e:
+            logger.warning(f"risk_config.json unreadable ({e}); aborting scalping save")
+            raise HTTPException(500, "Config file corrupted")
+    overrides["scalping_enabled"] = bool(request.enabled)
+    os.makedirs(os.path.dirname(risk_path), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(risk_path), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(overrides, f, indent=2)
+        os.replace(tmp, risk_path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+    status = "activado" if request.enabled else "desactivado"
+    return {
+        "scalping_enabled": request.enabled,
+        "scan_interval": engine.scan_interval,
+        "message": f"Modo scalping {status}",
+    }
 
 
 @router.get("/scalping/status")

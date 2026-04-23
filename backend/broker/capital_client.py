@@ -541,24 +541,32 @@ class CapitalClient(BaseBroker):
     # ($21 instead of $200+), and various commodities to decimal-shifted
     # decoys. Add entries here as they are confirmed against Capital.com.
     _EPIC_MAP_OVERRIDE: Dict[str, str] = {
-        # Energies / commodities — Capital.com epics (verified live 2026-04-22).
-        "BCO_USD":     "OIL_BRENT",     # Brent crude
-        "WTICO_USD":   "OIL_CRUDE",     # WTI crude
-        "NATGAS_USD":  "NATURALGAS",
-        "WHEAT_USD":   "WHEAT",
-        "CORN_USD":    "CORN",
-        "SOYBN_USD":   "SOYBEAN",
-        # SUGAR_USD removed: probe rejected "SUGAR" — Capital.com does not
-        # offer it under that epic. Search heuristic will blocklist instead.
-        "XAU_USD":     "GOLD",
-        "XAG_USD":     "SILVER",
-        "XPT_USD":     "PLATINUM",
-        "XPD_USD":     "PALLADIUM",
-        "XCU_USD":     "COPPER",
-        # Indices — only the verified ones remain. NAS100/US2000/DE30/FR40/CN50
-        # were guesses (USTEC/RUSSELL/GERMANY40/FRANCE40/CHINA50) and the probe
-        # rejected them. The search heuristic will auto-blocklist if Capital.com
-        # doesn't offer them at all.
+        # Energies / metals / grains — only LIVE-VERIFIED epics remain.
+        #
+        # CRITICAL incident 2026-04-23 02:34 UTC: the previous override
+        # `XCU_USD -> "COPPER"` PASSED `_probe_epic` (the epic exists on
+        # Capital.com) BUT the broker's "COPPER" epic is actually the
+        # COP/PER currency cross (Colombian peso vs Peruvian sol),
+        # NOT copper commodity. Our engine opened a SELL on COP/PER thinking
+        # it was copper. Closed via /emergency/close-all at +\$1.02 (luck —
+        # could just as easily have been -\$1.88). The probe verifies that
+        # the epic EXISTS, not that it's the *right* instrument.
+        #
+        # Defensive position: keep only mappings that have been validated
+        # against the actual market price (price falls in the expected range
+        # for that instrument). Everything else is removed; the strict search
+        # heuristic will find the right epic OR auto-blocklist.
+        "BCO_USD":     "OIL_BRENT",   # verified \$98 (Brent crude range)
+        "WTICO_USD":   "OIL_CRUDE",   # verified \$93 (WTI range)
+        "XAU_USD":     "GOLD",        # verified \$4717 (Gold range)
+        # NATGAS/WHEAT/CORN/SOYBN/XAG/XPT/XPD/XCU removed: epic name might
+        # collide with a forex cross (XCU vs COP-PER incident above). Re-add
+        # only after validating both `_probe_epic` AND a sane price range.
+
+        # Indices — passed probe AND have unambiguous Capital.com epics
+        # (US30/US500/UK100/J225/AU200/HK50 are unique enough that they
+        # cannot collide with currency pairs). Still safer to add a price
+        # sanity check before fully trusting them.
         "US30_USD":    "US30",
         "SPX500_USD":  "US500",
         "UK100_GBP":   "UK100",
@@ -679,19 +687,70 @@ class CapitalClient(BaseBroker):
         # Fallback to our guess (don't cache - might be wrong, retry next time)
         return epic_guess
 
-    async def _probe_epic(self, epic: str) -> bool:
-        """Verify ``epic`` actually exists on Capital.com via market details.
-        Returns True if broker accepts it, False on 404 / other error.
-        Used by `warm_epic_cache` to validate `_EPIC_MAP_OVERRIDE` entries
-        so a wrong override doesn't silently route trades to a non-existent
-        instrument (lesson learned from the BITO/CGC/etc. equity guesses).
+    # Price-sanity ranges for instruments whose epic name might collide with
+    # a different market (e.g. "COPPER" matched COP/PER currency cross, not
+    # copper commodity). When `_probe_epic` runs against an override, the
+    # market's snapshot bid must fall inside this range or the override is
+    # rejected. Loose bands by design — better to allow drift than miss the
+    # next 1000x mismatch.
+    _EXPECTED_PRICE_RANGES: Dict[str, tuple] = {
+        "BCO_USD":    (40, 200),       # Brent crude USD / barrel
+        "WTICO_USD":  (40, 200),       # WTI crude USD / barrel
+        "NATGAS_USD": (1, 15),         # Henry Hub USD / MMBtu
+        "WHEAT_USD":  (200, 1500),     # USD / bushel * 100 (cents) or USD / metric ton
+        "CORN_USD":   (200, 1500),
+        "SOYBN_USD":  (500, 2500),
+        "SUGAR_USD":  (5, 50),
+        "XAU_USD":    (1500, 6000),    # Gold USD / oz
+        "XAG_USD":    (15, 80),        # Silver USD / oz
+        "XPT_USD":    (500, 2500),     # Platinum
+        "XPD_USD":    (500, 3000),     # Palladium
+        "XCU_USD":    (3, 12),         # Copper USD / lb (NOT the COP/PER cross at ~6 — too close, see below)
+        "US30_USD":   (15000, 60000),
+        "SPX500_USD": (3000, 8000),
+        "NAS100_USD": (10000, 30000),
+        "DE30_EUR":   (10000, 30000),
+        "FR40_EUR":   (5000, 12000),
+        "UK100_GBP":  (5000, 12000),
+        "JP225_USD":  (15000, 60000),
+        "AU200_AUD":  (5000, 12000),
+        "HK33_HKD":   (15000, 40000),
+        "CN50_USD":   (8000, 30000),
+        "US2000_USD": (1000, 4000),
+    }
+
+    async def _probe_epic(self, epic: str, expected_range: Optional[tuple] = None) -> bool:
+        """Verify ``epic`` actually exists on Capital.com via market details
+        AND, if a price range is provided, that the latest bid is inside it.
+        Without the price check, an epic name collision (e.g. "COPPER"
+        resolving to the COP/PER currency cross instead of copper commodity)
+        would silently pass — exactly the failure that opened a real-money
+        trade on the wrong instrument 2026-04-23 02:34 UTC.
         """
         try:
-            await self._get(f"/api/v1/markets/{epic}")
+            data = await self._get(f"/api/v1/markets/{epic}")
+        except Exception as e:
+            logger.debug(f"_probe_epic({epic!r}) lookup failed: {e}")
+            return False
+        if expected_range is None:
+            return True
+        try:
+            snapshot = data.get("snapshot", {}) or {}
+            bid = snapshot.get("bid")
+            if bid is None:
+                logger.debug(f"_probe_epic({epic!r}) no bid in snapshot — accepting")
+                return True
+            lo, hi = expected_range
+            if not (lo <= bid <= hi):
+                logger.warning(
+                    f"_probe_epic({epic!r}) REJECTED: bid={bid} outside expected "
+                    f"range [{lo}, {hi}] — epic likely points to a different instrument"
+                )
+                return False
             return True
         except Exception as e:
-            logger.debug(f"_probe_epic({epic!r}) failed: {e}")
-            return False
+            logger.debug(f"_probe_epic({epic!r}) sanity check failed: {e}")
+            return True  # don't block on metadata weirdness — only on hard mismatch
 
     async def warm_epic_cache(self, instruments: List[str]) -> None:
         """Pre-resolve all instrument epics with throttling.
@@ -726,13 +785,17 @@ class CapitalClient(BaseBroker):
                     cached_epic = self._epic_cache[inst]
                     if cached_epic == self._EPIC_MAP_OVERRIDE.get(inst):
                         await asyncio.sleep(0.2)
-                        if not await self._probe_epic(cached_epic):
+                        # Pass an expected price range when known so a name
+                        # collision (e.g. COPPER -> COP/PER currency cross) is
+                        # caught even if the epic technically exists.
+                        price_range = self._EXPECTED_PRICE_RANGES.get(inst)
+                        if not await self._probe_epic(cached_epic, expected_range=price_range):
                             del self._epic_cache[inst]
                             self._epic_blocklist.add(inst)
                             logger.warning(
                                 f"Epic warmup blocklisted {inst!r}: override "
-                                f"{cached_epic!r} not recognised by broker — "
-                                f"remove from _EPIC_MAP_OVERRIDE or fix the value"
+                                f"{cached_epic!r} failed probe (existence + price "
+                                f"sanity) — remove from _EPIC_MAP_OVERRIDE or fix"
                             )
             except Exception as e:
                 self._epic_blocklist.add(inst)

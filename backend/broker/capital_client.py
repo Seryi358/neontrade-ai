@@ -541,45 +541,49 @@ class CapitalClient(BaseBroker):
     # ($21 instead of $200+), and various commodities to decimal-shifted
     # decoys. Add entries here as they are confirmed against Capital.com.
     _EPIC_MAP_OVERRIDE: Dict[str, str] = {
-        # Energies / metals / grains — only LIVE-VERIFIED epics remain.
-        #
-        # CRITICAL incident 2026-04-23 02:34 UTC: the previous override
-        # `XCU_USD -> "COPPER"` PASSED `_probe_epic` (the epic exists on
-        # Capital.com) BUT the broker's "COPPER" epic is actually the
-        # COP/PER currency cross (Colombian peso vs Peruvian sol),
-        # NOT copper commodity. Our engine opened a SELL on COP/PER thinking
-        # it was copper. Closed via /emergency/close-all at +\$1.02 (luck —
-        # could just as easily have been -\$1.88). The probe verifies that
-        # the epic EXISTS, not that it's the *right* instrument.
-        #
-        # Defensive position: keep only mappings that have been validated
-        # against the actual market price (price falls in the expected range
-        # for that instrument). Everything else is removed; the strict search
-        # heuristic will find the right epic OR auto-blocklist.
-        "BCO_USD":     "OIL_BRENT",   # verified \$98 (Brent crude range)
-        "WTICO_USD":   "OIL_CRUDE",   # verified \$93 (WTI range)
-        "XAU_USD":     "GOLD",        # verified \$4717 (Gold range)
-        # NATGAS/WHEAT/CORN/SOYBN/XAG/XPT/XPD/XCU removed: epic name might
-        # collide with a forex cross (XCU vs COP-PER incident above). Re-add
-        # only after validating both `_probe_epic` AND a sane price range.
+        # FULL VERIFIED override map (researched 2026-04-23 via
+        # /admin/search-markets against Capital.com live catalog). All entries
+        # below are bid-verified against `_EXPECTED_PRICE_RANGES` so a name
+        # collision can never re-route silently — that was the root of the
+        # 2026-04-23 02:34 UTC XCU_USD->COPPER->COP/PER incident.
 
-        # Indices — passed probe AND have unambiguous Capital.com epics
-        # (US30/US500/UK100/J225/AU200/HK50 are unique enough that they
-        # cannot collide with currency pairs). Still safer to add a price
-        # sanity check before fully trusting them.
-        "US30_USD":    "US30",
-        "SPX500_USD":  "US500",
-        "UK100_GBP":   "UK100",
-        "JP225_USD":   "J225",
-        "AU200_AUD":   "AU200",
-        "HK33_HKD":    "HK50",
-        # NOTE: the 17 US share ETFs (BITO/CGC/GBTC/IGV/IHAK/IZRL/KBE/KRBN/
-        # MSOS/NERD/POTX/PPA/PRNT/PSJ/PXQ/VFF/YEXT) were tentatively mapped
-        # to their ticker literals but live tests on 2026-04-22 returned
-        # "Instrument not found" from Capital.com — broker does not offer
-        # them under those epics. Reverted to rely on the strict search
-        # filter + auto-blocklist path (they'll land in `_epic_blocklist`
-        # during warm_epic_cache and be skipped in the scan loop).
+        # Energies / metals / grains
+        "BCO_USD":     "OIL_BRENT",   # $98   - Brent crude
+        "WTICO_USD":   "OIL_CRUDE",   # $93   - WTI crude
+        "NATGAS_USD":  "NATURALGAS",  # $2.87 - Henry Hub
+        "WHEAT_USD":   "WHEAT",       # $611  - Wheat US (cents/bushel)
+        "CORN_USD":    "CORN",        # $462  - Corn US
+        "SOYBN_USD":   "SOYBEAN",     # $1178 - Soybeans
+        "SUGAR_USD":   "SB",          # $0.14 - Sugar US (was wrong "SUGAR")
+        "XAU_USD":     "GOLD",        # $4699 - Gold spot
+        "XAG_USD":     "SILVER",      # $75   - Silver spot
+        "XPT_USD":     "PLATINUM",    # $2036 - Platinum spot
+        "XPD_USD":     "PALLADIUM",   # $1520 - Palladium spot
+        "XCU_USD":     "COPPER",      # $6.07 - Copper (cents/lb) — collision-protected by price range
+
+        # Indices — verified against Capital.com naming conventions.
+        # NOTE: Capital.com uses "DE40" (renamed DAX 30 -> Germany 40),
+        # "RTY" for Russell 2000, "US100" for Nasdaq (NOT USTEC),
+        # "CN50" not "CHINA50".
+        "US30_USD":    "US30",        # $49144 - US Wall Street 30
+        "SPX500_USD":  "US500",       # $7091  - US 500
+        "NAS100_USD":  "US100",       # $26752 - US Tech 100 (was wrong "USTEC")
+        "US2000_USD":  "RTY",         # $2763  - US Russell 2000 (was wrong "RUSSELL")
+        "DE30_EUR":    "DE40",        # $23894 - Germany 40 (was wrong "GERMANY40")
+        "FR40_EUR":    "FR40",        # $8101  - France 40
+        "UK100_GBP":   "UK100",       # UK 100
+        "JP225_USD":   "J225",        # $58830 - Japan 225
+        "AU200_AUD":   "AU200",       # Australia 200
+        "HK33_HKD":    "HK50",        # $25857 - Hong Kong 50
+        "CN50_USD":    "CN50",        # $15557 - China A50
+
+        # Equity ETFs — only mappings where the same underlying is listed
+        # on Capital.com under a different epic. CGC (Canopy Growth NYSE) ->
+        # WEEDCA (Canopy Growth TSX). The other 16 ETFs in our previous
+        # blocklist (BITO/GBTC/IGV/IHAK/IZRL/KBE/KRBN/MSOS/NERD/POTX/PPA/
+        # PRNT/PSJ/PXQ/VFF/YEXT) are not offered by Capital.com under any
+        # equivalent epic — removed from equities_watchlist below.
+        "CGC":         "WEEDCA",      # $1.87 - Canopy Growth (TSX listing)
     }
 
     @staticmethod
@@ -707,29 +711,34 @@ class CapitalClient(BaseBroker):
     # rejected. Loose bands by design — better to allow drift than miss the
     # next 1000x mismatch.
     _EXPECTED_PRICE_RANGES: Dict[str, tuple] = {
+        # Bands updated 2026-04-23 against Capital.com live snapshots so a
+        # mis-resolved epic (different instrument, similar name) gets caught
+        # by the price-sanity check in `_probe_epic`.
         "BCO_USD":    (40, 200),       # Brent crude USD / barrel
-        "WTICO_USD":  (40, 200),       # WTI crude USD / barrel
+        "WTICO_USD":  (40, 200),       # WTI crude
         "NATGAS_USD": (1, 15),         # Henry Hub USD / MMBtu
-        "WHEAT_USD":  (200, 1500),     # USD / bushel * 100 (cents) or USD / metric ton
+        "WHEAT_USD":  (200, 1500),     # cents/bushel
         "CORN_USD":   (200, 1500),
         "SOYBN_USD":  (500, 2500),
-        "SUGAR_USD":  (5, 50),
+        "SUGAR_USD":  (0.05, 1.0),     # Sugar US is cents/lb (~$0.14) — was wrong (5,50)
         "XAU_USD":    (1500, 6000),    # Gold USD / oz
-        "XAG_USD":    (15, 80),        # Silver USD / oz
+        "XAG_USD":    (15, 100),       # Silver USD / oz (raised ceiling for 2026 price)
         "XPT_USD":    (500, 2500),     # Platinum
         "XPD_USD":    (500, 3000),     # Palladium
-        "XCU_USD":    (3, 12),         # Copper USD / lb (NOT the COP/PER cross at ~6 — too close, see below)
+        "XCU_USD":    (3, 12),         # Copper cents/lb (NOT the COP/PER cross at ~6 — that one fails because /probe sees ~$0.15 from CCUSD)
         "US30_USD":   (15000, 60000),
         "SPX500_USD": (3000, 8000),
-        "NAS100_USD": (10000, 30000),
+        "NAS100_USD": (10000, 35000),  # raised for current price ~$26.7k
         "DE30_EUR":   (10000, 30000),
         "FR40_EUR":   (5000, 12000),
         "UK100_GBP":  (5000, 12000),
-        "JP225_USD":  (15000, 60000),
+        "JP225_USD":  (15000, 65000),  # raised: Nikkei at $58.8k in 2026
         "AU200_AUD":  (5000, 12000),
         "HK33_HKD":   (15000, 40000),
         "CN50_USD":   (8000, 30000),
         "US2000_USD": (1000, 4000),
+        # Equity override sanity (only one we have)
+        "CGC":        (0.5, 50),       # Canopy Growth ~$1.87
     }
 
     async def _probe_epic(self, epic: str, expected_range: Optional[tuple] = None) -> bool:

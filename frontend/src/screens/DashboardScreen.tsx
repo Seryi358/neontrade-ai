@@ -613,7 +613,7 @@ export default function DashboardScreen() {
           Watchlist: {status?.watchlist_count ?? 0} pairs
         </Text>
         <Text style={styles.footerText}>
-          Engine v2.2 -- Atlas
+          Engine v2.2
         </Text>
       </View>
     </ScrollView>

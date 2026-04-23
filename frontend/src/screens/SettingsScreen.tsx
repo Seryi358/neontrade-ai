@@ -695,8 +695,8 @@ export default function SettingsScreen() {
         </View>
         <Text style={styles.modeDescription}>
           {mode === 'AUTO'
-            ? 'Atlas opera automaticamente basado en las estrategias detectadas'
-            : 'Atlas te sugiere operaciones y tu decides si ejecutar o no'
+            ? 'El sistema opera automaticamente basado en las estrategias detectadas'
+            : 'El sistema te sugiere operaciones y tu decides si ejecutar o no'
           }
         </Text>
 
@@ -1372,7 +1372,7 @@ export default function SettingsScreen() {
         <HUDDivider />
 
         {/* Version */}
-        <HUDStatRow label="Version" value="Atlas v3.0" valueColor={theme.colors.textMuted} />
+        <HUDStatRow label="Version" value="v3.0" valueColor={theme.colors.textMuted} />
       </HUDCard>
 
       <View style={styles.bottomSpacer} />

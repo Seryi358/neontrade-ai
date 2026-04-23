@@ -443,7 +443,7 @@ export default function ManualModeScreen() {
       ) : (
         <EmptyState
           title="No hay operaciones pendientes"
-          subtitle="Cuando Atlas detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion."
+          subtitle="Cuando el sistema detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion."
           hint="Cambia al modo MANUAL en Configuracion para aprobar operaciones manualmente."
         />
       )}

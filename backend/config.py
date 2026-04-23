@@ -418,30 +418,35 @@ class Settings(BaseSettings):
     # Alex: "yo enfoco el trading en acciones como swing trading en acciones de EEUU"
     # Available only via IBKR (not Oanda/Capital.com).
     equities_watchlist: List[str] = [
-        # Innovation (ARK) — from mentorship course materials
-        "ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX", "PRNT", "IZRL",
+        # Cleaned 2026-04-23: removed 16 ETFs not offered by Capital.com
+        # under any equivalent epic (verified live via /admin/search-markets):
+        # BITO, GBTC, IGV, IHAK, IZRL, KBE, KRBN, MSOS, NERD, POTX, PPA,
+        # PRNT, PSJ, PXQ, VFF, YEXT. They were silently auto-blocklisted
+        # at every warm cycle wasting ~64 broker API calls per warm.
+        # CGC kept — mapped to WEEDCA (Canopy Growth TSX listing).
+
+        # Innovation (ARK)
+        "ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX",
         "MOON",
         # Airlines
         "JETS", "AAL", "DAL", "UAL",
         # Banking
-        "KBE", "JPM", "BAC", "GS", "MS", "WFC",
+        "JPM", "BAC", "GS", "MS", "WFC",
         # Software / Cybersecurity
-        "HACK", "IGV", "PSJ",
+        "HACK",
         # Semiconductors
         "SOXX", "PSI", "XSD",
-        # Networking
-        "PXQ",
         # Internet / Cloud
-        "FDN", "CLOU", "SKYY", "CIBR", "EMQQ", "IHAK", "PNQI",
+        "FDN", "CLOU", "SKYY", "CIBR", "EMQQ", "PNQI",
         # Clean Energy
-        "ICLN", "TAN", "FAN", "KRBN",
+        "ICLN", "TAN", "FAN",
         # Aerospace / Defense
-        "XAR", "ITA", "PPA", "BA", "LMT", "RTX", "NOC", "GD", "TDG",
+        "XAR", "ITA", "BA", "LMT", "RTX", "NOC", "GD", "TDG",
         "AVAV", "IRDM", "SPCE",
         # Biotechnology
         "XBI", "IBB", "FBT",
         # Gaming
-        "ESPO", "HERO", "GAMR", "NERD", "EA",
+        "ESPO", "HERO", "GAMR", "EA",
         # Uranium
         "URA", "CCJ", "NXE", "DNN", "UUUU",
         # Agriculture
@@ -449,14 +454,14 @@ class Settings(BaseSettings):
         # Electric Car
         "NIO", "FCEL", "PLUG", "MGA",
         # AI
-        "NVDA", "IBM", "BIDU", "YEXT",
+        "NVDA", "IBM", "BIDU",
         # Cannabis — per TradingLab Watchlist module
-        "MJ", "MSOS", "TLRY", "CGC", "ACB", "CRON", "SNDL", "GRWG",
-        "VFF", "YOLO", "POTX", "MO",
+        "MJ", "TLRY", "CGC", "ACB", "CRON", "SNDL", "GRWG",
+        "YOLO", "MO",
         # VR
         "VUZI",
         # Crypto-related equities
-        "COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK", "BITO", "GBTC",
+        "COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK",
         # Basic Materials — includes leveraged gold miners ETFs per mentorship
         "GDX", "GLD", "SLV", "XME", "PALL", "PPLT", "DUST", "JNUG", "NUGT",
     ]
@@ -605,48 +610,48 @@ class Settings(BaseSettings):
     # treats each ticker as independent and two same-sector trades fire at 1% each
     # instead of 0.75% (mentorship cap for correlated pairs).
     equities_correlation_groups: List[List[str]] = [
-        # Big US banks — heavily correlated on rates / credit cycle
-        ["JPM", "BAC", "GS", "MS", "WFC", "C", "KBE"],
+        # Cleaned 2026-04-23 to remove tickers Capital.com does not offer
+        # (BITO, GBTC, IGV, IHAK, IZRL, KBE, KRBN, MSOS, NERD, POTX, PPA,
+        # PRNT, PSJ, PXQ, VFF, YEXT). Single-ticker groups dropped.
+
+        # Big US banks
+        ["JPM", "BAC", "GS", "MS", "WFC", "C"],
         # Airlines
         ["AAL", "DAL", "UAL", "JETS"],
-        # Semiconductors + semi ETFs
-        ["NVDA", "SOXX", "PSI", "XSD", "PXQ"],
+        # Semiconductors
+        ["NVDA", "SOXX", "PSI", "XSD"],
         # Big cloud / software ETFs
-        ["CLOU", "SKYY", "IGV", "PSJ", "FDN", "PNQI"],
+        ["CLOU", "SKYY", "FDN", "PNQI"],
         # Cyber / AI thematic
-        ["HACK", "CIBR", "IHAK", "EMQQ"],
+        ["HACK", "CIBR", "EMQQ"],
         # ARK innovation family
-        ["ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX", "PRNT"],
+        ["ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX"],
         # Clean energy / solar
-        ["ICLN", "TAN", "FAN", "KRBN"],
+        ["ICLN", "TAN", "FAN"],
         # Defense / aerospace
-        ["XAR", "ITA", "PPA", "BA", "LMT", "RTX", "NOC", "GD", "TDG", "AVAV"],
+        ["XAR", "ITA", "BA", "LMT", "RTX", "NOC", "GD", "TDG", "AVAV"],
         # Space
         ["IRDM", "SPCE"],
         # Biotech
         ["XBI", "IBB", "FBT"],
         # Gaming / eSports
-        ["ESPO", "HERO", "GAMR", "NERD", "EA"],
+        ["ESPO", "HERO", "GAMR", "EA"],
         # Uranium / nuclear
         ["URA", "CCJ", "NXE", "DNN", "UUUU"],
         # Agriculture
         ["COW", "MOO", "WOOD"],
         # EVs / battery tech
         ["NIO", "FCEL", "PLUG", "MGA"],
-        # China / big tech
-        ["BIDU", "YEXT"],
         # Cannabis
-        ["MJ", "MSOS", "TLRY", "CGC", "ACB", "CRON", "SNDL", "GRWG", "VFF", "YOLO", "POTX"],
+        ["MJ", "TLRY", "CGC", "ACB", "CRON", "SNDL", "GRWG", "YOLO"],
         # Tobacco + vape
         ["MO", "VUZI"],
         # Crypto-equities (co-move with BTC)
-        ["COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK", "BITO", "GBTC"],
+        ["COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK"],
         # Precious metals miners / ETFs
         ["GDX", "GLD", "SLV", "XME", "PALL", "PPLT"],
         # Leveraged miners (extreme correlation with gold)
         ["DUST", "JNUG", "NUGT"],
-        # Israeli tech
-        ["IZRL"],
     ]
 
     # model_config defined at class level above (Pydantic v2 ConfigDict)

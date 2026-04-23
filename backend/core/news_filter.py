@@ -366,11 +366,53 @@ class NewsFilter:
 
         return False, ""
 
-    @staticmethod
-    def _extract_currencies(instrument: str) -> set:
-        """Extract the two currency codes from a pair name like 'EUR_USD' -> {'EUR', 'USD'}."""
-        parts = instrument.replace("/", "_").split("_")
-        return {p.upper() for p in parts if len(p) == 3}
+    # Mapping from non-forex tickers to the currency whose calendar drives them.
+    # Populated for every instrument in the live watchlist that is NOT a forex
+    # pair. Without this mapping `_extract_currencies("JPM")` returned `{"JPM"}`,
+    # and `should_close_for_news` never matched USD calendar events for stocks —
+    # meaning NFP/CPI/FOMC could NOT close BAC/JPM/etc. Added 2026-04-22.
+    _INSTRUMENT_CURRENCY_MAP: dict = {
+        # US equities — all driven by USD macro calendar
+        # Banks, airlines, tech, ETFs, miners, crypto-equities, defense, etc.
+        **{t: "USD" for t in [
+            "AAL","DAL","UAL","JETS","KBE","JPM","BAC","GS","MS","WFC",
+            "HACK","IGV","PSJ","SOXX","PSI","XSD","PXQ","FDN","CLOU","SKYY",
+            "CIBR","EMQQ","IHAK","PNQI","ICLN","TAN","FAN","KRBN",
+            "XAR","ITA","PPA","BA","LMT","RTX","NOC","GD","TDG","AVAV",
+            "IRDM","SPCE","XBI","IBB","FBT","ESPO","HERO","GAMR","NERD","EA",
+            "URA","CCJ","NXE","DNN","UUUU","COW","MOO","WOOD",
+            "NIO","FCEL","PLUG","MGA","NVDA","IBM","BIDU","YEXT",
+            "MJ","MSOS","TLRY","CGC","ACB","CRON","SNDL","GRWG","VFF","YOLO","POTX",
+            "MO","VUZI","COIN","MSTR","MARA","RIOT","HUT","BLOK","BITO","GBTC",
+            "GDX","GLD","SLV","XME","PALL","PPLT","DUST","JNUG","NUGT",
+            "ARKK","ARKW","ARKF","ARKG","ARKQ","ARKX","PRNT","IZRL","MOON",
+            "C",
+        ]},
+        # Indices explicitly include their currency in the ticker already
+        # (US30_USD, SPX500_USD, DE30_EUR, etc.) so _extract_currencies handles them.
+        # Commodities with XAU/XAG/XPT/XPD/XCU/WTICO/BCO/NATGAS/WHEAT/CORN/SOYBN/SUGAR
+        # use the paired currency — already handled by the default extractor.
+    }
+
+    @classmethod
+    def _extract_currencies(cls, instrument: str) -> set:
+        """Extract the currency codes relevant to ``instrument``.
+
+        Forex pairs contain the currencies in the symbol (``EUR_USD``).
+        Non-forex tickers (``JPM``, ``NVDA``, ...) are resolved via
+        ``_INSTRUMENT_CURRENCY_MAP`` before falling back to the splitter. This
+        ensures USD calendar events (NFP, CPI, FOMC) can close US equity trades
+        when impact is high.
+        """
+        sym = instrument.replace("/", "_")
+        mapped = cls._INSTRUMENT_CURRENCY_MAP.get(sym)
+        if mapped:
+            # Still include any 3-letter parts found via splitting so commodity-
+            # style symbols that also have a mapping continue to match both.
+            parts = sym.split("_")
+            return {mapped} | {p.upper() for p in parts if len(p) == 3 and p.isalpha()}
+        parts = sym.split("_")
+        return {p.upper() for p in parts if len(p) == 3 and p.isalpha()}
 
     async def get_todays_events(self, include_past: bool = False) -> List[dict]:
         """Get today's events, sorted chronologically. By default only upcoming."""

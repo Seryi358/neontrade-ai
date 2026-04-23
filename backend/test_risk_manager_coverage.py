@@ -35,6 +35,7 @@ def rm():
         ms.correlation_groups = [["EUR_USD", "GBP_USD"]]
         ms.indices_correlation_groups = []
         ms.crypto_correlation_groups = [["BTC_USD", "ETH_USD"]]
+        ms.equities_correlation_groups = []
         ms.max_reentries_per_setup = 3
         ms.reentry_risk_1 = 0.5
         ms.reentry_risk_2 = 0.25
@@ -373,6 +374,7 @@ class TestCorrelation:
             ms.correlation_groups = [["EUR_USD", "GBP_USD"]]
             ms.indices_correlation_groups = []
             ms.crypto_correlation_groups = []
+            ms.equities_correlation_groups = []
             result = rm._adjust_for_correlation("GBP_USD", 0.01)
         assert result == 0.0075
 
@@ -384,6 +386,7 @@ class TestCorrelation:
             ms.correlation_groups = [["EUR_USD", "GBP_USD"]]
             ms.indices_correlation_groups = []
             ms.crypto_correlation_groups = []
+            ms.equities_correlation_groups = []
             result = rm._adjust_for_correlation("USD_JPY", 0.01)
         assert result == 0.01
 
@@ -395,6 +398,7 @@ class TestCorrelation:
             ms.correlation_groups = []
             ms.indices_correlation_groups = []
             ms.crypto_correlation_groups = [["BTC_USD", "ETH_USD"]]
+            ms.equities_correlation_groups = []
             result = rm._adjust_for_correlation("ETH_USD", 0.01)
         assert result == 0.0075
 

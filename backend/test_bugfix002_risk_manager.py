@@ -112,6 +112,7 @@ class TestPositionSizing:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
         mock_settings.leverage_forex = 100
         mock_settings.leverage_crypto = 20
         mock_settings.leverage_commodities = 100
@@ -134,6 +135,7 @@ class TestPositionSizing:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
         mock_settings.leverage_forex = 100
         mock_settings.leverage_crypto = 20
         mock_settings.leverage_commodities = 100
@@ -155,6 +157,7 @@ class TestPositionSizing:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
 
         units = run(rm.calculate_position_size("EUR_USD", TradingStyle.DAY_TRADING, 1.1000, 1.1000))
         assert units == 0
@@ -176,6 +179,7 @@ class TestPositionSizing:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
         mock_settings.leverage_forex = 100
         mock_settings.leverage_crypto = 20
         mock_settings.leverage_commodities = 100
@@ -373,6 +377,7 @@ class TestCorrelation:
         mock_settings.correlation_groups = [["EUR_USD", "GBP_USD", "EUR_GBP"]]
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
         mock_settings.correlated_risk_pct = 0.0075
 
         # Register a trade on EUR_USD
@@ -386,6 +391,7 @@ class TestCorrelation:
         mock_settings.correlation_groups = [["EUR_USD", "GBP_USD"]]
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
         mock_settings.correlated_risk_pct = 0.0075
 
         rm.register_trade("t1", "EUR_USD", 0.01)
@@ -398,6 +404,7 @@ class TestCorrelation:
         mock_settings.correlation_groups = [["EUR_USD", "GBP_USD"]]
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
 
         adjusted = rm._adjust_for_correlation("GBP_USD", 0.01)
         assert adjusted == 0.01
@@ -482,6 +489,7 @@ class TestCanTakeTrade:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
 
         assert rm.can_take_trade(TradingStyle.DAY_TRADING, "EUR_USD") is True
 
@@ -497,6 +505,7 @@ class TestCanTakeTrade:
         mock_settings.correlation_groups = []
         mock_settings.indices_correlation_groups = []
         mock_settings.crypto_correlation_groups = []
+        mock_settings.equities_correlation_groups = []
 
         # Fill up to 7%
         for i in range(7):

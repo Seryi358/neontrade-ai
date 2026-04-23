@@ -1104,25 +1104,39 @@ async def get_notifications():
 # ── Engine Logs (last N lines from loguru file) ────────────────
 
 @router.get("/logs")
-async def get_engine_logs(lines: int = Query(100, ge=10, le=500)):
+async def get_engine_logs(
+    lines: int = Query(100, ge=10, le=5000),
+    tail: int = Query(0, ge=0, le=5000),
+    date: Optional[str] = Query(None, description="YYYY-MM-DD (UTC) — defaults to today"),
+    grep: Optional[str] = Query(None, description="Case-insensitive substring filter"),
+):
     """Get the last N lines of engine logs for debugging.
 
     Audit M8: use UTC when building today's filename so it matches loguru's
-    ``{time:YYYY-MM-DD}`` rotation (UTC in containers). Using local time
-    caused off-by-one misses across the midnight boundary.
+    ``{time:YYYY-MM-DD}`` rotation (UTC in containers).
+
+    Improvements:
+    - ``date`` param (UTC, YYYY-MM-DD) to retrieve a specific day's rotated log.
+    - ``grep`` param for a case-insensitive substring filter (applied before tail).
+    - ``tail`` alias for ``lines`` (whichever is higher wins, default 100).
+    - ``lines`` cap raised to 5000 to allow deep forensic pulls.
     """
     import os
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    import re
+
+    effective = max(lines, tail)
+    target_date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Validate date format (YYYY-MM-DD) to prevent path injection
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", target_date):
+        return {"error": f"Invalid date format: {target_date!r}. Expected YYYY-MM-DD."}
+
     log_dirs = ["logs", "/app/logs"]
-    # Search for today's log file (loguru format: atlas_YYYY-MM-DD.log)
     for log_dir in log_dirs:
         if not os.path.isdir(log_dir):
             continue
-        # Try today's log, then any .log file
-        candidates = [
-            os.path.join(log_dir, f"atlas_{today}.log"),
-        ]
-        # Also find any recent .log file
+        # Priority: exact date match; if missing, fall back to newest .log
+        candidates = [os.path.join(log_dir, f"atlas_{target_date}.log")]
         try:
             for f in sorted(os.listdir(log_dir), reverse=True):
                 if f.endswith(".log"):
@@ -1134,11 +1148,23 @@ async def get_engine_logs(lines: int = Query(100, ge=10, le=500)):
                 try:
                     with open(lp, "r") as f:
                         all_lines = f.readlines()
-                        return {"file": lp, "total_lines": len(all_lines), "lines": [l.rstrip() for l in all_lines[-lines:]]}
+                    if grep:
+                        needle = grep.lower()
+                        filtered = [l for l in all_lines if needle in l.lower()]
+                    else:
+                        filtered = all_lines
+                    return {
+                        "file": lp,
+                        "total_lines": len(all_lines),
+                        "filtered_lines": len(filtered) if grep else None,
+                        "returned_lines": min(effective, len(filtered)),
+                        "date_requested": target_date,
+                        "lines": [l.rstrip() for l in filtered[-effective:]],
+                    }
                 except Exception as e:
                     return {"error": str(e), "file": lp}
 
-    return {"error": "No log file found", "searched": log_dirs}
+    return {"error": "No log file found", "searched": log_dirs, "date_requested": target_date}
 
 
 # ── Economic Calendar ───────────────────────────────────────────

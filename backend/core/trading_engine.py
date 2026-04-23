@@ -2090,8 +2090,28 @@ class TradingEngine:
                     if setup is None:
                         continue
 
-                    # Re-generate explanation with the setup signal context
-                    # (setup is TradeRisk, not SetupSignal, so we pass what we can)
+                    # Re-generate explanation with the SetupSignal context now
+                    # that strategies have committed to a trade. Without this,
+                    # the persisted trade reasoning ends with the
+                    # "Buena estructura pero sin señal de entrada clara aún.
+                    #  Monitorear." line from the analysis-phase explanation
+                    # (signal=None branch in explanation_engine), which made the
+                    # JPM audit trail look like the engine had ignored its own
+                    # advice. _detect_setup stashes the raw SetupSignal on
+                    # `trade_risk._signal`.
+                    real_signal = getattr(setup, "_signal", None)
+                    if real_signal is not None:
+                        try:
+                            explanation = self.explanation_engine.generate_full_analysis(
+                                instrument=instrument,
+                                analysis_result=analysis,
+                                setup_signal=real_signal,
+                            )
+                            self._latest_explanations[instrument] = explanation
+                        except Exception as e:
+                            logger.debug(
+                                f"Explanation regen for {instrument} failed (non-blocking): {e}"
+                            )
                     await self._handle_setup(setup, analysis, explanation)
 
             except Exception as e:
@@ -2367,6 +2387,11 @@ class TradingEngine:
         trade_risk._ai_score = getattr(signal, '_ai_score', 0)
         trade_risk._ai_recommendation = getattr(signal, '_ai_recommendation', '')
         trade_risk._ai_reasoning = getattr(signal, '_ai_reasoning', '')
+        # Carry the raw SetupSignal so the scan loop can re-generate the
+        # explanation with signal context (otherwise the pre-setup "Monitorear"
+        # recommendation leaks into the persisted trade reasoning — root cause
+        # confirmed 2026-04-22 JPM forensic audit).
+        trade_risk._signal = signal
         return trade_risk
 
     def _calculate_sl_tp(
@@ -2477,6 +2502,18 @@ class TradingEngine:
 
         parts.append(f"R:R = 1:{setup.reward_risk_ratio:.2f}")
         parts.append(explanation.recommendation)
+
+        # BLACK is contra-trend by design (Elliott Wave 1 anticipation): the
+        # SELL/BUY direction can look opposite to the HTF bias to a casual
+        # reader. Surface this so the audit trail does not look like the engine
+        # contradicted itself (added 2026-04-22 after JPM forensic audit).
+        if (setup.strategy_variant or "").upper() == "BLACK":
+            parts.append(
+                "Nota: BLACK es estrategia CONTRATENDENCIA (anticipacion Onda 1 "
+                "Elliott). Cuando el sesgo HTF es ALCISTA, BLACK busca VENTA; "
+                "cuando es BAJISTA, busca COMPRA. La aparente contradiccion "
+                "direccion vs sesgo es esperada y correcta."
+            )
 
         return "\n".join(parts)
 

@@ -47,31 +47,55 @@ _ALLOWED_ERROR_TYPES = {"PERCEPTION", "TECHNICAL", "ROUTINE", "EMOTIONAL", None}
 
 
 ASR_POSTMORTEM_PROMPT = """Eres un analista experto del curso TradingLab evaluando un trade ya cerrado.
-Tu tarea es completar el ASR (Auto Self Review) del trade, evaluando la EJECUCIÓN
-contra el PLAN, NO contra el resultado.
+Tu tarea es completar el ASR (Auto Self Review) evaluando la EJECUCIÓN contra
+el PLAN, NO contra el resultado.
 
 Instrucciones (Alex Ruiz):
 - "correcto o incorrecto no viene relacionado con el resultado del trade,
    viene relacionado con vuestro plan de trading"
-- Un trade puede haber perdido dinero pero tener ejecución correcta (todo el plan
-  cumplido, simplemente la probabilidad jugó en contra). De igual forma un trade
-  ganador puede tener ejecución incorrecta (suerte, no plan).
-- Si NO puedes evaluar un campo con la información disponible, devuelve null
-  para ese campo (preferible a inventar).
+- Un trade puede haber perdido dinero pero tener ejecución correcta (todo el
+  plan cumplido, simplemente la probabilidad jugó en contra). De igual forma
+  un trade ganador puede tener ejecución incorrecta (suerte, no plan).
+- **IMPORTANTE**: aunque el registro tenga campos vacíos o "no registrado",
+  DEBES hacer tu mejor evaluación basada en: (1) los datos visibles (entry/SL/
+  TP/strategy/result/screenshot), (2) las reglas conocidas de cada strategy
+  (BLUE/RED/PINK/WHITE/BLACK/GREEN), (3) la imagen del gráfico si fue adjuntada.
+  Sólo devuelve `null` cuando realmente no haya forma razonable de evaluar.
+- Reglas por strategy (resumen TradingLab):
+    * BLUE = Cambio de tendencia en 1H. SL debajo del 0.618 Fib / mínimo
+      anterior. TP1 = swing anterior; TP_max = EMA 50 4H. R:R mínimo 1.5.
+    * RED  = Cambio de tendencia en 4H. SL debajo EMA 50 4H. TP = máximo
+      anterior o Fib 1.0. R:R ≥ 2.0.
+    * PINK = Patrón correctivo de continuación. SL mínimo anterior. TP máximo
+      anterior.
+    * WHITE = Continuación post-Pink. SL extremo anterior. TP nivel de Pink.
+    * BLACK = CONTRATENDENCIA. SL encima máximo anterior. TP = EMA 50 4H.
+      R:R ≥ 2.0 OBLIGATORIO. SELL con HTF alcista (o BUY con HTF bajista)
+      es la semántica ESPERADA, no una contradicción.
+    * GREEN = Semanal + Diario + 15M. R:R hasta 10:1. Sólo cripto.
 - error_type: PERCEPTION (leí mal el gráfico), TECHNICAL (apliqué mal una regla),
   ROUTINE (no seguí mi rutina/checklist), EMOTIONAL (revenge/FOMO/miedo).
+  Escoge el MÁS relevante si el trade no fue perfecto; devuelve null sólo si
+  la ejecución fue impecable según el plan.
 
 Devuelve EXACTAMENTE este JSON (sin markdown, sin texto extra), con todas las
-claves siguientes (usa null cuando no puedas evaluar):
-- asr_htf_correct (bool|null)
-- asr_ltf_correct (bool|null)
-- asr_strategy_correct (bool|null)
-- asr_sl_correct (bool|null)
-- asr_tp_correct (bool|null)
-- asr_management_correct (bool|null)
-- asr_would_enter_again (bool|null)
-- asr_lessons (string en español, 1-3 frases)
-- asr_error_type (string: PERCEPTION | TECHNICAL | ROUTINE | EMOTIONAL | null)
+claves siguientes. Prefiere `true`/`false` razonado sobre `null`:
+- asr_htf_correct (bool|null): ¿el análisis HTF estuvo alineado con la
+  strategy? (p.ej. BLACK necesita HTF alcista para SELL)
+- asr_ltf_correct (bool|null): ¿el timeframe de ejecución (M5 day / M1 scalp)
+  mostró una señal válida?
+- asr_strategy_correct (bool|null): ¿la strategy elegida era la adecuada para
+  el contexto del mercado visible?
+- asr_sl_correct (bool|null): ¿el SL estuvo en el lugar correcto según las
+  reglas de la strategy?
+- asr_tp_correct (bool|null): ¿el TP1 estuvo en el nivel correcto?
+- asr_management_correct (bool|null): ¿la gestión post-entry fue correcta?
+  (BE movido a tiempo, trailing activado tras swing, etc.)
+- asr_would_enter_again (bool|null): con la info disponible, ¿volverías a
+  tomar este trade?
+- asr_lessons (string en español, 2-4 frases concretas sobre qué aprender
+  de este trade específico)
+- asr_error_type (string|null: PERCEPTION | TECHNICAL | ROUTINE | EMOTIONAL | null)
 
 CONTEXTO DEL TRADE:
 __TRADE_CONTEXT__
@@ -192,20 +216,43 @@ class AutoASRGenerator:
 
     @staticmethod
     def _format_trade_context(t: Dict[str, Any]) -> str:
-        """Compact human-readable summary the model uses to grade execution."""
-        keys = [
-            "instrument", "direction", "strategy", "entry_price", "exit_price",
-            "sl", "tp", "rr_achieved", "pnl_dollars", "pnl_pct", "result",
+        """Compact human-readable summary the model uses to grade execution.
+
+        Always emit EVERY key the checklist cares about (even as "no
+        registrado") so the model knows which dimensions exist and can
+        still reason about them from the screenshot/strategy rules alone.
+        Without this, sparse journal records caused the model to default to
+        all-null ASR — observed live when JPM backfill filled only
+        `asr_lessons`.
+        """
+        primary_keys = [
+            "instrument", "direction", "strategy", "strategy_variant",
+            "entry_price", "exit_price", "sl", "tp", "stop_loss", "take_profit",
+            "rr_achieved", "risk_reward_ratio",
+            "pnl_dollars", "pnl", "pnl_pct", "result", "status",
+            "confidence",
             "balance_after", "drawdown_pct", "duration_minutes",
             "trading_style", "timeframes_used",
+            "opened_at", "closed_at", "mode",
         ]
         lines = []
-        for k in keys:
-            if k in t and t[k] not in (None, "", []):
-                lines.append(f"- {k}: {t[k]}")
-        # Include any free-text fields the human filled
+        for k in primary_keys:
+            if k in t:
+                val = t[k]
+                if val in (None, "", []):
+                    lines.append(f"- {k}: (no registrado)")
+                else:
+                    lines.append(f"- {k}: {val}")
+        # Reasoning / explanation text from the strategy detection phase
+        for long_key in ("reasoning", "ai_analysis", "ai_reasoning", "explanation_es"):
+            v = t.get(long_key)
+            if v and isinstance(v, str):
+                # Truncate to keep prompt size bounded.
+                snippet = v if len(v) <= 1500 else (v[:1500] + "...[truncated]")
+                lines.append(f"\n=== {long_key} ===\n{snippet}")
+        # Free-text fields (human-filled notes)
         for note_key in (
-            "trade_summary", "management_notes",
+            "trade_summary", "management_notes", "notes",
             "emotional_notes_pre", "emotional_notes_during", "emotional_notes_post",
         ):
             v = t.get(note_key)

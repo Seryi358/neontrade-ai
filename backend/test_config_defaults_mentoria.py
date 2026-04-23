@@ -10,6 +10,38 @@ import pytest
 from config import settings, TRADING_PROFILES
 
 
+@pytest.fixture(autouse=True)
+def restore_mutable_defaults():
+    """Snapshot-and-restore the mutable settings this file asserts on.
+
+    `scalping_enabled`, `trading_style`, `swing_for_equities`,
+    `auto_asr_enabled` and `self_improvement_tuning_mode` are touched
+    (directly or via mocks that leak) by other test files. Without
+    this fixture the test-order dictates whether assertions about
+    default values pass.
+    """
+    snap = {
+        "scalping_enabled": settings.scalping_enabled,
+        "trading_style": settings.trading_style,
+        "swing_for_equities": getattr(settings, "swing_for_equities", False),
+        "auto_asr_enabled": getattr(settings, "auto_asr_enabled", False),
+        "self_improvement_tuning_mode": getattr(settings, "self_improvement_tuning_mode", "off"),
+        "discretion_pct": settings.discretion_pct,
+        "position_management_style": settings.position_management_style,
+    }
+    # Reset to the Pydantic-declared defaults at the top of each test so
+    # assertions are independent of whatever prior tests left behind.
+    settings.scalping_enabled = False
+    settings.trading_style = "day_trading"
+    settings.swing_for_equities = False
+    settings.auto_asr_enabled = False
+    settings.self_improvement_tuning_mode = "off"
+    yield
+    # Put whatever was there back — don't overwrite other tests' state.
+    for k, v in snap.items():
+        setattr(settings, k, v)
+
+
 class TestTradingStyle:
     def test_trading_style_is_day_trading(self):
         assert settings.trading_style == "day_trading"

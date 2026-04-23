@@ -2447,7 +2447,13 @@ async def get_trade_screenshots(trade_id: str):
 
 
 @router.post("/screenshots/{trade_id}/regenerate")
-async def regenerate_trade_screenshots(trade_id: str):
+async def regenerate_trade_screenshots(
+    trade_id: str,
+    strategy: Optional[str] = Query(None, description="Override strategy label (e.g. BLACK/BLUE_A)"),
+    original_sl: Optional[float] = Query(None, description="Override SL used for R:R calc (useful when position is now at BE)"),
+    original_tp: Optional[float] = Query(None, description="Override TP1 for R:R calc"),
+    original_tp_max: Optional[float] = Query(None, description="Override TP_max line on chart"),
+):
     """Regenerate the open + close screenshots for an existing trade with the
     current screenshot_generator (fresh broker candles + correct strategy
     name). Old screenshots are kept; new ones are appended to the
@@ -2503,7 +2509,8 @@ async def regenerate_trade_screenshots(trade_id: str):
                     if not record.get("result") and t.get("result"):
                         record["result"] = t["result"]
                 break
-    # Fallback to live open positions
+    # Fallback to live open positions — prefer original_sl over current_sl
+    # so the R:R label is meaningful even when a trade is already at BE.
     if record is None and hasattr(engine, 'position_manager'):
         pos = engine.position_manager.positions.get(trade_id)
         if pos is not None:
@@ -2514,8 +2521,9 @@ async def regenerate_trade_screenshots(trade_id: str):
                 "strategy": getattr(pos, "strategy_variant", None) or "UNKNOWN",
                 "entry_price": pos.entry_price,
                 "exit_price": None,
-                "sl": pos.current_sl or pos.original_sl,
+                "sl": pos.original_sl or pos.current_sl,
                 "tp": pos.take_profit_1,
+                "tp_max": pos.take_profit_max,
                 "pnl_dollars": 0,
                 "pnl_pct": 0,
                 "result": "OPEN",
@@ -2523,12 +2531,24 @@ async def regenerate_trade_screenshots(trade_id: str):
     if record is None:
         raise HTTPException(404, f"Trade {trade_id} not found")
 
+    # Apply operator overrides. Useful for retrofilling mentorship-exam
+    # screenshots when the live record lost strategy/sl/tp during a restart.
+    if strategy is not None:
+        record["strategy"] = strategy
+    if original_sl is not None:
+        record["sl"] = original_sl
+    if original_tp is not None:
+        record["tp"] = original_tp
+    if original_tp_max is not None:
+        record["tp_max"] = original_tp_max
+
     inst = record["instrument"]
     direction = record["direction"]
     strategy = record.get("strategy") or "UNKNOWN"
     entry = record.get("entry_price") or 0
     sl = record.get("sl") or 0
     tp1 = record.get("tp") or 0
+    tp_max = record.get("tp_max")
     exit_price = record.get("exit_price")
     pnl_pct = record.get("pnl_pct") or 0
 
@@ -2557,7 +2577,7 @@ async def regenerate_trade_screenshots(trade_id: str):
             entry_price=entry,
             sl=sl,
             tp1=tp1,
-            tp_max=None,
+            tp_max=tp_max,
             strategy=strategy,
             confidence=1.0,
             candles=candles,

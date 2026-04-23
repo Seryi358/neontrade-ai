@@ -2006,6 +2006,12 @@ class TradingEngine:
 
         for instrument in batch:
             try:
+                # Skip instruments that the broker can't resolve (saves ~4 wasted
+                # API calls per scan cycle on each broken epic — 10+ indices were
+                # returning 404 every cycle before this guard).
+                if hasattr(self.broker, "is_blocklisted") and self.broker.is_blocklisted(instrument):
+                    continue
+
                 # Check if we can take more risk
                 style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
                 current_style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)

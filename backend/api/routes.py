@@ -182,6 +182,13 @@ async def run_diagnostic():
             "failure_count": broker_circuit_breaker._failure_count,
             "threshold": broker_circuit_breaker.failure_threshold,
         },
+        # Instruments the broker rejected during warm_epic_cache. The scan
+        # loop skips these so they don't waste 4 API calls/cycle each.
+        "epic_blocklist": (
+            broker.get_epic_blocklist()
+            if hasattr(broker, "get_epic_blocklist")
+            else []
+        ),
         "steps": [],
     }
     if results["broker_type"]:

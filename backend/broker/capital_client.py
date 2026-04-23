@@ -107,6 +107,12 @@ class CapitalClient(BaseBroker):
 
         # Instrument epic cache (our_name -> capital_epic)
         self._epic_cache: Dict[str, str] = {}
+        # Set of instruments that failed to resolve to a valid epic during
+        # warm_epic_cache (e.g. 404 from Capital.com search or no candidate
+        # passed the strict matching heuristic). The trading engine consults
+        # `is_blocklisted` so the scan loop skips them entirely instead of
+        # wasting 4 API calls per cycle on each one.
+        self._epic_blocklist: set = set()
 
     # ── Session Management ────────────────────────────────────────
 
@@ -670,18 +676,43 @@ class CapitalClient(BaseBroker):
     async def warm_epic_cache(self, instruments: List[str]) -> None:
         """Pre-resolve all instrument epics with throttling.
         Call this BEFORE the initial scan to avoid burst API calls
-        from interleaved search + candle requests."""
-        uncached = [i for i in instruments if i not in self._epic_cache]
+        from interleaved search + candle requests.
+
+        Side-effect: instruments that fail to resolve (404 from search, or no
+        candidate passed `_epic_matches_instrument`) are added to
+        `self._epic_blocklist` so the scan loop can skip them entirely.
+        """
+        uncached = [i for i in instruments if i not in self._epic_cache and i not in self._epic_blocklist]
         if not uncached:
             return
         logger.info(f"Warming epic cache for {len(uncached)} instruments...")
         for inst in uncached:
             try:
-                await self._resolve_epic(inst)
+                resolved = await self._resolve_epic(inst)
+                # _resolve_epic returns the epic_guess on failure WITHOUT caching it,
+                # so an entry in the cache means resolution succeeded.
+                if inst not in self._epic_cache:
+                    self._epic_blocklist.add(inst)
+                    logger.warning(
+                        f"Epic warmup blocklisted {inst!r}: no valid epic resolved "
+                        f"(guessed {resolved!r}; instrument will be skipped in scans)"
+                    )
             except Exception as e:
+                self._epic_blocklist.add(inst)
                 logger.debug(f"Epic warmup failed for {inst}: {e}")
             await asyncio.sleep(0.5)
-        logger.info(f"Epic cache warmed: {len(self._epic_cache)} instruments cached")
+        logger.info(
+            f"Epic cache warmed: {len(self._epic_cache)} cached, "
+            f"{len(self._epic_blocklist)} blocklisted"
+        )
+
+    def is_blocklisted(self, instrument: str) -> bool:
+        """True if ``instrument`` failed to resolve and should be skipped in scans."""
+        return instrument in self._epic_blocklist
+
+    def get_epic_blocklist(self) -> List[str]:
+        """Snapshot of currently blocklisted instruments (for /diagnostic, /watchlist endpoints)."""
+        return sorted(self._epic_blocklist)
 
     def _denormalize_instrument(self, epic: str) -> str:
         """Convert Capital.com epic back to our format (e.g., EURUSD -> EUR_USD)."""

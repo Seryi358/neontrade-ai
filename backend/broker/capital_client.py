@@ -541,31 +541,30 @@ class CapitalClient(BaseBroker):
     # ($21 instead of $200+), and various commodities to decimal-shifted
     # decoys. Add entries here as they are confirmed against Capital.com.
     _EPIC_MAP_OVERRIDE: Dict[str, str] = {
-        # Energies / commodities — Capital.com epics
+        # Energies / commodities — Capital.com epics (verified live 2026-04-22).
         "BCO_USD":     "OIL_BRENT",     # Brent crude
         "WTICO_USD":   "OIL_CRUDE",     # WTI crude
         "NATGAS_USD":  "NATURALGAS",
         "WHEAT_USD":   "WHEAT",
         "CORN_USD":    "CORN",
         "SOYBN_USD":   "SOYBEAN",
-        "SUGAR_USD":   "SUGAR",
+        # SUGAR_USD removed: probe rejected "SUGAR" — Capital.com does not
+        # offer it under that epic. Search heuristic will blocklist instead.
         "XAU_USD":     "GOLD",
         "XAG_USD":     "SILVER",
         "XPT_USD":     "PLATINUM",
         "XPD_USD":     "PALLADIUM",
         "XCU_USD":     "COPPER",
-        # Indices — common Capital.com aliases
+        # Indices — only the verified ones remain. NAS100/US2000/DE30/FR40/CN50
+        # were guesses (USTEC/RUSSELL/GERMANY40/FRANCE40/CHINA50) and the probe
+        # rejected them. The search heuristic will auto-blocklist if Capital.com
+        # doesn't offer them at all.
         "US30_USD":    "US30",
-        "US2000_USD":  "RUSSELL",
-        "NAS100_USD":  "USTEC",
         "SPX500_USD":  "US500",
-        "DE30_EUR":    "GERMANY40",
-        "FR40_EUR":    "FRANCE40",
         "UK100_GBP":   "UK100",
         "JP225_USD":   "J225",
         "AU200_AUD":   "AU200",
         "HK33_HKD":    "HK50",
-        "CN50_USD":    "CHINA50",
         # NOTE: the 17 US share ETFs (BITO/CGC/GBTC/IGV/IHAK/IZRL/KBE/KRBN/
         # MSOS/NERD/POTX/PPA/PRNT/PSJ/PXQ/VFF/YEXT) were tentatively mapped
         # to their ticker literals but live tests on 2026-04-22 returned

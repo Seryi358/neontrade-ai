@@ -85,11 +85,24 @@ Atlas detectó setup BLACK válido cumpliendo los 7 pasos:
 **Confianza final:** 100% (HTF score 75 + confluence +5 puntos)
 **Sesgo HTF:** ALCISTA → SELL contra-tendencia (esperado en BLACK, no contradicción)
 
-### Análisis post-mortem AutoASR (GPT-4o)
+### Análisis post-mortem AutoASR (GPT-4o Vision)
 
-> "Es importante revisar si se siguieron todos los pasos del plan de trading, independientemente del resultado."
+| Dimensión | Evaluación | Justificación |
+|---|---|---|
+| HTF correcto | ✅ Sí | Bias alcista HTF detectado correctamente |
+| LTF correcto | ❌ No | Señal de entrada LTF no fue clara |
+| Strategy correcta | ✅ Sí | BLACK era la adecuada para contexto contra-tendencia |
+| SL correcto | ✅ Sí | En $314.62 encima del máximo previo (regla BLACK) |
+| TP correcto | ✅ Sí | En EMA 50 4H ($308.29), mentoría compliance |
+| Management | _(insuficiente data para evaluar)_ | |
+| ¿Volvería a entrar? | ❌ No | El LTF no daba señal suficientemente clara |
+| **Error type** | **PERCEPTION** | Lectura apresurada del LTF |
 
-Resultado: SL hit por mean-reversion intradía. La gestión 50%-half-risk movió SL de $314.62 → $313.76 al primer dip a $311.22 (correcto per plan), pero el rebote subsecuente lo tagged. Es el modo de fallo conocido del trailing tight en mercado lateral. **Ejecución correcta per plan; resultado adverso por probabilidad.**
+**Lecciones (GPT-4o sobre screenshot + plan):**
+
+> "El análisis HTF fue correcto, pero la señal de entrada en el LTF no fue clara. Es crucial esperar una confirmación más sólida antes de entrar. Asegúrate de que todas las condiciones de entrada estén alineadas con la estrategia BLACK."
+
+**Conclusión**: Aunque el SL y TP siguieron las reglas de BLACK, la señal LTF era débil. La gestión 50%-half-risk cut funcionó correctamente (SL movido $314.62 → $313.76 al dip a $311.22) pero el rebote tagged el SL apretado. Este es el modo de fallo típico del trailing tight en mercado lateral. La lección principal: el análisis HTF puede ser correcto pero si el LTF no confirma con claridad, es mejor esperar. **Ejecución parcial per plan (SL/TP OK); entrada apresurada per el análisis AI post-mortem.**
 
 ### Screenshots
 

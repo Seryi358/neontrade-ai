@@ -297,14 +297,50 @@ async def get_mode():
 
 @router.post("/mode")
 async def set_mode(request: TradingModeRequest):
-    """Switch between AUTO and MANUAL trading modes."""
+    """Switch between AUTO and MANUAL trading modes.
+
+    Persists the choice to ``data/risk_config.json`` so it survives container
+    restarts (added 2026-04-22 after a redeploy reverted Sergio's AUTO mode
+    silently — _load_risk_overrides now also applies engine_mode at startup).
+    """
     from main import engine
+    from config import settings as _s
     mode_upper = request.mode.upper()
     if mode_upper not in ("AUTO", "MANUAL"):
         raise HTTPException(400, "Mode must be 'AUTO' or 'MANUAL'")
 
     if hasattr(engine, 'set_mode'):
         engine.set_mode(mode_upper)
+    _s.engine_mode = mode_upper
+
+    # Persist to risk_config.json (atomic, preserves other keys)
+    import json, os, tempfile
+    _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    risk_path = os.path.join(_backend_dir, "data", "risk_config.json")
+    overrides: dict = {}
+    if os.path.exists(risk_path):
+        try:
+            with open(risk_path) as f:
+                overrides = json.load(f)
+            if not isinstance(overrides, dict):
+                overrides = {}
+        except Exception as e:
+            logger.warning(f"risk_config.json unreadable ({e}); aborting mode save")
+            raise HTTPException(500, "Config file corrupted — manual fix required before saving")
+    overrides["engine_mode"] = mode_upper
+    os.makedirs(os.path.dirname(risk_path), exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(risk_path), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(overrides, f, indent=2)
+        os.replace(tmp_path, risk_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
     return {
         "mode": mode_upper,
         "message": "Modo cambiado a AUTOMÁTICO" if mode_upper == "AUTO"

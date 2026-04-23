@@ -423,6 +423,29 @@ async def get_positions():
     return status["positions"]
 
 
+@router.post("/positions/sync")
+async def sync_positions_from_broker():
+    """Force a reconciliation between broker open trades and local
+    position_manager state. Useful when the engine is paused (out-of-hours)
+    but the broker still holds positions, or after a redeploy that lost
+    in-memory state. Returns the position list AFTER the sync.
+    """
+    from main import engine
+    if engine is None or not hasattr(engine, "_sync_positions_from_broker"):
+        raise HTTPException(503, "Engine not ready for sync")
+    try:
+        await engine._sync_positions_from_broker()
+    except Exception as e:
+        logger.error(f"Manual position sync failed: {e}")
+        raise HTTPException(500, f"Sync failed: {e}")
+    status = engine.get_status()
+    return {
+        "status": "synced",
+        "open_positions": len(status["positions"]),
+        "positions": status["positions"],
+    }
+
+
 # ── Analysis & Explanations ──────────────────────────────────────
 
 # RT-12 fix: literal /analysis MUST come before parameterized /analysis/{instrument}

@@ -566,6 +566,29 @@ class CapitalClient(BaseBroker):
         "AU200_AUD":   "AU200",
         "HK33_HKD":    "HK50",
         "CN50_USD":    "CHINA50",
+        # US share ETFs whose Capital.com search returned ambiguous matches
+        # (added 2026-04-22). For most US-listed ETFs the broker epic is
+        # literally the ticker, so we lock them in here. If a particular
+        # epic ends up wrong, remove the entry and the existing strict
+        # `_epic_matches_instrument` heuristic will reject bad alternatives
+        # rather than silently rerouting.
+        "BITO":        "BITO",
+        "CGC":         "CGC",
+        "GBTC":        "GBTC",
+        "IGV":         "IGV",
+        "IHAK":        "IHAK",
+        "IZRL":        "IZRL",
+        "KBE":         "KBE",
+        "KRBN":        "KRBN",
+        "MSOS":        "MSOS",
+        "NERD":        "NERD",
+        "POTX":        "POTX",
+        "PPA":         "PPA",
+        "PRNT":        "PRNT",
+        "PSJ":         "PSJ",
+        "PXQ":         "PXQ",
+        "VFF":         "VFF",
+        "YEXT":        "YEXT",
     }
 
     @staticmethod

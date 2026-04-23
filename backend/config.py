@@ -86,7 +86,10 @@ class Settings(BaseSettings):
     # Default values mirror the historical behaviour but can be overridden
     # at runtime via the matching API endpoints — and crucially they now
     # round-trip through the JSON file instead of being lost on redeploy.
-    engine_mode: str = "MANUAL"   # AUTO|MANUAL — overridden by data/risk_config.json
+    # Default AUTO so fresh deploys don't silently revert Sergio's preferred
+    # mode; runtime override via POST /mode persists to risk_config.json and
+    # wins on the next startup.
+    engine_mode: str = "AUTO"     # AUTO|MANUAL — overridden by data/risk_config.json
     enabled_strategies: dict = {}  # legacy slot; engine still owns its own JSON
 
     # Self-Improvement Loop — Phase 1 (auto-ASR after every closed trade).
@@ -97,6 +100,16 @@ class Settings(BaseSettings):
     # Tuning proposals (Phase 2) are NOT in this MVP and are gated separately.
     auto_asr_enabled: bool = False
     auto_asr_model: str = "gpt-4o"
+
+    # Phase 2 of self-improvement loop: TuningEngine emits parameter-change
+    # proposals based on aggregated stats. "off" disables (default), "proposals"
+    # creates proposals + email notification only, "auto" auto-applies SAFE-tier
+    # changes after a 24h grace window. MODERATE/DRASTIC tiers always require
+    # explicit approval via /self-improvement/proposals/{id}/approve.
+    self_improvement_tuning_mode: str = "off"
+    # Min closed trades before TuningEngine emits anything (avoids overfitting
+    # on tiny samples).
+    self_improvement_min_trades: int = 10
 
     # Per-asset-class style override (added 2026-04-22 after mentoría audit C1).
     # Alex (`Watchlist para Acciones`): "yo hago swing trading en acciones, y
@@ -667,6 +680,12 @@ def _load_risk_overrides():
         "engine_mode",                   # "AUTO" | "MANUAL"
         "enabled_strategies",            # dict[str, bool]
         "trading_style",                 # "day_trading" | "swing" | "scalping"
+        # Self-Improvement persisted toggles (Phase 5 — 2026-04-22)
+        "auto_asr_enabled",              # bool — fire AutoASR after each close
+        "auto_asr_model",                # str — gpt-4o by default
+        "swing_for_equities",            # bool — route equities through SWING
+        "self_improvement_tuning_mode",  # "off" | "proposals" | "auto"
+        "max_trades_per_day",            # int 0..10
     }
     # Range validation — must match the API endpoint constraints (routes.py PUT /risk-config)
     _RANGE_CHECKS = {
@@ -720,6 +739,18 @@ def _load_risk_overrides():
                         continue
                 elif key == "trading_style":
                     if value not in ("day_trading", "swing", "scalping"):
+                        continue
+                elif key in ("auto_asr_enabled", "swing_for_equities"):
+                    if not isinstance(value, bool):
+                        continue
+                elif key == "auto_asr_model":
+                    if not isinstance(value, str) or not value:
+                        continue
+                elif key == "self_improvement_tuning_mode":
+                    if value not in ("off", "proposals", "auto"):
+                        continue
+                elif key == "max_trades_per_day":
+                    if not isinstance(value, int) or value < 0 or value > 10:
                         continue
                 setattr(settings, key, value)
         except Exception as e:

@@ -2055,6 +2055,132 @@ async def trigger_auto_asr(trade_id: str):
     }
 
 
+@router.post("/self-improvement/config")
+async def update_self_improvement_config(
+    auto_asr_enabled: Optional[bool] = None,
+    auto_asr_model: Optional[str] = None,
+    swing_for_equities: Optional[bool] = None,
+    self_improvement_tuning_mode: Optional[str] = None,
+):
+    """Mutate self-improvement runtime toggles and persist them so they
+    survive container restarts. Each field is optional; only provided
+    fields are touched. ``self_improvement_tuning_mode`` accepts
+    ``off`` | ``proposals`` | ``auto``.
+    """
+    from config import settings as _s
+    updates: Dict[str, object] = {}
+    if auto_asr_enabled is not None:
+        updates["auto_asr_enabled"] = bool(auto_asr_enabled)
+    if auto_asr_model is not None:
+        if not auto_asr_model:
+            raise HTTPException(400, "auto_asr_model cannot be empty")
+        updates["auto_asr_model"] = str(auto_asr_model)
+    if swing_for_equities is not None:
+        updates["swing_for_equities"] = bool(swing_for_equities)
+    if self_improvement_tuning_mode is not None:
+        if self_improvement_tuning_mode not in ("off", "proposals", "auto"):
+            raise HTTPException(400, "tuning_mode must be off|proposals|auto")
+        updates["self_improvement_tuning_mode"] = self_improvement_tuning_mode
+    if not updates:
+        raise HTTPException(400, "No fields provided")
+
+    # Apply in-memory + persist to risk_config.json
+    import json, os, tempfile
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    risk_path = os.path.join(backend_dir, "data", "risk_config.json")
+    overrides: dict = {}
+    if os.path.exists(risk_path):
+        try:
+            with open(risk_path) as f:
+                overrides = json.load(f)
+            if not isinstance(overrides, dict):
+                overrides = {}
+        except Exception as e:
+            raise HTTPException(500, f"risk_config.json corrupted: {e}")
+    for k, v in updates.items():
+        setattr(_s, k, v)
+        overrides[k] = v
+    os.makedirs(os.path.dirname(risk_path), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(risk_path), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(overrides, f, indent=2)
+        os.replace(tmp, risk_path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+    return {"status": "updated", "applied": updates}
+
+
+@router.get("/self-improvement/proposals")
+async def list_tuning_proposals(status: Optional[str] = None):
+    """List tuning proposals. Optional filter by status."""
+    from core.self_improvement import ProposalStore
+    store = ProposalStore()
+    return [p.to_dict() for p in store.list_all(status=status)]
+
+
+@router.post("/self-improvement/proposals/{proposal_id}/approve")
+async def approve_tuning_proposal(proposal_id: str):
+    """Approve and apply a pending tuning proposal."""
+    from core.self_improvement import ProposalStore, apply_proposal
+    from main import engine
+    from config import settings as _s
+    store = ProposalStore()
+    proposal = store.get(proposal_id)
+    if proposal is None:
+        raise HTTPException(404, "Proposal not found")
+    if proposal.status != "pending":
+        raise HTTPException(400, f"Proposal is {proposal.status}, only pending can be approved")
+    persist = engine._make_tuning_persist_fn() if hasattr(engine, "_make_tuning_persist_fn") else None
+    if persist is None:
+        raise HTTPException(503, "Engine not ready to apply proposal")
+    if not apply_proposal(_s, proposal, persist):
+        raise HTTPException(500, "Failed to apply proposal")
+    store._save()
+    return proposal.to_dict()
+
+
+@router.post("/self-improvement/proposals/{proposal_id}/reject")
+async def reject_tuning_proposal(proposal_id: str):
+    """Reject a pending proposal (no mutation, just marks rejected)."""
+    from core.self_improvement import ProposalStore
+    store = ProposalStore()
+    proposal = store.get(proposal_id)
+    if proposal is None:
+        raise HTTPException(404, "Proposal not found")
+    if proposal.status != "pending":
+        raise HTTPException(400, f"Proposal is {proposal.status}")
+    proposal.status = "rejected"
+    store._save()
+    return proposal.to_dict()
+
+
+@router.post("/self-improvement/proposals/{proposal_id}/rollback")
+async def rollback_tuning_proposal(proposal_id: str):
+    """Restore the original value of an already-applied proposal."""
+    from core.self_improvement import ProposalStore, rollback_proposal
+    from main import engine
+    from config import settings as _s
+    store = ProposalStore()
+    proposal = store.get(proposal_id)
+    if proposal is None:
+        raise HTTPException(404, "Proposal not found")
+    if proposal.status != "applied":
+        raise HTTPException(400, f"Proposal is {proposal.status}, only applied can be rolled back")
+    persist = engine._make_tuning_persist_fn() if hasattr(engine, "_make_tuning_persist_fn") else None
+    if persist is None:
+        raise HTTPException(503, "Engine not ready to rollback proposal")
+    if not rollback_proposal(_s, proposal, persist):
+        raise HTTPException(500, "Failed to rollback proposal")
+    store._save()
+    return proposal.to_dict()
+
+
 @router.get("/self-improvement/status")
 async def self_improvement_status():
     """Report whether self-improvement features are wired up and enabled."""
@@ -2068,6 +2194,9 @@ async def self_improvement_status():
         "trade_journal_ready": (engine is not None and engine.trade_journal is not None),
         "swing_for_equities": getattr(_s, "swing_for_equities", False),
         "equities_correlation_groups_count": len(getattr(_s, "equities_correlation_groups", [])),
+        "tuning_mode": getattr(_s, "self_improvement_tuning_mode", "off"),
+        "tuning_min_trades": getattr(_s, "self_improvement_min_trades", 10),
+        "engine_mode_default": getattr(_s, "engine_mode", "AUTO"),
     }
 
 

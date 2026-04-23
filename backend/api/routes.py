@@ -1028,6 +1028,55 @@ async def get_candles(
         raise HTTPException(500, f"Error al obtener velas: {error_msg}")
 
 
+@router.get("/admin/search-markets")
+async def admin_search_markets(term: str, limit: int = 20):
+    """Search Capital.com's market catalog by free-text term. Used to
+    research the correct epic for blocklisted instruments — e.g. Capital.com
+    offers a "Nasdaq 100" epic under "US100" not "USTEC".
+
+    Returns lightweight market records (epic, name, type, bid, offer) so the
+    operator can visually pick the right one and update
+    ``_EPIC_MAP_OVERRIDE``. This endpoint is authenticated via the standard
+    X-API-Key so only Sergio can hit it.
+    """
+    from main import engine
+    broker = engine.broker
+    try:
+        data = await broker._get("/api/v1/markets", params={"searchTerm": term, "limit": limit})
+    except Exception as e:
+        raise HTTPException(500, f"Search failed: {e}")
+    markets = data.get("markets", [])
+    return [
+        {
+            "epic": m.get("epic"),
+            "name": m.get("instrumentName"),
+            "type": m.get("instrumentType"),
+            "symbol": m.get("symbol"),
+            "bid": m.get("bid"),
+            "offer": m.get("offer"),
+            "streaming": m.get("streamingPricesAvailable"),
+            "market_status": m.get("marketStatus"),
+            "expiry": m.get("expiry"),
+        }
+        for m in markets
+    ]
+
+
+@router.post("/admin/blocklist/remove")
+async def admin_unblocklist(instrument: str):
+    """Remove an instrument from the in-memory epic blocklist. Use after
+    adding a correct override so `_resolve_epic` can re-cache cleanly.
+    Does NOT clear the cache — that happens on the next resolution."""
+    from main import engine
+    broker = engine.broker
+    if not hasattr(broker, "_epic_blocklist"):
+        raise HTTPException(503, "Broker does not expose blocklist")
+    existed = instrument in broker._epic_blocklist
+    broker._epic_blocklist.discard(instrument)
+    broker._epic_cache.pop(instrument, None)
+    return {"instrument": instrument, "was_blocklisted": existed, "cleared": True}
+
+
 @router.get("/price/{instrument}")
 async def get_price(instrument: str):
     """Get current bid/ask price for an instrument."""

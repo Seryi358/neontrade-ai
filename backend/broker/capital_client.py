@@ -1429,7 +1429,14 @@ class CapitalClient(BaseBroker):
             return False
 
     async def close_trade(self, trade_id: str) -> bool:
-        """Close a specific position."""
+        """Close a specific position.
+
+        Capital.com may reject with 400 when the underlying market is closed
+        (equities outside NYSE hours) or when the position is in a transient
+        closing state. The response body contains the actual reason
+        ("MARKET_OFFERS_CLOSED", "POSITION_CLOSING", ...). Surface it in the
+        log so we don't re-spam the API pointlessly.
+        """
         try:
             await self._delete(f"/api/v1/positions/{trade_id}")
             logger.info(f"Position {trade_id} closed")
@@ -1438,10 +1445,20 @@ class CapitalClient(BaseBroker):
             if e.response.status_code == 404:
                 logger.info(f"Trade {trade_id} already closed (404)")
                 return True
-            logger.error(f"Failed to close position {trade_id}: {e}")
+            body = ""
+            try:
+                body = e.response.text[:300]
+            except Exception:
+                pass
+            logger.error(
+                f"Failed to close position {trade_id}: {e.response.status_code} {body}"
+            )
             return False
         except Exception as e:
-            logger.error(f"Failed to close position {trade_id}: {e}")
+            # Our retry wrapper raises a plain Exception with the status code
+            # + body baked into the message for 4xx short-circuits.
+            msg = str(e)
+            logger.error(f"Failed to close position {trade_id}: {msg[:300]}")
             return False
 
     # ── Instrument Info ──────────────────────────────────────────

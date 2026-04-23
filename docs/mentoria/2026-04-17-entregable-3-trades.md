@@ -114,9 +114,9 @@ Atlas detectó setup BLACK válido cumpliendo los 7 pasos:
 
 ---
 
-## Trade 2 — BAC SELL (BLACK) — Aún abierta en BREAK_EVEN
+## Trade 2 — BAC SELL (BLACK) — CERRADA con profit
 
-**Fecha/hora UTC:** 2026-04-22T14:24:15 (abierta hace ~13h, sigue activa)
+**Fecha/hora UTC:** 2026-04-22T14:24:15 → 2026-04-23T09:02:05 (18h 38min)
 **Trade ID:** `00002043-0001-54c4-0000-000080e404b8`
 
 | Campo | Valor |
@@ -125,32 +125,53 @@ Atlas detectó setup BLACK válido cumpliendo los 7 pasos:
 | Strategy | **BLACK** (Anticipación Contratendencia) |
 | Direction | SELL (contratendencia vs HTF bullish) |
 | Entry | $53.42 |
-| SL inicial | $53.787 (encima máximo previo) |
-| SL actual | **$53.42** (movido a BE — mentoría) |
+| SL inicial | $53.787 (encima máximo previo, 0.2% buffer) |
 | TP1 | $52.67 (EMA 50 4H con offset 93%) |
 | Size | 8 unidades |
-| Risk | $2.94 inicial, **$0 actual** (BE) |
-| R:R | 2.04:1 |
-| Estado | OPEN, fase BREAK_EVEN, unrealized +$0.56 |
+| Risk inicial | $2.94 (~1% de $190) |
+| R:R | 2.04:1 (≥ 2.0 mínimo BLACK) |
+| **Exit** | **$53.03** (broker close externo, extended hours) |
+| **Resultado** | **closed_external +$3.12 (+1.63%)** |
 
 ### Por qué se ejecutó (BLACK strategy compliance)
 
-Setup BLACK abierto 1h ANTES que JPM en setup similar (US banks, sector correlation). Antes del fix del audit 2026-04-22, el filtro de correlación NO existía para equities → ambos trades abrieron al 1% (debió ser 0.75% c/u). **Bug ya corregido**: `equities_correlation_groups` ahora incluye `["JPM","BAC","GS","MS","WFC","C"]` agrupados.
+Setup BLACK abierto 1h ANTES que JPM en setup similar (ambos US banks, correlación sectorial). Antes del fix del audit 2026-04-22, no había filtro `equities_correlation_groups` → ambos abrieron al 1% c/u (debió ser 0.75% c/u per mentoría). **Bug corregido post-trade**.
 
-### Gestión activa de la posición
+### Gestión de la posición (lifecycle completo)
 
-Post-entry, precio cayó favorable a $53.04 → engine activó:
-1. **SL_MOVED** (15:30 UTC): SL tightened de $53.787 a $53.51 (50% risk cut)
-2. **BREAK_EVEN** (16:00+ UTC): SL movido a entrada $53.42
+1. **14:24 UTC 22-abr**: Entry SELL @$53.42, SL $53.787
+2. **15:30 UTC 22-abr**: Phase `SL_MOVED` — 50% risk cut aplicado, SL tightened a $53.51
+3. **16:00+ UTC 22-abr**: Phase `BREAK_EVEN` — SL movido a entrada $53.42 (pct_to_tp1 0.50 alcanzado)
+4. **21:00 UTC 22-abr**: Engine paused out_of_hours
+5. **07:00 UTC 23-abr**: Engine reanudó scans
+6. **06:17-06:28 UTC 23-abr**: Engine intentó cerrar 3× via emergency exit — **broker rechazó 400** (NYSE cerrado, no se puede cerrar equity fuera de horas)
+7. **09:02:05 UTC 23-abr**: Broker cerró externamente @$53.03 (probablemente extended hours o stop automatic) con **+$3.12 profit (+1.63%)**
 
-**Estado actual:** posición protegida, sin riesgo de pérdida. Esperando ruptura de swing para activar trailing per gate de mentoría ("hasta que no se rompa este máximo anterior, no vamos a utilizar trailing").
+### Análisis post-mortem AutoASR (GPT-4o Vision)
+
+| Dimensión | Evaluación | Justificación |
+|---|---|---|
+| HTF correcto | ✅ Sí | Contexto bajista HTF alineado con SELL contra-tendencia |
+| LTF correcto | ❌ No | La señal de entrada LTF no era clara suficiente |
+| Strategy correcta | ✅ Sí | BLACK era adecuada para contexto |
+| SL correcto | ❌ No | No en el lugar ideal según reglas BLACK estrictas |
+| TP correcto | ✅ Sí | En EMA 50 4H |
+| ¿Volvería a entrar? | ❌ No | Entrada apresurada |
+| **Error type** | **PERCEPTION** | Lectura apresurada del LTF |
+
+**Lecciones (GPT-4o):**
+
+> "Es importante asegurarse de que haya una señal clara de entrada antes de ejecutar un trade, incluso si la estructura parece buena. Revisar la colocación del SL para que esté correctamente alineado con la estrategia BLACK."
+
+**Conclusión**: Trade ganador (+$3.12) pero **ejecución imperfecta**. La suerte jugó a favor esta vez — el broker cerró extended hours en precio favorable. Según el plan: HTF era bueno pero LTF entry débil. La lección de Alex aplica: *"correcto o incorrecto no viene relacionado con el resultado del trade"* — este trade ganó dinero pero el AI identifica que la entrada fue apresurada (error PERCEPTION). En otro contexto habría podido perder.
 
 ### Screenshots
 
 **OPEN:**
 ![Trade 2 BAC OPEN](screenshots/trade_2_bac_open.png)
 
-**CLOSE:** _(pendiente — trade aún abierto)_
+**CLOSE:**
+![Trade 2 BAC CLOSE](screenshots/trade_2_bac_close.png)
 
 ---
 

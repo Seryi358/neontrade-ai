@@ -888,7 +888,7 @@ class CapitalClient(BaseBroker):
             balance=balance,
             equity=balance + pnl,
             unrealized_pnl=pnl,
-            margin_used=deposit,
+            margin_used=max(0.0, balance - available),
             margin_available=available,
             open_trade_count=open_count,
             currency=acct.get("currency", "USD"),

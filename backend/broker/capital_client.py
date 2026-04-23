@@ -777,25 +777,23 @@ class CapitalClient(BaseBroker):
                         f"(guessed {resolved!r}; instrument will be skipped in scans)"
                     )
                 else:
-                    # Validate that the cached epic actually exists on the broker.
-                    # Required for `_EPIC_MAP_OVERRIDE` entries — search-resolved
-                    # epics are already validated by their search response, but
-                    # override map entries skip search entirely and would
-                    # silently route to a non-existent epic on a wrong guess.
+                    # Validate the cached epic against expected price range
+                    # whenever we have one. Required for `_EPIC_MAP_OVERRIDE`
+                    # entries (which skip search entirely) AND for search-
+                    # resolved epics that match a token of a different market
+                    # (e.g. XCU_USD -> some \$0.15 forex cross via the strict
+                    # filter accepting a non-copper match).
                     cached_epic = self._epic_cache[inst]
-                    if cached_epic == self._EPIC_MAP_OVERRIDE.get(inst):
+                    price_range = self._EXPECTED_PRICE_RANGES.get(inst)
+                    if price_range is not None:
                         await asyncio.sleep(0.2)
-                        # Pass an expected price range when known so a name
-                        # collision (e.g. COPPER -> COP/PER currency cross) is
-                        # caught even if the epic technically exists.
-                        price_range = self._EXPECTED_PRICE_RANGES.get(inst)
                         if not await self._probe_epic(cached_epic, expected_range=price_range):
                             del self._epic_cache[inst]
                             self._epic_blocklist.add(inst)
                             logger.warning(
-                                f"Epic warmup blocklisted {inst!r}: override "
-                                f"{cached_epic!r} failed probe (existence + price "
-                                f"sanity) — remove from _EPIC_MAP_OVERRIDE or fix"
+                                f"Epic warmup blocklisted {inst!r}: cached epic "
+                                f"{cached_epic!r} bid is outside expected range — "
+                                f"likely a different instrument (collision)"
                             )
             except Exception as e:
                 self._epic_blocklist.add(inst)

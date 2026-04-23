@@ -61,21 +61,20 @@ Instrucciones (Alex Ruiz):
 - error_type: PERCEPTION (leí mal el gráfico), TECHNICAL (apliqué mal una regla),
   ROUTINE (no seguí mi rutina/checklist), EMOTIONAL (revenge/FOMO/miedo).
 
-Devuelve EXACTAMENTE este JSON (sin markdown, sin texto extra):
-{
-  "asr_htf_correct": <bool|null>,
-  "asr_ltf_correct": <bool|null>,
-  "asr_strategy_correct": <bool|null>,
-  "asr_sl_correct": <bool|null>,
-  "asr_tp_correct": <bool|null>,
-  "asr_management_correct": <bool|null>,
-  "asr_would_enter_again": <bool|null>,
-  "asr_lessons": "<string en español, 1-3 frases>",
-  "asr_error_type": "<PERCEPTION|TECHNICAL|ROUTINE|EMOTIONAL|null>"
-}
+Devuelve EXACTAMENTE este JSON (sin markdown, sin texto extra), con todas las
+claves siguientes (usa null cuando no puedas evaluar):
+- asr_htf_correct (bool|null)
+- asr_ltf_correct (bool|null)
+- asr_strategy_correct (bool|null)
+- asr_sl_correct (bool|null)
+- asr_tp_correct (bool|null)
+- asr_management_correct (bool|null)
+- asr_would_enter_again (bool|null)
+- asr_lessons (string en español, 1-3 frases)
+- asr_error_type (string: PERCEPTION | TECHNICAL | ROUTINE | EMOTIONAL | null)
 
 CONTEXTO DEL TRADE:
-{trade_context}
+__TRADE_CONTEXT__
 """
 
 
@@ -108,8 +107,9 @@ class AutoASRGenerator:
         """Generate ASR for a single trade. Best-effort; never raises."""
         trade_id = trade_record.get("trade_id", "unknown")
         try:
-            user_text = ASR_POSTMORTEM_PROMPT.format(
-                trade_context=self._format_trade_context(trade_record),
+            user_text = ASR_POSTMORTEM_PROMPT.replace(
+                "__TRADE_CONTEXT__",
+                self._format_trade_context(trade_record),
             )
             messages, vision_used = self._build_messages(user_text, screenshot_path)
 
@@ -121,6 +121,14 @@ class AutoASRGenerator:
                 max_tokens=600,
             )
             raw = (resp.choices[0].message.content or "").strip()
+            # Defensive: strip ```json fences if the model wraps the response.
+            if raw.startswith("```"):
+                lines = raw.splitlines()
+                if lines and lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                raw = "\n".join(lines).strip()
             data = json.loads(raw)
             asr_fields = self._coerce_asr(data)
 

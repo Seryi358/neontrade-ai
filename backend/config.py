@@ -843,6 +843,40 @@ TRADING_PROFILES = {
             "funded_account_mode": False,
         },
     },
+    "micro_capital": {
+        "name": "Micro Capital (<= $300)",
+        "description": "Cuenta micro: solo majors + top crypto + oro. Day Trading, scalping OFF, max 1 setup en warmup. Evita instrumentos donde el spread come >25% del riesgo de 1%.",
+        "settings": {
+            "trading_style": "day_trading",
+            "risk_day_trading": 0.01,
+            "risk_scalping": 0.005,
+            "risk_swing": 0.01,
+            "max_total_risk": 0.03,            # 3% cap (estricto para micro)
+            "correlated_risk_pct": 0.0075,
+            "min_rr_ratio": 2.0,                # R:R alto para compensar el spread
+            "min_rr_black": 2.5,
+            "min_rr_green": 2.5,
+            "position_management_style": "cp",
+            "be_trigger_method": "pct_to_tp1",
+            "partial_taking": False,
+            "allow_partial_profits": False,
+            "sl_management_style": "ema",
+            "drawdown_method": "fixed_levels",
+            "delta_enabled": False,
+            "trading_start_hour": 7,
+            "trading_end_hour": 21,
+            "close_before_friday_hour": 20,
+            "no_new_trades_friday_hour": 18,
+            "avoid_news_minutes_before": 30,
+            "avoid_news_minutes_after": 30,
+            # Watchlist micro: forex majors + top crypto + oro. Stops/indices excluded.
+            "active_watchlist_categories": ["forex", "crypto"],
+            "discretion_pct": 0.0,
+            "scalping_enabled": False,
+            "funded_account_mode": False,
+            "max_trades_per_day": 2,            # Aún más estricto
+        },
+    },
 }
 
 # ── Funded Account Presets (Workshop de Cuentas Fondeadas) ────────────

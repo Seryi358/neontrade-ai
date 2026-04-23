@@ -2465,36 +2465,61 @@ async def regenerate_trade_screenshots(trade_id: str):
     if engine is None or engine.screenshot_generator is None:
         raise HTTPException(503, "Screenshot generator not initialized")
 
-    # Find trade in journal
+    # Look up trade — prefer DB history (has SL/TP populated) over journal
+    # (which stores sl/tp as null for trades recorded before the schema
+    # was fully wired). Fallback to open positions for trades still live.
     record = None
+    from main import db as _db
+    if _db is not None:
+        try:
+            hist = await _db.get_trade_history(limit=200)
+            db_row = next((t for t in hist if t.get("id") == trade_id), None)
+            if db_row:
+                record = {
+                    "trade_id": db_row["id"],
+                    "instrument": db_row["instrument"],
+                    "direction": db_row["direction"],
+                    "strategy": db_row.get("strategy_variant") or db_row.get("strategy") or "UNKNOWN",
+                    "entry_price": db_row["entry_price"],
+                    "exit_price": db_row.get("exit_price"),
+                    "sl": db_row.get("stop_loss"),
+                    "tp": db_row.get("take_profit"),
+                    "pnl_dollars": db_row.get("pnl"),
+                    "pnl_pct": None,
+                    "result": db_row.get("status", "").replace("closed_", "").upper(),
+                }
+        except Exception:
+            pass
+    # Overlay journal fields if we also have them (pnl_pct etc.)
     if engine.trade_journal:
         for t in engine.trade_journal.get_trades(9999):
             if t.get("trade_id") == trade_id:
-                record = t
+                if record is None:
+                    record = dict(t)
+                else:
+                    # Merge: keep DB sl/tp, pull journal pnl_pct/result
+                    if record.get("pnl_pct") is None and t.get("pnl_pct") is not None:
+                        record["pnl_pct"] = t["pnl_pct"]
+                    if not record.get("result") and t.get("result"):
+                        record["result"] = t["result"]
                 break
-    if record is None:
-        # Fallback to history (DB)
-        from main import db as _db
-        if _db is not None:
-            try:
-                hist = await _db.get_trade_history(limit=200)
-                record = next((t for t in hist if t.get("id") == trade_id), None)
-                if record:
-                    # normalise field names from history schema
-                    record = {
-                        "trade_id": record["id"],
-                        "instrument": record["instrument"],
-                        "direction": record["direction"],
-                        "strategy": record.get("strategy_variant") or record.get("strategy") or "UNKNOWN",
-                        "entry_price": record["entry_price"],
-                        "exit_price": record.get("exit_price"),
-                        "sl": record.get("stop_loss"),
-                        "tp": record.get("take_profit"),
-                        "pnl_dollars": record.get("pnl"),
-                        "result": record.get("status", "").replace("closed_", "").upper(),
-                    }
-            except Exception:
-                pass
+    # Fallback to live open positions
+    if record is None and hasattr(engine, 'position_manager'):
+        pos = engine.position_manager.positions.get(trade_id)
+        if pos is not None:
+            record = {
+                "trade_id": trade_id,
+                "instrument": pos.instrument,
+                "direction": pos.direction,
+                "strategy": getattr(pos, "strategy_variant", None) or "UNKNOWN",
+                "entry_price": pos.entry_price,
+                "exit_price": None,
+                "sl": pos.current_sl or pos.original_sl,
+                "tp": pos.take_profit_1,
+                "pnl_dollars": 0,
+                "pnl_pct": 0,
+                "result": "OPEN",
+            }
     if record is None:
         raise HTTPException(404, f"Trade {trade_id} not found")
 

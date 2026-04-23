@@ -2446,6 +2446,130 @@ async def get_trade_screenshots(trade_id: str):
     return {"trade_id": trade_id, "screenshots": paths}
 
 
+@router.post("/screenshots/{trade_id}/regenerate")
+async def regenerate_trade_screenshots(trade_id: str):
+    """Regenerate the open + close screenshots for an existing trade with the
+    current screenshot_generator (fresh broker candles + correct strategy
+    name). Old screenshots are kept; new ones are appended to the
+    `data/screenshots/` directory with a fresh timestamp.
+
+    Critical for the TradingLab mentorship deliverable: existing trades
+    closed before the screenshot generator was fixed have placeholder
+    "No chart data available" cards. This endpoint lets us produce a
+    proper chart retroactively from the journal record.
+    """
+    from main import engine
+    import re
+    if not re.match(r'^[\w\-\.]+$', trade_id) or '..' in trade_id:
+        raise HTTPException(400, "Invalid trade_id")
+    if engine is None or engine.screenshot_generator is None:
+        raise HTTPException(503, "Screenshot generator not initialized")
+
+    # Find trade in journal
+    record = None
+    if engine.trade_journal:
+        for t in engine.trade_journal.get_trades(9999):
+            if t.get("trade_id") == trade_id:
+                record = t
+                break
+    if record is None:
+        # Fallback to history (DB)
+        from main import db as _db
+        if _db is not None:
+            try:
+                hist = await _db.get_trade_history(limit=200)
+                record = next((t for t in hist if t.get("id") == trade_id), None)
+                if record:
+                    # normalise field names from history schema
+                    record = {
+                        "trade_id": record["id"],
+                        "instrument": record["instrument"],
+                        "direction": record["direction"],
+                        "strategy": record.get("strategy_variant") or record.get("strategy") or "UNKNOWN",
+                        "entry_price": record["entry_price"],
+                        "exit_price": record.get("exit_price"),
+                        "sl": record.get("stop_loss"),
+                        "tp": record.get("take_profit"),
+                        "pnl_dollars": record.get("pnl"),
+                        "result": record.get("status", "").replace("closed_", "").upper(),
+                    }
+            except Exception:
+                pass
+    if record is None:
+        raise HTTPException(404, f"Trade {trade_id} not found")
+
+    inst = record["instrument"]
+    direction = record["direction"]
+    strategy = record.get("strategy") or "UNKNOWN"
+    entry = record.get("entry_price") or 0
+    sl = record.get("sl") or 0
+    tp1 = record.get("tp") or 0
+    exit_price = record.get("exit_price")
+    pnl_pct = record.get("pnl_pct") or 0
+
+    # Fetch fresh candles from broker
+    candles = []
+    ema_vals = None
+    try:
+        raw = await engine.broker.get_candles(inst, "H1", 100)
+        candles = [
+            {"time": c.time, "open": c.open, "high": c.high, "low": c.low, "close": c.close}
+            for c in (raw or [])
+        ]
+    except Exception as e:
+        logger.warning(f"regenerate: candles fetch failed for {inst}: {e}")
+    # Try to grab live EMAs from last_scan_results
+    if inst in engine.last_scan_results:
+        ema_vals = getattr(engine.last_scan_results[inst], 'ema_values', None)
+
+    new_paths = []
+    # Always regenerate OPEN
+    try:
+        p = await engine.screenshot_generator.capture_trade_open(
+            trade_id=trade_id,
+            instrument=inst,
+            direction=direction,
+            entry_price=entry,
+            sl=sl,
+            tp1=tp1,
+            tp_max=None,
+            strategy=strategy,
+            confidence=1.0,
+            candles=candles,
+            ema_values=ema_vals,
+        )
+        if p:
+            new_paths.append(p)
+    except Exception as e:
+        logger.error(f"regenerate open failed: {e}")
+    # Regenerate CLOSE only if trade was closed
+    if exit_price is not None:
+        try:
+            result_label = (record.get("result") or
+                            ("TP" if (record.get("pnl_dollars") or 0) > 0
+                             else ("SL" if (record.get("pnl_dollars") or 0) < 0 else "BE")))
+            p = await engine.screenshot_generator.capture_trade_close(
+                trade_id=trade_id,
+                instrument=inst,
+                direction=direction,
+                entry_price=entry,
+                close_price=exit_price,
+                pnl_pct=pnl_pct,
+                result=result_label,
+                candles=candles,
+            )
+            if p:
+                new_paths.append(p)
+        except Exception as e:
+            logger.error(f"regenerate close failed: {e}")
+    return {
+        "trade_id": trade_id,
+        "regenerated_paths": new_paths,
+        "candles_used": len(candles),
+        "strategy": strategy,
+    }
+
+
 @router.get("/screenshots/{trade_id}/image/{filename}")
 async def get_screenshot_image(trade_id: str, filename: str):
     """Serve a screenshot image file."""

@@ -2694,11 +2694,50 @@ class TradingEngine:
 
     # ── Trade Execution ──────────────────────────────────────────
 
+    @staticmethod
+    def _is_equity_market_open(now: datetime) -> bool:
+        """NYSE/NASDAQ regular session = Mon-Fri 13:30-20:00 UTC.
+        Used to skip equity setups when the market is closed (broker would
+        reject anyway with "Instrument is currently closed", but rejecting
+        upstream avoids broker spam + a bad audit trail entry).
+        """
+        wd = now.weekday()  # 0=Mon..6=Sun
+        if wd >= 5:
+            return False
+        h = now.hour
+        m = now.minute
+        # Open at 13:30 UTC, close at 20:00 UTC
+        if h < 13 or (h == 13 and m < 30):
+            return False
+        if h >= 20:
+            return False
+        return True
+
+    def _is_equity_instrument(self, instrument: str) -> bool:
+        try:
+            return instrument in settings.equities_watchlist
+        except Exception:
+            return False
+
     async def _execute_setup(self, setup: TradeRisk):
         """Execute a validated trading setup (AUTO mode).
         Supports MARKET and LIMIT entry types from TradingLab."""
         entry_type = getattr(setup, 'entry_type', 'MARKET')
         limit_price = getattr(setup, 'limit_price', None)
+
+        # Equity market hours guard — broker rejects with "Instrument is
+        # currently closed" anyway, but skipping upstream avoids the
+        # rejected order in the audit log + the broker's circuit-breaker
+        # noise (observed live: IBB BLACK setup at 03:39 UTC tried to fire
+        # while NYSE was closed, broker rejected, log got polluted).
+        if self._is_equity_instrument(setup.instrument):
+            now_utc = datetime.now(timezone.utc)
+            if not self._is_equity_market_open(now_utc):
+                logger.info(
+                    f"Skipping {setup.instrument} {setup.direction}: NYSE closed "
+                    f"({now_utc.strftime('%H:%M UTC')}). Equity hours: Mon-Fri 13:30-20:00 UTC."
+                )
+                return None
 
         logger.info("=" * 50)
         logger.info(f"EXECUTING TRADE: {setup.direction} {setup.instrument}")

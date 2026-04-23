@@ -403,7 +403,7 @@ class TradeScreenshotGenerator:
         # Timestamp watermark
         ts = trade_info.get("timestamp", "")
         ax.text(
-            0.99, 0.01, f"Atlas  |  {ts} UTC",
+            0.99, 0.01, f"{ts} UTC",
             transform=ax.transAxes, fontsize=7,
             color=THEME["text_dim"], alpha=0.5,
             ha="right", va="bottom",
@@ -711,7 +711,7 @@ class TradeScreenshotGenerator:
         # Watermark
         ts = trade_info.get("timestamp", "")
         ax.text(
-            5, 0.7, f"Atlas  |  {ts} UTC  |  No chart data available",
+            5, 0.7, f"{ts} UTC  |  No chart data available",
             fontsize=8, color=THEME["text_dim"], alpha=0.5,
             ha="center", va="center",
         )

@@ -330,6 +330,9 @@ class TestExpireOldSetups:
 class TestNotifications:
     def test_push_and_get_unread(self, engine):
         """Push a notification and retrieve it as unread."""
+        # Engine now loads prior notifications from disk at init (persistence
+        # added 2026-04-23). Reset for isolated unit test.
+        engine._notifications = []
         engine._push_notification("ALERT", "Test Title", "Test Body", {"key": "val"})
         unread = engine.get_unread_notifications()
         assert len(unread) == 1
@@ -339,6 +342,7 @@ class TestNotifications:
 
     def test_unread_marked_as_read(self, engine):
         """After get_unread_notifications, calling again returns empty."""
+        engine._notifications = []
         engine._push_notification("INFO", "T", "B")
         engine.get_unread_notifications()
         second_call = engine.get_unread_notifications()

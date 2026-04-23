@@ -566,29 +566,13 @@ class CapitalClient(BaseBroker):
         "AU200_AUD":   "AU200",
         "HK33_HKD":    "HK50",
         "CN50_USD":    "CHINA50",
-        # US share ETFs whose Capital.com search returned ambiguous matches
-        # (added 2026-04-22). For most US-listed ETFs the broker epic is
-        # literally the ticker, so we lock them in here. If a particular
-        # epic ends up wrong, remove the entry and the existing strict
-        # `_epic_matches_instrument` heuristic will reject bad alternatives
-        # rather than silently rerouting.
-        "BITO":        "BITO",
-        "CGC":         "CGC",
-        "GBTC":        "GBTC",
-        "IGV":         "IGV",
-        "IHAK":        "IHAK",
-        "IZRL":        "IZRL",
-        "KBE":         "KBE",
-        "KRBN":        "KRBN",
-        "MSOS":        "MSOS",
-        "NERD":        "NERD",
-        "POTX":        "POTX",
-        "PPA":         "PPA",
-        "PRNT":        "PRNT",
-        "PSJ":         "PSJ",
-        "PXQ":         "PXQ",
-        "VFF":         "VFF",
-        "YEXT":        "YEXT",
+        # NOTE: the 17 US share ETFs (BITO/CGC/GBTC/IGV/IHAK/IZRL/KBE/KRBN/
+        # MSOS/NERD/POTX/PPA/PRNT/PSJ/PXQ/VFF/YEXT) were tentatively mapped
+        # to their ticker literals but live tests on 2026-04-22 returned
+        # "Instrument not found" from Capital.com — broker does not offer
+        # them under those epics. Reverted to rely on the strict search
+        # filter + auto-blocklist path (they'll land in `_epic_blocklist`
+        # during warm_epic_cache and be skipped in the scan loop).
     }
 
     @staticmethod
@@ -696,6 +680,20 @@ class CapitalClient(BaseBroker):
         # Fallback to our guess (don't cache - might be wrong, retry next time)
         return epic_guess
 
+    async def _probe_epic(self, epic: str) -> bool:
+        """Verify ``epic`` actually exists on Capital.com via market details.
+        Returns True if broker accepts it, False on 404 / other error.
+        Used by `warm_epic_cache` to validate `_EPIC_MAP_OVERRIDE` entries
+        so a wrong override doesn't silently route trades to a non-existent
+        instrument (lesson learned from the BITO/CGC/etc. equity guesses).
+        """
+        try:
+            await self._get(f"/api/v1/markets/{epic}")
+            return True
+        except Exception as e:
+            logger.debug(f"_probe_epic({epic!r}) failed: {e}")
+            return False
+
     async def warm_epic_cache(self, instruments: List[str]) -> None:
         """Pre-resolve all instrument epics with throttling.
         Call this BEFORE the initial scan to avoid burst API calls
@@ -720,6 +718,23 @@ class CapitalClient(BaseBroker):
                         f"Epic warmup blocklisted {inst!r}: no valid epic resolved "
                         f"(guessed {resolved!r}; instrument will be skipped in scans)"
                     )
+                else:
+                    # Validate that the cached epic actually exists on the broker.
+                    # Required for `_EPIC_MAP_OVERRIDE` entries — search-resolved
+                    # epics are already validated by their search response, but
+                    # override map entries skip search entirely and would
+                    # silently route to a non-existent epic on a wrong guess.
+                    cached_epic = self._epic_cache[inst]
+                    if cached_epic == self._EPIC_MAP_OVERRIDE.get(inst):
+                        await asyncio.sleep(0.2)
+                        if not await self._probe_epic(cached_epic):
+                            del self._epic_cache[inst]
+                            self._epic_blocklist.add(inst)
+                            logger.warning(
+                                f"Epic warmup blocklisted {inst!r}: override "
+                                f"{cached_epic!r} not recognised by broker — "
+                                f"remove from _EPIC_MAP_OVERRIDE or fix the value"
+                            )
             except Exception as e:
                 self._epic_blocklist.add(inst)
                 logger.debug(f"Epic warmup failed for {inst}: {e}")

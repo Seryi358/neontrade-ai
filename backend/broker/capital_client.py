@@ -621,19 +621,21 @@ class CapitalClient(BaseBroker):
         notional). Now: hardcoded override map first, then exact-epic match,
         then strict instrument-aware filter on search results.
         """
-        if instrument in self._epic_cache:
-            return self._epic_cache[instrument]
-        # Blocklist must be checked AT resolution time too, not just in the
-        # scan loop. Otherwise /price, /candles, manual trade approval and
-        # reentry paths would silently re-resolve to the bad epic outside
-        # of warm_epic_cache (and re-cache it). Raising here surfaces the
-        # mistake instead of silently routing to the wrong instrument.
+        # Blocklist FIRST — must win even when cache contains a stale entry
+        # populated before warm_epic_cache had a chance to validate
+        # (race observed live: /price call reached cache before warm finished
+        # → cache had wrong epic → subsequent calls returned bad price).
         if instrument in self._epic_blocklist:
+            # Drop any stale cache entry too so the next call after un-
+            # blocklisting doesn't pick up the bad epic.
+            self._epic_cache.pop(instrument, None)
             raise ValueError(
                 f"Instrument {instrument!r} is blocklisted (epic resolution "
                 f"failed warm-cache validation). Skipping to prevent silent "
                 f"routing to the wrong market."
             )
+        if instrument in self._epic_cache:
+            return self._epic_cache[instrument]
 
         # Override map: known broker-side epic for instruments where the search
         # heuristic is unreliable (commodities, indices).
@@ -772,11 +774,20 @@ class CapitalClient(BaseBroker):
         candidate passed `_epic_matches_instrument`) are added to
         `self._epic_blocklist` so the scan loop can skip them entirely.
         """
-        uncached = [i for i in instruments if i not in self._epic_cache and i not in self._epic_blocklist]
-        if not uncached:
+        # Process: anything NOT blocklisted AND (not cached OR has a price
+        # range we can re-validate). The second condition catches stale cache
+        # entries populated by /price calls between the deploy and warm
+        # completion (race observed live where XCU_USD got cached to a wrong
+        # \$0.15 forex epic before the probe could blocklist it).
+        to_process = [
+            i for i in instruments
+            if i not in self._epic_blocklist
+            and (i not in self._epic_cache or i in self._EXPECTED_PRICE_RANGES)
+        ]
+        if not to_process:
             return
-        logger.info(f"Warming epic cache for {len(uncached)} instruments...")
-        for inst in uncached:
+        logger.info(f"Warming epic cache for {len(to_process)} instruments...")
+        for inst in to_process:
             try:
                 resolved = await self._resolve_epic(inst)
                 # _resolve_epic returns the epic_guess on failure WITHOUT caching it,

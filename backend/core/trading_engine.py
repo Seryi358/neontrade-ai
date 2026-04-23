@@ -206,16 +206,15 @@ class TradingEngine:
         else:
             self.alert_manager = None
 
-        # Trading mode — MANUAL by default (mentorship: 100% precisión, 0% discreción para principiantes).
-        # User must explicitly switch to AUTO after gaining confidence with 100+ trades.
-        # Initial value is overridden from settings.engine_mode (loaded from
-        # data/risk_config.json) so prior AUTO selections survive restarts.
-        _persisted_mode = (getattr(settings, "engine_mode", "MANUAL") or "MANUAL").upper()
+        # Trading mode — Sergio's preference is AUTO (changed default 2026-04-22).
+        # Engine init reads settings.engine_mode (loaded from data/risk_config.json)
+        # so persisted overrides win; falls back to AUTO if absent or invalid.
+        _persisted_mode = (getattr(settings, "engine_mode", "AUTO") or "AUTO").upper()
         try:
             self.mode: TradingMode = TradingMode(_persisted_mode)
         except ValueError:
-            self.mode = TradingMode.MANUAL
-            logger.warning(f"Invalid persisted engine_mode={_persisted_mode!r}; falling back to MANUAL")
+            self.mode = TradingMode.AUTO
+            logger.warning(f"Invalid persisted engine_mode={_persisted_mode!r}; falling back to AUTO")
         self.pending_setups: List[PendingSetup] = []
         self._setup_expiry_minutes: int = 30  # Configurable expiry
 
@@ -461,11 +460,11 @@ class TradingEngine:
             self._approve_lock = asyncio.Lock()
         async with self._approve_lock:
             self._expire_old_setups()
-            style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
-            current_style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
             for setup in self.pending_setups:
                 if setup.id == setup_id and setup.status == "pending":
-                    # Check risk limits before approving
+                    # Check risk limits before approving — per-instrument style
+                    # so equities can use SWING when swing_for_equities is on.
+                    current_style = self._style_for_instrument(setup.instrument)
                     if not self.risk_manager.can_take_trade(current_style, setup.instrument):
                         logger.warning(f"Setup {setup_id} rejected: max risk limit or scale-in rule")
                         return False
@@ -510,10 +509,9 @@ class TradingEngine:
         self._expire_old_setups()
         pending = [s for s in self.pending_setups if s.status == "pending"]
         count = 0
-        style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
-        current_style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
         for setup in pending:
-            # Check risk limits before approving each trade
+            # Per-instrument style so equity trades go through SWING when enabled.
+            current_style = self._style_for_instrument(setup.instrument)
             if not self.risk_manager.can_take_trade(current_style, setup.instrument):
                 logger.warning(f"Skipping setup {setup.id} ({setup.instrument}): max risk limit reached")
                 continue
@@ -529,6 +527,31 @@ class TradingEngine:
                     setup.status = "pending"
         logger.info(f"Approved and executed {count}/{len(pending)} pending setups")
         return count
+
+    @staticmethod
+    def _style_for_instrument(instrument: str) -> TradingStyle:
+        """Resolve the trading style for ``instrument`` honoring per-asset-class
+        overrides.
+
+        Mentoría audit C1 (Watchlist para Acciones): Alex says he does SWING
+        trading on US equities, not day trading. When ``swing_for_equities``
+        is True and the instrument lives in the equities watchlist, force
+        SWING regardless of the global ``trading_style``. Falls back to the
+        configured global style for everything else.
+        """
+        style_map = {
+            "day_trading": TradingStyle.DAY_TRADING,
+            "swing": TradingStyle.SWING,
+            "scalping": TradingStyle.SCALPING,
+        }
+        base = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
+        if getattr(settings, "swing_for_equities", False):
+            try:
+                if instrument in settings.equities_watchlist:
+                    return TradingStyle.SWING
+            except Exception:
+                pass
+        return base
 
     def _spawn_bg(self, coro, name: str = "") -> None:
         """Start a fire-and-forget coroutine with GC-safe strong reference.
@@ -762,6 +785,12 @@ class TradingEngine:
 
         # Monthly ASR (After Session Review) on the 1st at ~08:00 UTC
         await self._maybe_send_monthly_asr(now)
+
+        # Weekly Self-Improvement review (Sun 08:00 UTC) — runs the
+        # TuningEngine over last 7 days of trades and either emits proposals
+        # for approval or auto-applies SAFE-tier ones, depending on
+        # settings.self_improvement_tuning_mode.
+        await self._maybe_run_weekly_review(now)
 
         if market_open:
             # Check Friday close rule
@@ -2019,9 +2048,8 @@ class TradingEngine:
                 if hasattr(self.broker, "is_blocklisted") and self.broker.is_blocklisted(instrument):
                     continue
 
-                # Check if we can take more risk
-                style_map = {"day_trading": TradingStyle.DAY_TRADING, "swing": TradingStyle.SWING, "scalping": TradingStyle.SCALPING}
-                current_style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
+                # Check if we can take more risk (per-instrument style routing)
+                current_style = self._style_for_instrument(instrument)
                 if not self.risk_manager.can_take_trade(
                     current_style, instrument
                 ):
@@ -2418,13 +2446,8 @@ class TradingEngine:
             )
             return None
 
-        # Calculate position size using the configured trading style
-        style_map = {
-            "day_trading": TradingStyle.DAY_TRADING,
-            "swing": TradingStyle.SWING,
-            "scalping": TradingStyle.SCALPING,
-        }
-        style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
+        # Per-instrument style routing — equities use SWING when enabled.
+        style = self._style_for_instrument(signal.instrument)
         units = await self.risk_manager.calculate_position_size(
             signal.instrument, style, signal.entry_price, signal.stop_loss
         )
@@ -2954,13 +2977,9 @@ class TradingEngine:
             return
 
         # Build a TradeRisk from the pending setup
-        # R30 fix: use configured trading style, not hardcoded DAY_TRADING
-        style_map = {
-            "day_trading": TradingStyle.DAY_TRADING,
-            "swing": TradingStyle.SWING,
-            "scalping": TradingStyle.SCALPING,
-        }
-        _style = style_map.get(settings.trading_style, TradingStyle.DAY_TRADING)
+        # R30 fix: per-instrument style (was hardcoded DAY_TRADING; now also
+        # respects swing_for_equities for equity setups).
+        _style = self._style_for_instrument(setup.instrument)
         _risk = self.risk_manager.get_risk_for_style(_style, setup.instrument)
         _risk = self.risk_manager._adjust_for_correlation(setup.instrument, _risk)
 
@@ -3075,6 +3094,166 @@ class TradingEngine:
                     )
             except Exception as e:
                 logger.warning(f"AI daily report failed: {e}")
+
+    # ── Weekly Self-Improvement Review ────────────────────────
+
+    async def _maybe_run_weekly_review(self, now: datetime):
+        """Sunday 08:00 UTC — aggregate last 7 days, run TuningEngine, email or auto-apply.
+
+        Mirror of `_maybe_send_monthly_asr`. Single-shot per (year, isoweek)
+        via `self._weekly_review_done` flag.
+        """
+        if now.weekday() != 6 or now.hour != 8 or now.minute > 5:  # 6 = Sunday
+            return
+        if not self._db:
+            return
+        iso_year, iso_week, _ = now.isocalendar()
+        week_key = f"{iso_year}-W{iso_week:02d}"
+        if getattr(self, "_weekly_review_done", None) == week_key:
+            return
+        self._weekly_review_done = week_key
+
+        # If self-improvement is fully off, nothing to do.
+        mode = getattr(settings, "self_improvement_tuning_mode", "off")
+        if mode == "off":
+            logger.info(f"Weekly review {week_key}: tuning_mode=off, skipping")
+            return
+
+        try:
+            from core.self_improvement import (
+                TuningEngine, ProposalStore, apply_proposal,
+            )
+            store = ProposalStore()
+            engine_t = TuningEngine(settings, store)
+
+            # Aggregate last 7 days from trade journal
+            week_start = (now - timedelta(days=7)).isoformat()
+            trades = await self._db.get_trades_between(week_start, now.isoformat())
+            if not trades:
+                logger.info(f"Weekly review {week_key}: no trades in window, no proposals")
+                return
+
+            stats = self._build_tuning_stats(trades)
+            proposals = engine_t.evaluate(stats)
+            logger.info(f"Weekly review {week_key}: {len(proposals)} proposals emitted")
+
+            for p in proposals:
+                store.create(p)
+                # Always email so Sergio can audit
+                if self.alert_manager:
+                    try:
+                        await self.alert_manager.send_alert(
+                            "tuning_proposal",
+                            f"Atlas Tuning Proposal — {p.parameter_key}",
+                            (
+                                f"<b>Parámetro:</b> {p.parameter_key}\n"
+                                f"<b>Actual:</b> {p.current_value}\n"
+                                f"<b>Propuesto:</b> {p.proposed_value}\n"
+                                f"<b>Tier:</b> {p.tier}\n\n"
+                                f"<b>Razón:</b>\n{p.rationale}\n\n"
+                                f"<b>Aprobar:</b> POST /api/v1/self-improvement/proposals/{p.id}/approve\n"
+                                f"<b>Rechazar:</b> POST /api/v1/self-improvement/proposals/{p.id}/reject"
+                            ),
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to email proposal {p.id}: {e}")
+
+                # Auto-apply only SAFE-tier when mode == "auto"
+                if mode == "auto" and p.tier == "safe":
+                    persist = self._make_tuning_persist_fn()
+                    if apply_proposal(settings, p, persist):
+                        store._save()
+                        logger.info(f"Auto-applied SAFE proposal {p.id}: {p.parameter_key}={p.proposed_value}")
+        except Exception as e:
+            logger.warning(f"Weekly review {week_key} failed: {e}")
+
+    @staticmethod
+    def _build_tuning_stats(trades: list) -> dict:
+        """Reduce a list of closed trades to the small dict TuningEngine expects."""
+        total = len(trades)
+        wins = sum(1 for t in trades if (t.get("pnl", 0) or 0) > 0)
+        losses = sum(1 for t in trades if (t.get("pnl", 0) or 0) < 0)
+        win_rate = wins / total if total else 0.0
+        gross_profit = sum((t.get("pnl", 0) or 0) for t in trades if (t.get("pnl", 0) or 0) > 0)
+        gross_loss = abs(sum((t.get("pnl", 0) or 0) for t in trades if (t.get("pnl", 0) or 0) < 0))
+        pf = (gross_profit / gross_loss) if gross_loss > 0 else (float("inf") if gross_profit > 0 else 0.0)
+
+        # Per-style buckets (best-effort: trades dict may or may not have 'style' field)
+        by_style: Dict[str, Dict[str, float]] = {}
+        for s in ("day_trading", "swing", "scalping"):
+            tr = [t for t in trades if t.get("style") == s or t.get("trading_style") == s]
+            if not tr:
+                continue
+            wn = sum(1 for t in tr if (t.get("pnl", 0) or 0) > 0)
+            gp = sum((t.get("pnl", 0) or 0) for t in tr if (t.get("pnl", 0) or 0) > 0)
+            gl = abs(sum((t.get("pnl", 0) or 0) for t in tr if (t.get("pnl", 0) or 0) < 0))
+            by_style[s] = {
+                "trades": len(tr),
+                "wins": wn,
+                "win_rate": wn / len(tr),
+                "profit_factor": (gp / gl) if gl > 0 else (float("inf") if gp > 0 else 0.0),
+            }
+
+        # Max DD as a percentage from the equity walk
+        balances = []
+        running = 0.0
+        for t in sorted(trades, key=lambda x: x.get("opened_at") or x.get("date") or ""):
+            running += t.get("pnl", 0) or 0
+            balances.append(running)
+        if balances:
+            peak = balances[0]
+            max_dd = 0.0
+            for b in balances:
+                if b > peak:
+                    peak = b
+                if peak > 0:
+                    dd = (peak - b) / peak * 100
+                    if dd > max_dd:
+                        max_dd = dd
+        else:
+            max_dd = 0.0
+
+        return {
+            "total_trades": total,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": win_rate,
+            "profit_factor": pf,
+            "by_style": by_style,
+            "max_dd_pct": max_dd,
+        }
+
+    def _make_tuning_persist_fn(self):
+        """Build a closure that persists a single (key, value) override to
+        data/risk_config.json using the same atomic write pattern as the
+        runtime `PUT /risk-config` endpoint."""
+        def _persist(key: str, value):
+            import json as _json, os as _os, tempfile as _tf
+            backend_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+            risk_path = _os.path.join(backend_dir, "data", "risk_config.json")
+            overrides: dict = {}
+            if _os.path.exists(risk_path):
+                try:
+                    with open(risk_path) as f:
+                        overrides = _json.load(f)
+                    if not isinstance(overrides, dict):
+                        overrides = {}
+                except Exception:
+                    overrides = {}
+            overrides[key] = value
+            _os.makedirs(_os.path.dirname(risk_path), exist_ok=True)
+            fd, tmp = _tf.mkstemp(dir=_os.path.dirname(risk_path), suffix=".tmp")
+            try:
+                with _os.fdopen(fd, "w") as f:
+                    _json.dump(overrides, f, indent=2)
+                _os.replace(tmp, risk_path)
+            except Exception:
+                try:
+                    _os.unlink(tmp)
+                except OSError:
+                    pass
+                raise
+        return _persist
 
     # ── Monthly ASR ────────────────────────────────────────────
 

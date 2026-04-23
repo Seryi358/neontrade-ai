@@ -258,6 +258,270 @@ class AutoASRGenerator:
         }
 
 
+# ── Phase 2: TuningEngine + ProposalStore (rule-based parameter tuning) ───────
+
+import uuid
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+
+# Hard caps so a runaway rule can never tighten dangerously or loosen recklessly.
+TUNING_SAFETY_GATES: Dict[str, Dict[str, float]] = {
+    "max_total_risk":         {"floor": 0.01, "ceiling": 0.05},
+    "risk_day_trading":       {"floor": 0.002, "ceiling": 0.02},
+    "risk_scalping":          {"floor": 0.0,   "ceiling": 0.01},
+    "risk_swing":             {"floor": 0.002, "ceiling": 0.02},
+    "min_rr_ratio":           {"floor": 1.0,   "ceiling": 3.0},
+    "move_sl_to_be_pct_to_tp1": {"floor": 0.30, "ceiling": 0.80},
+}
+
+TUNING_COOLDOWN_DAYS = {
+    "default": 7,
+    "max_total_risk": 14,
+    "scalping_enabled": 30,
+}
+
+
+@dataclass
+class TuningProposal:
+    id: str
+    created_at: str
+    parameter_key: str
+    current_value: object
+    proposed_value: object
+    tier: str                # "safe" | "moderate" | "drastic"
+    rationale: str
+    evidence: dict
+    status: str = "pending"   # pending | applied | rejected | rolled_back | expired
+    applied_at: Optional[str] = None
+    rolled_back_at: Optional[str] = None
+    parent_snapshot: Optional[dict] = None  # snapshot of changed key for rollback
+
+    def to_dict(self) -> dict:
+        return {k: getattr(self, k) for k in (
+            "id", "created_at", "parameter_key", "current_value",
+            "proposed_value", "tier", "rationale", "evidence",
+            "status", "applied_at", "rolled_back_at", "parent_snapshot",
+        )}
+
+
+class ProposalStore:
+    """JSON-backed reversible change log. SQLite would be cleaner but the
+    project already uses JSON for trade_journal/missed_trades/risk_config so
+    a parallel file keeps ops simple. Atomic tempfile+replace writes."""
+
+    def __init__(self, path: Optional[str] = None):
+        if path is None:
+            base = Path(__file__).resolve().parent.parent / "data" / "tuning_proposals.json"
+            path = str(base)
+        self.path = path
+        self._proposals: List[TuningProposal] = self._load()
+
+    def _load(self) -> List[TuningProposal]:
+        if not os.path.exists(self.path):
+            return []
+        try:
+            with open(self.path) as f:
+                raw = json.load(f)
+            return [TuningProposal(**p) for p in raw]
+        except Exception as e:
+            logger.warning(f"ProposalStore load failed ({e}); starting empty")
+            return []
+
+    def _save(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        import tempfile
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(self.path), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump([p.to_dict() for p in self._proposals], f, indent=2)
+            os.replace(tmp, self.path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
+    def create(self, proposal: TuningProposal):
+        self._proposals.append(proposal)
+        self._save()
+
+    def list_all(self, status: Optional[str] = None) -> List[TuningProposal]:
+        if status is None:
+            return list(self._proposals)
+        return [p for p in self._proposals if p.status == status]
+
+    def get(self, proposal_id: str) -> Optional[TuningProposal]:
+        return next((p for p in self._proposals if p.id == proposal_id), None)
+
+    def in_cooldown(self, parameter_key: str, days: int) -> bool:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        for p in self._proposals:
+            if p.parameter_key == parameter_key and p.status == "applied" and p.applied_at:
+                try:
+                    when = datetime.fromisoformat(p.applied_at)
+                    if when >= cutoff:
+                        return True
+                except Exception:
+                    continue
+        return False
+
+
+class TuningEngine:
+    """Rule-based parameter-change proposer.
+
+    Reads aggregated stats + current settings, emits TuningProposal objects.
+    Never mutates settings directly — that's the orchestrator's job after
+    safety gating + (optional) approval.
+    """
+
+    MIN_TRADES_DEFAULT = 10
+
+    def __init__(self, settings_obj, proposal_store: ProposalStore):
+        self.settings = settings_obj
+        self.store = proposal_store
+
+    def evaluate(self, stats: dict) -> List[TuningProposal]:
+        """Return new proposals based on `stats`.
+
+        Expected stats shape (built by the orchestrator from MonthlyReport /
+        weekly-review payload):
+            {
+              "total_trades": int,
+              "win_rate": float (0..1),
+              "by_style": {"day_trading": {trades, win_rate, profit_factor}, ...},
+              "max_dd_pct": float (0..100),
+            }
+        """
+        proposals: List[TuningProposal] = []
+        min_trades = getattr(self.settings, "self_improvement_min_trades", self.MIN_TRADES_DEFAULT)
+        if stats.get("total_trades", 0) < min_trades:
+            return proposals
+
+        # Rule 1 (SAFE): reduce day-trading risk by 50% if WR < 30% on >=10 trades.
+        wr = stats.get("win_rate", 0.0)
+        if wr < 0.30 and stats.get("total_trades", 0) >= min_trades:
+            cur = float(getattr(self.settings, "risk_day_trading", 0.01))
+            new_val = self._clamp("risk_day_trading", cur * 0.5)
+            if new_val != cur and not self.store.in_cooldown("risk_day_trading", TUNING_COOLDOWN_DAYS["default"]):
+                proposals.append(TuningProposal(
+                    id=str(uuid.uuid4()),
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                    parameter_key="risk_day_trading",
+                    current_value=cur,
+                    proposed_value=new_val,
+                    tier="safe",
+                    rationale=(
+                        f"Win rate {wr*100:.1f}% sobre {stats.get('total_trades')} trades — "
+                        f"reducir riesgo diario {cur*100:.2f}% -> {new_val*100:.2f}% para limitar "
+                        f"el drawdown mientras se identifica la causa."
+                    ),
+                    evidence={"win_rate": wr, "trades": stats.get("total_trades"), "rule": "low_wr_reduce_risk"},
+                ))
+
+        # Rule 2 (SAFE): disable scalping if its profit factor < 0.7 and >=20 scalp trades
+        # AND day trading is doing better.
+        if getattr(self.settings, "scalping_enabled", False):
+            scalp = stats.get("by_style", {}).get("scalping", {})
+            day = stats.get("by_style", {}).get("day_trading", {})
+            if (
+                scalp.get("trades", 0) >= 20
+                and scalp.get("profit_factor", 1.0) < 0.7
+                and day.get("trades", 0) >= 10
+                and day.get("win_rate", 0.0) > scalp.get("win_rate", 0.0) + 0.10
+            ):
+                if not self.store.in_cooldown("scalping_enabled", TUNING_COOLDOWN_DAYS["scalping_enabled"]):
+                    proposals.append(TuningProposal(
+                        id=str(uuid.uuid4()),
+                        created_at=datetime.now(timezone.utc).isoformat(),
+                        parameter_key="scalping_enabled",
+                        current_value=True,
+                        proposed_value=False,
+                        tier="safe",
+                        rationale=(
+                            f"Scalping PF {scalp.get('profit_factor'):.2f} < 0.7 sobre {scalp.get('trades')} trades, "
+                            f"y day trading WR {day.get('win_rate', 0)*100:.1f}% supera scalping WR {scalp.get('win_rate', 0)*100:.1f}% "
+                            f"por más de 10 puntos. Sugerido: pausar scalping y enfocarse en day trading."
+                        ),
+                        evidence={
+                            "scalping": scalp,
+                            "day_trading": day,
+                            "rule": "scalping_underperforms_day",
+                        },
+                    ))
+
+        # Rule 3 (SAFE): tighten max_total_risk if observed max DD breached 8%.
+        if stats.get("max_dd_pct", 0.0) >= 8.0:
+            cur = float(getattr(self.settings, "max_total_risk", 0.05))
+            new_val = self._clamp("max_total_risk", cur * 0.7)
+            if new_val != cur and not self.store.in_cooldown("max_total_risk", TUNING_COOLDOWN_DAYS["max_total_risk"]):
+                proposals.append(TuningProposal(
+                    id=str(uuid.uuid4()),
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                    parameter_key="max_total_risk",
+                    current_value=cur,
+                    proposed_value=new_val,
+                    tier="safe",
+                    rationale=(
+                        f"Max drawdown {stats.get('max_dd_pct'):.2f}% supera el 8% objetivo. "
+                        f"Reducir max_total_risk {cur*100:.1f}% -> {new_val*100:.1f}% mientras se recupera."
+                    ),
+                    evidence={"max_dd_pct": stats.get("max_dd_pct"), "rule": "dd_breach_tighten_risk"},
+                ))
+
+        return proposals
+
+    @staticmethod
+    def _clamp(key: str, value: float) -> float:
+        gate = TUNING_SAFETY_GATES.get(key)
+        if not gate:
+            return value
+        return max(gate["floor"], min(gate["ceiling"], value))
+
+
+def apply_proposal(settings_obj, proposal: TuningProposal, persist_fn) -> bool:
+    """Apply a proposal: mutate settings, snapshot prior value, persist via callback.
+
+    `persist_fn(key, value)` is responsible for writing the override to disk
+    (e.g. the same flow as PUT /risk-config so the change survives restarts).
+    Returns True on success.
+    """
+    key = proposal.parameter_key
+    if not hasattr(settings_obj, key):
+        logger.warning(f"apply_proposal: settings has no attribute {key!r}; skipping")
+        return False
+    proposal.parent_snapshot = {key: getattr(settings_obj, key)}
+    setattr(settings_obj, key, proposal.proposed_value)
+    try:
+        persist_fn(key, proposal.proposed_value)
+    except Exception as e:
+        # Roll back in-memory mutation if persistence fails — keeps disk and
+        # memory consistent.
+        setattr(settings_obj, key, proposal.parent_snapshot[key])
+        logger.error(f"apply_proposal persist failed for {key}: {e}")
+        return False
+    proposal.status = "applied"
+    proposal.applied_at = datetime.now(timezone.utc).isoformat()
+    return True
+
+
+def rollback_proposal(settings_obj, proposal: TuningProposal, persist_fn) -> bool:
+    """Restore the snapshotted value and mark proposal rolled_back."""
+    if proposal.status != "applied" or not proposal.parent_snapshot:
+        return False
+    key = proposal.parameter_key
+    prior = proposal.parent_snapshot.get(key)
+    setattr(settings_obj, key, prior)
+    try:
+        persist_fn(key, prior)
+    except Exception as e:
+        logger.error(f"rollback_proposal persist failed for {key}: {e}")
+        return False
+    proposal.status = "rolled_back"
+    proposal.rolled_back_at = datetime.now(timezone.utc).isoformat()
+    return True
+
+
 def find_close_screenshot(screenshots_dir: str, trade_id: str) -> Optional[str]:
     """Locate the most recent close screenshot for a trade, if it exists."""
     if not os.path.isdir(screenshots_dir):

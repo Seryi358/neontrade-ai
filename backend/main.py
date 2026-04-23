@@ -230,8 +230,8 @@ async def _periodic_cleanup():
 
 # ── FastAPI App ──────────────────────────────────────────────────
 app = FastAPI(
-    title="Atlas",
-    description="AI-Powered Trading System - TradingLab Strategies",
+    title="Trading Dashboard",
+    description="Personal trading dashboard",
     version="3.0.0",
     lifespan=lifespan,
 )

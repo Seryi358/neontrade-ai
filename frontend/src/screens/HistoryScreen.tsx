@@ -1,10 +1,11 @@
 /**
- * Atlas - History Screen
+ * History Screen
  * Trade history with performance stats and filtering by strategy color.
- * CyberPunk 2077 HUD redesign with sub-navigation pills.
+ * Tapping a trade opens TradeDetailModal with screenshots + reasoning + ASR.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import TradeDetailModal from '../components/TradeDetailModal';
 import {
   View,
   Text,
@@ -68,6 +69,8 @@ const getStrategyDotColor = (color: string): string => {
 
 export default function HistoryScreen() {
   const [trades, setTrades] = useState<Trade[]>([]);
+  // Selected trade id opens the detail modal (screenshots + reasoning + ASR).
+  const [detailTradeId, setDetailTradeId] = useState<string | null>(null);
   const [stats, setStats] = useState<HistoryStats | null>(null);
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
@@ -192,50 +195,50 @@ export default function HistoryScreen() {
     </ScrollView>
   );
 
-  // ── Trade Item ──────────────────────────────────────────────────
+  // ── Trade Item (tappable) ───────────────────────────────────────
   const renderTradeItem = ({ item }: { item: Trade }) => (
-    <HUDCard
-      accentColor={getStrategyDotColor(item.strategy_color)}
-    >
-      {/* Row 1: Strategy dot + instrument + date */}
-      <View style={styles.tradeTopRow}>
-        <View style={styles.tradeLeft}>
-          <View style={styles.tradeInstrumentRow}>
-            <View style={[styles.strategyDot, { backgroundColor: getStrategyDotColor(item.strategy_color) }]} />
-            <Text style={styles.tradeInstrument}>
-              {item.instrument.replace('_', '/')}
-            </Text>
+    <TouchableOpacity onPress={() => setDetailTradeId(item.id)} activeOpacity={0.7}>
+      <HUDCard accentColor={getStrategyDotColor(item.strategy_color)}>
+        {/* Row 1: Strategy dot + instrument + date */}
+        <View style={styles.tradeTopRow}>
+          <View style={styles.tradeLeft}>
+            <View style={styles.tradeInstrumentRow}>
+              <View style={[styles.strategyDot, { backgroundColor: getStrategyDotColor(item.strategy_color) }]} />
+              <Text style={styles.tradeInstrument}>
+                {item.instrument.replace('_', '/')}
+              </Text>
+            </View>
+            <Text style={styles.tradeDate}>{formatDate(item.closed_at)}</Text>
           </View>
-          <Text style={styles.tradeDate}>{formatDate(item.closed_at)}</Text>
+
+          {/* P&L (large, colored) */}
+          <Text style={[styles.tradePnl, {
+            color: item.pnl >= 0 ? theme.colors.profit : theme.colors.loss,
+          }]}>
+            {item.pnl >= 0 ? '+' : ''}${safe(item.pnl)}
+          </Text>
         </View>
 
-        {/* P&L (large, colored) */}
-        <Text style={[styles.tradePnl, {
-          color: item.pnl >= 0 ? theme.colors.profit : theme.colors.loss,
-        }]}>
-          {item.pnl >= 0 ? '+' : ''}${safe(item.pnl)}
-        </Text>
-      </View>
-
-      {/* Row 2: Direction badge + Mode badge + prices */}
-      <View style={styles.tradeBottomRow}>
-        <View style={styles.tradeBadges}>
-          <HUDBadge
-            label={item.direction}
-            color={item.direction === 'BUY' ? theme.colors.profit : theme.colors.loss}
-            small
-          />
-          <HUDBadge
-            label={item.mode}
-            color={theme.colors.textMuted}
-            small
-          />
+        {/* Row 2: Direction badge + Mode badge + prices */}
+        <View style={styles.tradeBottomRow}>
+          <View style={styles.tradeBadges}>
+            <HUDBadge
+              label={item.direction}
+              color={item.direction === 'BUY' ? theme.colors.profit : theme.colors.loss}
+              small
+            />
+            <HUDBadge
+              label={item.mode}
+              color={theme.colors.textMuted}
+              small
+            />
+          </View>
+          <Text style={styles.tradePrices}>
+            {safe(item.entry_price, 5)} → {safe(item.exit_price, 5)}
+          </Text>
         </View>
-        <Text style={styles.tradePrices}>
-          {safe(item.entry_price, 5)} → {safe(item.exit_price, 5)}
-        </Text>
-      </View>
-    </HUDCard>
+      </HUDCard>
+    </TouchableOpacity>
   );
 
   // ── Loading State ───────────────────────────────────────────────
@@ -281,6 +284,13 @@ export default function HistoryScreen() {
           </Text>
         </View>
       )}
+
+      {/* Trade detail modal — shows screenshots + reasoning + ASR. Tapping
+          any trade in the list opens this. Used for the mentorship exam. */}
+      <TradeDetailModal
+        tradeId={detailTradeId}
+        onClose={() => setDetailTradeId(null)}
+      />
     </View>
   );
 }

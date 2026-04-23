@@ -569,7 +569,7 @@ class AlertManager:
 
     async def test_channel(self, channel: AlertChannel) -> bool:
         """Send a test message to *one* channel. Returns True on success."""
-        title = "Atlas - Test Notification"
+        title = "Test Notification"
         body = (
             "If you can see this message, your notification channel "
             "is configured correctly.\n\n"
@@ -646,11 +646,11 @@ class AlertManager:
             "description": description,
             "color": colour,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "footer": {"text": "Atlas"},
+            "footer": {"text": "Trading Dashboard"},
         }
 
         payload = {
-            "username": "Atlas",
+            "username": "Trading Dashboard",
             "embeds": [embed],
         }
 
@@ -870,7 +870,7 @@ def _build_email_html(title: str, body: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="supported-color-schemes" content="light only">
-<title>Atlas</title>
+<title>Trading Dashboard</title>
 <!--[if mso]><style>*{{font-family:'Segoe UI',Helvetica,Arial,sans-serif !important;}}</style><![endif]-->
 <style>
   :root {{ color-scheme: light only; }}
@@ -893,7 +893,7 @@ def _build_email_html(title: str, body: str) -> str:
   <!-- header -->
   <tr><td class="nt-pad" style="padding:32px 32px 0 32px;">
     <span style="font-family:-apple-system,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;text-transform:uppercase;">
-      Atlas</span>
+      Trading Dashboard</span>
   </td></tr>
 
   <!-- title -->
@@ -926,7 +926,7 @@ def _build_email_html(title: str, body: str) -> str:
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;color:#aeaeb2;">
-          Atlas &middot; TradingLab</td>
+          Trading Dashboard</td>
         <td align="right" style="font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;color:#aeaeb2;">
           {ts}</td>
       </tr>

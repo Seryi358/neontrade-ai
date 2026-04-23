@@ -146,10 +146,12 @@ class TestBuildEmailHtml:
         html = _build_email_html("Title", "My body content")
         assert "My body content" in html
 
-    def test_contains_atlas_branding(self):
+    def test_contains_trading_dashboard_branding(self):
+        # Rebranded 2026-04-23: mentorship delivery should not leak the
+        # internal "Atlas" codename. Neutral "Trading Dashboard" label.
         html = _build_email_html("Title", "Body")
-        assert "Atlas" in html
-        assert "TradingLab" in html
+        assert "Trading Dashboard" in html
+        assert "Atlas" not in html
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -623,6 +623,17 @@ class CapitalClient(BaseBroker):
         """
         if instrument in self._epic_cache:
             return self._epic_cache[instrument]
+        # Blocklist must be checked AT resolution time too, not just in the
+        # scan loop. Otherwise /price, /candles, manual trade approval and
+        # reentry paths would silently re-resolve to the bad epic outside
+        # of warm_epic_cache (and re-cache it). Raising here surfaces the
+        # mistake instead of silently routing to the wrong instrument.
+        if instrument in self._epic_blocklist:
+            raise ValueError(
+                f"Instrument {instrument!r} is blocklisted (epic resolution "
+                f"failed warm-cache validation). Skipping to prevent silent "
+                f"routing to the wrong market."
+            )
 
         # Override map: known broker-side epic for instruments where the search
         # heuristic is unreliable (commodities, indices).

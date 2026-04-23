@@ -1423,6 +1423,10 @@ async def get_risk_config():
         "max_total_risk": round(settings.max_total_risk, 4),
         "correlated_risk_pct": settings.correlated_risk_pct,
         "min_rr_ratio": settings.min_rr_ratio,
+        # Strategy-specific R:R minimums (per TradingLab — BLACK/GREEN ≥ 2.0)
+        "min_rr_black": getattr(settings, "min_rr_black", 2.0),
+        "min_rr_green": getattr(settings, "min_rr_green", 2.0),
+        "min_rr_blue_c": getattr(settings, "min_rr_blue_c", 2.0),
         "move_sl_to_be_pct_to_tp1": settings.move_sl_to_be_pct_to_tp1,
         "trading_start_hour": settings.trading_start_hour,
         "trading_end_hour": settings.trading_end_hour,
@@ -2115,6 +2119,33 @@ async def trigger_auto_asr(trade_id: str):
     )
     if record is None:
         raise HTTPException(404, f"Trade {trade_id} not found in journal")
+
+    # Merge the richer DB history record (has reasoning, strategy_variant,
+    # risk_reward_ratio, stop_loss, take_profit) so the AutoASR prompt has
+    # real execution context — without this the JPM backfill filled only
+    # `asr_lessons` because the journal fields were mostly null.
+    try:
+        from main import db as _db
+        if _db is not None:
+            hist = await _db.get_trade_history(limit=200)
+            db_row = next((h for h in hist if h.get("id") == trade_id), None)
+            if db_row:
+                for k in (
+                    "reasoning", "strategy_variant", "risk_reward_ratio",
+                    "confidence", "stop_loss", "take_profit", "mode",
+                    "opened_at", "closed_at", "status", "pnl_pips",
+                ):
+                    v = db_row.get(k)
+                    if v not in (None, ""):
+                        record.setdefault(k, v)
+                # Also surface DB entry/exit if journal had them null
+                if record.get("entry_price") in (None, 0):
+                    record["entry_price"] = db_row.get("entry_price")
+                if record.get("exit_price") in (None, 0):
+                    record["exit_price"] = db_row.get("exit_price")
+    except Exception as _e:
+        logger.debug(f"AutoASR backfill: could not merge DB record for {trade_id}: {_e}")
+
     from core.self_improvement import AutoASRGenerator, find_close_screenshot
     journal_path = getattr(engine.trade_journal, "_data_path", "data/trade_journal.json")
     screenshots_dir = _os.path.join(_os.path.dirname(_os.path.abspath(journal_path)), "screenshots")

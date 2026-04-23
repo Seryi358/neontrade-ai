@@ -249,9 +249,22 @@ class TradingEngine:
         # Monthly review generator
         self.monthly_review = MonthlyReviewGenerator() if _MONTHLY_REVIEW_AVAILABLE else None
 
-        # Notification queue for Electron native notifications
+        # Notification queue for Electron native notifications.
+        # Persisted to disk so restarts don't wipe trade_executed / trade_closed
+        # records — critical for the mentorship deliverable where every trade
+        # must be reviewable even after a redeploy.
         self._notifications: List[Dict] = []
         self._max_notifications = 100
+        self._notifications_path = os.path.join("data", "notifications.json")
+        try:
+            if os.path.exists(self._notifications_path):
+                with open(self._notifications_path) as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, list):
+                    self._notifications = loaded[-self._max_notifications:]
+                    logger.info(f"Loaded {len(self._notifications)} notifications from disk")
+        except Exception as e:
+            logger.warning(f"Could not load persisted notifications: {e}")
 
         # Equity snapshot tracking (record every 10 minutes)
         self._last_equity_snapshot: datetime = datetime.min.replace(tzinfo=timezone.utc)
@@ -324,7 +337,12 @@ class TradingEngine:
     # ── Notifications ──────────────────────────────────────────────
 
     def _push_notification(self, notif_type: str, title: str, body: str, data: dict = None):
-        """Add a notification to the queue for Electron to consume."""
+        """Add a notification to the queue for Electron to consume.
+
+        Persists the updated list to disk (atomic tempfile+replace) so the
+        queue survives container restarts — the Electron UI used to lose
+        notifications every redeploy before this change.
+        """
         notif = {
             "id": str(uuid.uuid4()),
             "type": notif_type,
@@ -339,6 +357,24 @@ class TradingEngine:
         if len(self._notifications) > self._max_notifications:
             self._notifications = self._notifications[-self._max_notifications:]
         logger.warning(f"Notification: [{notif_type}] {title} — {body}")
+        # Fire-and-forget disk persist (failures logged but never block).
+        try:
+            import tempfile
+            os.makedirs(os.path.dirname(self._notifications_path), exist_ok=True)
+            d = os.path.dirname(self._notifications_path)
+            fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(self._notifications, f, indent=2)
+                os.replace(tmp, self._notifications_path)
+            except Exception:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                raise
+        except Exception as e:
+            logger.debug(f"Could not persist notifications: {e}")
 
     def get_unread_notifications(self) -> List[Dict]:
         """Get and mark as read all unread notifications."""

@@ -769,9 +769,9 @@ class TradingEngine:
         while self._running:
             tick_count += 1
             try:
-                await asyncio.wait_for(self._tick(), timeout=300)  # 5 min timeout per tick
+                await asyncio.wait_for(self._tick(), timeout=600)  # 10 min timeout per tick
             except asyncio.TimeoutError:
-                logger.error(f"Tick #{tick_count} TIMED OUT after 300s — skipping to next cycle")
+                logger.error(f"Tick #{tick_count} TIMED OUT after 600s — skipping to next cycle")
             except Exception as e:
                 logger.error(f"Error in main loop tick #{tick_count}: {e}")
                 if self._ws_broadcast:
@@ -2304,7 +2304,22 @@ class TradingEngine:
             logger.warning("Scalping: DD limits reached — scalping paused")
             return
 
-        for instrument in get_active_watchlist():
+        full_watchlist = get_active_watchlist()
+        max_per_scan = 50
+        if len(full_watchlist) > max_per_scan:
+            batch_idx = getattr(self, '_scalping_batch_idx', 0)
+            if batch_idx >= len(full_watchlist):
+                batch_idx = 0
+            batch = full_watchlist[batch_idx:batch_idx + max_per_scan]
+            self._scalping_batch_idx = (batch_idx + max_per_scan) % len(full_watchlist)
+            logger.info(
+                f"Round-robin scalping scan: batch {batch_idx // max_per_scan + 1} "
+                f"({len(batch)}/{len(full_watchlist)} instruments)"
+            )
+        else:
+            batch = full_watchlist
+
+        for instrument in batch:
             try:
                 # Skip if already in a trade on this instrument
                 if any(

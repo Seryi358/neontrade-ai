@@ -81,6 +81,14 @@ class Settings(BaseSettings):
     # Alex started trading with 500 EUR. No minimum capital is specified in the mentorship.
     trading_style: str = "day_trading"  # Alex: "el mejor estilo es Day Trading independientemente de la situación"
 
+    # Persisted runtime state (loaded by `_load_risk_overrides` from
+    # `data/risk_config.json` so mode/watchlist survive container restarts).
+    # Default values mirror the historical behaviour but can be overridden
+    # at runtime via the matching API endpoints — and crucially they now
+    # round-trip through the JSON file instead of being lost on redeploy.
+    engine_mode: str = "MANUAL"   # AUTO|MANUAL — overridden by data/risk_config.json
+    enabled_strategies: dict = {}  # legacy slot; engine still owns its own JSON
+
     # Self-Improvement Loop — Phase 1 (auto-ASR after every closed trade).
     # When True, _on_position_closed fires a fire-and-forget AutoASRGenerator
     # task that uses GPT-4o (vision) to fill in the journal's ASR fields
@@ -650,6 +658,15 @@ def _load_risk_overrides():
         "funded_current_phase", "funded_no_overnight", "funded_no_news_trading",
         "funded_no_weekend", "scalping_enabled", "scalping_max_daily_dd",
         "scalping_max_total_dd", "trading_start_hour", "trading_end_hour",
+        # Non-numeric overrides — added 2026-04-22 after a redeploy reset
+        # Sergio's AUTO/276-instrument config back to MANUAL/10-forex defaults.
+        # Without these in the allowlist, runtime mutations (`PUT /watchlist/categories`,
+        # `POST /mode`, `PUT /strategies/config`) wrote to disk but the loader
+        # silently dropped them on the next startup.
+        "active_watchlist_categories",   # list[str]
+        "engine_mode",                   # "AUTO" | "MANUAL"
+        "enabled_strategies",            # dict[str, bool]
+        "trading_style",                 # "day_trading" | "swing" | "scalping"
     }
     # Range validation — must match the API endpoint constraints (routes.py PUT /risk-config)
     _RANGE_CHECKS = {
@@ -689,6 +706,20 @@ def _load_risk_overrides():
                         logging.getLogger(__name__).error(
                             f"risk_config.json: {key}={value!r} out of range [{lo}, {hi}] — SKIPPED"
                         )
+                        continue
+                # Type-shape validation for non-numeric persisted overrides.
+                if key == "active_watchlist_categories":
+                    valid = {"forex", "forex_exotic", "commodities", "indices", "equities", "crypto", "market_view"}
+                    if not isinstance(value, list) or not all(isinstance(c, str) and c in valid for c in value):
+                        continue
+                elif key == "engine_mode":
+                    if value not in ("AUTO", "MANUAL"):
+                        continue
+                elif key == "enabled_strategies":
+                    if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, bool) for k, v in value.items()):
+                        continue
+                elif key == "trading_style":
+                    if value not in ("day_trading", "swing", "scalping"):
                         continue
                 setattr(settings, key, value)
         except Exception as e:

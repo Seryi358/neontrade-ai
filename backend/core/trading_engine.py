@@ -206,9 +206,16 @@ class TradingEngine:
         else:
             self.alert_manager = None
 
-        # Trading mode — MANUAL by default (mentorship: 100% precisión, 0% discreción para principiantes)
-        # User must explicitly switch to AUTO after gaining confidence with 100+ trades
-        self.mode: TradingMode = TradingMode.MANUAL
+        # Trading mode — MANUAL by default (mentorship: 100% precisión, 0% discreción para principiantes).
+        # User must explicitly switch to AUTO after gaining confidence with 100+ trades.
+        # Initial value is overridden from settings.engine_mode (loaded from
+        # data/risk_config.json) so prior AUTO selections survive restarts.
+        _persisted_mode = (getattr(settings, "engine_mode", "MANUAL") or "MANUAL").upper()
+        try:
+            self.mode: TradingMode = TradingMode(_persisted_mode)
+        except ValueError:
+            self.mode = TradingMode.MANUAL
+            logger.warning(f"Invalid persisted engine_mode={_persisted_mode!r}; falling back to MANUAL")
         self.pending_setups: List[PendingSetup] = []
         self._setup_expiry_minutes: int = 30  # Configurable expiry
 

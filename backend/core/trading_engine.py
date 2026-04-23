@@ -656,6 +656,10 @@ class TradingEngine:
         # Register PositionManager callback so its internal closes
         # (TP_max, emergency exit) also persist to DB + trade journal
         self.position_manager.set_on_trade_closed(self._on_position_closed)
+        # Persist SL changes to the trades row (audit trail) — without this the
+        # journal stop_loss column froze at the original SL even though the
+        # position manager moved it intraday (root cause of JPM audit confusion).
+        self.position_manager.set_on_sl_changed(self._on_sl_changed)
 
         self._running = True
         logger.info(f"Watching {len(get_active_watchlist())} pairs")
@@ -1173,6 +1177,33 @@ class TradingEngine:
             self.risk_manager.unregister_all_trades()
             self.position_manager.positions.clear()
 
+    # ── Position-Manager SL change callback ────────────────────
+
+    async def _on_sl_changed(
+        self,
+        trade_id: str,
+        instrument: str,
+        direction: str,
+        old_sl: float,
+        new_sl: float,
+        phase: str,
+    ):
+        """Persist SL moves to the trades row so the audit trail reflects
+        every broker-confirmed stop adjustment. Without this the journal
+        column stayed at the original SL forever, hiding tightening events."""
+        if not self._db:
+            return
+        try:
+            await self._db.update_trade(trade_id, {"stop_loss": new_sl})
+            logger.info(
+                f"{trade_id}: SL persisted {old_sl:.5f} -> {new_sl:.5f} "
+                f"(phase={phase}, instrument={instrument}, direction={direction})"
+            )
+        except Exception as db_err:
+            logger.warning(
+                f"DB SL persist failed for {trade_id}: {db_err}"
+            )
+
     # ── Position-Manager close callback ────────────────────────
 
     async def _on_position_closed(
@@ -1292,6 +1323,41 @@ class TradingEngine:
                 except Exception as e:
                     logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
             self._spawn_bg(_capture_close(), name="capture_trade_close")
+
+        # 9. Self-improvement: AutoASR (fire-and-forget, opt-in via flag).
+        # Uses GPT-4o (vision) to grade execution against the trading plan and
+        # write back to the journal's ASR fields. Safe: fully wrapped, never
+        # blocks the close pipeline. See backend/core/self_improvement.py.
+        if (
+            getattr(settings, "auto_asr_enabled", False)
+            and self.ai_analyzer is not None
+            and self.trade_journal is not None
+        ):
+            async def _auto_asr():
+                try:
+                    from core.self_improvement import AutoASRGenerator, find_close_screenshot
+                    # Wait briefly so the close screenshot file lands on disk
+                    # before we try to attach it to the vision prompt.
+                    await asyncio.sleep(3.0)
+                    record = next(
+                        (t for t in self.trade_journal.get_trades(50) if t.get("trade_id") == trade_id),
+                        None,
+                    )
+                    if not record:
+                        logger.debug(f"AutoASR skipped: trade {trade_id} not yet in journal")
+                        return
+                    journal_path = getattr(self.trade_journal, "_data_path", "data/trade_journal.json")
+                    screenshots_dir = os.path.join(os.path.dirname(os.path.abspath(journal_path)), "screenshots")
+                    shot = find_close_screenshot(screenshots_dir, trade_id)
+                    gen = AutoASRGenerator(
+                        openai_client=self.ai_analyzer.client,
+                        trade_journal=self.trade_journal,
+                        model=getattr(settings, "auto_asr_model", "gpt-4o"),
+                    )
+                    await gen.generate_asr(record, screenshot_path=shot)
+                except Exception as e:
+                    logger.warning(f"AutoASR background task failed for {trade_id}: {e}")
+            self._spawn_bg(_auto_asr(), name="auto_asr")
 
     # ── Position Sync ────────────────────────────────────────────
 
@@ -2090,8 +2156,28 @@ class TradingEngine:
                     if setup is None:
                         continue
 
-                    # Re-generate explanation with the setup signal context
-                    # (setup is TradeRisk, not SetupSignal, so we pass what we can)
+                    # Re-generate explanation with the SetupSignal context now
+                    # that strategies have committed to a trade. Without this,
+                    # the persisted trade reasoning ends with the
+                    # "Buena estructura pero sin señal de entrada clara aún.
+                    #  Monitorear." line from the analysis-phase explanation
+                    # (signal=None branch in explanation_engine), which made the
+                    # JPM audit trail look like the engine had ignored its own
+                    # advice. _detect_setup stashes the raw SetupSignal on
+                    # `trade_risk._signal`.
+                    real_signal = getattr(setup, "_signal", None)
+                    if real_signal is not None:
+                        try:
+                            explanation = self.explanation_engine.generate_full_analysis(
+                                instrument=instrument,
+                                analysis_result=analysis,
+                                setup_signal=real_signal,
+                            )
+                            self._latest_explanations[instrument] = explanation
+                        except Exception as e:
+                            logger.debug(
+                                f"Explanation regen for {instrument} failed (non-blocking): {e}"
+                            )
                     await self._handle_setup(setup, analysis, explanation)
 
             except Exception as e:
@@ -2367,6 +2453,11 @@ class TradingEngine:
         trade_risk._ai_score = getattr(signal, '_ai_score', 0)
         trade_risk._ai_recommendation = getattr(signal, '_ai_recommendation', '')
         trade_risk._ai_reasoning = getattr(signal, '_ai_reasoning', '')
+        # Carry the raw SetupSignal so the scan loop can re-generate the
+        # explanation with signal context (otherwise the pre-setup "Monitorear"
+        # recommendation leaks into the persisted trade reasoning — root cause
+        # confirmed 2026-04-22 JPM forensic audit).
+        trade_risk._signal = signal
         return trade_risk
 
     def _calculate_sl_tp(
@@ -2477,6 +2568,18 @@ class TradingEngine:
 
         parts.append(f"R:R = 1:{setup.reward_risk_ratio:.2f}")
         parts.append(explanation.recommendation)
+
+        # BLACK is contra-trend by design (Elliott Wave 1 anticipation): the
+        # SELL/BUY direction can look opposite to the HTF bias to a casual
+        # reader. Surface this so the audit trail does not look like the engine
+        # contradicted itself (added 2026-04-22 after JPM forensic audit).
+        if (setup.strategy_variant or "").upper() == "BLACK":
+            parts.append(
+                "Nota: BLACK es estrategia CONTRATENDENCIA (anticipacion Onda 1 "
+                "Elliott). Cuando el sesgo HTF es ALCISTA, BLACK busca VENTA; "
+                "cuando es BAJISTA, busca COMPRA. La aparente contradiccion "
+                "direccion vs sesgo es esperada y correcta."
+            )
 
         return "\n".join(parts)
 

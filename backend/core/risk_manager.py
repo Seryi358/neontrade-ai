@@ -522,11 +522,14 @@ class RiskManager:
             if len(parts) > 1:
                 active_instruments.add(parts[0])
 
-        # Check all correlation groups (forex, indices, crypto)
+        # Check all correlation groups (forex, indices, crypto, equities).
+        # Equities added after 2026-04-22 BAC+JPM double-BLACK fired at 1% each
+        # because the filter had no bank cluster.
         all_groups = (
             settings.correlation_groups
             + getattr(settings, 'indices_correlation_groups', [])
             + getattr(settings, 'crypto_correlation_groups', [])
+            + getattr(settings, 'equities_correlation_groups', [])
         )
 
         for group in all_groups:

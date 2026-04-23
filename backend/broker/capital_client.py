@@ -528,14 +528,88 @@ class CapitalClient(BaseBroker):
 
     # ── Instrument Resolution ────────────────────────────────────
 
+    # Known instruments that the Capital.com search returns ambiguous matches
+    # for. Each maps our canonical instrument to the broker-side epic. Without
+    # this map the previous "shortest epic wins" fallback resolved e.g.
+    # BCO_USD -> BTC_USD (returned $78,345 instead of ~$85), BA -> wrong share
+    # ($21 instead of $200+), and various commodities to decimal-shifted
+    # decoys. Add entries here as they are confirmed against Capital.com.
+    _EPIC_MAP_OVERRIDE: Dict[str, str] = {
+        # Energies / commodities — Capital.com epics
+        "BCO_USD":     "OIL_BRENT",     # Brent crude
+        "WTICO_USD":   "OIL_CRUDE",     # WTI crude
+        "NATGAS_USD":  "NATURALGAS",
+        "WHEAT_USD":   "WHEAT",
+        "CORN_USD":    "CORN",
+        "SOYBN_USD":   "SOYBEAN",
+        "SUGAR_USD":   "SUGAR",
+        "XAU_USD":     "GOLD",
+        "XAG_USD":     "SILVER",
+        "XPT_USD":     "PLATINUM",
+        "XPD_USD":     "PALLADIUM",
+        "XCU_USD":     "COPPER",
+        # Indices — common Capital.com aliases
+        "US30_USD":    "US30",
+        "US2000_USD":  "RUSSELL",
+        "NAS100_USD":  "USTEC",
+        "SPX500_USD":  "US500",
+        "DE30_EUR":    "GERMANY40",
+        "FR40_EUR":    "FRANCE40",
+        "UK100_GBP":   "UK100",
+        "JP225_USD":   "J225",
+        "AU200_AUD":   "AU200",
+        "HK33_HKD":    "HK50",
+        "CN50_USD":    "CHINA50",
+    }
+
+    @staticmethod
+    def _epic_matches_instrument(epic: str, instrument: str) -> bool:
+        """Heuristic safety check: an epic returned by search must "look like"
+        the instrument we asked for. Specifically: when our instrument has a
+        clear non-currency root token (e.g. BCO_USD has root "BCO", BAC has
+        root "BAC"), the epic MUST contain that root case-insensitively. This
+        blocks the catastrophic case where searching "BCO/USD" returned BTC.
+        Forex pairs (both 3-letter ISO) skip the check because the canonical
+        forex epics (EURUSD/GBPUSD/etc.) follow a deterministic shape.
+        """
+        if not epic:
+            return False
+        epic_up = epic.upper()
+        # Forex: both halves are 3-letter ISO currencies → trust the search
+        parts = instrument.replace("/", "_").split("_")
+        if len(parts) == 2 and all(len(p) == 3 and p.isalpha() for p in parts):
+            return True
+        # Single-token (stock/ETF) → epic must contain the literal ticker
+        if len(parts) == 1:
+            return parts[0].upper() in epic_up
+        # Multi-token where the first part is NOT a 3-letter ISO currency:
+        # require the first token (the asset root, e.g. "BCO", "NAS100") in
+        # the epic so we don't accidentally match the suffix currency.
+        first = parts[0].upper()
+        if not (len(first) == 3 and first.isalpha()):
+            return first in epic_up
+        return True
+
     async def _resolve_epic(self, instrument: str) -> str:
         """
         Convert our instrument name (e.g., EUR_USD) to Capital.com epic.
         Capital.com uses names like 'EURUSD' for forex.
         Prefers spot/CFD instruments over forwards/futures.
+
+        Hardened 2026-04-22 after subagent audit found the previous fallback
+        ("shortest epic wins") silently rerouted BCO_USD → BTC_USD (1000× wrong
+        notional). Now: hardcoded override map first, then exact-epic match,
+        then strict instrument-aware filter on search results.
         """
         if instrument in self._epic_cache:
             return self._epic_cache[instrument]
+
+        # Override map: known broker-side epic for instruments where the search
+        # heuristic is unreliable (commodities, indices).
+        override = self._EPIC_MAP_OVERRIDE.get(instrument)
+        if override:
+            self._epic_cache[instrument] = override
+            return override
 
         # Try common forex format: EUR_USD -> EURUSD
         epic_guess = instrument.replace("_", "").replace("/", "")
@@ -554,23 +628,33 @@ class CapitalClient(BaseBroker):
                         self._epic_cache[instrument] = epic_guess
                         return epic_guess
 
-                # Prefer CURRENCIES type for forex pairs, or shortest epic
-                # (forwards/futures have suffixes like M2026, U2026)
+                # Filter to candidates that actually look like our instrument
+                candidates = [m for m in markets if self._epic_matches_instrument(m["epic"], instrument)]
+                if not candidates:
+                    logger.warning(
+                        f"_resolve_epic: search for {instrument!r} returned "
+                        f"{len(markets)} markets but NONE match the instrument "
+                        f"root token. Refusing to cache an ambiguous epic. "
+                        f"Sample epics: {[m['epic'] for m in markets[:5]]}"
+                    )
+                    # Do NOT cache the bad guess — let later attempts retry.
+                    return epic_guess
+
+                # Among the matching candidates, prefer:
+                # 1. exact case-insensitive match to our guess
+                # 2. CURRENCIES type for forex / SHARES for stocks / OPTIONS off
+                # 3. shortest epic (spot, not forwards)
                 best = None
-                for m in markets:
+                for m in candidates:
                     epic = m["epic"]
                     inst_type = m.get("instrumentType", "")
-                    # Exact match on stripped name = spot instrument
                     if epic.upper() == epic_guess.upper():
                         best = epic
                         break
-                    # For forex, prefer CURRENCIES type
                     if inst_type == "CURRENCIES" and best is None:
                         best = epic
-                    # For stocks, prefer SHARES type
                     elif inst_type == "SHARES" and best is None:
                         best = epic
-                    # Fallback: prefer shortest epic (spot, not forwards)
                     elif best is None or len(epic) < len(best):
                         best = epic
 

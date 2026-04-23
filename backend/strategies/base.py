@@ -4034,9 +4034,14 @@ class BlackStrategy(BaseStrategy):
                 return {}
 
         # BLACK TP_max: Fibonacci 1.618 extension (projected Wave 1 target).
-        # BLACK anticipates a trend reversal — if the reversal develops into a full
-        # Wave 1, the Fib 1.618 extension is the maximum ambitious target.
+        # Mentoría audit 2026-04-22: PDF pg.6 "Black" does NOT list a tp_max —
+        # the rule is "TP en EMA 50 4H SIEMPRE". The Fib extension is kept as an
+        # ambitious "reach" target ONLY for the post-TP1 AGGRESSIVE phase, but
+        # capped at 1.5× tp1 distance so equities with wide daily swings can
+        # never render absurd 30-40% targets (e.g. BAC tp_max=32.57 from entry
+        # 53.42 observed live before this fix).
         tp1 = result.get("tp1")
+        TP_MAX_REACH_MULTIPLIER = 1.5
         if tp1:
             fib_1618 = (
                 analysis.fibonacci_levels.get("ext_bull_1.618") if direction == "BUY"
@@ -4046,15 +4051,28 @@ class BlackStrategy(BaseStrategy):
                 analysis.fibonacci_levels.get("ext_bull_1.272") if direction == "BUY"
                 else analysis.fibonacci_levels.get("ext_bear_1.272")
             )
-            # Try 1.618 first, then 1.272 — must be beyond tp1
-            if fib_1618:
-                valid = (fib_1618 > tp1) if direction == "BUY" else (fib_1618 < tp1)
-                if valid:
-                    result["tp_max"] = fib_1618
-            if "tp_max" not in result and fib_1272:
-                valid = (fib_1272 > tp1) if direction == "BUY" else (fib_1272 < tp1)
-                if valid:
-                    result["tp_max"] = fib_1272
+            tp1_distance = abs(tp1 - entry_price)
+            max_reach = tp1_distance * TP_MAX_REACH_MULTIPLIER
+            if max_reach > 0:
+                ceiling = (entry_price + max_reach) if direction == "BUY" else (entry_price - max_reach)
+
+                def _accept(cand: float) -> Optional[float]:
+                    beyond_tp1 = (cand > tp1) if direction == "BUY" else (cand < tp1)
+                    if not beyond_tp1:
+                        return None
+                    within_cap = (cand <= ceiling) if direction == "BUY" else (cand >= ceiling)
+                    # If the fib is farther than the cap, clamp to the cap itself.
+                    return cand if within_cap else ceiling
+
+                # Try 1.618 first, then 1.272 — must be beyond tp1 AND within reach cap
+                if fib_1618:
+                    accepted = _accept(fib_1618)
+                    if accepted is not None:
+                        result["tp_max"] = accepted
+                if "tp_max" not in result and fib_1272:
+                    accepted = _accept(fib_1272)
+                    if accepted is not None:
+                        result["tp_max"] = accepted
 
         return result
 

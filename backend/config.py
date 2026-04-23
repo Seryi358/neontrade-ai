@@ -81,6 +81,25 @@ class Settings(BaseSettings):
     # Alex started trading with 500 EUR. No minimum capital is specified in the mentorship.
     trading_style: str = "day_trading"  # Alex: "el mejor estilo es Day Trading independientemente de la situación"
 
+    # Self-Improvement Loop — Phase 1 (auto-ASR after every closed trade).
+    # When True, _on_position_closed fires a fire-and-forget AutoASRGenerator
+    # task that uses GPT-4o (vision) to fill in the journal's ASR fields
+    # based on the trade record + close screenshot. Default OFF — opt in once
+    # you've reviewed cost/quality on a few trades. Requires OPENAI_API_KEY.
+    # Tuning proposals (Phase 2) are NOT in this MVP and are gated separately.
+    auto_asr_enabled: bool = False
+    auto_asr_model: str = "gpt-4o"
+
+    # Per-asset-class style override (added 2026-04-22 after mentoría audit C1).
+    # Alex (`Watchlist para Acciones`): "yo hago swing trading en acciones, y
+    #  swing trading en acciones de Estados Unidos". Treating equities as
+    # day_trading violated mentorship — when True, equity instruments are sized
+    # under the SWING style regardless of the global `trading_style`.
+    # Default OFF for this deploy: enabling without exhaustive testing changes
+    # HTF/LTF timeframe pyramids inside strategies and could silently kill all
+    # equity setups. Flip to True once the swing equity flow has been backtested.
+    swing_for_equities: bool = False
+
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # Trading Plan PDF: 0.50% for scalping
@@ -558,6 +577,55 @@ class Settings(BaseSettings):
         ["US30_USD", "SPX500_USD", "NAS100_USD"],
         ["DE30_EUR", "FR40_EUR"],
         ["JP225_USD", "AU200_AUD"],
+    ]
+
+    # US equity correlation groups (added 2026-04-22 after BAC+JPM double-BLACK).
+    # Watchlist clusters symbols by sector; without these groups the risk filter
+    # treats each ticker as independent and two same-sector trades fire at 1% each
+    # instead of 0.75% (mentorship cap for correlated pairs).
+    equities_correlation_groups: List[List[str]] = [
+        # Big US banks — heavily correlated on rates / credit cycle
+        ["JPM", "BAC", "GS", "MS", "WFC", "C", "KBE"],
+        # Airlines
+        ["AAL", "DAL", "UAL", "JETS"],
+        # Semiconductors + semi ETFs
+        ["NVDA", "SOXX", "PSI", "XSD", "PXQ"],
+        # Big cloud / software ETFs
+        ["CLOU", "SKYY", "IGV", "PSJ", "FDN", "PNQI"],
+        # Cyber / AI thematic
+        ["HACK", "CIBR", "IHAK", "EMQQ"],
+        # ARK innovation family
+        ["ARKK", "ARKW", "ARKF", "ARKG", "ARKQ", "ARKX", "PRNT"],
+        # Clean energy / solar
+        ["ICLN", "TAN", "FAN", "KRBN"],
+        # Defense / aerospace
+        ["XAR", "ITA", "PPA", "BA", "LMT", "RTX", "NOC", "GD", "TDG", "AVAV"],
+        # Space
+        ["IRDM", "SPCE"],
+        # Biotech
+        ["XBI", "IBB", "FBT"],
+        # Gaming / eSports
+        ["ESPO", "HERO", "GAMR", "NERD", "EA"],
+        # Uranium / nuclear
+        ["URA", "CCJ", "NXE", "DNN", "UUUU"],
+        # Agriculture
+        ["COW", "MOO", "WOOD"],
+        # EVs / battery tech
+        ["NIO", "FCEL", "PLUG", "MGA"],
+        # China / big tech
+        ["BIDU", "YEXT"],
+        # Cannabis
+        ["MJ", "MSOS", "TLRY", "CGC", "ACB", "CRON", "SNDL", "GRWG", "VFF", "YOLO", "POTX"],
+        # Tobacco + vape
+        ["MO", "VUZI"],
+        # Crypto-equities (co-move with BTC)
+        ["COIN", "MSTR", "MARA", "RIOT", "HUT", "BLOK", "BITO", "GBTC"],
+        # Precious metals miners / ETFs
+        ["GDX", "GLD", "SLV", "XME", "PALL", "PPLT"],
+        # Leveraged miners (extreme correlation with gold)
+        ["DUST", "JNUG", "NUGT"],
+        # Israeli tech
+        ["IZRL"],
     ]
 
     # model_config defined at class level above (Pydantic v2 ConfigDict)

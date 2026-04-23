@@ -1948,6 +1948,63 @@ class ASRRequest(BaseModel):
     lessons: Optional[str] = None
 
 
+@router.post("/self-improvement/asr/{trade_id}")
+async def trigger_auto_asr(trade_id: str):
+    """Manually trigger AutoASR generation for an existing closed trade.
+
+    Useful for backfilling ASR on trades that closed before
+    ``settings.auto_asr_enabled`` was turned on, or for re-running ASR
+    after fixing the prompt. Requires ``OPENAI_API_KEY`` and an
+    initialized OpenAIAnalyzer + TradeJournal on the engine.
+    """
+    from main import engine
+    from config import settings as _s
+    import os as _os
+    if engine is None:
+        raise HTTPException(503, "Engine not initialized")
+    if engine.ai_analyzer is None or engine.trade_journal is None:
+        raise HTTPException(503, "AI analyzer or trade journal not initialized")
+    record = next(
+        (t for t in engine.trade_journal.get_trades(9999) if t.get("trade_id") == trade_id),
+        None,
+    )
+    if record is None:
+        raise HTTPException(404, f"Trade {trade_id} not found in journal")
+    from core.self_improvement import AutoASRGenerator, find_close_screenshot
+    journal_path = getattr(engine.trade_journal, "_data_path", "data/trade_journal.json")
+    screenshots_dir = _os.path.join(_os.path.dirname(_os.path.abspath(journal_path)), "screenshots")
+    shot = find_close_screenshot(screenshots_dir, trade_id)
+    gen = AutoASRGenerator(
+        openai_client=engine.ai_analyzer.client,
+        trade_journal=engine.trade_journal,
+        model=getattr(_s, "auto_asr_model", "gpt-4o"),
+    )
+    result = await gen.generate_asr(record, screenshot_path=shot)
+    return {
+        "trade_id": result.trade_id,
+        "success": result.success,
+        "fields_filled": result.fields_filled,
+        "vision_used": result.vision_used,
+        "error": result.error,
+    }
+
+
+@router.get("/self-improvement/status")
+async def self_improvement_status():
+    """Report whether self-improvement features are wired up and enabled."""
+    from main import engine
+    from config import settings as _s
+    return {
+        "auto_asr_enabled": getattr(_s, "auto_asr_enabled", False),
+        "auto_asr_model": getattr(_s, "auto_asr_model", "gpt-4o"),
+        "openai_configured": bool((getattr(_s, "openai_api_key", "") or "").strip()),
+        "ai_analyzer_ready": (engine is not None and engine.ai_analyzer is not None),
+        "trade_journal_ready": (engine is not None and engine.trade_journal is not None),
+        "swing_for_equities": getattr(_s, "swing_for_equities", False),
+        "equities_correlation_groups_count": len(getattr(_s, "equities_correlation_groups", [])),
+    }
+
+
 @router.put("/journal/trades/{trade_id}/asr")
 async def update_trade_asr(trade_id: str, req: ASRRequest):
     """Submit ASR (Auto Self Review) checklist for a trade.

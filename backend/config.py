@@ -81,6 +81,15 @@ class Settings(BaseSettings):
     # Alex started trading with 500 EUR. No minimum capital is specified in the mentorship.
     trading_style: str = "day_trading"  # Alex: "el mejor estilo es Day Trading independientemente de la situación"
 
+    # Self-Improvement Loop — Phase 1 (auto-ASR after every closed trade).
+    # When True, _on_position_closed fires a fire-and-forget AutoASRGenerator
+    # task that uses GPT-4o (vision) to fill in the journal's ASR fields
+    # based on the trade record + close screenshot. Default OFF — opt in once
+    # you've reviewed cost/quality on a few trades. Requires OPENAI_API_KEY.
+    # Tuning proposals (Phase 2) are NOT in this MVP and are gated separately.
+    auto_asr_enabled: bool = False
+    auto_asr_model: str = "gpt-4o"
+
     # Per-asset-class style override (added 2026-04-22 after mentoría audit C1).
     # Alex (`Watchlist para Acciones`): "yo hago swing trading en acciones, y
     #  swing trading en acciones de Estados Unidos". Treating equities as

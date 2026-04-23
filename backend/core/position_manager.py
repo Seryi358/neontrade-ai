@@ -265,6 +265,14 @@ class PositionManager:
             Callable[..., Awaitable[None]]
         ] = None
 
+        # Callback for stop-loss change events (persists each move to the trades
+        # row so the audit log can reconstruct the SL timeline). Without this
+        # the journal `stop_loss` column kept the original SL forever, hiding
+        # the truth that the JPM trade closed at a tightened SL not the entry SL.
+        self._on_sl_changed: Optional[
+            Callable[..., Awaitable[None]]
+        ] = None
+
         # Partial profit taking: Alex doesn't use it but the mentorship
         # teaches it as optional and CPA recommends partial closes at key levels.
         self.allow_partial_profits = allow_partial_profits
@@ -309,6 +317,20 @@ class PositionManager:
             f"crypto_cpa_ema={self._crypto_cpa_ema_key}, "
             f"partial_profits={self.allow_partial_profits}"
         )
+
+    def set_on_sl_changed(
+        self,
+        callback: Callable[..., Awaitable[None]],
+    ):
+        """Register a callback fired after each successful broker SL update.
+
+        Signature:
+            async def on_sl_changed(
+                trade_id: str, instrument: str, direction: str,
+                old_sl: float, new_sl: float, phase: str,
+            ) -> None
+        """
+        self._on_sl_changed = callback
 
     def set_on_trade_closed(
         self,
@@ -1294,10 +1316,27 @@ class PositionManager:
                     f"{pos.trade_id}: Blocked SL move UP for SELL: {pos.current_sl:.5f} -> {new_sl:.5f}"
                 )
                 return False
+        old_sl = pos.current_sl
         try:
             result = await self.broker.modify_trade_sl(pos.trade_id, new_sl)
             if result:
                 pos.current_sl = new_sl
+                # Persist the new SL so the audit log reflects reality.
+                # Errors are swallowed to never block trading on an audit failure.
+                if self._on_sl_changed is not None:
+                    try:
+                        await self._on_sl_changed(
+                            trade_id=pos.trade_id,
+                            instrument=pos.instrument,
+                            direction=pos.direction,
+                            old_sl=old_sl,
+                            new_sl=new_sl,
+                            phase=getattr(pos.phase, "value", str(pos.phase)),
+                        )
+                    except Exception as cb_err:
+                        logger.warning(
+                            f"on_sl_changed callback failed for {pos.trade_id}: {cb_err}"
+                        )
                 return True
             else:
                 logger.warning(f"Broker rejected SL update for {pos.trade_id}: {pos.current_sl} -> {new_sl}")

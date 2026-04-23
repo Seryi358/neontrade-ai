@@ -85,16 +85,31 @@ class SetupSignal:
 # This mapping ensures BLUE/RED/PINK/WHITE/BLACK strategies work correctly
 # for ALL three trading styles, not just day trading.
 
-def _get_trading_style() -> str:
-    """Get current trading style from config."""
+def _get_trading_style(instrument: Optional[str] = None) -> str:
+    """Get the trading style for ``instrument``, honoring per-asset-class overrides.
+
+    Mentoría audit C1 (Watchlist para Acciones): Alex says he does SWING
+    trading on US equities, not day trading. When ``settings.swing_for_equities``
+    is True and ``instrument`` lives in ``settings.equities_watchlist``, this
+    returns ``"swing"`` regardless of the global ``settings.trading_style``.
+    Falls back to the global style for everything else (or when no instrument
+    is provided).
+    """
     try:
-        return settings.trading_style
+        base = settings.trading_style
     except Exception:
         return "day_trading"
+    if instrument and getattr(settings, "swing_for_equities", False):
+        try:
+            if instrument in settings.equities_watchlist:
+                return "swing"
+        except Exception:
+            pass
+    return base
 
 
-def _tf_ema(role: str, period: int = 50) -> str:
-    """Get the EMA key for a given role in the current trading style.
+def _tf_ema(role: str, period: int = 50, instrument: Optional[str] = None) -> str:
+    """Get the EMA key for a given role in the trading style of ``instrument``.
 
     Roles (TradingLab MTFA):
       - 'setup': The timeframe where strategies detect patterns (1H for day, D for swing)
@@ -103,8 +118,13 @@ def _tf_ema(role: str, period: int = 50) -> str:
       - 'direction': The directional timeframe (D for day, W or M for swing)
 
     Returns EMA key like 'EMA_H1_50' or 'EMA_D_50'.
+
+    When ``instrument`` is provided and ``settings.swing_for_equities`` is on,
+    equity instruments use the SWING pyramid (W direction → D pattern → H1
+    entry → M15 exec) so the strategy detects setups consistent with how Alex
+    teaches stock trading.
     """
-    style = _get_trading_style()
+    style = _get_trading_style(instrument)
     tf_map = {
         "day_trading": {"setup": "H1", "confirm": "H4", "exec": "M5", "direction": "D"},
         "swing": {"setup": "D", "confirm": "W", "exec": "H1", "direction": "M"},
@@ -233,7 +253,7 @@ def _is_at_key_level(analysis: AnalysisResult, direction: str) -> Tuple[bool, fl
         return False, 0.0, "No se puede determinar precio actual"
 
     # Scalping uses wider tolerance (H1 S/R levels are broader than daily)
-    style = _get_trading_style()
+    style = _get_trading_style(analysis.instrument)
     tol_pct = 0.008 if style == "scalping" else 0.003  # 0.8% scalping, 0.3% day/swing
     tolerance = current_price * tol_pct
 
@@ -272,7 +292,7 @@ def _check_rcc_confirmation(analysis, ema_key: str, direction: str) -> bool:
     candles = getattr(analysis, 'last_candles', {}).get(candle_tf, [])
     # Fallback: use exec TF candles (style-adaptive, not hardcoded M5)
     if len(candles) < 3:
-        style = _get_trading_style()
+        style = _get_trading_style(analysis.instrument)
         _exec_fallback = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
         fallback_tf = _exec_fallback.get(style, "M5")
         candles = getattr(analysis, 'last_candles', {}).get(fallback_tf, [])
@@ -1139,7 +1159,7 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
     B: Simple impulse-pullback with no prior reversal pattern (neutral, no bonus)
     C: Breaks 1H EMA 50 but rejects 4H EMA 50 BEFORE pullback (most restrictive, LOWEST confidence -5)
     """
-    confirm_ema_key = _tf_ema("confirm", 50)
+    confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
     ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
 
     # Variante A: structural double bottom/top detection
@@ -1197,7 +1217,7 @@ def _classify_blue_variant(analysis: AnalysisResult, direction: str) -> str:
         # Check for rejection: price approached confirm EMA and bounced away
         # Style-adaptive candle source: day=M5, scalping=M5, swing=H1
         _variant_tf = {"day_trading": "M5", "swing": "H1", "scalping": "M5"}
-        variant_candle_tf = _variant_tf.get(_get_trading_style(), "M5")
+        variant_candle_tf = _variant_tf.get(_get_trading_style(analysis.instrument), "M5")
         m5_candles = getattr(analysis, 'last_candles', {}).get(variant_candle_tf, [])
         if len(m5_candles) >= 3:
             # Look for a candle that wicked through EMA 4H but closed on the other side (rejection)
@@ -1549,7 +1569,7 @@ class BlueStrategy(BaseStrategy):
             failed.append("Paso 2: Sin desaceleracion clara en diario")
 
         # --- Paso 3: Cambio de tendencia en setup TF (1H for day, Daily for swing) ---
-        setup_ema_key = _tf_ema("setup", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
         ema_1h_break, ema_1h_desc = _check_ema_break(analysis, setup_ema_key, direction)
         if ema_1h_break:
             score += 20.0
@@ -1562,7 +1582,7 @@ class BlueStrategy(BaseStrategy):
         # --- TradingLab rule: BLUE requires confirm-TF EMA 50 NOT broken ---
         # If confirm EMA (4H for day, Weekly for swing) is ALSO broken, this is
         # a RED (both broken), not a BLUE (only setup broken).
-        confirm_ema_key = _tf_ema("confirm", 50)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         confirm_break, confirm_desc = _check_ema_break(analysis, confirm_ema_key, direction)
         if confirm_break:
             failed.append(
@@ -1582,8 +1602,8 @@ class BlueStrategy(BaseStrategy):
             return None
 
         # Style-adaptive EMA keys (same as check_htf_conditions)
-        setup_ema_key = _tf_ema("setup", 50)
-        confirm_ema_key = _tf_ema("confirm", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
 
         # TradingLab: Volume confirmation - confluence scoring, not hard block
         # The mentorship does NOT make volume a hard requirement for every entry.
@@ -1645,8 +1665,8 @@ class BlueStrategy(BaseStrategy):
         #   day: M5 MA50 > M5 diagonal > M2 MA50 > M2 diagonal
         #   swing: H1 MA50 > H1 diagonal (Alex: "bajamos a gráfico de una hora")
         #   scalping: M1 MA50 > M1 diagonal (Alex: "ruptura en un minuto")
-        exec_ema_key = _tf_ema("exec", 50)
-        style = _get_trading_style()
+        exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
+        style = _get_trading_style(analysis.instrument)
         _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
@@ -1805,7 +1825,7 @@ class BlueStrategy(BaseStrategy):
             take_profit_1=tp1,
             take_profit_max=tp_levels.get("tp_max"),
             confidence=confidence,
-            reasoning=f"BLUE {variant}: {_tf_ema('setup', 50).split('_')[1]} trend change at {_tf_ema('direction', 50).split('_')[1]} S/R. Pullback to EMA50 + Fib zone. Entry on {exec_tf} break.",
+            reasoning=f"BLUE {variant}: {_tf_ema('setup', 50, analysis.instrument).split('_')[1]} trend change at {_tf_ema('direction', 50, analysis.instrument).split('_')[1]} S/R. Pullback to EMA50 + Fib zone. Entry on {exec_tf} break.",
             explanation_es=explanation_es,
             elliott_wave_phase="Onda 1-2",
             timeframes_analyzed={
@@ -1869,7 +1889,7 @@ class BlueStrategy(BaseStrategy):
         Swing adaptation: TP_max scales up to EMA 50 Weekly for swing trading.
         """
         # Use style-adaptive confirm-timeframe EMA (4H for day, Weekly for swing, M15 for scalping)
-        confirm_ema_key = _tf_ema("confirm", 50)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
         resistances = analysis.key_levels.get("resistances", [])
         supports = analysis.key_levels.get("supports", [])
@@ -2020,8 +2040,8 @@ class RedStrategy(BaseStrategy):
         # --- Paso 3: Cambio de tendencia en confirm + setup TF (AMBAS EMA 50 rotas) ---
         # TradingLab: RED requires BOTH setup AND confirm EMA 50 broken.
         # Style-adaptive: day=H1+H4, swing=D+W, scalping=M5+M15
-        setup_ema_key = _tf_ema("setup", 50)
-        confirm_ema_key = _tf_ema("confirm", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         ema_4h_break, ema_4h_desc = _check_ema_break(analysis, confirm_ema_key, direction)
         ema_1h_break, ema_1h_desc = _check_ema_break(analysis, setup_ema_key, direction)
 
@@ -2090,11 +2110,11 @@ class RedStrategy(BaseStrategy):
         # TradingLab: be "permisivos" with the setup EMA break during pullback,
         # BUT if the break is "uncontrolled" (price continues strongly through
         # with large bodies, no pullback), it's NOT a RED - it's just momentum.
-        setup_ema_key = _tf_ema("setup", 50)
-        confirm_ema_key = _tf_ema("confirm", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         ema_setup_val = _ema_val(analysis, setup_ema_key)
         # Style-adaptive candle timeframe and lookback for uncontrolled break check
-        style = _get_trading_style()
+        style = _get_trading_style(analysis.instrument)
         _uncontrolled_tf = {"day_trading": "M5", "swing": "H1", "scalping": "M5"}
         _uncontrolled_lookback = {"day_trading": 3, "swing": 3, "scalping": 5}
         _uncontrolled_threshold = {"day_trading": 2, "swing": 2, "scalping": 3}
@@ -2174,8 +2194,8 @@ class RedStrategy(BaseStrategy):
         #   day: M5 MA50 > M5 diagonal > M2 MA50 > M2 diagonal
         #   swing: H1 MA50 > H1 diagonal (Alex: "bajamos a gráfico de una hora y ejecutamos")
         #   scalping: M1 MA50 > M1 diagonal (Alex: "ruptura en un minuto")
-        exec_ema_key = _tf_ema("exec", 50)
-        style = _get_trading_style()
+        exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
+        style = _get_trading_style(analysis.instrument)
         # Secondary EMA: day uses M2≈M5_EMA20, swing/scalping have no secondary per mentorship
         _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
@@ -2314,7 +2334,7 @@ class RedStrategy(BaseStrategy):
             take_profit_1=tp1,
             take_profit_max=tp_max,
             confidence=confidence,
-            reasoning=f"RED: {_tf_ema('confirm', 50).split('_')[1]} trend change confirmed. Pullback to EMA50 + Fib. Entry on {exec_tf} break.",
+            reasoning=f"RED: {_tf_ema('confirm', 50, analysis.instrument).split('_')[1]} trend change confirmed. Pullback to EMA50 + Fib. Entry on {exec_tf} break.",
             explanation_es=explanation_es,
             elliott_wave_phase="Onda 2->3 o 4->5",
             timeframes_analyzed={
@@ -2334,7 +2354,7 @@ class RedStrategy(BaseStrategy):
         - Scalping: SL en nivel Fibonacci 0.618 (Workshop de Scalping, Estrategia RED).
           Alex: "stop loss en el nivel de 0.618 de Fibonacci"
         """
-        style = _get_trading_style()
+        style = _get_trading_style(analysis.instrument)
 
         # Scalping RED: SL at Fibonacci 0.618 level (Workshop de Scalping)
         if style == "scalping":
@@ -2360,7 +2380,7 @@ class RedStrategy(BaseStrategy):
 
         # Day trading / Swing: SL debajo de EMA 50 confirm TF o minimo anterior
         # Style-adaptive: day=H4, swing=W, scalping=M15 (with hardcoded fallback)
-        confirm_ema_key = _tf_ema("confirm", 50)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
@@ -2615,8 +2635,8 @@ class PinkStrategy(BaseStrategy):
         # see if the EMA WAS broken during the correction, not just current position.
         # Style-adaptive: day=H1+H4, swing=D+W, scalping=M5+M15
         opposite = "SELL" if direction == "BUY" else "BUY"
-        setup_ema_key = _tf_ema("setup", 50)
-        confirm_ema_key = _tf_ema("confirm", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
 
         # Check if setup EMA was historically broken during correction (last 20 candles)
         ema_h1_val = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
@@ -2695,7 +2715,7 @@ class PinkStrategy(BaseStrategy):
         # NOT re-check EMA direction (which would conflict with HTF check).
         # Style-adaptive: day=H1, swing=D, scalping=M5
         price = _get_current_price_proxy(analysis)
-        setup_ema_key = _tf_ema("setup", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
         ema_1h = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
         if price and ema_1h:
             dist = abs(price - ema_1h) / ema_1h * 100
@@ -2804,8 +2824,8 @@ class PinkStrategy(BaseStrategy):
         # NOTE: Per mentorship, the exec EMA will NOT be respected throughout the
         # Pink pattern due to volatility. Diagonal check is MORE likely to be
         # the valid entry for PINK, so diagonal gets equal/higher confidence.
-        exec_ema_key = _tf_ema("exec", 50)
-        style = _get_trading_style()
+        exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
+        style = _get_trading_style(analysis.instrument)
         _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
@@ -2947,7 +2967,7 @@ class PinkStrategy(BaseStrategy):
             take_profit_1=tp1,
             take_profit_max=tp_levels.get("tp_max"),
             confidence=confidence,
-            reasoning=f"PINK: Corrective pattern in {_tf_ema('setup', 50).split('_')[1]} within {_tf_ema('confirm', 50).split('_')[1]} trend. Entry at pattern completion on {exec_tf} break.",
+            reasoning=f"PINK: Corrective pattern in {_tf_ema('setup', 50, analysis.instrument).split('_')[1]} within {_tf_ema('confirm', 50, analysis.instrument).split('_')[1]} trend. Entry at pattern completion on {exec_tf} break.",
             explanation_es=explanation_es,
             elliott_wave_phase="Onda 4->5",
             timeframes_analyzed={
@@ -3102,8 +3122,8 @@ class WhiteStrategy(BaseStrategy):
 
         # --- Paso 2: Impulso + pullback en setup TF ---
         # Verificar que EMA 50 setup-TF esta en el lado correcto (tendencia ya rota previamente)
-        setup_ema_key = _tf_ema("setup", 50)
-        confirm_ema_key = _tf_ema("confirm", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         ema_1h_ok, ema_1h_desc = _check_ema_break(analysis, setup_ema_key, direction)
         if ema_1h_ok:
             score += 10.0
@@ -3157,7 +3177,7 @@ class WhiteStrategy(BaseStrategy):
                     break
 
         # (c) Check if price is on correct side of EMA 50 setup-TF
-        setup_ema_key = _tf_ema("setup", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
         ema_1h_check, _ = _check_ema_break(analysis, setup_ema_key, direction)
         if ema_1h_check:
             pink_proxy_score += 1
@@ -3203,7 +3223,7 @@ class WhiteStrategy(BaseStrategy):
 
         # --- Paso 3: Pullback a setup EMA 50 + Fibonacci ---
         # Style-adaptive: day=H1, swing=D, scalping=M5
-        setup_ema_key = _tf_ema("setup", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
         pb_ok, pb_desc = _check_ema_pullback(analysis, setup_ema_key, direction)
         if pb_ok:
             confidence += 15.0
@@ -3233,8 +3253,8 @@ class WhiteStrategy(BaseStrategy):
         # --- Paso 5: Entrada en exec TF (RCC) ---
         # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
         # Style-adaptive execution cascade (same as Blue — WHITE is a Blue after Pink)
-        exec_ema_key = _tf_ema("exec", 50)
-        style = _get_trading_style()
+        exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
+        style = _get_trading_style(analysis.instrument)
         _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
@@ -3369,7 +3389,7 @@ class WhiteStrategy(BaseStrategy):
             take_profit_1=tp1,
             take_profit_max=tp_levels.get("tp_max"),
             confidence=confidence,
-            reasoning=f"WHITE: Post-Pink continuation. Pullback to EMA50 {_tf_ema('setup', 50).split('_')[1]} after impulse. Entry on {exec_tf} confirmation.",
+            reasoning=f"WHITE: Post-Pink continuation. Pullback to EMA50 {_tf_ema('setup', 50, analysis.instrument).split('_')[1]} after impulse. Entry on {exec_tf} confirmation.",
             explanation_es=explanation_es,
             elliott_wave_phase="Onda 3 de Onda 5",
             timeframes_analyzed={
@@ -3577,7 +3597,7 @@ class BlackStrategy(BaseStrategy):
         # --- Paso 4: Confirm-TF sobrecomprado + precio lejos de EMA 50 confirm-TF ---
         # TradingLab: "sobrecompra clara e INNEGOCIABLE en gráfico de 4 horas"
         # This is a HARD REQUIREMENT — not just a bonus.
-        confirm_ema_key = _tf_ema("confirm", 50)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         ema_4h_50 = _ema_val(analysis, confirm_ema_key)
         price = _get_current_price_proxy(analysis)
 
@@ -3654,7 +3674,7 @@ class BlackStrategy(BaseStrategy):
 
         # --- Paso 5: Patron de reversal en setup-TF ---
         # EMA 50 setup-TF NO debe actuar como S/R dinamico (precio debe estar lejos o cruzandola)
-        setup_ema_key = _tf_ema("setup", 50)
+        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
         ema_1h_50 = _ema_val(analysis, setup_ema_key)
         if ema_1h_50:
             dist_1h = abs(entry_price - ema_1h_50) / ema_1h_50 * 100
@@ -3746,7 +3766,7 @@ class BlackStrategy(BaseStrategy):
         # candlestick bajar a 5 minutos."
         # For swing style, check DAILY candlestick patterns (not H1).
         # For day_trading/scalping, check H1 as before.
-        style = _get_trading_style()
+        style = _get_trading_style(analysis.instrument)
         if style == "swing":
             h1_candle_patterns = getattr(analysis, 'daily_candlestick_patterns', [])
             if not h1_candle_patterns:
@@ -3787,8 +3807,8 @@ class BlackStrategy(BaseStrategy):
         #   swing: H1 MA50 > diagonal H1
         #   scalping: M1 MA50 > diagonal M1
         # Diagonal is especially important for BLACK (triangle/wedge patterns)
-        exec_ema_key = _tf_ema("exec", 50)
-        style = _get_trading_style()
+        exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
+        style = _get_trading_style(analysis.instrument)
         _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
@@ -3855,7 +3875,7 @@ class BlackStrategy(BaseStrategy):
         # Check if setup EMA 50 acts as dynamic support (blocks SELL) or
         # dynamic resistance (blocks BUY).
         # Style-adaptive: day=H1, swing=D, scalping=M5
-        setup_ema_key_blk = _tf_ema("setup", 50)
+        setup_ema_key_blk = _tf_ema("setup", 50, analysis.instrument)
         ema_1h_50 = _ema_val(analysis, setup_ema_key_blk) or _ema_val(analysis, "EMA_H1_50")
         if ema_1h_50 and ema_1h_50 > 0:
             # Mere proximity is NOT disqualifying per mentorship.
@@ -3958,7 +3978,7 @@ class BlackStrategy(BaseStrategy):
             take_profit_1=tp1,
             take_profit_max=tp_levels.get("tp_max"),
             confidence=confidence,
-            reasoning=f"BLACK: Counter-trend at {_tf_ema('direction', 50).split('_')[1]} S/R. Overbought/oversold with deceleration. TP at EMA50 {_tf_ema('confirm', 50).split('_')[1]}. Min 2:1 R:R.",
+            reasoning=f"BLACK: Counter-trend at {_tf_ema('direction', 50, analysis.instrument).split('_')[1]} S/R. Overbought/oversold with deceleration. TP at EMA50 {_tf_ema('confirm', 50, analysis.instrument).split('_')[1]}. Min 2:1 R:R.",
             explanation_es=explanation_es,
             elliott_wave_phase="Onda 1 (anticipacion)",
             timeframes_analyzed={
@@ -4003,7 +4023,7 @@ class BlackStrategy(BaseStrategy):
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:
         """TP en confirm-TF EMA 50 (with slight offset — Alex: "sacrificas 10 pips por salir antes").
         Swing: EMA 50 Weekly. Day Trading: EMA 50 4H. Scalping: EMA 50 M15."""
-        confirm_ema_key = _tf_ema("confirm", 50)
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
         ema_4h_50 = _ema_val(analysis, confirm_ema_key) or _ema_val(analysis, "EMA_H4_50")
         result: Dict[str, float] = {}
 
@@ -4128,7 +4148,7 @@ class GreenStrategy(BaseStrategy):
         is_crypto = _is_crypto_instrument(instrument)
         if not is_crypto:
             return self.FOREX_TIMEFRAMES
-        style = _get_trading_style()
+        style = _get_trading_style(analysis.instrument)
         return self.CRYPTO_TIMEFRAMES.get(style, self.CRYPTO_TIMEFRAMES["swing"])
 
     def check_htf_conditions(self, analysis: AnalysisResult) -> Tuple[bool, float, List[str], List[str]]:

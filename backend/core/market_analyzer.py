@@ -137,6 +137,24 @@ class MarketAnalyzer:
         Run complete multi-timeframe analysis on an instrument.
         This is the main analysis pipeline from the Trading Plan.
         """
+        # Short-circuit blocklisted instruments BEFORE attempting candle
+        # fetches — otherwise each scan generates 5-7 ERROR log lines per
+        # blocklisted instrument (one per timeframe). Observed live: 2671
+        # ERROR lines in a single day from 16 blocklisted ETFs.
+        if hasattr(self.broker, "is_blocklisted") and self.broker.is_blocklisted(instrument):
+            logger.debug(f"full_analysis skipped: {instrument} is blocklisted")
+            return AnalysisResult(
+                instrument=instrument,
+                htf_trend=Trend.RANGING,
+                htf_condition=MarketCondition.NEUTRAL,
+                ltf_trend=Trend.RANGING,
+                htf_ltf_convergence=False,
+                key_levels={"supports": [], "resistances": []},
+                ema_values={},
+                fibonacci_levels={},
+                candlestick_patterns=[],
+            )
+
         # Step 1: Get candle data for all timeframes
         candles = {}
         timeframes = {
@@ -156,7 +174,16 @@ class MarketAnalyzer:
                 raw = await self.broker.get_candles(instrument, tf, count)
                 candles[tf] = self._candles_to_dataframe(raw)
             except Exception as e:
-                logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
+                # Downgrade to DEBUG when the failure is a blocklisted/unknown
+                # epic — the engine has already decided to skip this market
+                # so an ERROR-level log is just noise. Real broker errors
+                # (timeouts, 5xx, candle data corruption) still bubble up
+                # via WARNING in the underlying _get retry loop.
+                err_msg = str(e).lower()
+                if "blocklisted" in err_msg or "not found" in err_msg or "instrument" in err_msg:
+                    logger.debug(f"Skipped {tf} candles for {instrument}: {e}")
+                else:
+                    logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
                 candles[tf] = pd.DataFrame()
 
         # Derive M2 from M1 candles (Capital.com has no MINUTE_2 resolution)

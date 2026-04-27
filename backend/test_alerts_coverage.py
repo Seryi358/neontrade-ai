@@ -505,7 +505,10 @@ class TestChannelSends:
 class TestTestChannel:
     @pytest.mark.asyncio
     async def test_telegram_channel(self):
-        mgr = AlertManager(config=AlertConfig())
+        mgr = AlertManager(config=AlertConfig(
+            telegram_bot_token="token",
+            telegram_chat_id="chat",
+        ))
         with patch.object(mgr, '_send_telegram', new_callable=AsyncMock) as mock:
             result = await mgr.test_channel(AlertChannel.TELEGRAM)
             mock.assert_called_once()
@@ -513,7 +516,9 @@ class TestTestChannel:
 
     @pytest.mark.asyncio
     async def test_discord_channel(self):
-        mgr = AlertManager(config=AlertConfig())
+        mgr = AlertManager(config=AlertConfig(
+            discord_webhook_url="https://example.com/webhook",
+        ))
         with patch.object(mgr, '_send_discord', new_callable=AsyncMock) as mock:
             result = await mgr.test_channel(AlertChannel.DISCORD)
             mock.assert_called_once()
@@ -521,7 +526,11 @@ class TestTestChannel:
 
     @pytest.mark.asyncio
     async def test_email_channel(self):
-        mgr = AlertManager(config=AlertConfig())
+        mgr = AlertManager(config=AlertConfig(
+            email_username="sender@example.com",
+            email_password="secret",
+            email_recipient="dest@example.com",
+        ))
         with patch.object(mgr, '_send_email', new_callable=AsyncMock) as mock:
             result = await mgr.test_channel(AlertChannel.EMAIL)
             mock.assert_called_once()
@@ -529,7 +538,13 @@ class TestTestChannel:
 
     @pytest.mark.asyncio
     async def test_gmail_channel(self):
-        mgr = AlertManager(config=AlertConfig())
+        mgr = AlertManager(config=AlertConfig(
+            gmail_sender="sender@example.com",
+            gmail_recipient="dest@example.com",
+            gmail_client_id="cid",
+            gmail_client_secret="csecret",
+            gmail_refresh_token="refresh",
+        ))
         with patch.object(mgr, '_send_gmail', new_callable=AsyncMock) as mock:
             result = await mgr.test_channel(AlertChannel.GMAIL)
             mock.assert_called_once()
@@ -541,6 +556,18 @@ class TestTestChannel:
         with patch.object(mgr, '_send_telegram', new_callable=AsyncMock, side_effect=RuntimeError("fail")):
             result = await mgr.test_channel(AlertChannel.TELEGRAM)
             assert result is False
+
+    @pytest.mark.asyncio
+    async def test_email_channel_incomplete_config_returns_false(self):
+        mgr = AlertManager(config=AlertConfig())
+        result = await mgr.test_channel(AlertChannel.EMAIL)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_gmail_channel_incomplete_config_returns_false(self):
+        mgr = AlertManager(config=AlertConfig())
+        result = await mgr.test_channel(AlertChannel.GMAIL)
+        assert result is False
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -608,6 +608,29 @@ class AlertManager:
             "is configured correctly.\n\n"
             f"<b>Timestamp:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
         )
+        cfg = self._config
+        if channel == AlertChannel.TELEGRAM and (
+            not cfg.telegram_bot_token or not cfg.telegram_chat_id
+        ):
+            logger.warning("Test alert to telegram skipped – incomplete config")
+            return False
+        if channel == AlertChannel.DISCORD and not cfg.discord_webhook_url:
+            logger.warning("Test alert to discord skipped – incomplete config")
+            return False
+        if channel == AlertChannel.EMAIL and (
+            not cfg.email_username or not cfg.email_password or not cfg.email_recipient
+        ):
+            logger.warning("Test alert to email skipped – incomplete SMTP config")
+            return False
+        if channel == AlertChannel.GMAIL and (
+            not cfg.gmail_refresh_token
+            or not cfg.gmail_client_id
+            or not cfg.gmail_client_secret
+            or not cfg.gmail_sender
+            or not cfg.gmail_recipient
+        ):
+            logger.warning("Test alert to gmail skipped – incomplete Gmail config")
+            return False
         try:
             if channel == AlertChannel.TELEGRAM:
                 await self._send_telegram(title, body)

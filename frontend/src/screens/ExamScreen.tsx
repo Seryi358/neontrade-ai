@@ -127,8 +127,9 @@ export default function ExamScreen() {
     }
   };
 
-  const openReport = () => {
-    if (reportHtml && Platform.OS === 'web') {
+  const openReport = async () => {
+    if (!reportHtml) return;
+    if (Platform.OS === 'web') {
       const blob = new Blob([reportHtml], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       blobUrlsRef.current.push(url);
@@ -138,6 +139,14 @@ export default function ExamScreen() {
         try { URL.revokeObjectURL(url); } catch {}
         blobUrlsRef.current = blobUrlsRef.current.filter(u => u !== url);
       }, 60_000);
+      return;
+    }
+
+    try {
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(reportHtml)}`;
+      await Linking.openURL(dataUrl);
+    } catch {
+      Alert.alert('Report Ready', 'No se pudo abrir el reporte en este dispositivo. Ábrelo desde la versión web.');
     }
   };
 
@@ -149,15 +158,19 @@ export default function ExamScreen() {
       <View style={styles.container}>
         <HUDHeader title="Exam Report" subtitle="TradingLab Final Exam" />
         <View style={styles.reportActions}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={openReport}>
-            <Text style={styles.primaryBtnText}>Open Report</Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => { void openReport(); }}>
+            <Text style={styles.primaryBtnText}>{Platform.OS === 'web' ? 'Open Report' : 'Open in Browser'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => setReportHtml(null)}>
             <Text style={styles.secondaryBtnText}>Back</Text>
           </TouchableOpacity>
         </View>
         <HUDCard title="Preview">
-          <Text style={styles.previewText}>Report generated. Open it in the browser to view the full analysis with charts.</Text>
+          <Text style={styles.previewText}>
+            {Platform.OS === 'web'
+              ? 'Report generated. Open it in the browser to view the full analysis with charts.'
+              : 'Report generated. Use the browser button to view the full analysis with charts.'}
+          </Text>
         </HUDCard>
       </View>
     );

@@ -202,6 +202,7 @@ class ManagedPosition:
     cpa_revert_level: float = 0   # Key level that triggered temporary CPA; if price breaks through cleanly, revert
     pre_cpa_phase: Optional[str] = None  # Phase before CPA was triggered (for reverting)
     _half_risk_applied: bool = False  # Track 50% risk reduction step before BE
+    pre_be_structure_level: Optional[float] = None  # Structural break level for the pre-BE half-risk cut
     # Iter-29 / Audit A4: the swing level that price must break through after BE
     # before trailing is activated. Captured when the position reaches BE and
     # pulled from `_latest_swings` (BUY: nearest swing high above entry;
@@ -697,28 +698,58 @@ class PositionManager:
             else (pos.entry_price - current_price)
         )
 
-        # Intermediate step: at 50% of BE threshold, reduce risk by 50%
-        # Mentorship transcription: "antes del break-even, al 50% de beneficio, muevo el SL
-        # para eliminar el 50% del riesgo" — progressive risk reduction before full BE.
-        # NOTE: Mentorship says this should trigger when "price exits the structure"
-        # (structural event). Current implementation uses 50% of BE distance as a proxy.
-        # A structural trigger would require pattern boundary detection, which is complex.
-        # The profit-based proxy is a reasonable approximation for automated trading.
+        # Intermediate step: reduce 50% of risk before full BE. The mentorship
+        # teaches this as a structural event ("cuando sale de la estructura"),
+        # so we trigger on the nearest swing break when available. If swing
+        # data is missing, fall back to the previous half-R distance proxy.
         half_be_profit = risk_distance * 0.5
-        if current_profit >= half_be_profit and not getattr(pos, '_half_risk_applied', False):
+        if pos.pre_be_structure_level is None:
+            pos.pre_be_structure_level = self._pick_pre_be_structure_level(pos)
+
+        structure_broken = False
+        if pos.pre_be_structure_level is not None:
+            structure_broken = (
+                current_price > pos.pre_be_structure_level
+                if pos.direction == "BUY"
+                else current_price < pos.pre_be_structure_level
+            )
+
+        half_risk_triggered = (
+            structure_broken
+            if pos.pre_be_structure_level is not None
+            else current_profit >= half_be_profit
+        )
+
+        if half_risk_triggered and not getattr(pos, '_half_risk_applied', False):
             # Move SL to reduce 50% of remaining risk
             if pos.direction == "BUY":
                 half_sl = pos.current_sl + (pos.entry_price - pos.current_sl) * 0.5
                 if half_sl > pos.current_sl:
                     if await self._update_sl(pos, half_sl):
                         pos._half_risk_applied = True
-                        logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
+                        trigger_desc = (
+                            f"structural break above {pos.pre_be_structure_level:.5f}"
+                            if pos.pre_be_structure_level is not None
+                            else f"legacy half-R fallback ({half_be_profit:.5f})"
+                        )
+                        logger.info(
+                            f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f} "
+                            f"({trigger_desc})"
+                        )
             else:
                 half_sl = pos.current_sl - (pos.current_sl - pos.entry_price) * 0.5
                 if half_sl < pos.current_sl:
                     if await self._update_sl(pos, half_sl):
                         pos._half_risk_applied = True
-                        logger.info(f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f}")
+                        trigger_desc = (
+                            f"structural break below {pos.pre_be_structure_level:.5f}"
+                            if pos.pre_be_structure_level is not None
+                            else f"legacy half-R fallback ({half_be_profit:.5f})"
+                        )
+                        logger.info(
+                            f"{pos.trade_id}: 50% risk reduction -> SL {half_sl:.5f} "
+                            f"({trigger_desc})"
+                        )
 
         # Calculate BE threshold based on configured method
         if settings.be_trigger_method == "risk_distance":
@@ -796,6 +827,32 @@ class PositionManager:
         if not lows:
             return None
         # Nearest below = highest of the lows below current_price
+        return max(lows)
+
+    def _pick_pre_be_structure_level(
+        self,
+        pos: ManagedPosition,
+    ) -> Optional[float]:
+        """Return the structure level whose break justifies the half-risk cut.
+
+        Mentorship guidance for the pre-BE adjustment is structural: reduce
+        risk once price exits the setup, not merely after moving a fixed
+        fraction of R. The closest practical proxy available here is the
+        nearest swing beyond the entry price.
+        """
+        swings = self._latest_swings.get(pos.instrument, {})
+        if not swings:
+            return None
+
+        if pos.direction == "BUY":
+            highs = [sh for sh in swings.get("highs", []) if sh > pos.entry_price]
+            if not highs:
+                return None
+            return min(highs)
+
+        lows = [sl for sl in swings.get("lows", []) if sl < pos.entry_price]
+        if not lows:
+            return None
         return max(lows)
 
     def _swing_break_confirmed(

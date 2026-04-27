@@ -54,6 +54,8 @@ def make_analysis(
     rsi_divergence=None,
     swing_lows=None,
     swing_highs=None,
+    h4_impulse_high=None,
+    h4_impulse_low=None,
     elliott_wave=None,
     elliott_wave_detail=None,
     bmsb=None,
@@ -96,6 +98,8 @@ def make_analysis(
         elliott_wave_detail=elliott_wave_detail or {},
         bmsb=bmsb,
         last_candles=last_candles or {},
+        h4_impulse_high=h4_impulse_high,
+        h4_impulse_low=h4_impulse_low,
     )
 
 
@@ -355,6 +359,17 @@ class TestWhiteStrategy:
         analysis = make_analysis(supports=[1.0930])
         sl = self.white.get_sl_placement(analysis, "BUY", 1.1000)
         assert sl < 1.1000
+
+    def test_tp_max_prefers_h4_impulse_extreme(self):
+        analysis = make_analysis(
+            price_proxy=1.1000,
+            swing_highs=[1.1080, 1.1120],
+            resistances=[1.1080, 1.1140],
+            h4_impulse_high=1.1200,
+        )
+        tps = self.white.get_tp_levels(analysis, "BUY", 1.1000)
+        assert tps["tp1"] == pytest.approx(1.1080)
+        assert tps["tp_max"] == pytest.approx(1.1200)
 
 
 # ── Section 6: BLACK strategy (counter-trend) ────────────────────────

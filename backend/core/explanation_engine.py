@@ -263,7 +263,7 @@ class ExplanationEngine:
                 "4. Pullback hasta EMA 50 1H + niveles de Fibonacci",
                 "5. Desaceleración y giro en 1H",
                 "6. Rompe, Cierra, Confirma (RCC) en 5M",
-                "7. SL en Fibonacci 0.618 / mínimo anterior | TP en EMA 50 4H",
+                "7. SL en Fibonacci 0.618 / mínimo anterior | TP1 en máximo/mínimo anterior | TP_max en EMA 50 4H",
             ],
             "BLUE_A": [
                 "1. Soporte/resistencia en temporalidad directional (Daily/Monthly)",
@@ -272,7 +272,7 @@ class ExplanationEngine:
                 "4. Pullback a EMA 50 1H + niveles Fibonacci",
                 "5. Desaceleración y giro en 1H",
                 "6. Ejecución en 5M: Rompe, Cierra, Confirma (RCC) — prioridad: EMA 50 5M > diagonal > EMA 2M",
-                "7. SL: debajo del 0.618 Fibonacci / debajo del mínimo anterior. TP: EMA 50 4H (básico), extensiones 1.272/1.618 (Blue A)",
+                "7. SL: debajo del 0.618 Fibonacci / debajo del mínimo anterior. TP1: máximo/mínimo anterior. TP_max: extensiones 1.272/1.618 (Blue A)",
             ],
             "BLUE_B": [
                 "1. Soporte/resistencia en temporalidad directional (Daily/Monthly)",
@@ -281,7 +281,7 @@ class ExplanationEngine:
                 "4. Pullback a EMA 50 1H + niveles Fibonacci",
                 "5. Desaceleración y giro en 1H",
                 "6. Ejecución en 5M: Rompe, Cierra, Confirma (RCC) — prioridad: EMA 50 5M > diagonal > EMA 2M",
-                "7. SL: debajo del 0.618 Fibonacci / debajo del mínimo anterior. TP: EMA 50 4H (sin extensiones)",
+                "7. SL: debajo del 0.618 Fibonacci / debajo del mínimo anterior. TP1: máximo/mínimo anterior. TP_max: EMA 50 4H",
             ],
             "BLUE_C": [
                 "1. Soporte/resistencia en temporalidad directional (Daily/Monthly)",
@@ -299,7 +299,7 @@ class ExplanationEngine:
                 "4. Pullback en 1H hasta EMA 50 1H + EMA 50 4H + Fibonacci",
                 "5. Desaceleración en 1H",
                 "6. Rompe, Cierra, Confirma (RCC) en 5M",
-                "7. SL debajo de EMA 50 4H | TP en máximo/mínimo anterior o extensión Fibonacci",
+                "7. SL debajo de EMA 50 4H | TP1 en máximo/mínimo anterior | TP_max en extensión Fibonacci 1.0 cuando el HTF acompaña",
             ],
             "PINK": [
                 "1. Nivel de soporte/resistencia diario O tendencia desarrollada",
@@ -315,7 +315,7 @@ class ExplanationEngine:
                 "3. Pullback hasta EMA 50 1H + Fibonacci",
                 "4. Desaceleración/giro (mismos criterios que Blue)",
                 "5. Rompe, Cierra, Confirma (RCC) en 5M",
-                "6. SL más allá del extremo anterior (máximo para ventas, mínimo para compras) | TP en nivel de la Pink",
+                "6. SL más allá del extremo anterior (máximo para ventas, mínimo para compras) | TP1 en nivel de la Pink | TP_max en máximo/mínimo del impulso 4H",
             ],
             "BLACK": [
                 "1. Nivel de soporte/resistencia diario (OBLIGATORIO)",

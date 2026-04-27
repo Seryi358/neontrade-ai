@@ -3162,6 +3162,30 @@ class ExamRequest(BaseModel):
     trade_ids: List[str]  # 3 trade IDs for TradingLab exam
 
 
+def _normalize_exam_paths(paths: Optional[List[str]]) -> List[str]:
+    seen = set()
+    normalized: List[str] = []
+    for path in paths or []:
+        if not path or not isinstance(path, str):
+            continue
+        if path in seen:
+            continue
+        seen.add(path)
+        normalized.append(path)
+    return normalized
+
+
+def _collect_exam_screenshot_paths(trade: dict, engine_obj, trade_id: str) -> List[str]:
+    paths: List[str] = []
+    if engine_obj is not None and getattr(engine_obj, "screenshot_generator", None) is not None:
+        paths.extend(engine_obj.screenshot_generator.get_screenshot_path(trade_id))
+    journal_paths = trade.get("screenshots") or []
+    if isinstance(journal_paths, str):
+        journal_paths = [journal_paths]
+    paths.extend(journal_paths)
+    return _normalize_exam_paths(paths)
+
+
 def _pick_exam_screenshot(paths: List[str]) -> Optional[str]:
     """Prefer close screenshots, then open screenshots, then newest fallback."""
     if not paths:
@@ -3176,7 +3200,12 @@ def _exam_gaps_for_trade(trade: dict, screenshot_paths: List[str]) -> List[str]:
     gaps: List[str] = []
     if not screenshot_paths:
         gaps.append("screenshot")
-    if not (trade.get("reasoning") or trade.get("ai_analysis")):
+    if not (
+        trade.get("reasoning")
+        or trade.get("ai_analysis")
+        or trade.get("trade_summary")
+        or trade.get("management_notes")
+    ):
         gaps.append("reasoning")
     if not trade.get("closed_at"):
         gaps.append("closed_trade")
@@ -3225,6 +3254,38 @@ def _merge_exam_journal_data(trade: dict, engine_obj) -> dict:
     return merged
 
 
+async def _load_exam_analysis_snapshot(db_obj, trade_id: str) -> Optional[dict]:
+    """Load the analysis snapshot recorded at execution time, if available.
+
+    This avoids fabricating exam HTF/LTF context from the current market.
+    """
+    import json
+
+    if db_obj is None:
+        return None
+    try:
+        cursor = await db_obj._db.execute(
+            "SELECT * FROM analysis_log WHERE id = ?",
+            [trade_id],
+        )
+        row = await cursor.fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    snapshot = dict(row)
+    explanation_payload = snapshot.get("explanation_json")
+    if isinstance(explanation_payload, str) and explanation_payload:
+        try:
+            explanation_payload = json.loads(explanation_payload)
+        except Exception:
+            explanation_payload = None
+    if explanation_payload is None:
+        explanation_payload = {}
+    snapshot["explanation_json"] = explanation_payload
+    return snapshot
+
+
 @router.post("/exam/generate")
 async def generate_exam_report(req: ExamRequest):
     """Generate a TradingLab exam report with 3 trades.
@@ -3238,6 +3299,8 @@ async def generate_exam_report(req: ExamRequest):
     # Mentorship deliverable is exactly 3 trades.
     if len(req.trade_ids) != 3:
         raise HTTPException(400, "Exactly 3 trade IDs are required for exam submission")
+    if len(set(req.trade_ids)) != 3:
+        raise HTTPException(400, "Exam submission requires 3 unique trade IDs")
 
     trades = []
     for tid in req.trade_ids:
@@ -3250,13 +3313,8 @@ async def generate_exam_report(req: ExamRequest):
             raise HTTPException(404, f"Trade {tid} not found")
         trade = _merge_exam_journal_data(dict(row), engine)
 
-        # Live scan state is supplemental only; the persisted trade row is the
-        # primary source of truth for exam evidence.
-        analysis = engine.last_scan_results.get(trade.get("instrument", ""), None) if engine else None
-
-        screenshot_paths: List[str] = []
-        if engine is not None and engine.screenshot_generator is not None:
-            screenshot_paths = engine.screenshot_generator.get_screenshot_path(tid)
+        analysis_snapshot = await _load_exam_analysis_snapshot(db, tid)
+        screenshot_paths = _collect_exam_screenshot_paths(trade, engine, tid)
 
         gaps = _exam_gaps_for_trade(trade, screenshot_paths)
         if gaps:
@@ -3265,13 +3323,32 @@ async def generate_exam_report(req: ExamRequest):
                 f"Trade {tid} is not exam-ready. Missing: {', '.join(gaps)}",
             )
 
-        screenshot_b64 = None
-        chosen = _pick_exam_screenshot(screenshot_paths)
-        if chosen:
+        screenshot_gallery: List[dict] = []
+        ordered_shots = sorted(
+            screenshot_paths,
+            key=lambda p: (
+                0 if "_close_" in p else 1 if "_open_" in p else 2,
+                p,
+            ),
+        )
+        for path in ordered_shots[:3]:
             from pathlib import Path
-            shot_path = Path(chosen)
-            if shot_path.exists():
-                screenshot_b64 = base64.b64encode(shot_path.read_bytes()).decode()
+
+            shot_path = Path(path)
+            if not shot_path.exists():
+                continue
+            label = "Chart"
+            if "_close_" in path:
+                label = "Close"
+            elif "_open_" in path:
+                label = "Open"
+            screenshot_gallery.append(
+                {
+                    "label": label,
+                    "path": path,
+                    "b64": base64.b64encode(shot_path.read_bytes()).decode(),
+                }
+            )
 
         # Compute derived metrics the mentorship exam wants to see
         _entry = trade.get("entry_price") or 0
@@ -3326,7 +3403,7 @@ async def generate_exam_report(req: ExamRequest):
             "asr_completed": bool(trade.get("asr_completed")),
             "asr_lessons": trade.get("asr_lessons", ""),
             "asr_would_enter_again": trade.get("asr_would_enter_again"),
-            "screenshot_b64": screenshot_b64,
+            "screenshots_b64": screenshot_gallery,
             "screenshot_files": screenshot_paths,
             "htf_analysis": None,
             "ltf_analysis": None,
@@ -3337,16 +3414,20 @@ async def generate_exam_report(req: ExamRequest):
                 f"y P&L ${abs(exam_trade['pnl'] or 0):.2f}."
             )
 
-        # Add analysis details if available
-        if analysis:
+        # Add recorded analysis snapshot if available. Never substitute the
+        # current market state here — the exam should reflect why the trade was
+        # taken at the time, not what the market looks like now.
+        if analysis_snapshot:
+            payload = analysis_snapshot.get("explanation_json") or {}
+            analysis_meta = payload.get("analysis") if isinstance(payload, dict) else {}
             exam_trade["htf_analysis"] = {
-                "trend": str(getattr(analysis, 'htf_trend', 'N/A')),
-                "condition": str(getattr(analysis, 'htf_condition', 'N/A')),
-                "score": getattr(analysis, 'score', 0),
+                "trend": str(analysis_snapshot.get("htf_trend") or "N/A"),
+                "condition": str(analysis_meta.get("htf_condition") or "N/A"),
+                "score": analysis_snapshot.get("score", 0),
             }
             exam_trade["ltf_analysis"] = {
-                "trend": str(getattr(analysis, 'ltf_trend', 'N/A')),
-                "convergence": getattr(analysis, 'htf_ltf_convergence', False),
+                "trend": str(analysis_snapshot.get("ltf_trend") or "N/A"),
+                "convergence": bool(analysis_snapshot.get("convergence")),
             }
 
         trades.append(exam_trade)
@@ -3368,13 +3449,13 @@ async def get_exam_eligible_trades():
         if trade.get("status", "") == "open":
             continue
         row = _merge_exam_journal_data(dict(trade), engine)
-        screenshot_paths: List[str] = []
-        if engine is not None and engine.screenshot_generator is not None:
-            screenshot_paths = engine.screenshot_generator.get_screenshot_path(
-                trade.get("id", "")
-            )
+        screenshot_paths = _collect_exam_screenshot_paths(
+            row,
+            engine,
+            trade.get("id", ""),
+        )
         row["exam_screenshots"] = screenshot_paths
-        row["exam_gaps"] = _exam_gaps_for_trade(trade, screenshot_paths)
+        row["exam_gaps"] = _exam_gaps_for_trade(row, screenshot_paths)
         row["exam_ready"] = len(row["exam_gaps"]) == 0
         eligible.append(row)
     eligible.sort(
@@ -3425,8 +3506,18 @@ def _build_exam_html(trades: list) -> str:
 
         # Screenshot image
         img_html = ""
-        if t.get("screenshot_b64"):
-            img_html = f'<img src="data:image/png;base64,{t["screenshot_b64"]}" style="width:100%;border-radius:12px;margin-bottom:16px;" alt="Chart">'
+        gallery = t.get("screenshots_b64") or []
+        if gallery:
+            cards = []
+            for shot in gallery:
+                cards.append(
+                    f'''
+                    <div style="margin-bottom:12px;">
+                        <div style="font-size:11px;font-weight:600;color:#86868b;letter-spacing:0.4px;margin-bottom:6px;">{_esc(shot.get("label", "Chart"))}</div>
+                        <img src="data:image/png;base64,{shot.get("b64", "")}" style="width:100%;border-radius:12px;display:block;" alt="{_esc(shot.get("label", "Chart"))}">
+                    </div>'''
+                )
+            img_html = "".join(cards)
 
         # Analysis details
         htf_html = ""

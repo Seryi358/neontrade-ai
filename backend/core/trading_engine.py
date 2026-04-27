@@ -89,6 +89,8 @@ class PendingSetup:
     take_profit_max: Optional[float] = None  # Extended TP for HTF "run" context
     trailing_tp_only: bool = False  # True for crypto GREEN: use EMA 50 trailing, not hard TP1
     strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED"
+    analysis_snapshot: Optional[Dict] = None
+    explanation_snapshot: Optional[Dict] = None
     status: str = "pending"  # "pending", "approved", "rejected", "expired"
     expires_at: str = ""
 
@@ -2883,12 +2885,23 @@ class TradingEngine:
             return
 
         reasoning = self._build_setup_reasoning(setup, analysis, explanation)
+        analysis_snapshot = {
+            "instrument": analysis.instrument,
+            "htf_trend": analysis.htf_trend.value if hasattr(analysis.htf_trend, "value") else str(analysis.htf_trend),
+            "htf_condition": analysis.htf_condition.value if hasattr(analysis.htf_condition, "value") else str(analysis.htf_condition),
+            "ltf_trend": analysis.ltf_trend.value if hasattr(analysis.ltf_trend, "value") else str(analysis.ltf_trend),
+            "convergence": bool(analysis.htf_ltf_convergence),
+            "score": analysis.score,
+        }
+        explanation_snapshot = asdict(explanation)
 
         # Attach strategy name from explanation to setup for later use
         setup._strategy_name = getattr(explanation, 'strategy_detected', None) or "DETECTED"
 
         # Attach reasoning to setup so it's available in _execute_setup for DB/alerts
         setup._reasoning = reasoning
+        setup._analysis_snapshot = analysis_snapshot
+        setup._explanation_snapshot = explanation_snapshot
 
         if self.mode == TradingMode.AUTO:
             # Execute immediately (original behavior)
@@ -2965,6 +2978,8 @@ class TradingEngine:
             take_profit_max=setup.take_profit_max,
             trailing_tp_only=setup.trailing_tp_only,
             strategy_variant=setup.strategy_variant,
+            analysis_snapshot=getattr(setup, "_analysis_snapshot", None),
+            explanation_snapshot=getattr(setup, "_explanation_snapshot", None),
             status="pending",
             expires_at=expires_at.isoformat(),
         )
@@ -3192,8 +3207,29 @@ class TradingEngine:
                             "risk_reward_ratio": setup.reward_risk_ratio,
                             "reasoning": getattr(setup, '_reasoning', None) or f"R:R {setup.reward_risk_ratio:.2f} | Risk {setup.risk_percent:.2%}",
                         })
+                        analysis_snapshot = getattr(setup, "_analysis_snapshot", None) or {}
+                        explanation_snapshot = getattr(setup, "_explanation_snapshot", None) or {}
+                        if analysis_snapshot or explanation_snapshot:
+                            await self._db.record_analysis({
+                                "id": trade_id,
+                                "instrument": setup.instrument,
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "htf_trend": analysis_snapshot.get("htf_trend"),
+                                "ltf_trend": analysis_snapshot.get("ltf_trend"),
+                                "convergence": analysis_snapshot.get("convergence", False),
+                                "score": analysis_snapshot.get("score"),
+                                "strategy_detected": (
+                                    setup.strategy_variant
+                                    or getattr(setup, "_strategy_name", None)
+                                    or explanation_snapshot.get("strategy_detected")
+                                ),
+                                "explanation_json": {
+                                    "analysis": analysis_snapshot,
+                                    "explanation": explanation_snapshot,
+                                },
+                            })
                     except Exception as db_err:
-                        logger.warning(f"DB record_trade failed (non-critical): {db_err}")
+                        logger.warning(f"DB record_trade/analysis failed (non-critical): {db_err}")
 
                 # Send native notification
                 dir_text = 'COMPRA' if setup.direction == 'BUY' else 'VENTA'
@@ -3403,6 +3439,8 @@ class TradingEngine:
         )
         # Preserve strategy name from PendingSetup so DB records the correct color
         trade_risk._strategy_name = setup.strategy
+        trade_risk._analysis_snapshot = setup.analysis_snapshot
+        trade_risk._explanation_snapshot = setup.explanation_snapshot
 
         result = await self._execute_setup(trade_risk)
         if not result:

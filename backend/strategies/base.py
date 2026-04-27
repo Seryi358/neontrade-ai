@@ -3436,7 +3436,9 @@ class WhiteStrategy(BaseStrategy):
         """
         TP como si fuera el de una PINK (previous swing extreme).
         TradingLab mentorship: "take profit como si fuera el de una PINK."
-        Uses previous swing high (BUY) or swing low (SELL) - same logic as PinkStrategy.
+        Uses previous swing high (BUY) or swing low (SELL) - same logic as
+        PinkStrategy. WHITE's extended target (tp_max) comes from the recent 4H
+        impulse extreme when that data is available.
         """
         supports = analysis.key_levels.get("supports", [])
         resistances = analysis.key_levels.get("resistances", [])
@@ -3454,9 +3456,12 @@ class WhiteStrategy(BaseStrategy):
                 if above:
                     result["tp1"] = above[0]  # Nearest resistance (same as PINK)
 
-            # tp_max: next swing high beyond tp1
+            # TradingLab PDF pg.6: WHITE tp_max = maximo del impulso 4H.
+            h4_impulse_high = getattr(analysis, "h4_impulse_high", None)
             tp1 = result.get("tp1")
-            if tp1:
+            if tp1 and h4_impulse_high and h4_impulse_high > tp1:
+                result["tp_max"] = h4_impulse_high
+            if tp1 and "tp_max" not in result:
                 further_highs = [sh for sh in swing_highs if sh > tp1]
                 if further_highs:
                     result["tp_max"] = min(further_highs)
@@ -3474,9 +3479,12 @@ class WhiteStrategy(BaseStrategy):
                 if below:
                     result["tp1"] = below[0]  # Nearest support (same as PINK)
 
-            # tp_max: next swing low beyond tp1
+            # TradingLab PDF pg.6: WHITE tp_max = minimo del impulso 4H.
+            h4_impulse_low = getattr(analysis, "h4_impulse_low", None)
             tp1 = result.get("tp1")
-            if tp1:
+            if tp1 and h4_impulse_low and h4_impulse_low < tp1:
+                result["tp_max"] = h4_impulse_low
+            if tp1 and "tp_max" not in result:
                 further_lows = [sl for sl in swing_lows if sl < tp1]
                 if further_lows:
                     result["tp_max"] = max(further_lows)

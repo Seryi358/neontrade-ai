@@ -122,6 +122,9 @@ class AnalysisResult:
     # Swing highs/lows from H1 structure detection (used by PINK/WHITE TP calc)
     swing_highs: List[float] = field(default_factory=list)
     swing_lows: List[float] = field(default_factory=list)
+    # Recent 4H impulse extremes (used by WHITE tp_max to target the higher-timeframe impulse).
+    h4_impulse_high: Optional[float] = None
+    h4_impulse_low: Optional[float] = None
 
 
 class MarketAnalyzer:
@@ -186,14 +189,20 @@ class MarketAnalyzer:
                     logger.error(f"Failed to get {tf} candles for {instrument}: {e}")
                 candles[tf] = pd.DataFrame()
 
-        # Derive M2 from M1 candles (Capital.com has no MINUTE_2 resolution)
-        # M2 EMAs are used for CPA day trading trailing (Alex: "2 minutos")
+        # Derive M2 from M1 candles (Capital.com has no MINUTE_2 resolution).
+        # This must be a true 2-minute aggregation, not a 1:1 copy, otherwise
+        # CPA day-trading exits end up following M1 noise instead of the
+        # mentorship's M2 chart.
         if "M1" in candles and not candles["M1"].empty:
-            candles["M2"] = candles["M1"].copy()
+            candles["M2"] = self._derive_m2_from_m1(candles["M1"])
         else:
             candles["M2"] = pd.DataFrame()
             # Throttle between timeframe fetches to avoid broker rate limits
             await asyncio.sleep(0.3)
+
+        h4_impulse_high, h4_impulse_low = self._estimate_h4_impulse_extremes(
+            candles.get("H4", pd.DataFrame())
+        )
 
         # Derive Monthly candles from Weekly data (Capital.com has no MONTH resolution)
         # Needed for swing MTFA direction chart (TradingLab: Monthly = directional for swing)
@@ -533,6 +542,8 @@ class MarketAnalyzer:
             pi_cycle=pi_cycle,
             swing_highs=swing_highs_list,
             swing_lows=swing_lows_list,
+            h4_impulse_high=h4_impulse_high,
+            h4_impulse_low=h4_impulse_low,
         )
         return result
 
@@ -576,6 +587,80 @@ class MarketAnalyzer:
             valid = (df[['open', 'high', 'low', 'close']] != 0).all(axis=1)
             df = df[valid]
         return df
+
+    def _derive_m2_from_m1(self, m1_df: pd.DataFrame) -> pd.DataFrame:
+        """Aggregate a real 2-minute OHLCV series from M1 candles.
+
+        Capital.com does not expose a native M2 resolution. Atlas still uses
+        `EMA_M2_50` for CPA day-trading management, so the closest faithful
+        implementation is to resample the M1 feed into 2-minute candles.
+        """
+        if m1_df.empty:
+            return pd.DataFrame()
+        if not isinstance(m1_df.index, pd.DatetimeIndex):
+            return m1_df.copy()
+
+        source = m1_df.sort_index().copy()
+        agg = {
+            "open": "first",
+            "high": "max",
+            "low": "min",
+            "close": "last",
+        }
+        if "volume" in source.columns:
+            agg["volume"] = "sum"
+
+        m2_df = source.resample("2min", label="right", closed="right").agg(agg)
+        m2_df = m2_df.dropna(subset=["open", "high", "low", "close"])
+        if not m2_df.empty:
+            valid = (m2_df[["open", "high", "low", "close"]] != 0).all(axis=1)
+            m2_df = m2_df[valid]
+        return m2_df
+
+    def _estimate_h4_impulse_extremes(
+        self, h4_df: pd.DataFrame
+    ) -> Tuple[Optional[float], Optional[float]]:
+        """Estimate the recent 4H impulse extremes for WHITE TP_max.
+
+        TradingLab documents WHITE's extended target as the max/min of the 4H
+        impulse. We approximate that by looking at the most recent H4 swing
+        extremes over a bounded recent window and falling back to raw highs/lows
+        when no pivots can be isolated cleanly.
+        """
+        if h4_df.empty:
+            return None, None
+
+        recent = h4_df.tail(24).copy()
+        if recent.empty:
+            return None, None
+
+        highs = recent["high"].tolist()
+        lows = recent["low"].tolist()
+        swing_highs: List[float] = []
+        swing_lows: List[float] = []
+        for i in range(2, len(recent) - 2):
+            if highs[i] > highs[i - 1] and highs[i] > highs[i + 1]:
+                swing_highs.append(float(highs[i]))
+            if lows[i] < lows[i - 1] and lows[i] < lows[i + 1]:
+                swing_lows.append(float(lows[i]))
+
+        raw_high = float(recent["high"].max())
+        raw_low = float(recent["low"].min())
+        raw_high_idx = int(recent["high"].argmax())
+        raw_low_idx = int(recent["low"].argmin())
+
+        impulse_high = max(swing_highs) if swing_highs else raw_high
+        impulse_low = min(swing_lows) if swing_lows else raw_low
+
+        # A fresh impulse extreme often sits in the newest one or two H4 bars,
+        # before a classical pivot can be confirmed with candles on both sides.
+        # In that case prefer the raw extreme so WHITE TP_max can still target
+        # the live impulse high/low instead of the previous completed swing.
+        if raw_high > impulse_high and raw_high_idx >= len(recent) - 2:
+            impulse_high = raw_high
+        if raw_low < impulse_low and raw_low_idx >= len(recent) - 2:
+            impulse_low = raw_low
+        return impulse_high, impulse_low
 
     def _detect_trend(self, df: pd.DataFrame) -> Trend:
         """

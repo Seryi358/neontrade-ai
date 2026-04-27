@@ -118,6 +118,46 @@ class TestCandlesToDataframe:
         df = analyzer._candles_to_dataframe(candles)
         assert len(df) == 1  # zero candle filtered
 
+    def test_derive_m2_from_m1_aggregates_two_minute_bars(self, analyzer):
+        idx = pd.date_range("2025-01-01 00:00:00+00:00", periods=6, freq="min")
+        m1_df = pd.DataFrame(
+            {
+                "open": [1.1000, 1.1005, 1.1010, 1.1015, 1.1020, 1.1025],
+                "high": [1.1006, 1.1010, 1.1016, 1.1021, 1.1026, 1.1032],
+                "low": [1.0998, 1.1002, 1.1008, 1.1012, 1.1018, 1.1023],
+                "close": [1.1004, 1.1009, 1.1014, 1.1019, 1.1024, 1.1030],
+                "volume": [10, 11, 12, 13, 14, 15],
+            },
+            index=idx,
+        )
+
+        m2_df = analyzer._derive_m2_from_m1(m1_df)
+
+        assert len(m2_df) == 4
+        # 00:00 candle stands alone because the resample bins are right-closed.
+        assert m2_df.iloc[1]["open"] == pytest.approx(1.1005)
+        assert m2_df.iloc[1]["high"] == pytest.approx(1.1016)
+        assert m2_df.iloc[1]["low"] == pytest.approx(1.1002)
+        assert m2_df.iloc[1]["close"] == pytest.approx(1.1014)
+        assert m2_df.iloc[1]["volume"] == 23
+
+    def test_estimate_h4_impulse_extremes_prefers_recent_swings(self, analyzer):
+        idx = pd.date_range("2025-01-01 00:00:00+00:00", periods=10, freq="4h")
+        h4_df = pd.DataFrame(
+            {
+                "open": [1.10, 1.11, 1.12, 1.11, 1.13, 1.12, 1.14, 1.13, 1.15, 1.14],
+                "high": [1.11, 1.13, 1.15, 1.12, 1.16, 1.13, 1.17, 1.14, 1.18, 1.15],
+                "low": [1.09, 1.10, 1.11, 1.09, 1.12, 1.10, 1.13, 1.11, 1.14, 1.12],
+                "close": [1.105, 1.125, 1.145, 1.105, 1.155, 1.115, 1.165, 1.125, 1.175, 1.135],
+            },
+            index=idx,
+        )
+
+        impulse_high, impulse_low = analyzer._estimate_h4_impulse_extremes(h4_df)
+
+        assert impulse_high == pytest.approx(1.18)
+        assert impulse_low == pytest.approx(1.09)
+
 
 # ──────────────────────────────────────────────────────────────────
 # _detect_trend

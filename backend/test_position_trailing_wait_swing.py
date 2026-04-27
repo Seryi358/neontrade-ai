@@ -83,8 +83,10 @@ def test_managed_position_has_swing_to_break_field():
     pos = _make_pos()
     assert hasattr(pos, "swing_to_break")
     assert hasattr(pos, "swing_broken")
+    assert hasattr(pos, "pre_be_structure_level")
     assert pos.swing_to_break is None
     assert pos.swing_broken is False
+    assert pos.pre_be_structure_level is None
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -255,6 +257,55 @@ def test_no_swing_data_uses_legacy_ema_gate(mock_settings):
     # Solo EMA favorable + precio por encima → activa trailing
     _run(pm._handle_be_phase(pos, 1.1060))
     assert pos.phase == PositionPhase.TRAILING_TO_TP1
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Pre-BE half-risk cut: structural trigger
+# ─────────────────────────────────────────────────────────────────────
+
+@patch("config.settings")
+def test_half_risk_waits_for_structure_break_buy(mock_settings):
+    """BUY: la reducción al 50% del riesgo espera ruptura estructural si hay swings."""
+    mock_settings.be_trigger_method = "risk_distance"
+    pm = _make_pm()
+    pos = _make_pos(direction="BUY", entry=1.1000, sl=1.0950,
+                    tp1=1.1100, phase=PositionPhase.SL_MOVED)
+    pos.current_sl = 1.0975
+    pm.track_position(pos)
+
+    pm.set_swing_values(
+        "EUR_USD",
+        swing_highs=[1.1030, 1.1080],
+        swing_lows=[1.0940, 1.0920],
+    )
+
+    # Supera 0.5R (= 1.1025) pero todavía no rompe el swing 1.1030.
+    _run(pm._handle_sl_moved_phase(pos, 1.1026))
+    assert pos._half_risk_applied is False
+    assert pos.current_sl == 1.0975
+    assert pos.pre_be_structure_level == 1.1030
+
+    # Al romper el swing, ahora sí aplica el recorte al 50%.
+    _run(pm._handle_sl_moved_phase(pos, 1.1032))
+    assert pos._half_risk_applied is True
+    assert pos.current_sl > 1.0975
+
+
+@patch("config.settings")
+def test_half_risk_falls_back_to_half_r_when_no_structure(mock_settings):
+    """Sin swings, conserva el fallback legado por distancia para no bloquear la gestión."""
+    mock_settings.be_trigger_method = "risk_distance"
+    pm = _make_pm()
+    pos = _make_pos(direction="BUY", entry=1.1000, sl=1.0950,
+                    tp1=1.1100, phase=PositionPhase.SL_MOVED)
+    pos.current_sl = 1.0975
+    pm.track_position(pos)
+
+    _run(pm._handle_sl_moved_phase(pos, 1.1026))
+
+    assert pos.pre_be_structure_level is None
+    assert pos._half_risk_applied is True
+    assert pos.current_sl > 1.0975
 
 
 # ─────────────────────────────────────────────────────────────────────

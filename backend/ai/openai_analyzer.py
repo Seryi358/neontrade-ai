@@ -240,7 +240,7 @@ BLUE A (Doble suelo/techo):
   Step 4: Price retraces to a key zone (Fibonacci 0.382-0.618, FVG, or OB)
   Step 5: Entry on 5m/2m with reversal candle pattern at the key zone
   SL: Below/above the 1H swing that created the new structure
-  TP1: EMA 50 4H level
+  TP1: Previous swing high/low
   TP_max: Fibonacci 1.272 or 1.618 extension (Blue A targets Wave 3 — Alex: "buscar la máxima extensión 1,618 o el nivel óptimo 1,272")
 
 BLUE B (Estandar):
@@ -249,8 +249,8 @@ BLUE B (Estandar):
   Step 3: Wait for retest of the broken EMA from the other side
   Step 4: Entry on retest with confirmation candle on 5m
   SL: Beyond the EMA break candle's wick
-  TP1: EMA 4H level
-  TP_max: Next 4H S/R level
+  TP1: Previous swing high/low
+  TP_max: EMA 50 4H level
 
 BLUE C (Rechazo EMA 4H):
   After breaking 1H MA50, price REJECTS 4H MA50 before pullback. Least effective Blue variant.
@@ -265,9 +265,9 @@ BLUE C (Rechazo EMA 4H):
   TP_max: Next 4H S/R level
   NOTE: Blue C is the LEAST effective of the three Blue variants — use with caution
 
-BLUE TP CLARIFICATION (depends on trading style):
-  - Day Trading: TP1 = EMA 50 4H
-  - Swing Trading: TP1 = EMA 50 Weekly (not 4H)
+BLUE TP CLARIFICATION:
+  - TP1 = previous swing high/low
+  - TP_max = EMA 50 4H for BLUE B/C, or Fib 1.272/1.618 for BLUE A
 
 BLUE SWING TRADING ADAPTATION: Same 7 rules but with swing timeframes:
   - Monthly = directional (replaces Daily)
@@ -291,14 +291,14 @@ Associated Wave: Wave 2 end on 4H → riding Wave 3
   Step 6: Drop to 5min — RCC on strongest level (EMA 50 5min > diagonal > 2min)
   SL: Below/above the EMA 50 of 4H. Must also cover the previous swing low/high — if EMA 50 4H is closer to entry than the previous swing extreme, use the previous swing extreme as SL instead.
   TP1: previous high/low (safest)
-  TP_max: Fibonacci 1.618 extension (Wave 3 target). Extended TP: 1.618 extension ONLY for Wave 3 with strong daily move.
-  Step 7: SL below EMA 50 4H (must cover previous swing). TP: previous high/low (safest). Extended: 1.618 only for Wave 3 with strong daily.
+  TP_max: Fibonacci 1.0 extension by default when HTF favors the move. 1.272/1.618 only as stronger extension cases.
+  Step 7: SL below EMA 50 4H (must cover previous swing). TP1: previous high/low (safest). Extended: Fib 1.0 by default.
 
 Swing Trading Red Adaptation:
   - Timeframes: Monthly (direction) → Weekly (trend change, EMA 50 Weekly break) → Daily (pullback to EMA 50 Daily + EMA 50 Weekly + Fibonacci) → 1H (execution)
   - IMPORTANT: In swing, Daily EMA 50 breaks during the pullback are NORMAL and expected. Do NOT invalidate Red because of Daily EMA breaks — "no puedes exigirle tanto a la correlación entre gráfico semanal y gráfico diario."
   - SL: Below/above EMA 50 Weekly (must cover previous swing extreme)
-  - TP: Previous high/low. Extended: 1.618 only for Wave 3 with strong Monthly direction
+  - TP1: Previous high/low. Extended TP_max: Fib 1.0 by default, then 1.272/1.618 only when momentum truly extends.
   - At ATH (no Monthly resistance): require 2+ deceleration candles + 1 reversal candle on Monthly
 
 ──── PINK STRATEGY (Corrective Pattern Continuation — Wave 4→5) ────
@@ -327,7 +327,7 @@ Associated Wave: After Pink completes, riding the continuation
   Step 3: Pullback to EMA 50 1H + Fibonacci levels (exactly like Blue)
   Step 4: Deceleration on 1H (same criteria as Blue — attack, support, deceleration, turn)
   Step 5: 5M entry with RCC (Rompe, Cierra, Confirma) — same execution as Blue
-  Step 6: SL above/below the previous swing high/low (tighter than Pink). TP: same as Pink target (previous swing extreme)
+  Step 6: SL above/below the previous swing high/low (tighter than Pink). TP1: same as Pink target (previous swing extreme). TP_max: max/min of the 4H impulse.
   White can SUBSTITUTE Pink — if you miss/don't like Pinks (especially channels), wait for White instead
   Channels favor White over Pink: "cuando yo veo un canal, no ejecuto pink, ejecuto white"
 

@@ -209,6 +209,7 @@ class TestScalpingScan:
     async def test_skip_blocklisted_instruments(self, engine):
         """Scalping scan should not fetch candles for blocklisted instruments."""
         engine.broker.is_blocklisted.side_effect = lambda inst: inst == "BAD_USD"
+        engine._is_instrument_session_open = MagicMock(return_value=True)
         engine.position_manager.positions = {}
         engine.risk_manager.can_take_trade.return_value = True
         engine.scalping_analyzer = MagicMock()

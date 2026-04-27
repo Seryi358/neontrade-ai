@@ -107,6 +107,21 @@ class ScalpingAnalyzer:
             "M1": 200,     # Execution
         }
 
+        if hasattr(self.broker, "is_blocklisted"):
+            try:
+                if self.broker.is_blocklisted(instrument):
+                    logger.debug(
+                        f"Scalping: skipping blocklisted instrument {instrument}"
+                    )
+                    return ScalpingData(
+                        instrument=instrument,
+                        candles={tf: pd.DataFrame() for tf in timeframe_counts},
+                    )
+            except Exception:
+                # If the broker cannot answer the blocklist check, fall back to
+                # the normal fetch path instead of breaking the scan loop.
+                pass
+
         candles: Dict[str, pd.DataFrame] = {}
         for tf, count in timeframe_counts.items():
             try:

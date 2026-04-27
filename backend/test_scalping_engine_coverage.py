@@ -119,6 +119,22 @@ class TestDetectDeceleration:
         assert result["adj"] >= 5
 
 
+class TestAnalyzeScalping:
+    @pytest.mark.asyncio
+    async def test_skip_blocklisted_instrument_without_fetching(self):
+        broker = MagicMock()
+        broker.is_blocklisted.return_value = True
+        broker.get_candles = AsyncMock()
+        analyzer = ScalpingAnalyzer(broker)
+
+        data = await analyzer.analyze_scalping("BAD_USD")
+
+        broker.get_candles.assert_not_awaited()
+        assert data.instrument == "BAD_USD"
+        assert set(data.candles.keys()) == {"H1", "M15", "M5", "M1"}
+        assert all(df.empty for df in data.candles.values())
+
+
 # ──────────────────────────────────────────────────────────────────
 # _enforce_fibonacci_sl
 # ──────────────────────────────────────────────────────────────────

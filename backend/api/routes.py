@@ -1330,6 +1330,10 @@ class RiskConfigRequest(BaseModel):
     delta_parameter: Optional[float] = None
     # Scale-in
     scale_in_require_be: Optional[bool] = None
+    max_trades_per_day_scalping: Optional[int] = None
+    cooldown_minutes_scalping: Optional[int] = None
+    avoid_news_minutes_before_scalping: Optional[int] = None
+    avoid_news_minutes_after_scalping: Optional[int] = None
 
 
 # ── Trading Profiles ─────────────────────────────────────────────
@@ -1373,6 +1377,8 @@ async def apply_profile(request: ApplyProfileRequest):
             engine.set_enabled_strategies(applied["enabled_strategies"])
         if "scalping_enabled" in applied:
             engine.toggle_scalping(bool(applied["scalping_enabled"]))
+        if hasattr(engine, "refresh_news_filter"):
+            engine.refresh_news_filter()
 
     return {
         "profile": request.profile_id,
@@ -1439,6 +1445,8 @@ async def get_risk_config():
         "close_before_friday_hour": settings.close_before_friday_hour,
         "avoid_news_minutes_before": settings.avoid_news_minutes_before,
         "avoid_news_minutes_after": settings.avoid_news_minutes_after,
+        "avoid_news_minutes_before_scalping": getattr(settings, "avoid_news_minutes_before_scalping", 60),
+        "avoid_news_minutes_after_scalping": getattr(settings, "avoid_news_minutes_after_scalping", 60),
         "avoid_news_minutes_before_swing": settings.avoid_news_minutes_before_swing,
         "avoid_news_minutes_after_swing": settings.avoid_news_minutes_after_swing,
         "news_impact_filter": settings.news_impact_filter,
@@ -1460,6 +1468,8 @@ async def get_risk_config():
         "position_management_style": settings.position_management_style,
         # Scale-in rule
         "scale_in_require_be": settings.scale_in_require_be,
+        "max_trades_per_day_scalping": getattr(settings, "max_trades_per_day_scalping", 10),
+        "cooldown_minutes_scalping": getattr(settings, "cooldown_minutes_scalping", 30),
         # Friday trading cutoff
         "no_new_trades_friday_hour": settings.no_new_trades_friday_hour,
     }
@@ -1484,6 +1494,7 @@ async def get_risk_status():
 async def set_risk_config(request: RiskConfigRequest):
     """Update risk management configuration at runtime."""
     from config import settings
+    from main import engine
     import json, os, tempfile
 
     updates = {}
@@ -1556,6 +1567,30 @@ async def set_risk_config(request: RiskConfigRequest):
         settings.scale_in_require_be = request.scale_in_require_be
         updates["scale_in_require_be"] = request.scale_in_require_be
 
+    if request.max_trades_per_day_scalping is not None:
+        if not (0 <= request.max_trades_per_day_scalping <= 50):
+            raise HTTPException(400, "max_trades_per_day_scalping debe estar entre 0 y 50")
+        settings.max_trades_per_day_scalping = request.max_trades_per_day_scalping
+        updates["max_trades_per_day_scalping"] = request.max_trades_per_day_scalping
+
+    if request.cooldown_minutes_scalping is not None:
+        if not (0 <= request.cooldown_minutes_scalping <= 240):
+            raise HTTPException(400, "cooldown_minutes_scalping debe estar entre 0 y 240")
+        settings.cooldown_minutes_scalping = request.cooldown_minutes_scalping
+        updates["cooldown_minutes_scalping"] = request.cooldown_minutes_scalping
+
+    if request.avoid_news_minutes_before_scalping is not None:
+        if not (0 <= request.avoid_news_minutes_before_scalping <= 240):
+            raise HTTPException(400, "avoid_news_minutes_before_scalping debe estar entre 0 y 240")
+        settings.avoid_news_minutes_before_scalping = request.avoid_news_minutes_before_scalping
+        updates["avoid_news_minutes_before_scalping"] = request.avoid_news_minutes_before_scalping
+
+    if request.avoid_news_minutes_after_scalping is not None:
+        if not (0 <= request.avoid_news_minutes_after_scalping <= 240):
+            raise HTTPException(400, "avoid_news_minutes_after_scalping debe estar entre 0 y 240")
+        settings.avoid_news_minutes_after_scalping = request.avoid_news_minutes_after_scalping
+        updates["avoid_news_minutes_after_scalping"] = request.avoid_news_minutes_after_scalping
+
     if not updates:
         raise HTTPException(400, "No se especificaron cambios")
 
@@ -1582,6 +1617,9 @@ async def set_risk_config(request: RiskConfigRequest):
         except OSError:
             pass
         raise
+
+    if engine is not None and hasattr(engine, "refresh_news_filter"):
+        engine.refresh_news_filter()
 
     return {
         "updated": updates,

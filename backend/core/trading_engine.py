@@ -123,6 +123,45 @@ def _create_broker():
 class TradingEngine:
     """Main trading engine - the brain of Atlas."""
 
+    def _build_news_filter(self) -> NewsFilter:
+        """Create a news filter that reflects current runtime settings."""
+        from core.news_filter import TradingStyle as NFTradingStyle
+
+        if settings.scalping_enabled:
+            trading_style = NFTradingStyle.SCALPING
+            minutes_before = getattr(settings, "avoid_news_minutes_before_scalping", 60)
+            minutes_after = getattr(settings, "avoid_news_minutes_after_scalping", 60)
+        elif settings.trading_style == "swing":
+            trading_style = NFTradingStyle.SWING
+            minutes_before = getattr(settings, "avoid_news_minutes_before_swing", 15)
+            minutes_after = getattr(settings, "avoid_news_minutes_after_swing", 5)
+        else:
+            trading_style = NFTradingStyle.DAY_TRADING
+            minutes_before = getattr(settings, "avoid_news_minutes_before", 30)
+            minutes_after = getattr(settings, "avoid_news_minutes_after", 30)
+
+        return NewsFilter(
+            trading_style=trading_style,
+            minutes_before=minutes_before,
+            minutes_after=minutes_after,
+            finnhub_key=getattr(settings, 'finnhub_api_key', ''),
+            newsapi_key=getattr(settings, 'newsapi_key', ''),
+        )
+
+    def refresh_news_filter(self):
+        """Recreate the news filter after runtime config changes."""
+        self.news_filter = self._build_news_filter()
+
+    def _active_max_trades_per_day(self) -> int:
+        if settings.scalping_enabled:
+            return getattr(settings, "max_trades_per_day_scalping", settings.max_trades_per_day)
+        return settings.max_trades_per_day
+
+    def _active_cooldown_minutes(self) -> int:
+        if settings.scalping_enabled:
+            return getattr(settings, "cooldown_minutes_scalping", settings.cooldown_minutes)
+        return settings.cooldown_minutes
+
     def __init__(self):
         self.broker = _create_broker()
         self.risk_manager = RiskManager(self.broker)
@@ -145,13 +184,7 @@ class TradingEngine:
         self.explanation_engine = ExplanationEngine()
         # R30 fix: scan lock prevents overlapping scan cycles (duplicate trades)
         self._scan_lock = asyncio.Lock()
-        from core.news_filter import TradingStyle as NFTradingStyle
-        news_style = NFTradingStyle.SCALPING if settings.scalping_enabled else NFTradingStyle.DAY_TRADING
-        self.news_filter = NewsFilter(
-            trading_style=news_style,
-            finnhub_key=getattr(settings, 'finnhub_api_key', ''),
-            newsapi_key=getattr(settings, 'newsapi_key', ''),
-        )
+        self.news_filter = self._build_news_filter()
 
         # Alert manager (Telegram, Discord, Email, Gmail OAuth2)
         if _ALERTS_AVAILABLE:
@@ -478,6 +511,7 @@ class TradingEngine:
             self._scan_interval = self._pre_scalping_interval
             if not enabled:
                 logger.info(f"Scalping DISABLED — scan interval restored to {self._pre_scalping_interval}s")
+        self.refresh_news_filter()
 
     def get_pending_setups(self) -> List[dict]:
         """Get all pending (non-expired) setups as dicts."""
@@ -2262,23 +2296,25 @@ class TradingEngine:
 
         # ── Overtrading / Revenge Trading Prevention (Psicología Avanzada) ──
         # "sobreoperar después de una pérdida" — top-5 failure mode per mentorship
-        if settings.max_trades_per_day > 0:
+        active_max_trades = self._active_max_trades_per_day()
+        if active_max_trades > 0:
             today_trades = self._daily_setups_executed
-            if today_trades >= settings.max_trades_per_day:
-                logger.info(f"Max daily trades reached ({settings.max_trades_per_day}). Skipping scan.")
+            if today_trades >= active_max_trades:
+                logger.info(f"Max daily trades reached ({active_max_trades}). Skipping scan.")
                 return
 
         # Post-loss cooldown: if N consecutive losses today, wait before next trade
+        active_cooldown_minutes = self._active_cooldown_minutes()
         consecutive_losses = getattr(self, '_consecutive_losses_today', 0)
         if consecutive_losses >= settings.cooldown_after_consecutive_losses:
             last_loss_time = getattr(self, '_last_loss_time', None)
             if last_loss_time:
                 now_utc = datetime.now(timezone.utc)
                 elapsed = (now_utc - last_loss_time).total_seconds() / 60
-                if elapsed < settings.cooldown_minutes:
+                if elapsed < active_cooldown_minutes:
                     logger.info(
                         f"Cooldown active: {consecutive_losses} consecutive losses, "
-                        f"waiting {settings.cooldown_minutes - elapsed:.0f}min more"
+                        f"waiting {active_cooldown_minutes - elapsed:.0f}min more"
                     )
                     return
 
@@ -3957,16 +3993,16 @@ class TradingEngine:
                 f"sin nuevos trades hasta {hhmm} UTC."
             )
             resumes_at = e["ends_at_utc"]
-        elif self._daily_setups_executed >= settings.max_trades_per_day:
+        elif self._active_max_trades_per_day() > 0 and self._daily_setups_executed >= self._active_max_trades_per_day():
             reason = "max_trades_reached"
             text = (
-                f"Límite de {settings.max_trades_per_day} trades/día alcanzado. "
+                f"Límite de {self._active_max_trades_per_day()} trades/día alcanzado. "
                 f"Reanuda mañana."
             )
             resumes_at = self._next_trading_open_iso(now, offset)
         elif (self._consecutive_losses_today >= settings.cooldown_after_consecutive_losses
               and self._last_loss_time is not None):
-            cooldown_end = self._last_loss_time + timedelta(minutes=settings.cooldown_minutes)
+            cooldown_end = self._last_loss_time + timedelta(minutes=self._active_cooldown_minutes())
             if now < cooldown_end:
                 reason = "cooldown_after_losses"
                 text = (
@@ -3984,7 +4020,7 @@ class TradingEngine:
             "news": news_state,
             "consecutive_losses_today": self._consecutive_losses_today,
             "setups_executed_today": self._daily_setups_executed,
-            "max_trades_per_day": settings.max_trades_per_day,
+            "max_trades_per_day": self._active_max_trades_per_day(),
             "now_utc": now.isoformat(),
             "trading_hours_utc": f"{settings.trading_start_hour:02d}:00-{settings.trading_end_hour:02d}:00",
         }

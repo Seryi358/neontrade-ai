@@ -721,7 +721,7 @@ export default function SettingsScreen() {
                 TRADINGLAB RECOMMENDED
               </Text>
               <Text style={styles.profileBtnDesc}>
-                Day Trading - 1% riesgo - R:R 1.5:1 - Salida rapida - Sin parciales - BE al 1%
+                Day Trading - 1% riesgo - R:R 1.5:1 - Salida rapida - Sin parciales - BE a mitad de TP1
               </Text>
             </>
           )}

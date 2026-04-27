@@ -47,6 +47,16 @@ def engine():
         mock_settings.close_before_friday_hour = 20
         mock_settings.no_new_trades_friday_hour = 18
         mock_settings.active_watchlist_categories = ["forex_majors"]
+        mock_settings.avoid_news_minutes_before = 30
+        mock_settings.avoid_news_minutes_after = 30
+        mock_settings.avoid_news_minutes_before_scalping = 60
+        mock_settings.avoid_news_minutes_after_scalping = 60
+        mock_settings.avoid_news_minutes_before_swing = 15
+        mock_settings.avoid_news_minutes_after_swing = 5
+        mock_settings.max_trades_per_day = 3
+        mock_settings.max_trades_per_day_scalping = 10
+        mock_settings.cooldown_minutes = 120
+        mock_settings.cooldown_minutes_scalping = 30
         mock_settings.scalping_max_daily_dd = 0.05
         mock_settings.scalping_max_total_dd = 0.10
 
@@ -477,19 +487,51 @@ class TestModeSwitching:
 
     def test_toggle_scalping_on(self, engine):
         """toggle_scalping(True) should set fast scan interval."""
+        from core import trading_engine as te
+        te.NewsFilter.reset_mock()
         with patch("core.trading_engine._SCALPING_AVAILABLE", True), \
              patch("core.trading_engine.ScalpingAnalyzer") as mock_sa, \
              patch("core.trading_engine.settings") as ms:
             ms.scalping_enabled = True
+            ms.trading_style = "day_trading"
+            ms.avoid_news_minutes_before_scalping = 60
+            ms.avoid_news_minutes_after_scalping = 60
+            ms.avoid_news_minutes_before = 30
+            ms.avoid_news_minutes_after = 30
+            ms.finnhub_api_key = ""
+            ms.newsapi_key = ""
             engine.toggle_scalping(True)
         assert engine._scan_interval == engine._scalping_scan_interval
+        _, kwargs = te.NewsFilter.call_args
+        assert kwargs["minutes_before"] == 60
+        assert kwargs["minutes_after"] == 60
 
     def test_toggle_scalping_off(self, engine):
         """toggle_scalping(False) should restore normal scan interval."""
+        from core import trading_engine as te
+        te.NewsFilter.reset_mock()
         with patch("core.trading_engine.settings") as ms:
             ms.scalping_enabled = False
+            ms.trading_style = "day_trading"
+            ms.avoid_news_minutes_before = 30
+            ms.avoid_news_minutes_after = 30
+            ms.finnhub_api_key = ""
+            ms.newsapi_key = ""
             engine.toggle_scalping(False)
         assert engine._scan_interval == 120
+        _, kwargs = te.NewsFilter.call_args
+        assert kwargs["minutes_before"] == 30
+        assert kwargs["minutes_after"] == 30
+
+    def test_active_scalping_limits_override_day_trading_defaults(self, engine):
+        with patch("core.trading_engine.settings") as ms:
+            ms.scalping_enabled = True
+            ms.max_trades_per_day = 3
+            ms.max_trades_per_day_scalping = 10
+            ms.cooldown_minutes = 120
+            ms.cooldown_minutes_scalping = 30
+            assert engine._active_max_trades_per_day() == 10
+            assert engine._active_cooldown_minutes() == 30
 
 
 # ──────────────────────────────────────────────────────────────────

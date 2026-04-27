@@ -190,8 +190,10 @@ class Settings(BaseSettings):
     # Mentorship: "sobreoperar después de una pérdida" is a top-5 failure mode.
     # These limits protect against emotional trading during drawdowns.
     max_trades_per_day: int = 3           # Day trading: fewer, higher-quality trades (mentorship: quality over quantity)
+    max_trades_per_day_scalping: int = 10  # Scalping needs a separate, higher cap than day trading
     cooldown_after_consecutive_losses: int = 2  # After 2 consecutive losses, enforce cooldown
     cooldown_minutes: int = 120           # 2 hour cooldown for day trading (more time between setups)
+    cooldown_minutes_scalping: int = 30   # Shorter reset window for scalping workshop cadence
 
     # Re-entry risk reduction (configurable per trader's plan)
     # Mentorship: "Cada uno pone sus normas" — these are DEFAULTS, not hard rules.
@@ -260,6 +262,8 @@ class Settings(BaseSettings):
     auto_close_overnight_positions: bool = True
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
     avoid_news_minutes_after: int = 30   # 30 min post-release — covers NFP/CPI/FOMC volatility window (audit §M5)
+    avoid_news_minutes_before_scalping: int = 60  # Mentorship literal: no scalping 60 min before news
+    avoid_news_minutes_after_scalping: int = 60   # Mentorship literal: no scalping 60 min after news
     # Swing trading: Alex says "podemos llegar a ejecutar incluso" during news
     # Relaxed buffers for swing style (mentorship: swing is less affected by news)
     avoid_news_minutes_before_swing: int = 15  # Relaxed: 15 min before for swing (matches NewsFilter)
@@ -697,6 +701,10 @@ def _load_risk_overrides():
         "swing_for_equities",            # bool — route equities through SWING
         "self_improvement_tuning_mode",  # "off" | "proposals" | "auto"
         "max_trades_per_day",            # int 0..10
+        "max_trades_per_day_scalping",   # int 0..50
+        "cooldown_minutes_scalping",     # int 0..240
+        "avoid_news_minutes_before_scalping",  # int 0..240
+        "avoid_news_minutes_after_scalping",   # int 0..240
     }
     # Range validation — must match the API endpoint constraints (routes.py PUT /risk-config)
     _RANGE_CHECKS = {
@@ -721,6 +729,10 @@ def _load_risk_overrides():
         "scalping_max_total_dd":  (0.01,  0.30),
         "trading_start_hour":     (0, 23),
         "trading_end_hour":       (0, 23),
+        "max_trades_per_day_scalping": (0, 50),
+        "cooldown_minutes_scalping": (0, 240),
+        "avoid_news_minutes_before_scalping": (0, 240),
+        "avoid_news_minutes_after_scalping": (0, 240),
     }
     if os.path.exists(risk_path):
         try:
@@ -762,6 +774,12 @@ def _load_risk_overrides():
                         continue
                 elif key == "max_trades_per_day":
                     if not isinstance(value, int) or value < 0 or value > 10:
+                        continue
+                elif key == "max_trades_per_day_scalping":
+                    if not isinstance(value, int) or value < 0 or value > 50:
+                        continue
+                elif key in ("cooldown_minutes_scalping", "avoid_news_minutes_before_scalping", "avoid_news_minutes_after_scalping"):
+                    if not isinstance(value, int) or value < 0 or value > 240:
                         continue
                 setattr(settings, key, value)
         except Exception as e:
@@ -825,7 +843,7 @@ _apply_funded_evaluation_defaults()
 TRADING_PROFILES = {
     "tradinglab_recommended": {
         "name": "TradingLab Recommended",
-        "description": "Configuración exacta de Alex Ruiz: Day Trading, 1% riesgo en todos los estilos, salida rápida, sin parciales, BE al 1%",
+        "description": "Configuración TradingLab: Day Trading, 1% riesgo, salida rápida, sin parciales, BE a mitad de TP1",
         "settings": {
             "trading_style": "day_trading",
             # Risk management — Alex's exact values
@@ -839,7 +857,7 @@ TRADING_PROFILES = {
             "min_rr_green": 2.0,            # GREEN crypto
             # Position management — Alex prefers quick exits
             "position_management_style": "cp",  # Short-term (Alex: "salir cuanto antes")
-            "be_trigger_method": "risk_distance",  # BE at 1% profit
+            "be_trigger_method": "pct_to_tp1",  # PDF: BE at 50% of TP1 distance
             "partial_taking": False,         # Alex does NOT take partials
             "allow_partial_profits": False,
             "sl_management_style": "ema",
@@ -858,7 +876,7 @@ TRADING_PROFILES = {
             "close_before_friday_hour": 20,
             "no_new_trades_friday_hour": 18,
             "avoid_news_minutes_before": 30,
-            "avoid_news_minutes_after": 15,
+            "avoid_news_minutes_after": 30,
             # Watchlists — Alex's full set across markets
             "active_watchlist_categories": ["forex", "forex_exotic", "commodities", "indices", "equities", "crypto"],
             # Discretion — Alex uses 20% with experience

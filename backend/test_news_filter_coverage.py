@@ -315,12 +315,19 @@ class TestGenerateKnownEvents:
         titles = [e.title for e in events]
         assert not any("CPI" in t for t in titles)
 
-    def test_gdp_quarter_month(self, nf):
-        """Day 25-28 in Jan/Apr/Jul/Oct weekday should generate GDP."""
-        gdp_day = datetime(2025, 1, 27, 12, 0, tzinfo=timezone.utc)  # Monday
+    def test_gdp_last_thursday_of_quarter_month(self, nf):
+        """Fallback GDP should align with the last Thursday of quarter months."""
+        gdp_day = datetime(2026, 4, 30, 12, 0, tzinfo=timezone.utc)  # Thursday
         events = nf._generate_known_events(gdp_day)
         titles = [e.title for e in events]
         assert any("GDP" in t for t in titles)
+
+    def test_non_release_quarter_month_weekday_no_gdp(self, nf):
+        """Nearby weekdays should not trigger a false GDP block."""
+        non_release_day = datetime(2026, 4, 27, 12, 0, tzinfo=timezone.utc)  # Monday
+        events = nf._generate_known_events(non_release_day)
+        titles = [e.title for e in events]
+        assert not any("GDP" in t for t in titles)
 
 
 # ──────────────────────────────────────────────────────────────────

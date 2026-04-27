@@ -2321,6 +2321,12 @@ class TradingEngine:
 
         for instrument in batch:
             try:
+                # Mirror the normal scan guard: once Capital.com has marked an
+                # instrument as blocklisted, don't waste four more candle calls
+                # per scalping cycle on it.
+                if hasattr(self.broker, "is_blocklisted") and self.broker.is_blocklisted(instrument):
+                    continue
+
                 # Skip if already in a trade on this instrument
                 if any(
                     pos.instrument == instrument
@@ -3820,4 +3826,3 @@ class TradingEngine:
         # Sort by score descending so the best candidates show first
         out.sort(key=lambda d: d["score"], reverse=True)
         return out
-

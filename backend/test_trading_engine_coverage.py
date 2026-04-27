@@ -194,6 +194,26 @@ class TestFridayRules:
         assert engine._is_friday_no_new_trades(friday) is False
 
 
+class TestScalpingScan:
+    @pytest.mark.asyncio
+    async def test_skip_blocklisted_instruments(self, engine):
+        """Scalping scan should not fetch candles for blocklisted instruments."""
+        engine.broker.is_blocklisted.side_effect = lambda inst: inst == "BAD_USD"
+        engine.position_manager.positions = {}
+        engine.risk_manager.can_take_trade.return_value = True
+        engine.scalping_analyzer = MagicMock()
+        engine.scalping_analyzer.analyze_scalping = AsyncMock()
+        engine.scalping_analyzer.detect_scalping_setup.return_value = None
+        engine._last_scan_results = {"EUR_USD": MagicMock()}
+        engine._check_scalping_dd_limits = MagicMock(return_value=True)
+
+        with patch("core.trading_engine.get_active_watchlist", return_value=["BAD_USD", "EUR_USD"]), \
+             patch("core.trading_engine.asyncio.sleep", new=AsyncMock()):
+            await engine._scan_scalping_setups()
+
+        engine.scalping_analyzer.analyze_scalping.assert_awaited_once_with("EUR_USD")
+
+
 # ──────────────────────────────────────────────────────────────────
 # _calculate_sl_tp
 # ──────────────────────────────────────────────────────────────────

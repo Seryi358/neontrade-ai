@@ -736,7 +736,7 @@ class NewsFilter:
           - Non-Farm Payrolls (first Friday)
           - Unemployment Rate  (first Friday, same release as NFP)
           - CPI / Inflation    (around 10th-14th)
-          - GDP                (around 25th-28th, quarterly)
+          - GDP                (advance estimate, last Thursday of Jan/Apr/Jul/Oct)
           - Interest Rate decisions are covered via FOMC/ECB/BOE entries
             in RECURRING_HIGH_IMPACT but also generated here for safety.
         """
@@ -768,16 +768,41 @@ class NewsFilter:
                 title="CPI / Inflation (estimated window)",
             ))
 
-        # US GDP: Quarterly, typically released around the 25th-28th
-        if 25 <= today.day <= 28 and weekday < 5 and today.month in (1, 4, 7, 10):
+        # US GDP (advance estimate): use a tighter heuristic for the BEA
+        # release cadence so the fallback does not invent false news blocks on
+        # arbitrary weekdays near month-end. The 2026 BEA release schedule
+        # places the advance estimate on the last Thursday of Jan/Apr/Jul/Oct.
+        if self._is_us_gdp_advance_release_day(today):
             events.append(NewsEvent(
                 time=datetime(today.year, today.month, today.day, 13, 30, tzinfo=timezone.utc),
                 currency="USD",
                 impact="high",
-                title="GDP (estimated quarterly window)",
+                title="GDP (estimated advance release)",
             ))
 
         return events
+
+    @staticmethod
+    def _is_us_gdp_advance_release_day(today) -> bool:
+        """Heuristic fallback for the BEA advance GDP release.
+
+        This is intentionally narrower than the older "25th-28th weekday"
+        window because false positives are costly: they can block all scalping
+        for hours on a day when no official GDP release exists.
+        """
+        if today.month not in (1, 4, 7, 10) or today.weekday() >= 5:
+            return False
+
+        if today.month == 12:
+            next_month = datetime(today.year + 1, 1, 1, tzinfo=timezone.utc).date()
+        else:
+            next_month = datetime(today.year, today.month + 1, 1, tzinfo=timezone.utc).date()
+
+        last_day = next_month - timedelta(days=1)
+        while last_day.weekday() != 3:  # Thursday
+            last_day -= timedelta(days=1)
+
+        return today == last_day
 
     # ------------------------------------------------------------------
     # NewsAPI.org headlines (supplementary)

@@ -810,7 +810,10 @@ def test_block_7_config():
     check("XAU_USD not in watchlist", "XAU_USD" not in settings.forex_watchlist)
 
     # Active categories
-    check("active_watchlist_categories forex only", settings.active_watchlist_categories == ["forex"])
+    check(
+        "active_watchlist_categories full market set",
+        settings.active_watchlist_categories == ["forex", "forex_exotic", "commodities", "indices", "equities", "crypto"],
+    )
 
     # Correlation groups
     check("correlation_groups non-empty", len(settings.correlation_groups) >= 6)

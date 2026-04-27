@@ -1,7 +1,7 @@
 """
 Migration: Expand trades.status CHECK constraint to include missing statuses.
 
-Adds: closed_news, closed_tp_max, closed_emergency_exit
+Adds: closed_news, closed_tp_max, closed_emergency_exit, closed_overnight
 
 SQLite does not support ALTER TABLE to modify CHECK constraints, so this
 migration recreates the table with the updated constraint and copies data.
@@ -31,7 +31,7 @@ DEFAULT_DB_PATH = os.path.join(
 VALID_STATUSES = (
     "'open', 'closed_tp', 'closed_sl', 'closed_manual', 'closed_be', "
     "'closed_friday_sl', 'closed_friday_tp', 'closed_friday_sl+tp', "
-    "'closed_funded_overnight', 'closed_news', 'closed_tp_max', 'closed_emergency_exit'"
+    "'closed_funded_overnight', 'closed_overnight', 'closed_news', 'closed_tp_max', 'closed_emergency_exit'"
 )
 
 CREATE_NEW_TABLE = f"""

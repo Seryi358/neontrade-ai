@@ -57,8 +57,8 @@ check("forex_watchlist has entries", len(settings.forex_watchlist) > 0)
 check("crypto_watchlist has entries", len(settings.crypto_watchlist) > 0)
 check("indices_watchlist has entries", len(settings.indices_watchlist) > 0)
 check("crypto_default_strategy is GREEN", settings.crypto_default_strategy == "GREEN")
-check("active_watchlist_categories default ['forex']",
-      settings.active_watchlist_categories == ["forex"])
+check("active_watchlist_categories default full market set",
+      settings.active_watchlist_categories == ["forex", "forex_exotic", "commodities", "indices", "equities", "crypto"])
 
 # --- Capital allocation ---
 print("\n[7.5] Capital allocation")

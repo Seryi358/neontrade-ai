@@ -276,8 +276,9 @@ class TradeScreenshotGenerator:
         if not os.path.isdir(self._data_dir):
             return paths
 
+        needle = f"_{trade_id}_"
         for filename in sorted(os.listdir(self._data_dir)):
-            if trade_id in filename and filename.endswith(".png"):
+            if needle in filename and filename.endswith(".png"):
                 paths.append(os.path.join(self._data_dir, filename))
 
         return paths

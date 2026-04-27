@@ -15,6 +15,7 @@ import asyncio
 import base64
 import html
 import json
+import re
 import smtplib
 import time
 from dataclasses import dataclass, field, asdict
@@ -39,6 +40,37 @@ def _h(val) -> str:
     if val is None:
         return ""
     return html.escape(str(val), quote=True)
+
+
+def _normalize_dynamic_html(body: str) -> str:
+    """Strip wrappers/code fences from dynamic HTML before delivery."""
+    result = str(body or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not result:
+        return ""
+
+    result = re.sub(r"^\s*```(?:html)?\s*", "", result, flags=re.IGNORECASE)
+    result = re.sub(r"\s*```\s*$", "", result)
+    result = re.sub(r"^\s*'''(?:html)?\s*", "", result, flags=re.IGNORECASE)
+    result = re.sub(r"\s*'''\s*$", "", result)
+    result = re.sub(r"(?is)<!DOCTYPE[^>]*>", "", result)
+    result = re.sub(r"(?is)<head[^>]*>.*?</head>", "", result)
+    result = re.sub(r"(?is)</?(?:html|body)[^>]*>", "", result)
+    result = re.sub(r"(?i)<li[^>]*>\s*", "• ", result)
+    result = re.sub(r"(?i)</li>\s*", "<br>", result)
+    result = re.sub(r"(?i)</?(?:ul|ol)[^>]*>", "", result)
+    result = re.sub(r"(?i)</?(?:p|div)[^>]*>", "<br>", result)
+    result = re.sub(r"(?i)(<br\s*/?>\s*){3,}", "<br><br>", result)
+    return result.strip()
+
+
+def _body_to_email_html(body: str) -> str:
+    """Convert a dynamic body into safe inner HTML for the email shell."""
+    normalized = _normalize_dynamic_html(body)
+    if not normalized:
+        return ""
+    if re.search(r"<[a-z][^>]*>", normalized, flags=re.IGNORECASE):
+        return normalized.replace("\n", "<br>\n")
+    return html.escape(normalized, quote=False).replace("\n", "<br>\n")
 
 # ── Constants ────────────────────────────────────────────────────
 
@@ -536,10 +568,11 @@ class AlertManager:
 
     async def send_engine_status(self, status: str, message: str):
         """Notify about engine start, stop, or error events."""
+        safe_message = _h(message).replace("\n", "<br>\n")
         title = f"Engine {status.capitalize()}"
         body = (
             f"<b>Status:</b> {status.upper()}\n"
-            f"<b>Message:</b> {message}\n"
+            f"<b>Message:</b> {safe_message}\n"
             f"<b>Time:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
         )
         data = {"status": status, "message": message}
@@ -823,18 +856,19 @@ def _html_to_telegram(html: str) -> str:
     Telegram only supports: <b>, <i>, <u>, <s>, <code>, <pre>, <a>, <tg-spoiler>, <blockquote>.
     All <span> and style attributes must be stripped. Keep text content.
     """
-    import re
+    result = _normalize_dynamic_html(html)
     # Remove <span ...> opening tags (keep inner text)
-    result = re.sub(r'<span[^>]*>', '', html)
+    result = re.sub(r'<span[^>]*>', '', result)
     # Remove </span> closing tags
     result = result.replace('</span>', '')
+    result = result.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    result = re.sub(r"\n{3,}", "\n\n", result)
     return result
 
 
 def _html_to_discord_md(html: str) -> str:
     """Minimal HTML-to-Discord-Markdown conversion."""
-    import re
-    md = html
+    md = _normalize_dynamic_html(html)
     # Strip <span> tags first (keep inner text)
     md = re.sub(r'<span[^>]*>', '', md)
     md = md.replace('</span>', '')
@@ -842,13 +876,18 @@ def _html_to_discord_md(html: str) -> str:
     md = md.replace("<i>", "*").replace("</i>", "*")
     md = md.replace("<code>", "`").replace("</code>", "`")
     md = md.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    md = re.sub(r"\n{3,}", "\n\n", md)
     return md
 
 
-def _html_to_plain(html: str) -> str:
+def _html_to_plain(html_text: str) -> str:
     """Strip HTML tags for the plain-text email fallback."""
-    import re
-    return re.sub(r"<[^>]+>", "", html)
+    plain = _normalize_dynamic_html(html_text)
+    plain = plain.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    plain = re.sub(r"<[^>]+>", "", plain)
+    plain = html.unescape(plain)
+    plain = re.sub(r"\n{3,}", "\n\n", plain)
+    return plain.strip()
 
 
 def _build_email_html(title: str, body: str) -> str:
@@ -860,7 +899,7 @@ def _build_email_html(title: str, body: str) -> str:
 
     Gmail dark mode: forced light-only color scheme so colors stay consistent.
     """
-    body_html = body.replace("\n", "<br>\n")
+    body_html = _body_to_email_html(body)
     ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
     return f"""\
 <!DOCTYPE html>

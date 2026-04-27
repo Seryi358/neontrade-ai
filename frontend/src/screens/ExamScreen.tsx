@@ -40,6 +40,10 @@ interface Trade {
   status: string;
   opened_at: string;
   closed_at: string;
+  reasoning?: string;
+  exam_ready?: boolean;
+  exam_gaps?: string[];
+  exam_screenshots?: string[];
 }
 
 export default function ExamScreen() {
@@ -58,7 +62,13 @@ export default function ExamScreen() {
       setError(null);
       const res = await authFetch(`${API_URL}/api/v1/exam/trades`);
       if (!res.ok) throw new Error('Failed to fetch trades');
-      setTrades(await res.json());
+      const data: Trade[] = await res.json();
+      data.sort((a, b) => {
+        const readyDelta = Number(Boolean(b.exam_ready)) - Number(Boolean(a.exam_ready));
+        if (readyDelta !== 0) return readyDelta;
+        return String(b.closed_at || b.opened_at || '').localeCompare(String(a.closed_at || a.opened_at || ''));
+      });
+      setTrades(data);
     } catch (err) {
       setError('Could not load trades');
     } finally {
@@ -77,17 +87,19 @@ export default function ExamScreen() {
     };
   }, []);
 
-  // Mentorship needs 3 trades; backend accepts up to 5 so the user can pick
-  // their best variants. Match that bound here instead of silently blocking
-  // the 4th/5th tap.
-  const MAX_EXAM_TRADES = 5;
-  const toggleSelect = (id: string) => {
+  const MAX_EXAM_TRADES = 3;
+  const toggleSelect = (trade: Trade) => {
+    if (!trade.exam_ready) {
+      const gaps = (trade.exam_gaps || []).join(', ') || 'missing evidence';
+      Alert.alert('Trade Not Ready', `This trade is missing: ${gaps}.`);
+      return;
+    }
     setSelected(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+      if (next.has(trade.id)) {
+        next.delete(trade.id);
       } else if (next.size < MAX_EXAM_TRADES) {
-        next.add(id);
+        next.add(trade.id);
       }
       return next;
     });
@@ -157,15 +169,16 @@ export default function ExamScreen() {
     const pnlColor = pnl >= 0 ? theme.colors.profit : theme.colors.loss;
     const dirColor = item.direction === 'BUY' ? theme.colors.profit : theme.colors.loss;
     const status = (item.status || '').replace('closed_', '').toUpperCase();
+    const isReady = Boolean(item.exam_ready);
 
     return (
       <TouchableOpacity
-        onPress={() => toggleSelect(item.id)}
+        onPress={() => toggleSelect(item)}
         activeOpacity={0.7}
       >
         <HUDCard
           style={isSelected ? styles.cardSelected : undefined}
-          borderColor={isSelected ? theme.colors.cp2077Yellow : undefined}
+          borderColor={isSelected ? theme.colors.cp2077Yellow : (isReady ? undefined : '#FF9500')}
         >
           <View style={styles.tradeRow}>
             <View style={styles.checkCircle}>
@@ -182,8 +195,14 @@ export default function ExamScreen() {
                 <Text style={[styles.tradeDirection, { color: dirColor }]}>{item.direction}</Text>
                 <Text style={styles.tradeMeta}>{item.strategy} {item.strategy_variant || ''}</Text>
                 <HUDBadge label={status} color={pnlColor} size="sm" />
+                <HUDBadge label={isReady ? 'READY' : 'NEEDS EVIDENCE'} color={isReady ? theme.colors.profit : '#FF9500'} size="sm" />
               </View>
               <Text style={styles.tradeDate}>{item.closed_at || item.opened_at}</Text>
+              {!isReady && (
+                <Text style={styles.tradeGapText}>
+                  Missing: {(item.exam_gaps || []).join(', ')}
+                </Text>
+              )}
             </View>
           </View>
         </HUDCard>
@@ -200,8 +219,8 @@ export default function ExamScreen() {
 
       <View style={styles.infoCard}>
         <Text style={styles.infoText}>
-          Select at least 3 trades to include in your TradingLab exam submission.
-          Each trade will include a chart screenshot, strategy analysis, and risk assessment.
+          Select exactly 3 trades to include in your TradingLab exam submission.
+          Only trades marked READY can be selected. Each report includes screenshot, reasoning, strategy analysis, and risk assessment.
         </Text>
       </View>
 
@@ -311,6 +330,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#aeaeb2',
     marginTop: 4,
+  },
+  tradeGapText: {
+    fontSize: 12,
+    color: '#FF9500',
+    marginTop: 6,
+    lineHeight: 17,
   },
   bottomBar: {
     borderTopWidth: 1,

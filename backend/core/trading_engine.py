@@ -385,14 +385,13 @@ class TradingEngine:
 
     # ── Strategy Selection ────────────────────────────────────────
 
-    # TradingLab: start with BLUE + RED only. "La BLUE es la más fácil de
-    # ejecutar" and "La RED es la más fácil y sencilla de operar".
-    # Enable PINK, WHITE, BLACK, GREEN only after mastering BLUE + RED.
-    # BLUE_A is the most effective (highest win rate), BLUE_B most common.
+    # Deployment default: keep every strategy live unless the user/profile
+    # explicitly narrows the set. The current operating requirement is for
+    # Atlas to auto-trade the full strategy matrix by default.
     _DEFAULT_STRATEGY_CONFIG: Dict[str, bool] = {
         "BLUE": True, "BLUE_A": True, "BLUE_B": True, "BLUE_C": True,
         "RED": True,
-        "PINK": False, "WHITE": False, "BLACK": False, "GREEN": False,
+        "PINK": True, "WHITE": True, "BLACK": True, "GREEN": True,
     }
 
     def _load_strategy_config(self) -> Dict[str, bool]:
@@ -609,6 +608,81 @@ class TradingEngine:
             return
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
+
+    def _spawn_close_screenshot(
+        self,
+        trade_id: str,
+        instrument: str,
+        direction: str,
+        entry_price: float,
+        exit_price: float,
+        pnl_dollars: float,
+        result: Optional[str] = None,
+        candles: Optional[list[dict]] = None,
+    ) -> None:
+        """Generate a close screenshot in the background.
+
+        Centralizes screenshot capture so exam/journal evidence is produced
+        consistently for TP/SL, manual sync, Friday/news exits, and other
+        close paths.
+        """
+        if not self.screenshot_generator:
+            return
+
+        _result = result or ("TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"))
+        _pnl_pct = (
+            round(
+                ((exit_price - entry_price) if direction == "BUY" else (entry_price - exit_price))
+                / entry_price
+                * 100,
+                2,
+            )
+            if entry_price
+            else 0.0
+        )
+
+        async def _capture_close():
+            _candles = candles
+            if not _candles:
+                ana = self._last_scan_results.get(instrument)
+                if ana is not None:
+                    _candles = (
+                        getattr(ana, "last_candles", {}).get("M5")
+                        or getattr(ana, "last_candles", {}).get("H1")
+                        or getattr(ana, "candles_m5", None)
+                    )
+            if not _candles:
+                try:
+                    raw = await self.broker.get_candles(instrument, "H1", 100)
+                    _candles = [
+                        {
+                            "time": c.time,
+                            "open": c.open,
+                            "high": c.high,
+                            "low": c.low,
+                            "close": c.close,
+                        }
+                        for c in (raw or [])
+                    ]
+                except Exception as e:
+                    logger.debug(
+                        f"Screenshot close: fresh candles fetch failed for {instrument}: {e}"
+                    )
+            try:
+                await self.screenshot_generator.capture_trade_close(
+                    trade_id=trade_id,
+                    instrument=instrument,
+                    direction=direction,
+                    entry_price=entry_price,
+                    close_price=exit_price,
+                    pnl_pct=_pnl_pct,
+                    result=_result,
+                    candles=_candles,
+                )
+            except Exception as e:
+                logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
+
+        self._spawn_bg(_capture_close(), name="capture_trade_close")
 
     def _expire_old_setups(self):
         """Mark setups past their expiry time as expired, and prune old non-pending setups."""
@@ -828,6 +902,12 @@ class TradingEngine:
         # settings.self_improvement_tuning_mode.
         await self._maybe_run_weekly_review(now)
 
+        # Close non-crypto positions outside the main trading session when the
+        # deployment is configured to avoid overnight financing.
+        if settings.auto_close_overnight_positions:
+            await self._sync_positions_from_broker()
+            await self._handle_auto_overnight_close(now)
+
         if market_open:
             # Check Friday close rule
             if self._should_close_friday(now):
@@ -1024,25 +1104,161 @@ class TradingEngine:
             return ("SYDNEY", 0.4)
 
     def _is_market_open(self, now: datetime) -> bool:
-        """Check if market is open. Forex: Mon-Fri during sessions. Crypto: 24/7.
-        Adjusts for DST: EST (winter) shifts session hours +1h in UTC."""
-        # If crypto is in the active watchlist, market is always open for crypto
-        # (crypto markets trade 24/7 including weekends — mentorship: "abierto 24/7")
-        has_crypto = "crypto" in settings.active_watchlist_categories
+        """Check if the automated trading session is open.
 
-        # Forex is closed on weekends
+        Atlas can track crypto context continuously, but the automatic engine
+        itself is session-bound by default: London + New York only, Monday to
+        Friday, to avoid unattended overnight exposure on a small account.
+        """
         if now.weekday() >= 5:  # Saturday=5, Sunday=6
-            return has_crypto  # Only open for crypto on weekends
+            return False
 
-        # Only trade during London + NY sessions (DST-adjusted)
         hour = now.hour
         offset = self._dst_offset(now)
         start = settings.trading_start_hour + offset
         end = settings.trading_end_hour + offset
-        if start <= hour < end:
+        return start <= hour < end
+
+    def _is_instrument_session_open(self, instrument: str, now: datetime) -> bool:
+        """Instrument-aware market-hours gate.
+
+        When crypto is active in the watchlist the global engine stays "open"
+        24/7, but non-crypto instruments must still respect London/NY session
+        hours so Atlas does not open forex/indices/equities overnight.
+        """
+        from strategies.base import _is_crypto_instrument
+
+        if now.weekday() >= 5:
+            return False
+        offset = self._dst_offset(now)
+        start = settings.trading_start_hour + offset
+        end = settings.trading_end_hour + offset
+        if start <= now.hour < end:
             return True
-        # Outside forex hours but crypto is always open
-        return has_crypto
+        if instrument and _is_crypto_instrument(instrument):
+            return not settings.auto_close_overnight_positions
+        return False
+
+    def _overnight_close_window_key(self, now: datetime) -> Optional[str]:
+        """Return a stable key for the current out-of-session close window."""
+        offset = self._dst_offset(now)
+        start = settings.trading_start_hour + offset
+        end = settings.trading_end_hour + offset
+        if start <= now.hour < end:
+            return None
+        anchor = now.date() if now.hour >= end else (now - timedelta(days=1)).date()
+        return f"{anchor.isoformat()}::{start:02d}-{end:02d}"
+
+    async def _handle_auto_overnight_close(self, now: datetime):
+        """Close non-crypto positions outside the configured trading session.
+
+        This is the live-account counterpart to funded no-overnight rules:
+        keep Atlas trading automatically, but avoid swap / financing exposure
+        on non-crypto instruments when the main session is over.
+        """
+        from strategies.base import _is_crypto_instrument
+
+        if settings.funded_account_mode and settings.funded_no_overnight:
+            return
+
+        window_key = self._overnight_close_window_key(now)
+        if window_key is None:
+            return
+
+        targets = [
+            (trade_id, pos)
+            for trade_id, pos in list(self.position_manager.positions.items())
+            if not _is_crypto_instrument(pos.instrument)
+        ]
+        if not targets:
+            return
+        if getattr(self, "_last_auto_overnight_close_window", None) == window_key:
+            return
+
+        closed = 0
+        now_iso = datetime.now(timezone.utc).isoformat()
+        logger.warning(
+            f"AUTO OVERNIGHT CLOSE: Closing {len(targets)} non-crypto positions outside session"
+        )
+        for trade_id, pos in targets:
+            try:
+                price_data = await self.broker.get_current_price(pos.instrument)
+                current_price = (
+                    price_data.bid if pos.direction == "BUY" else price_data.ask
+                )
+                price_diff = (
+                    (current_price - pos.entry_price)
+                    if pos.direction == "BUY"
+                    else (pos.entry_price - current_price)
+                )
+                pnl = price_diff * abs(pos.units) if pos.units != 0 else price_diff
+
+                ok = await self.broker.close_trade(trade_id)
+                if not ok:
+                    logger.error(
+                        f"Auto overnight close: broker.close_trade({trade_id}) returned False"
+                    )
+                    continue
+
+                balance = getattr(self.risk_manager, "_current_balance", 0.0) or 1.0
+                self.risk_manager.record_trade_result(
+                    trade_id,
+                    pos.instrument,
+                    pnl / balance if balance > 0 else 0.0,
+                )
+                self.risk_manager.unregister_trade(trade_id, pos.instrument)
+                self.position_manager.remove_position(trade_id)
+
+                if self._db:
+                    await self._db.update_trade(
+                        trade_id,
+                        {
+                            "status": "closed_overnight",
+                            "closed_at": now_iso,
+                            "exit_price": current_price,
+                            "pnl": pnl,
+                            "notes": "AUTO_OVERNIGHT_CLOSE",
+                        },
+                    )
+                if self.trade_journal:
+                    try:
+                        self.trade_journal.record_trade(
+                            trade_id=trade_id,
+                            instrument=pos.instrument,
+                            pnl_dollars=pnl,
+                            entry_price=pos.entry_price,
+                            exit_price=current_price,
+                            strategy=getattr(pos, "strategy_variant", "UNKNOWN"),
+                            direction=pos.direction,
+                        )
+                    except Exception as je:
+                        logger.warning(
+                            f"Trade journal failed for auto overnight close {trade_id}: {je}"
+                        )
+
+                self._spawn_close_screenshot(
+                    trade_id=trade_id,
+                    instrument=pos.instrument,
+                    direction=pos.direction,
+                    entry_price=pos.entry_price,
+                    exit_price=current_price,
+                    pnl_dollars=pnl,
+                    result="OVERNIGHT",
+                )
+                closed += 1
+            except Exception as e:
+                logger.warning(f"Auto overnight close failed for {trade_id}: {e}")
+
+        if closed > 0:
+            self._last_auto_overnight_close_window = window_key
+            if self.alert_manager:
+                try:
+                    await self.alert_manager.send_engine_status(
+                        "OVERNIGHT_CLOSE",
+                        f"Closed {closed} non-crypto positions outside session hours.",
+                    )
+                except Exception as e:
+                    logger.warning(f"Overnight close alert failed: {e}")
 
     def _should_close_friday(self, now: datetime) -> bool:
         """Check if we should close all positions (Friday rule). DST-adjusted."""
@@ -1166,6 +1382,19 @@ class TradingEngine:
                             )
                         except Exception as je:
                             logger.warning(f"Trade journal failed for Friday close {trade_id}: {je}")
+                    if trade_id and current and entry:
+                        direction = getattr(trade, 'direction', 'BUY')
+                        pnl_val = (current - entry) if direction == "BUY" else (entry - current)
+                        units = abs(getattr(trade, 'units', 0) or (getattr(pos, 'units', 0) if pos else 0))
+                        self._spawn_close_screenshot(
+                            trade_id=trade_id,
+                            instrument=instrument,
+                            direction=direction,
+                            entry_price=entry,
+                            exit_price=current,
+                            pnl_dollars=pnl_val * units if units else pnl_val,
+                            result=f"FRIDAY_{close_reason}",
+                        )
                 except Exception as e:
                     logger.error(f"Friday close failed for {trade_id}: {e}")
             else:
@@ -1241,6 +1470,15 @@ class TradingEngine:
                             )
                         except Exception as je:
                             logger.warning(f"Trade journal failed for funded close {tid}: {je}")
+                    self._spawn_close_screenshot(
+                        trade_id=tid,
+                        instrument=pos.instrument,
+                        direction=pos.direction,
+                        entry_price=pos.entry_price,
+                        exit_price=current_price,
+                        pnl_dollars=pnl,
+                        result="FUNDED_OVERNIGHT",
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to process funded close for {tid}: {e}")
 
@@ -1383,44 +1621,14 @@ class TradingEngine:
         # actually renders (without these the screenshot fell back to a
         # text-only "No chart data available" placeholder, which is useless
         # for the TradingLab mentorship deliverable).
-        if self.screenshot_generator:
-            _pnl_pct_close = round((exit_price - entry_price if direction == "BUY" else entry_price - exit_price) / entry_price * 100, 2) if entry_price else 0
-            close_candles = None
-            close_ema = None
-            if instrument in self._last_scan_results:
-                _ana = self._last_scan_results[instrument]
-                close_candles = (
-                    getattr(_ana, 'last_candles', {}).get('M5')
-                    or getattr(_ana, 'last_candles', {}).get('H1')
-                    or getattr(_ana, 'candles_m5', None)
-                )
-                close_ema = getattr(_ana, 'ema_values', None)
-            # If still no candles, try fetching fresh from broker
-            async def _capture_close():
-                _candles = close_candles
-                if not _candles:
-                    try:
-                        raw = await self.broker.get_candles(instrument, "H1", 100)
-                        _candles = [
-                            {"time": c.time, "open": c.open, "high": c.high, "low": c.low, "close": c.close}
-                            for c in (raw or [])
-                        ]
-                    except Exception as e:
-                        logger.debug(f"Screenshot close: fresh candles fetch failed for {instrument}: {e}")
-                try:
-                    await self.screenshot_generator.capture_trade_close(
-                        trade_id=trade_id,
-                        instrument=instrument,
-                        direction=direction,
-                        entry_price=entry_price,
-                        close_price=exit_price,
-                        pnl_pct=_pnl_pct_close,
-                        result="TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE"),
-                        candles=_candles,
-                    )
-                except Exception as e:
-                    logger.warning(f"Screenshot capture failed for {trade_id}: {e}")
-            self._spawn_bg(_capture_close(), name="capture_trade_close")
+        self._spawn_close_screenshot(
+            trade_id=trade_id,
+            instrument=instrument,
+            direction=direction,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            pnl_dollars=pnl_dollars,
+        )
 
         # 9. Self-improvement: AutoASR (fire-and-forget, opt-in via flag).
         # Uses GPT-4o (vision) to grade execution against the trading plan and
@@ -1664,36 +1872,14 @@ class TradingEngine:
                             logger.warning(f"Trade journal record failed for {tid}: {je}")
 
                     # Screenshot on trade close — fire-and-forget, don't block sync loop
-                    if self.screenshot_generator:
-                        _ss_pnl_pct = round(
-                            (close_price - pos.entry_price if pos.direction == "BUY" else pos.entry_price - close_price)
-                            / pos.entry_price * 100,
-                            2,
-                        ) if pos.entry_price else 0
-                        _ss_result = "TP" if pnl_dollars > 0 else ("SL" if pnl_dollars < 0 else "BE")
-                        _ss_tid = tid
-                        _ss_inst = pos.instrument
-                        _ss_dir = pos.direction
-                        _ss_entry = pos.entry_price
-                        _ss_close = close_price
-                        async def _capture_ext_close(
-                            __tid=_ss_tid, __inst=_ss_inst, __dir=_ss_dir,
-                            __entry=_ss_entry, __close=_ss_close,
-                            __pct=_ss_pnl_pct, __res=_ss_result,
-                        ):
-                            try:
-                                await self.screenshot_generator.capture_trade_close(
-                                    trade_id=__tid,
-                                    instrument=__inst,
-                                    direction=__dir,
-                                    entry_price=__entry,
-                                    close_price=__close,
-                                    pnl_pct=__pct,
-                                    result=__res,
-                                )
-                            except Exception as e:
-                                logger.warning(f"Screenshot capture failed for {__tid}: {e}")
-                        self._spawn_bg(_capture_ext_close(), name="capture_ext_close")
+                    self._spawn_close_screenshot(
+                        trade_id=tid,
+                        instrument=pos.instrument,
+                        direction=pos.direction,
+                        entry_price=pos.entry_price,
+                        exit_price=close_price,
+                        pnl_dollars=pnl_dollars,
+                    )
 
                     # Send close alert
                     if self.alert_manager:
@@ -1857,6 +2043,15 @@ class TradingEngine:
                             )
                         except Exception as je:
                             logger.warning(f"Trade journal failed for news close {pos.trade_id}: {je}")
+                    self._spawn_close_screenshot(
+                        trade_id=pos.trade_id,
+                        instrument=pos.instrument,
+                        direction=pos.direction,
+                        entry_price=pos.entry_price,
+                        exit_price=news_exit_price,
+                        pnl_dollars=pnl_val,
+                        result="NEWS",
+                    )
                     # Send alert
                     if self.alert_manager:
                         try:
@@ -1971,7 +2166,10 @@ class TradingEngine:
 
         failed_count = 0
         total_count = 0
+        now_utc = datetime.now(timezone.utc)
         for instrument in get_active_watchlist():
+            if not self._is_instrument_session_open(instrument, now_utc):
+                continue
             total_count += 1
             try:
                 analysis = await self.market_analyzer.full_analysis(instrument)
@@ -2022,7 +2220,7 @@ class TradingEngine:
 
                 # Also detect setups during initial scan — but respect trading guards
                 now = datetime.now(timezone.utc)
-                market_open = self._is_market_open(now)
+                market_open = self._is_instrument_session_open(instrument, now)
                 friday_block = self._is_friday_no_new_trades(now)
                 if market_open and not friday_block:
                     setup = await self._detect_setup(analysis)
@@ -2102,8 +2300,12 @@ class TradingEngine:
         else:
             batch = full_watchlist
 
+        now_utc = datetime.now(timezone.utc)
         for instrument in batch:
             try:
+                if not self._is_instrument_session_open(instrument, now_utc):
+                    continue
+
                 # Skip instruments that the broker can't resolve (saves ~4 wasted
                 # API calls per scan cycle on each broken epic — 10+ indices were
                 # returning 404 every cycle before this guard).
@@ -2319,8 +2521,12 @@ class TradingEngine:
         else:
             batch = full_watchlist
 
+        now_utc = datetime.now(timezone.utc)
         for instrument in batch:
             try:
+                if not self._is_instrument_session_open(instrument, now_utc):
+                    continue
+
                 # Mirror the normal scan guard: once Capital.com has marked an
                 # instrument as blocklisted, don't waste four more candle calls
                 # per scalping cycle on it.

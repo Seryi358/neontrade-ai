@@ -86,9 +86,9 @@ class Settings(BaseSettings):
     # Default values mirror the historical behaviour but can be overridden
     # at runtime via the matching API endpoints — and crucially they now
     # round-trip through the JSON file instead of being lost on redeploy.
-    # Default AUTO so fresh deploys don't silently revert Sergio's preferred
-    # mode; runtime override via POST /mode persists to risk_config.json and
-    # wins on the next startup.
+    # Default AUTO because Atlas is operated as an autonomous executor in this
+    # deployment; mentorship-faithful manual operation remains available via
+    # the TradingLab profile and the UI mode switch.
     engine_mode: str = "AUTO"     # AUTO|MANUAL — overridden by data/risk_config.json
     enabled_strategies: dict = {}  # legacy slot; engine still owns its own JSON
 
@@ -255,6 +255,9 @@ class Settings(BaseSettings):
     # Days to avoid
     close_before_friday_hour: int = 20  # Close positions before Friday 20:00 UTC
     no_new_trades_friday_hour: int = 18  # No NEW trades after Friday 18:00 UTC (Trading Plan)
+    # Atlas live default: close open positions before financing can accrue on
+    # small accounts that are meant to stay intraday.
+    auto_close_overnight_positions: bool = True
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
     avoid_news_minutes_after: int = 30   # 30 min post-release — covers NFP/CPI/FOMC volatility window (audit §M5)
     # Swing trading: Alex says "podemos llegar a ejecutar incluso" during news
@@ -572,9 +575,12 @@ class Settings(BaseSettings):
         "BTC_USD", "ETH_USD",
     ]
 
-    # Active categories — only forex by default (TradingLab: focus on divisas)
+    # Active categories — Atlas live default keeps the full opportunity set
+    # active so AUTO mode can still find trades after a cold restart.
     # Options: forex, forex_exotic, commodities, indices, equities, crypto
-    active_watchlist_categories: List[str] = ["forex"]
+    active_watchlist_categories: List[str] = [
+        "forex", "forex_exotic", "commodities", "indices", "equities", "crypto"
+    ]
 
     # ── Capital Allocation (Trading Plan PDF) ──────────────
     # Trading Plan: 80% trading, 20% long-term investment
@@ -853,16 +859,30 @@ TRADING_PROFILES = {
             "no_new_trades_friday_hour": 18,
             "avoid_news_minutes_before": 30,
             "avoid_news_minutes_after": 15,
-            # Watchlists — Alex's full set
-            "active_watchlist_categories": ["forex", "forex_exotic", "commodities", "indices", "crypto"],
-            # Discretion — Alex uses 20% but default for users is 0%
-            "discretion_pct": 0.0,
+            # Watchlists — Alex's full set across markets
+            "active_watchlist_categories": ["forex", "forex_exotic", "commodities", "indices", "equities", "crypto"],
+            # Discretion — Alex uses 20% with experience
+            "discretion_pct": 0.20,
+            # Equities in mentorship are routed through swing trading
+            "swing_for_equities": True,
             # Green SL mode — advanced (below last swing before diagonal)
             "green_sl_mode": "advanced",
             # Scalping — Alex prefers quick exits with M1 EMA 50 trailing
             "scalping_enabled": False,
             "scalping_exit_method": "fast",
             "funded_account_mode": False,
+            # GREEN must remain available whenever the crypto watchlist is on.
+            "enabled_strategies": {
+                "BLUE": True,
+                "BLUE_A": True,
+                "BLUE_B": True,
+                "BLUE_C": True,
+                "RED": True,
+                "PINK": True,
+                "WHITE": True,
+                "BLACK": True,
+                "GREEN": True,
+            },
         },
     },
     "conservative": {

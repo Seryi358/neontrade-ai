@@ -153,6 +153,12 @@ class TestBuildEmailHtml:
         assert "Trading Dashboard" in html
         assert "Atlas" not in html
 
+    def test_normalizes_fenced_html_body(self):
+        html = _build_email_html("Title", "'''html\n<p>Checklist</p>\n'''")
+        assert "'''html" not in html
+        assert "<p>" not in html
+        assert "Checklist" in html
+
 
 # ──────────────────────────────────────────────────────────────────
 # _SENSITIVE_FIELDS

@@ -102,17 +102,17 @@ const MOCK_STATUS = {
   pending_setups: 0,
   total_risk: 1.5,
   watchlist_count: 11,
-  positions: {
-    '1': {
+  positions: [
+    {
       instrument: 'EUR_USD',
       direction: 'BUY',
-      entry: 1.0850,
+      entry_price: 1.0850,
       current_sl: 1.0820,
-      tp1: 1.0910,
+      take_profit: 1.0910,
       phase: 'TRAILING',
       strategy: 'BLUE',
     },
-  },
+  ],
   daily_activity: {
     scans_completed: 45,
     setups_found: 3,
@@ -269,9 +269,15 @@ const MOCK_MODE = { mode: 'AUTO' };
 const MOCK_BROKER = { broker: 'capital', connected: true };
 
 const MOCK_SETTINGS_STRATEGIES = {
-  BLUE_DAY: true, BLUE_SWING: true, RED_DAY: true, RED_SWING: true,
-  PINK_DAY: true, PINK_SWING: true, WHITE_DAY: true, WHITE_SWING: true,
-  BLACK_DAY: true, BLACK_SWING: true, GREEN_DAY: true, GREEN_SWING: true,
+  BLUE: true,
+  BLUE_A: true,
+  BLUE_B: true,
+  BLUE_C: true,
+  RED: true,
+  PINK: true,
+  WHITE: true,
+  BLACK: true,
+  GREEN: true,
 };
 
 // ── URL matching with specificity ordering ──────────────────────
@@ -353,10 +359,10 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────
 
 describe('DashboardScreen', () => {
-  it('renders the NEONTRADE header', async () => {
+  it('renders the dashboard header', async () => {
     const { getByText } = render(<DashboardScreen />);
     await waitFor(() => {
-      expect(getByText('NEONTRADE')).toBeTruthy();
+      expect(getByText('Dashboard')).toBeTruthy();
     });
   });
 
@@ -547,7 +553,7 @@ describe('ManualModeScreen', () => {
   it('renders the manual mode header', async () => {
     const { getByText } = render(<ManualModeScreen />);
     await waitFor(() => {
-      expect(getByText('MODO MANUAL')).toBeTruthy();
+      expect(getByText('PENDING OPS // MANUAL')).toBeTruthy();
     });
   });
 
@@ -569,7 +575,8 @@ describe('ManualModeScreen', () => {
   it('shows risk:reward ratio', async () => {
     const { getByText } = render(<ManualModeScreen />);
     await waitFor(() => {
-      expect(getByText(/R:R 2\.0/)).toBeTruthy();
+      expect(getByText('R:R')).toBeTruthy();
+      expect(getByText('2.0')).toBeTruthy();
     });
   });
 
@@ -598,7 +605,7 @@ describe('SettingsScreen', () => {
   it('renders the settings screen header', async () => {
     const { getByText } = render(<SettingsScreen />);
     await waitFor(() => {
-      expect(getByText('CONFIGURACION')).toBeTruthy();
+      expect(getByText('SYSTEM CONFIGURATION')).toBeTruthy();
     });
   });
 
@@ -617,10 +624,10 @@ describe('SettingsScreen', () => {
   });
 
   it('shows strategy toggles', async () => {
-    const { getByText } = render(<SettingsScreen />);
+    const { getByText, getAllByText } = render(<SettingsScreen />);
     await waitFor(() => {
-      expect(getByText(/BLUE/)).toBeTruthy();
-      expect(getByText(/RED/)).toBeTruthy();
+      expect(getAllByText(/BLUE/).length).toBeGreaterThan(0);
+      expect(getByText(/GREEN/)).toBeTruthy();
     });
   });
 
@@ -634,7 +641,7 @@ describe('SettingsScreen', () => {
   it('shows risk configuration section', async () => {
     const { getByText } = render(<SettingsScreen />);
     await waitFor(() => {
-      expect(getByText(/GESTION DE RIESGO/)).toBeTruthy();
+      expect(getByText(/RISK PARAMETERS/)).toBeTruthy();
     });
   });
 });
@@ -647,7 +654,7 @@ describe('HistoryScreen', () => {
   it('renders the history screen header', async () => {
     const { getByText } = render(<HistoryScreen />);
     await waitFor(() => {
-      expect(getByText('HISTORIAL')).toBeTruthy();
+      expect(getByText('RENDIMIENTO (30 DIAS)')).toBeTruthy();
     });
   });
 
@@ -802,7 +809,7 @@ describe('API Service', () => {
     render(<HistoryScreen />);
     await waitFor(() => {
       expect(mockAuthFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/history?limit=50')
+        expect.stringContaining('/api/v1/history?limit=200')
       );
       expect(mockAuthFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/v1/history/stats')

@@ -5,6 +5,7 @@ module.exports = {
   ],
   setupFiles: ['./jest.setup.js'],
   moduleNameMapper: {
+    '^react-native-svg$': '<rootDir>/__mocks__/reactNativeSvgMock.js',
     '\\.(ttf|otf|png|jpg|jpeg|gif|svg|ico|icns)$': '<rootDir>/__mocks__/fileMock.js',
   },
   testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],

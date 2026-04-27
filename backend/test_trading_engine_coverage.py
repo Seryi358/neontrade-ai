@@ -153,14 +153,14 @@ class TestIsMarketOpen:
         now = datetime(2025, 7, 19, 14, 0, tzinfo=timezone.utc)  # Saturday
         assert engine._is_market_open(now) is False
 
-    def test_weekend_open_for_crypto(self, engine):
-        """Saturday should be open if crypto is in watchlist."""
+    def test_weekend_closed_even_with_crypto_default(self, engine):
+        """AUTO trading remains session-bound on weekends even with crypto enabled."""
         now = datetime(2025, 7, 19, 14, 0, tzinfo=timezone.utc)  # Saturday
         with patch("core.trading_engine.settings") as ms:
             ms.active_watchlist_categories = ["crypto"]
             ms.trading_start_hour = 7
             ms.trading_end_hour = 21
-            assert engine._is_market_open(now) is True
+            assert engine._is_market_open(now) is False
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -124,14 +124,14 @@ async def run_tests():
         ok(f"Enabled by default: {enabled}")
         ok(f"Disabled by default: {disabled}")
 
-        # Verify only BLUE + RED enabled
+        # Verify the full strategy matrix is live by default
         assert defaults["BLUE"] == True
         assert defaults["RED"] == True
-        assert defaults["PINK"] == False
-        assert defaults["BLACK"] == False
-        assert defaults["GREEN"] == False
-        assert defaults["WHITE"] == False
-        ok("Strategy defaults match TradingLab (BLUE+RED only)")
+        assert defaults["PINK"] == True
+        assert defaults["BLACK"] == True
+        assert defaults["GREEN"] == True
+        assert defaults["WHITE"] == True
+        ok("Strategy defaults match deployment baseline (all enabled)")
 
     except Exception as e:
         fail(f"Strategy system: {e}")
@@ -301,8 +301,10 @@ async def run_tests():
         (settings.avoid_news_minutes_before == 30, "News 30m before"),
         (settings.avoid_news_minutes_after == 15, "News 15m after"),
         (settings.discretion_pct == 0.0, "0% discretion (beginner)"),
-        ("forex" in settings.active_watchlist_categories, "Active: forex only"),
-        (len(settings.active_watchlist_categories) == 1, "No commodities/crypto active"),
+        ("forex" in settings.active_watchlist_categories, "Active: forex included"),
+        ("indices" in settings.active_watchlist_categories, "Indices enabled"),
+        ("equities" in settings.active_watchlist_categories, "Equities enabled"),
+        ("crypto" in settings.active_watchlist_categories, "Crypto enabled"),
     ]
     for check, desc in checks:
         if check:

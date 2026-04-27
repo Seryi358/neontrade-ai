@@ -74,7 +74,7 @@ class TradeDatabase:
                 pnl REAL,
                 pnl_pips REAL,
                 status TEXT NOT NULL DEFAULT 'open'
-                    CHECK(status IN ('open', 'closed_tp', 'closed_sl', 'closed_manual', 'closed_be', 'closed_external', 'closed_friday_sl', 'closed_friday_tp', 'closed_friday_sl+tp', 'closed_funded_overnight', 'closed_news', 'closed_tp_max', 'closed_emergency_exit', 'closed_emergency_no_ema', 'closed_trailing_sl_hit')),
+                    CHECK(status IN ('open', 'closed_tp', 'closed_sl', 'closed_manual', 'closed_be', 'closed_external', 'closed_friday_sl', 'closed_friday_tp', 'closed_friday_sl+tp', 'closed_funded_overnight', 'closed_overnight', 'closed_news', 'closed_tp_max', 'closed_emergency_exit', 'closed_emergency_no_ema', 'closed_trailing_sl_hit')),
                 mode TEXT NOT NULL DEFAULT 'AUTO' CHECK(mode IN ('AUTO', 'MANUAL')),
                 confidence REAL,
                 risk_reward_ratio REAL,
@@ -172,16 +172,16 @@ class TradeDatabase:
             await self._db.commit()
             logger.info(f"Migration M1: fixed {count} trades with strategy='DETECTED'")
 
-        # M2: Expand status CHECK constraint to include closed_news, closed_tp_max, closed_emergency_exit.
+        # M2/M3: Expand status CHECK constraint for newer close reasons.
         # SQLite doesn't allow ALTER CHECK, so recreate the table if constraint is outdated.
-        # Detect by checking if 'closed_news' is in the table schema.
+        # Detect by checking if the newest statuses are in the table schema.
         cursor = await self._db.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='trades'"
         )
         row = await cursor.fetchone()
         table_sql = row[0] if row else ""
-        if "closed_news" not in table_sql:
-            logger.info("Migration M2: expanding trades.status CHECK constraint...")
+        if "closed_news" not in table_sql or "closed_overnight" not in table_sql:
+            logger.info("Migration M2/M3: expanding trades.status CHECK constraint...")
             # Fix stuck trades first (have exit_price but status='open')
             cursor = await self._db.execute(
                 "SELECT id, pnl FROM trades WHERE status = 'open' AND exit_price IS NOT NULL AND exit_price > 0"
@@ -195,7 +195,7 @@ class TradeDatabase:
             valid = (
                 "'open','closed_tp','closed_sl','closed_manual','closed_be','closed_external',"
                 "'closed_friday_sl','closed_friday_tp','closed_friday_sl+tp',"
-                "'closed_funded_overnight','closed_news','closed_tp_max','closed_emergency_exit',"
+                "'closed_funded_overnight','closed_overnight','closed_news','closed_tp_max','closed_emergency_exit',"
                 "'closed_emergency_no_ema','closed_trailing_sl_hit'"
             )
             await self._db.execute(f"""
@@ -221,7 +221,7 @@ class TradeDatabase:
             await self._db.commit()
             cursor = await self._db.execute("SELECT COUNT(*) FROM trades")
             total = (await cursor.fetchone())[0]
-            logger.info(f"Migration M2: complete. {total} trades in updated table. {len(stuck)} stuck trades fixed.")
+            logger.info(f"Migration M2/M3: complete. {total} trades in updated table. {len(stuck)} stuck trades fixed.")
 
     async def close(self):
         """Close the database connection."""

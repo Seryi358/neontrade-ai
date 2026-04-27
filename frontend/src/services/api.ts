@@ -272,8 +272,10 @@ export const api = {
 
   // Screenshots (Trading Plan: capture every trade)
   getTradeScreenshots: (tradeId: string) => apiGet<any>(`/api/v1/screenshots/${tradeId}`),
-  getScreenshotUrl: (tradeId: string, filename: string) =>
-    `${API_URL}/api/v1/screenshots/${tradeId}/image/${filename}`,
+  getScreenshotUrl: (tradeId: string, filename: string) => {
+    const safeName = filename.split('/').pop() || filename;
+    return `${API_URL}/api/v1/screenshots/${tradeId}/image/${safeName}`;
+  },
 
   // Monthly Review (Trading Plan: monthly trade review)
   listMonthlyReviews: () => apiGet<any>('/api/v1/monthly-review'),

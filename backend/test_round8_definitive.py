@@ -1494,7 +1494,10 @@ def test_api_frontend():
     check("T345: Settings has correlation_groups", hasattr(settings, 'correlation_groups'))
     check("T346: Correlation groups is list of lists", isinstance(settings.correlation_groups[0], list))
     check("T347: Settings has active_watchlist_categories", hasattr(settings, 'active_watchlist_categories'))
-    check("T348: active_watchlist_categories default", settings.active_watchlist_categories == ["forex"])
+    check(
+        "T348: active_watchlist_categories default",
+        settings.active_watchlist_categories == ["forex", "forex_exotic", "commodities", "indices", "equities", "crypto"],
+    )
     check("T349: Settings has allocation_trading_pct", settings.allocation_trading_pct == 0.80)
     check("T350: Settings has allocation_crypto_pct", settings.allocation_crypto_pct == 0.10)
 

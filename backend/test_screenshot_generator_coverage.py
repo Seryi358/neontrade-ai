@@ -148,6 +148,13 @@ class TestGetScreenshotPath:
         paths = gen.get_screenshot_path("abc")
         assert paths == []
 
+    def test_trade_id_match_is_anchored(self, gen, tmp_path):
+        (tmp_path / "EUR_USD_abc_open_20250310.png").write_text("dummy")
+        (tmp_path / "EUR_USD_abc1_open_20250310.png").write_text("dummy")
+        paths = gen.get_screenshot_path("abc")
+        assert len(paths) == 1
+        assert "abc1" not in paths[0]
+
 
 # ──────────────────────────────────────────────────────────────────
 # capture_trade_open

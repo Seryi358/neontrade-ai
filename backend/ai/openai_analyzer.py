@@ -1221,7 +1221,9 @@ Generate a daily report with these sections:
 6. **Tomorrow's Plan**: Top 3 pairs to focus on, preferred strategies, any scheduled news to avoid
 
 Format the report clearly with section headers. Be specific and reference TradingLab rules.
-Use HTML tags for formatting (<b>, <br>, <ul>/<li>) since this may be sent via email."""
+Use HTML tags for formatting (<b>, <br>, <ul>/<li>) since this may be sent via email.
+Return ONLY the inner HTML fragment. Do not wrap the answer in ``` blocks, ''' blocks,
+<!DOCTYPE>, <html>, <head>, or <body> tags."""
 
         try:
             response = await self.client.chat.completions.create(

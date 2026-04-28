@@ -388,9 +388,10 @@ describe('DashboardScreen', () => {
   });
 
   it('shows daily activity stats', async () => {
-    const { getByText } = render(<DashboardScreen />);
+    const { getByText, getAllByText } = render(<DashboardScreen />);
     await waitFor(() => {
-      expect(getByText(/45/)).toBeTruthy();
+      expect(getByText('Scans')).toBeTruthy();
+      expect(getAllByText('45').length).toBeGreaterThan(0);
     });
   });
 

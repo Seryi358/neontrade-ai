@@ -1078,7 +1078,6 @@ export default function SettingsScreen() {
         {[
           { key: 'telegram_enabled', label: 'Telegram' },
           { key: 'discord_enabled', label: 'Discord' },
-          { key: 'email_enabled', label: 'Email SMTP' },
           { key: 'gmail_enabled', label: 'Gmail OAuth2' },
         ].map((ch) => (
           <View key={ch.key} style={styles.configRow}>
@@ -1092,7 +1091,7 @@ export default function SettingsScreen() {
           </View>
         ))}
 
-        {(alertConfig.telegram_enabled || alertConfig.discord_enabled || alertConfig.email_enabled || alertConfig.gmail_enabled) && (
+        {(alertConfig.telegram_enabled || alertConfig.discord_enabled || alertConfig.gmail_enabled) && (
           <>
             <HUDDivider />
             <HUDStatRow

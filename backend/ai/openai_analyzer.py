@@ -123,7 +123,9 @@ LTF ANALYSIS (4H → 1H → 15m → 5m → 2m):
 3. 15m: adjust patterns, hourly levels, intraday FVG/OB zones
 4. 5m/2m: find optimal entry execution point
 
-CRITICAL RULE: HTF/LTF convergence is MANDATORY. Never trade against the higher timeframe trend unless running a BLACK (counter-trend) strategy with RSI divergence confirmation.
+CRITICAL RULE: HTF/LTF convergence is MANDATORY for BLUE, RED, PINK, WHITE, and GREEN.
+BLACK is the counter-trend exception. For BLACK, RSI divergence is strong added confluence,
+not a standalone permission to ignore the rest of the setup checklist.
 
 ═══════════════════════════════════════════════════════════════════
             ELLIOTT WAVE THEORY INTEGRATION (Daily Chart)

@@ -4156,7 +4156,7 @@ class GreenStrategy(BaseStrategy):
         is_crypto = _is_crypto_instrument(instrument)
         if not is_crypto:
             return self.FOREX_TIMEFRAMES
-        style = _get_trading_style(analysis.instrument)
+        style = _get_trading_style(instrument)
         return self.CRYPTO_TIMEFRAMES.get(style, self.CRYPTO_TIMEFRAMES["swing"])
 
     def check_htf_conditions(self, analysis: AnalysisResult) -> Tuple[bool, float, List[str], List[str]]:

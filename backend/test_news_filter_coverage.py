@@ -33,13 +33,12 @@ def _event(minutes_from_now=0, currency="USD", impact="high", title="CPI"):
 
 class TestNewsWindows:
     def test_scalping_window(self):
-        """Scalping: 45 min before, 30 min after (mentorship 60/60 reduced to
-        compromise — original 60/60 blocked the last hour daily)."""
-        assert NEWS_WINDOWS[TradingStyle.SCALPING] == (45, 30)
+        """Scalping: 60 min before, 60 min after."""
+        assert NEWS_WINDOWS[TradingStyle.SCALPING] == (60, 60)
 
     def test_day_trading_window(self):
-        """Day trading: 30 min before, 15 min after."""
-        assert NEWS_WINDOWS[TradingStyle.DAY_TRADING] == (30, 15)
+        """Day trading: 30 min before, 30 min after."""
+        assert NEWS_WINDOWS[TradingStyle.DAY_TRADING] == (30, 30)
 
     def test_swing_window(self):
         """Swing: 15 min before, 5 min after."""
@@ -104,12 +103,12 @@ class TestInit:
     def test_default_day_trading_window(self):
         nf = NewsFilter(trading_style=TradingStyle.DAY_TRADING)
         assert nf.minutes_before == 30
-        assert nf.minutes_after == 15
+        assert nf.minutes_after == 30
 
     def test_scalping_window(self):
         nf = NewsFilter(trading_style=TradingStyle.SCALPING)
-        assert nf.minutes_before == 45
-        assert nf.minutes_after == 30
+        assert nf.minutes_before == 60
+        assert nf.minutes_after == 60
 
     def test_custom_override(self):
         """Explicit minutes should override style defaults."""
@@ -171,7 +170,7 @@ class TestHasUpcomingNews:
 
     @pytest.mark.asyncio
     async def test_style_override_scalping(self, nf):
-        """Scalping uses same 30min window as day_trading."""
+        """Scalping uses a stricter 60/60 window than day trading."""
         # Event 20 min away — inside both windows
         nf._cached_events = [_event(minutes_from_now=20)]
         nf._cache_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -196,7 +195,7 @@ class TestHasUpcomingNews:
 
     @pytest.mark.asyncio
     async def test_event_long_past_not_blocked(self, nf):
-        """Event 60 min ago should NOT block (day_trading after-window is 15min)."""
+        """Event 60 min ago should NOT block (day_trading after-window is 30min)."""
         nf._cached_events = [_event(minutes_from_now=-60)]
         nf._cache_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         has_news, _ = await nf.has_upcoming_news()

@@ -3136,11 +3136,18 @@ class TradingEngine:
     ) -> str:
         """Build a Spanish reasoning string for the setup."""
         parts = []
+        setup_confidence = getattr(setup, "_strategy_confidence", 0.0) or min(
+            setup.reward_risk_ratio * 33, 100.0
+        )
         parts.append(f"Instrumento: {setup.instrument}")
         parts.append(f"Dirección: {'COMPRA' if setup.direction == 'BUY' else 'VENTA'}")
         parts.append(f"Score de análisis: {analysis.score:.0f}/100")
         parts.append(f"Sesgo general: {explanation.overall_bias}")
-        parts.append(f"Confianza: {explanation.confidence_level}")
+        parts.append(f"Calidad del análisis: {explanation.confidence_level}")
+        parts.append(
+            "Confianza del setup: "
+            f"{setup_confidence:.0f}% ({self._confidence_level_from_pct(setup_confidence)})"
+        )
 
         if explanation.strategy_detected:
             name = self.explanation_engine.STRATEGY_NAMES.get(
@@ -3174,6 +3181,15 @@ class TradingEngine:
             )
 
         return "\n".join(parts)
+
+    @staticmethod
+    def _confidence_level_from_pct(confidence_pct: float) -> str:
+        """Map a numeric setup confidence into the same ALTA/MEDIA/BAJA bands."""
+        if confidence_pct >= 80:
+            return "ALTA"
+        if confidence_pct >= 65:
+            return "MEDIA"
+        return "BAJA"
 
     async def _queue_setup(self, setup: TradeRisk, reasoning: str):
         """Queue a setup for manual approval (MANUAL mode)."""

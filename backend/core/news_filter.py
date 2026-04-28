@@ -13,7 +13,7 @@ Supplementary:
 Rules from Mentorship (style-dependent):
 - SCALPING:    Do NOT trade during news. Period. Spread and slippage make it
                impossible. Block at least 60 min before and 60 min after.
-- DAY TRADING: Do not open new positions 30 min before / 15 min after.
+- DAY TRADING: Do not open new positions 30 min before / 30 min after.
                Existing positions should be moved to break-even.
 - SWING:       Exercise extreme caution, but can potentially execute.
                15 min before / 5 min after.
@@ -56,10 +56,9 @@ class TradingStyle(str, Enum):
 # Per-style danger windows (minutes_before, minutes_after)
 NEWS_WINDOWS: Dict[TradingStyle, Tuple[int, int]] = {
     # Scalping: mentorship says "spread + slippage make it impossible" during news
-    # Original mentorship: 60/60. Reduced to 45/30 as compromise (60/60 blocked last hour)
-    TradingStyle.SCALPING: (45, 30),
+    TradingStyle.SCALPING: (60, 60),
     # Mentorship: Don't open new positions; move existing to break-even
-    TradingStyle.DAY_TRADING: (30, 15),
+    TradingStyle.DAY_TRADING: (30, 30),
     # Mentorship: Exercise extreme caution but can potentially execute
     TradingStyle.SWING: (15, 5),
 }
@@ -139,7 +138,7 @@ class NewsFilter:
 
     The danger window around news is determined by the *trading_style*:
       - SCALPING:    60 min before / 60 min after  (spread + slippage = impossible)
-      - DAY_TRADING: 30 min before / 15 min after  (no new positions; move to BE)
+      - DAY_TRADING: 30 min before / 30 min after  (no new positions; move to BE)
       - SWING:       15 min before /  5 min after   (extreme caution)
 
     You can also override the window via explicit *minutes_before* / *minutes_after*

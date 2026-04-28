@@ -3306,6 +3306,56 @@ def _merge_exam_journal_data(trade: dict, engine_obj) -> dict:
     return merged
 
 
+def _infer_exam_analysis_from_text(trade: dict) -> Optional[dict]:
+    """Backfill exam HTF/LTF context for older trades without analysis_log rows.
+
+    Historic trades created before snapshot persistence may still have enough
+    structured Spanish reasoning to reconstruct a lightweight HTF/LTF summary
+    for the exam deliverable.
+    """
+    import re
+
+    text = "\n".join(
+        str(part or "")
+        for part in (
+            trade.get("reasoning"),
+            trade.get("trade_summary"),
+            trade.get("ai_analysis"),
+        )
+        if part
+    )
+    if not text:
+        return None
+
+    def _map_bias(raw: str) -> str:
+        raw_upper = raw.strip().upper()
+        if "ALCISTA" in raw_upper:
+            return "bullish"
+        if "BAJISTA" in raw_upper:
+            return "bearish"
+        if "RANGO" in raw_upper or "LATERAL" in raw_upper:
+            return "ranging"
+        return "N/A"
+
+    score_match = re.search(r"Score de an[aá]lisis:\s*(\d+)", text, flags=re.IGNORECASE)
+    bias_match = re.search(r"Sesgo general:\s*([A-ZÁÉÍÓÚa-záéíóú ]+)", text)
+    conf_ok = "Convergencia HTF/LTF confirmada" in text
+    htf_trend = _map_bias(bias_match.group(1)) if bias_match else "N/A"
+    ltf_trend = htf_trend if conf_ok else "N/A"
+
+    return {
+        "htf_analysis": {
+            "trend": htf_trend,
+            "condition": "N/A",
+            "score": int(score_match.group(1)) if score_match else 0,
+        },
+        "ltf_analysis": {
+            "trend": ltf_trend,
+            "convergence": conf_ok,
+        },
+    }
+
+
 async def _load_exam_analysis_snapshot(db_obj, trade_id: str) -> Optional[dict]:
     """Load the analysis snapshot recorded at execution time, if available.
 
@@ -3481,6 +3531,11 @@ async def generate_exam_report(req: ExamRequest):
                 "trend": str(analysis_snapshot.get("ltf_trend") or "N/A"),
                 "convergence": bool(analysis_snapshot.get("convergence")),
             }
+        else:
+            inferred = _infer_exam_analysis_from_text(trade)
+            if inferred:
+                exam_trade["htf_analysis"] = inferred["htf_analysis"]
+                exam_trade["ltf_analysis"] = inferred["ltf_analysis"]
 
         trades.append(exam_trade)
 

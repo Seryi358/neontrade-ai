@@ -147,6 +147,8 @@ def _base_analysis(instrument="EUR_USD", **overrides) -> AnalysisResult:
         session="LONDON",
         swing_highs=[1.1200, 1.1150],
         swing_lows=[1.0850, 1.0900],
+        last_candles={},
+        structure_breaks=[],
     )
     defaults.update(overrides)
     return AnalysisResult(**defaults)
@@ -233,15 +235,53 @@ def make_white_analysis() -> AnalysisResult:
         elliott_wave="Wave 5",
         elliott_wave_detail={"phase": "impulse", "wave": 5},
         ema_values={
-            "EMA_H1_50": 1.0950,
+            "EMA_H1_50": 1.1000,
             "EMA_H4_50": 1.0920,
             "EMA_D_50": 1.0880,
-            "EMA_M5_50": 1.1010,
-            "EMA_M5_5": 1.1020,
+            "EMA_M5_50": 1.0982,
+            "EMA_M5_5": 1.0992,
             "EMA_M15_50": 1.1000,
             "EMA_W_50": 1.0800,
         },
-        current_price=1.1030,
+        chart_patterns=[
+            {"type": "channel", "timeframe": "H1"},
+            {"type": "trendline_break", "timeframe": "M5"},
+        ],
+        candlestick_patterns=["ENGULFING_BULLISH"],
+        rsi_divergence="bullish",
+        fibonacci_levels={
+            "0.382": 1.1005,
+            "0.500": 1.1002,
+            "0.618": 1.0999,
+            "0.75": 1.0990,
+            "1.0": 1.1100,
+        },
+        structure_breaks=[{"type": "BOS", "direction": "bullish"}],
+        last_candles={
+            "H1": [
+                {"open": 1.1020, "high": 1.1030, "low": 1.1000, "close": 1.1015},
+                {"open": 1.1015, "high": 1.1020, "low": 1.0985, "close": 1.0990},
+                {"open": 1.0990, "high": 1.1000, "low": 1.0975, "close": 1.0980},
+                {"open": 1.0980, "high": 1.0995, "low": 1.0970, "close": 1.0985},
+                {"open": 1.0985, "high": 1.1015, "low": 1.0980, "close": 1.1010},
+                {"open": 1.1010, "high": 1.1030, "low": 1.1005, "close": 1.1025},
+            ],
+            "M5": [
+                {"open": 1.0998, "high": 1.1006, "low": 1.0995, "close": 1.1002},
+                {"open": 1.1002, "high": 1.1010, "low": 1.1001, "close": 1.1008},
+                {"open": 1.1008, "high": 1.1014, "low": 1.1006, "close": 1.1012},
+            ],
+        },
+        key_levels={
+            "supports": [1.0997, 1.0992, 1.0985],
+            "resistances": [1.1048, 1.1080, 1.1100],
+            "FVGs": [],
+            "fvg_zones": [],
+            "liquidity_pools": [],
+        },
+        swing_lows=[1.0997, 1.0992],
+        swing_highs=[1.1048, 1.1080],
+        current_price=1.1004,
     )
 
 
@@ -662,6 +702,10 @@ class TestE2EWhiteStrategy:
         mock_settings.risk_swing = 0.01
         mock_settings.drawdown_method = "fixed_1pct"
         mock_settings.delta_enabled = False
+        mock_settings.delta_max_risk = 0.02
+        mock_settings.max_total_risk = 0.05
+        mock_settings.correlated_risk_pct = 0.0075
+        mock_settings.leverage_forex = 100
         mock_settings.min_rr_ratio = 1.5
         mock_settings.funded_account_mode = False
 
@@ -680,13 +724,12 @@ class TestE2EWhiteStrategy:
                                 "WHITE": True, "BLACK": False, "GREEN": False},
         )
 
-        if signal is not None:
-            assert signal.strategy == StrategyColor.WHITE
-
-        if trade_risk is not None and trade_id is not None:
-            assert len(broker.orders) == 1
-            assert trade_id in rm._active_risks
-            assert trade_id in pm.positions
+        assert signal is not None
+        assert signal.strategy == StrategyColor.WHITE
+        assert trade_risk is not None and trade_id is not None
+        assert len(broker.orders) == 1
+        assert any(key.endswith(trade_id) for key in rm._active_risks)
+        assert trade_id in pm.positions
 
 
 # =====================================================================

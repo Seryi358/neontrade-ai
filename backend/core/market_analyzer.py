@@ -378,12 +378,15 @@ class MarketAnalyzer:
             htf_trend, ltf_trend, convergence, htf_condition, patterns, chart_pats
         )
 
-        # Step 16: Last closed candles per timeframe (for RCC confirmation)
+        # Step 16: Last closed candles per timeframe.
+        # Keep a deeper window than RCC strictly needs so strategy code can
+        # validate historical EMA breaks, repeated touches and pattern context
+        # on the correct timeframe for each trading style.
         last_candles = {}
-        for tf in ("M5", "H1", "H4"):
+        for tf in ("M1", "M5", "M15", "H1", "H4", "D", "W", "M"):
             df = candles.get(tf, pd.DataFrame())
             if not df.empty and len(df) >= 3:
-                tail = df.tail(3)
+                tail = df.tail(20)
                 last_candles[tf] = [
                     {"open": float(r["open"]), "high": float(r["high"]),
                      "low": float(r["low"]), "close": float(r["close"]),

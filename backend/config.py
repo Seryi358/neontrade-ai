@@ -338,9 +338,10 @@ class Settings(BaseSettings):
     funded_no_weekend: bool = False  # True only for FTMO "normal" accounts
 
     # ── Green Strategy SL Mode ──────────────────────────────────
-    # "advanced" (default) = SL below last swing before diagonal (mentorship method)
-    # "beginner" = SL below pattern minimum (simpler, wider SL)
-    green_sl_mode: str = "advanced"
+    # "beginner" (default) = SL below pattern minimum (the course's initial
+    # way of teaching GREEN before moving to the tighter/advanced stop).
+    # "advanced" = SL below last swing before diagonal break.
+    green_sl_mode: str = "beginner"
 
     # ── Discretion Level (ch22.1 Trading Plan) ──────────────────
     # Beginners: 100% precision, 0% discretion. Follow the plan exactly.

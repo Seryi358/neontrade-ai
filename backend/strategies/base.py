@@ -379,6 +379,149 @@ def _check_ema_pullback(analysis: AnalysisResult, ema_key: str, direction: str) 
         return False, f"No hay pullback a {ema_key} (distancia {distance_pct:.2f}%)"
 
 
+def _tf_from_ema_key(ema_key: str) -> str:
+    parts = ema_key.split("_")
+    if len(parts) >= 3:
+        return parts[1]
+    return ""
+
+
+def _get_recent_candles(
+    analysis: AnalysisResult, *timeframes: str, min_count: int = 0
+) -> List[Dict]:
+    last_candles = getattr(analysis, "last_candles", {}) or {}
+    for tf in timeframes:
+        if not tf:
+            continue
+        candles = last_candles.get(tf, [])
+        if len(candles) >= min_count:
+            return candles
+    return []
+
+
+def _pattern_name(pattern: object) -> str:
+    if isinstance(pattern, dict):
+        return str(pattern.get("type") or pattern.get("pattern") or "")
+    return str(pattern)
+
+
+def _pattern_timeframe(pattern: object) -> str:
+    if isinstance(pattern, dict):
+        return str(pattern.get("timeframe") or pattern.get("tf") or "").upper()
+    return ""
+
+
+def _pattern_matches(pattern: object, *keywords: str) -> bool:
+    name = _pattern_name(pattern).lower()
+    return any(keyword in name for keyword in keywords)
+
+
+def _historical_setup_ema_broken_during_correction(
+    analysis: AnalysisResult, ema_key: str, direction: str
+) -> Tuple[bool, str]:
+    ema_val = _ema_val(analysis, ema_key)
+    setup_tf = _tf_from_ema_key(ema_key)
+    style = _get_trading_style(analysis.instrument)
+    fallback_tfs = {
+        "day_trading": ("H1", "M5"),
+        "swing": ("D", "H1"),
+        "scalping": ("M5", "M1"),
+    }.get(style, ("H1", "M5"))
+    candles = _get_recent_candles(analysis, setup_tf, *fallback_tfs, min_count=5)
+    if ema_val and candles:
+        for candle in candles[-20:]:
+            close = candle.get("close", 0.0)
+            if direction == "BUY" and close < ema_val:
+                return True, f"EMA {setup_tf or ema_key} fue rota durante la correccion"
+            if direction == "SELL" and close > ema_val:
+                return True, f"EMA {setup_tf or ema_key} fue rota durante la correccion"
+        return False, f"EMA {setup_tf or ema_key} NO fue rota durante la correccion"
+
+    opposite = "SELL" if direction == "BUY" else "BUY"
+    ema_broken, desc = _check_ema_break(analysis, ema_key, opposite)
+    return ema_broken, desc
+
+
+def _detect_completed_pink_context(
+    analysis: AnalysisResult, direction: str
+) -> Tuple[bool, List[str], List[str]]:
+    met: List[str] = []
+    failed: List[str] = []
+
+    setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
+    confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
+    setup_tf = _tf_from_ema_key(setup_ema_key)
+    opposite = "SELL" if direction == "BUY" else "BUY"
+
+    corrective_patterns = []
+    for pattern in getattr(analysis, "chart_patterns", []) or []:
+        ptf = _pattern_timeframe(pattern)
+        if ptf not in ("", setup_tf):
+            continue
+        if _pattern_matches(
+            pattern,
+            "wedge", "cuna", "cuña",
+            "triangle", "triangulo", "triángulo",
+            "channel", "canal",
+        ):
+            corrective_patterns.append(pattern)
+
+    if not corrective_patterns:
+        failed.append(
+            f"White requiere una PINK previa real: sin patron correctivo en {setup_tf or 'setup TF'}"
+        )
+        return False, met, failed
+
+    pattern_labels = ", ".join(sorted({_pattern_name(p) for p in corrective_patterns if _pattern_name(p)}))
+    if pattern_labels:
+        met.append(f"Contexto PINK: patron correctivo detectado ({pattern_labels})")
+
+    historical_break, historical_desc = _historical_setup_ema_broken_during_correction(
+        analysis, setup_ema_key, direction
+    )
+    if not historical_break:
+        failed.append(f"Contexto PINK: {historical_desc}")
+        return False, met, failed
+    met.append(f"Contexto PINK: {historical_desc}")
+
+    confirm_broken, confirm_desc = _check_ema_break(analysis, confirm_ema_key, opposite)
+    if confirm_broken:
+        failed.append(
+            f"Contexto PINK invalido: EMA {_tf_from_ema_key(confirm_ema_key) or confirm_ema_key} "
+            f"tambien fue rota ({confirm_desc})"
+        )
+        return False, met, failed
+    met.append(
+        f"Contexto PINK: EMA {_tf_from_ema_key(confirm_ema_key) or confirm_ema_key} se mantuvo intacta"
+    )
+
+    expected_dir = "bullish" if direction == "BUY" else "bearish"
+    structure_breaks = getattr(analysis, "structure_breaks", []) or []
+    pink_completed = False
+    for sb in structure_breaks[-8:]:
+        if not isinstance(sb, dict):
+            continue
+        if sb.get("direction") == expected_dir and sb.get("type") in ("BOS", "CHOCH"):
+            pink_completed = True
+            met.append(
+                f"Contexto PINK completado: {sb.get('type')} {sb.get('direction')} posterior al patron"
+            )
+            break
+    if not pink_completed:
+        failed.append("Contexto PINK incompleto: falta BOS/CHOCH a favor tras la correccion")
+        return False, met, failed
+
+    setup_trend_ok, setup_desc = _check_ema_break(analysis, setup_ema_key, direction)
+    if not setup_trend_ok:
+        failed.append(
+            f"Contexto WHITE invalido: el impulso post-PINK no sigue defendiendo la EMA {setup_tf or setup_ema_key}"
+        )
+        return False, met, failed
+    met.append(f"Impulso post-PINK intacto: {setup_desc}")
+
+    return True, met, failed
+
+
 def _get_current_price_proxy(analysis: AnalysisResult) -> Optional[float]:
     """Best estimate of current price. Prefers actual price over EMA proxies."""
     # 1. Use actual current price from market_analyzer (M5 latest close)
@@ -597,19 +740,28 @@ def _check_minimum_candle_count(analysis, ema_key: str, direction: str, min_cand
     """
     TradingLab: Before entering on a breakout, verify at least min_candles (3-5)
     have formed after the initial break. Prevents entering on false breakouts.
-    Checks M5 last candles to see sustained break of the EMA.
+    Checks the last candles of the SAME timeframe as the EMA being validated.
     """
     ema_val = _ema_val(analysis, ema_key)
     if ema_val is None:
         return True  # No data = don't block
 
-    m5_candles = getattr(analysis, 'last_candles', {}).get("M5", [])
-    if len(m5_candles) < min_candles:
+    candle_tf = _tf_from_ema_key(ema_key)
+    candles = _get_recent_candles(analysis, candle_tf, min_count=min_candles)
+    if len(candles) < min_candles:
+        style = _get_trading_style(analysis.instrument)
+        fallback_tf = {
+            "day_trading": "M5",
+            "swing": "H1",
+            "scalping": "M1",
+        }.get(style, "M5")
+        candles = _get_recent_candles(analysis, fallback_tf, "M5", min_count=min_candles)
+    if len(candles) < min_candles:
         return True  # Not enough data to check
 
     # Count how many of the last N candles closed on the correct side
     count = 0
-    for candle in m5_candles[-min_candles:]:
+    for candle in candles[-min_candles:]:
         if direction == "BUY" and candle["close"] > ema_val:
             count += 1
         elif direction == "SELL" and candle["close"] < ema_val:
@@ -1433,8 +1585,10 @@ class BaseStrategy(ABC):
                 signal.confidence = max(0.0, signal.confidence - 5.0)
                 signal.conditions_failed.append(pd_desc)
 
-            # TradingLab: Minimum candle count (3 candles sustaining breakout)
-            if not _check_minimum_candle_count(analysis, "EMA_M5_50", signal.direction, 3):
+            # TradingLab: minimum candle count must be checked on the actual
+            # execution timeframe, not hardcoded to M5.
+            exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
+            if not _check_minimum_candle_count(analysis, exec_ema_key, signal.direction, 3):
                 signal.confidence = max(0.0, signal.confidence - 8.0)
                 signal.conditions_failed.append(
                     "Rompimiento reciente: menos de 3 velas confirmando"
@@ -2191,17 +2345,16 @@ class RedStrategy(BaseStrategy):
 
         # --- Paso 6: Entrada en exec TF (RCC) ---
         # TradingLab execution priority (style-adaptive):
-        #   day: M5 MA50 > M5 diagonal > M2 MA50 > M2 diagonal
+        #   day: M5 MA50 > M5 diagonal
         #   swing: H1 MA50 > H1 diagonal (Alex: "bajamos a gráfico de una hora y ejecutamos")
         #   scalping: M1 MA50 > M1 diagonal (Alex: "ruptura en un minuto")
         exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
         style = _get_trading_style(analysis.instrument)
-        # Secondary EMA: day uses M2≈M5_EMA20, swing/scalping have no secondary per mentorship
-        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        _sec_ema_map = {"day_trading": None, "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         # Timeframe labels for chart-pattern matching
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
-        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        _sec_tf_map = {"day_trading": None, "swing": None, "scalping": None}
         exec_tf = _exec_tf_map.get(style, "M5")
         sec_tf = _sec_tf_map.get(style)
 
@@ -2236,7 +2389,7 @@ class RedStrategy(BaseStrategy):
                         entry_found = True
                         break
 
-        # Priority 3: Secondary EMA break (day trading only — M2 via M5 EMA 20 proxy)
+        # Priority 3: Secondary EMA break (reserved for styles that define one explicitly)
         if not entry_found and ema_sec_break and sec_ema_key:
             if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
@@ -2246,7 +2399,7 @@ class RedStrategy(BaseStrategy):
                 return None
             entry_found = True
 
-        # Priority 4: Diagonal breakout on secondary TF (day trading only)
+        # Priority 4: Diagonal breakout on secondary TF (reserved for styles that define one explicitly)
         if not entry_found and sec_tf and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
@@ -2638,22 +2791,11 @@ class PinkStrategy(BaseStrategy):
         setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
         confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
 
-        # Check if setup EMA was historically broken during correction (last 20 candles)
-        ema_h1_val = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
-        h1_candles = getattr(analysis, 'last_candles', {}).get("H1", [])
-        ema_1h_was_broken = False
-        if ema_h1_val and len(h1_candles) >= 5:
-            for candle in h1_candles[-20:]:
-                close = candle.get("close", 0)
-                if direction == "BUY" and close < ema_h1_val:
-                    ema_1h_was_broken = True
-                    break
-                elif direction == "SELL" and close > ema_h1_val:
-                    ema_1h_was_broken = True
-                    break
-        else:
-            # Fallback to current check if no historical data (style-adaptive)
-            ema_1h_was_broken, _ = _check_ema_break(analysis, setup_ema_key, opposite)
+        setup_tf = _tf_from_ema_key(setup_ema_key)
+        confirm_tf = _tf_from_ema_key(confirm_ema_key)
+        ema_1h_was_broken, hist_break_desc = _historical_setup_ema_broken_during_correction(
+            analysis, setup_ema_key, direction
+        )
 
         # TradingLab: confirm EMA must NOT be broken by the correction (opposite direction).
         # Style-adaptive: day=H4, swing=W, scalping=M15
@@ -2662,18 +2804,18 @@ class PinkStrategy(BaseStrategy):
         # 1H EMA 50 must have been broken during correction (historical check)
         if ema_1h_was_broken:
             score += 15.0
-            met.append(f"Paso 3a: EMA 50 1H fue rota durante corrección (histórico)")
+            met.append(f"Paso 3a: {hist_break_desc}")
         else:
-            failed.append(f"Paso 3a: EMA 50 1H NO fue rota durante corrección")
+            failed.append(f"Paso 3a: {hist_break_desc}")
             return False, score, met, failed
 
         # 4H EMA 50 must NOT be broken (if it were, this would be RED, not PINK)
         if not ema_4h_break:
             score += 10.0
-            met.append(f"Paso 3b: EMA 50 4H NO rota (condicion PINK) - {ema_4h_desc}")
+            met.append(f"Paso 3b: EMA 50 {confirm_tf or 'confirm'} NO rota (condicion PINK) - {ema_4h_desc}")
         else:
             failed.append(
-                f"Paso 3b: EMA 50 4H ROTA - {ema_4h_desc} "
+                f"Paso 3b: EMA 50 {confirm_tf or 'confirm'} ROTA - {ema_4h_desc} "
                 f"(esto es RED, no PINK)"
             )
             return False, score, met, failed
@@ -2818,7 +2960,7 @@ class PinkStrategy(BaseStrategy):
         # --- Paso 5: Ejecutar al final del patron en exec TF (RCC) ---
         # TradingLab: "NEVER enter on break alone" — RCC failure = REJECT entry
         # Style-adaptive execution cascade:
-        #   day: M5 > diagonal M5 > M2 > diagonal M2
+        #   day: M5 > diagonal M5
         #   swing: H1 > diagonal H1
         #   scalping: M1 > diagonal M1
         # NOTE: Per mentorship, the exec EMA will NOT be respected throughout the
@@ -2826,10 +2968,10 @@ class PinkStrategy(BaseStrategy):
         # the valid entry for PINK, so diagonal gets equal/higher confidence.
         exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
         style = _get_trading_style(analysis.instrument)
-        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        _sec_ema_map = {"day_trading": None, "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
-        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        _sec_tf_map = {"day_trading": None, "swing": None, "scalping": None}
         exec_tf = _exec_tf_map.get(style, "M5")
         sec_tf = _sec_tf_map.get(style)
 
@@ -2866,7 +3008,7 @@ class PinkStrategy(BaseStrategy):
                         entry_found = True
                         break
 
-        # Priority 3: Secondary EMA break + RCC (day trading only)
+        # Priority 3: Secondary EMA break + RCC (reserved for styles that define one explicitly)
         if not entry_found and ema_sec_break and sec_ema_key:
             if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
@@ -2876,7 +3018,7 @@ class PinkStrategy(BaseStrategy):
                 return None
             entry_found = True
 
-        # Priority 4: Diagonal breakout on secondary TF (day trading only, +8)
+        # Priority 4: Diagonal breakout on secondary TF (reserved for styles that define one explicitly, +8)
         if not entry_found and sec_tf and hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
             for p in chart_patterns:
@@ -3078,12 +3220,9 @@ class WhiteStrategy(BaseStrategy):
     5. Bajar a 5M: ejecutar en rompimiento+cierre+confirmacion
     6. SL encima del maximo anterior. TP en nivel objetivo de Pink (extremo del swing previo)
 
-    Nota: En la deteccion automatica, White depende de que Pink ya se haya
-    completado. Dado que no tenemos estado persistente de trades previos en
-    este modulo, evaluamos las condiciones tecnicas equivalentes:
-    - Tendencia establecida con impulso reciente
-    - Pullback a EMA 50 1H despues de un movimiento fuerte
-    - Estructura similar a Blue pero en contexto de onda 5
+    Nota: En la deteccion automatica, WHITE solo se valida cuando el contexto
+    post-PINK es tecnicamente reconocible: patron correctivo previo, ruptura
+    estructural posterior y tendencia de continuacion intacta.
     """
 
     def __init__(self):
@@ -3103,7 +3242,6 @@ class WhiteStrategy(BaseStrategy):
             return False, score, met, failed
 
         # --- Paso 1: Debe venir de contexto Pink (tendencia establecida + impulso previo) ---
-        # Verificamos que haya tendencia clara y convergencia (indica que Pink ya opero o pudo operar)
         if analysis.htf_trend != Trend.RANGING:
             score += 10.0
             met.append(f"Paso 1: Tendencia HTF establecida ({analysis.htf_trend.value})")
@@ -3111,14 +3249,14 @@ class WhiteStrategy(BaseStrategy):
             failed.append("Paso 1: Sin tendencia HTF - White requiere contexto post-Pink")
             return False, score, met, failed
 
-        # Mentorship: "no operes contra tendencia" — but WHITE comes after PINK,
-        # so LTF may be pulling back (temporary divergence). Penalty, not hard-block.
         if analysis.htf_ltf_convergence:
-            score += 10.0
+            score += 5.0
             met.append("Paso 1b: Convergencia HTF/LTF (indica tendencia consolidada)")
         else:
-            score -= 10.0
-            failed.append("Paso 1b: Sin convergencia HTF/LTF — penalización -10 (post-PINK pullback posible)")
+            failed.append(
+                "Paso 1b: Sin convergencia HTF/LTF en este instante "
+                "(WHITE sigue siendo valida si el contexto post-PINK es correcto)"
+            )
 
         # --- Paso 2: Impulso + pullback en setup TF ---
         # Verificar que EMA 50 setup-TF esta en el lado correcto (tendencia ya rota previamente)
@@ -3146,56 +3284,10 @@ class WhiteStrategy(BaseStrategy):
         if direction is None:
             return None
 
-        # TradingLab: White MUST come from PINK. Since we can't track previous
-        # trades, we use structural proxies to verify the PINK phase occurred:
-        # (a) A recent structure break (BOS) in the trend direction, AND
-        # (b) The correction before it was a pattern (wedge/triangle), AND
-        # (c) Price is now above/below EMA 50 1H.
         failed: List[str] = []
-        pink_proxy_score = 0
-
-        # (a) Check for recent BOS in trend direction
-        structure_breaks = getattr(analysis, 'structure_breaks', [])
-        expected_sb_dir = "bullish" if direction == "BUY" else "bearish"
-        has_recent_bos = False
-        for sb in structure_breaks[-5:]:
-            if isinstance(sb, dict) and sb.get("type") == "BOS" and sb.get("direction") == expected_sb_dir:
-                has_recent_bos = True
-                pink_proxy_score += 1
-                break
-
-        # (b) Check if a corrective pattern (wedge/triangle) was present
-        has_corrective_pattern = False
-        if hasattr(analysis, 'chart_patterns'):
-            chart_patterns = analysis.chart_patterns or []
-            for p in chart_patterns:
-                ptype = p.get("type", "") if isinstance(p, dict) else str(p)
-                ptype_lower = ptype.lower()
-                if any(k in ptype_lower for k in ("wedge", "cuna", "triangle", "triangulo")):
-                    has_corrective_pattern = True
-                    pink_proxy_score += 1
-                    break
-
-        # (c) Check if price is on correct side of EMA 50 setup-TF
-        setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
-        ema_1h_check, _ = _check_ema_break(analysis, setup_ema_key, direction)
-        if ema_1h_check:
-            pink_proxy_score += 1
-
-        # Accept Elliott wave data ONLY if it's Wave 4 or 5 context (PINK territory)
-        ew_detail = getattr(analysis, 'elliott_wave_detail', {})
-        wave_count = str(ew_detail.get("wave_count", "")).strip() if ew_detail else ""
-        if wave_count in ("4", "5"):
-            pink_proxy_score += 1
-
-        # Need at least 3 of the 4 proxy conditions to confirm PINK phase
-        if pink_proxy_score < 3:
-            failed.append(
-                f"White requiere contexto post-Pink: solo {pink_proxy_score}/4 "
-                f"condiciones proxy cumplidas (BOS={has_recent_bos}, "
-                f"patron_correctivo={has_corrective_pattern}, "
-                f"EMA_1H_ok={ema_1h_check}, elliott={bool(ew_detail)})"
-            )
+        pink_ok, pink_met, pink_failed = _detect_completed_pink_context(analysis, direction)
+        if not pink_ok:
+            failed.extend(pink_failed)
             return None
 
         # TradingLab: Volume confirmation - confluence scoring, not hard block
@@ -3212,6 +3304,8 @@ class WhiteStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed = []  # Reset after initial check
+
+        met.extend(pink_met)
 
         # Volume confluence scoring (not hard block)
         if vol_ok and vol_ratio > 1.2:
@@ -3255,10 +3349,10 @@ class WhiteStrategy(BaseStrategy):
         # Style-adaptive execution cascade (same as Blue — WHITE is a Blue after Pink)
         exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
         style = _get_trading_style(analysis.instrument)
-        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        _sec_ema_map = {"day_trading": None, "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
-        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        _sec_tf_map = {"day_trading": None, "swing": None, "scalping": None}
         exec_tf = _exec_tf_map.get(style, "M5")
         sec_tf = _sec_tf_map.get(style)
 
@@ -3393,10 +3487,10 @@ class WhiteStrategy(BaseStrategy):
             explanation_es=explanation_es,
             elliott_wave_phase="Onda 3 de Onda 5",
             timeframes_analyzed={
-                "day_trading": ["D", "H4", "H1", "M5", "M2"],
+                "day_trading": ["D", "H4", "H1", "M5"],
                 "swing": ["M", "W", "D", "H1"],
                 "scalping": ["H1", "M15", "M5", "M1"],
-            }.get(style, ["D", "H4", "H1", "M5", "M2"]),
+            }.get(style, ["D", "H4", "H1", "M5"]),
             risk_reward_ratio=rr,
             conditions_met=met,
             conditions_failed=failed,
@@ -3811,16 +3905,16 @@ class BlackStrategy(BaseStrategy):
 
         # --- Paso 6: Ejecutar en rompimiento exec TF (RCC) ---
         # TradingLab execution priority for BLACK (style-adaptive):
-        #   day: M5 MA50 > diagonal M5 > M2 MA50
+        #   day: M5 MA50 > diagonal M5
         #   swing: H1 MA50 > diagonal H1
         #   scalping: M1 MA50 > diagonal M1
         # Diagonal is especially important for BLACK (triangle/wedge patterns)
         exec_ema_key = _tf_ema("exec", 50, analysis.instrument)
         style = _get_trading_style(analysis.instrument)
-        _sec_ema_map = {"day_trading": "EMA_M5_20", "swing": None, "scalping": None}
+        _sec_ema_map = {"day_trading": None, "swing": None, "scalping": None}
         sec_ema_key = _sec_ema_map.get(style)
         _exec_tf_map = {"day_trading": "M5", "swing": "H1", "scalping": "M1"}
-        _sec_tf_map = {"day_trading": "M2", "swing": None, "scalping": None}
+        _sec_tf_map = {"day_trading": None, "swing": None, "scalping": None}
         exec_tf = _exec_tf_map.get(style, "M5")
         sec_tf = _sec_tf_map.get(style)
 
@@ -3855,7 +3949,7 @@ class BlackStrategy(BaseStrategy):
                         entry_found = True
                         break
 
-        # Priority 3: Secondary EMA break + RCC (day trading only)
+        # Priority 3: Secondary EMA break + RCC (reserved for styles that define one explicitly)
         if not entry_found and ema_sec_break and sec_ema_key:
             if _check_rcc_confirmation(analysis, sec_ema_key, direction):
                 confidence += 8.0
@@ -4163,15 +4257,31 @@ class GreenStrategy(BaseStrategy):
         score = 0.0
         met: List[str] = []
         failed: List[str] = []
+        green_tf = self._get_green_timeframes(analysis.instrument)
 
-        # --- Paso 1: Direccion de tendencia semanal ---
+        # --- Paso 1: Direccion o estructura del timeframe grande ---
         direction = self._determine_direction(analysis)
         if direction is None:
-            failed.append("Paso 1: Sin tendencia semanal clara (Green requiere tendencia semanal)")
-            return False, score, met, failed
-
-        score += 15.0
-        met.append(f"Paso 1: Tendencia semanal {analysis.htf_trend.value}")
+            if analysis.ltf_trend == Trend.BULLISH:
+                direction = "BUY"
+                score += 10.0
+                met.append(
+                    f"Paso 1: Estructura direccional detectada aunque {green_tf['direction']} no este clasificado"
+                )
+            elif analysis.ltf_trend == Trend.BEARISH:
+                direction = "SELL"
+                score += 10.0
+                met.append(
+                    f"Paso 1: Estructura direccional detectada aunque {green_tf['direction']} no este clasificado"
+                )
+            else:
+                failed.append(
+                    f"Paso 1: Sin tendencia ni estructura clara en {green_tf['direction']} para GREEN"
+                )
+                return False, score, met, failed
+        else:
+            score += 15.0
+            met.append(f"Paso 1: Direccion {green_tf['direction']} {analysis.htf_trend.value}")
 
         # --- Paso 2: Correccion semanal forma patron diario ---
         # TradingLab: Also check for breakout of weekly resistance/support level
@@ -4317,7 +4427,12 @@ class GreenStrategy(BaseStrategy):
     def check_ltf_entry(self, analysis: AnalysisResult) -> Optional[SetupSignal]:
         direction = self._determine_direction(analysis)
         if direction is None:
-            return None
+            if analysis.ltf_trend == Trend.BULLISH:
+                direction = "BUY"
+            elif analysis.ltf_trend == Trend.BEARISH:
+                direction = "SELL"
+            else:
+                return None
 
         # TradingLab: Volume confirmation - confluence scoring, not hard block
         vol_ok, vol_ratio = _check_volume_confirmation(analysis, "M5")
@@ -4333,6 +4448,9 @@ class GreenStrategy(BaseStrategy):
         confidence = 0.0
         met: List[str] = []
         failed: List[str] = []
+        green_tf = self._get_green_timeframes(analysis.instrument)
+        diagonal_tf = green_tf["diagonal"]
+        execution_tf = green_tf["execution"]
 
         # Volume confluence scoring (not hard block)
         if vol_ok and vol_ratio > 1.2:
@@ -4342,37 +4460,40 @@ class GreenStrategy(BaseStrategy):
             confidence -= 3.0
             failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
-        # TradingLab: Green REQUIRES 1H diagonal (non-negotiable)
+        # TradingLab: Green REQUIRES a diagonal on the strategy's diagonal TF.
         has_diagonal = False
         if hasattr(analysis, 'chart_patterns'):
             patterns = analysis.chart_patterns or []
             for p in patterns:
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
+                ptf = _pattern_timeframe(p)
+                if ptf not in ("", diagonal_tf):
+                    continue
                 if any(k in ptype.lower() for k in ("diagonal", "wedge", "triangle", "channel", "trendline")):
                     has_diagonal = True
                     break
-        # TradingLab: "Si no hay diagonal en una hora, no hay trade. Esto no es negociable."
-        # BOS/CHOCH is NOT a substitute for a diagonal pattern per the mentorship.
-        # A diagonal/wedge/triangle/channel/trendline MUST be present.
+        # TradingLab: "Si no hay diagonal, no hay trade."
         if not has_diagonal:
-            failed.append("Green REQUIERE diagonal en 1H (non-negotiable) — sin patron diagonal, cuña, triangulo o canal")
+            failed.append(
+                f"Green REQUIERE diagonal en {diagonal_tf} (non-negotiable) — sin patron diagonal, cuña, triangulo o canal"
+            )
             return None
 
-        # --- Paso 4: Cambio de tendencia en 1H al final del patron ---
+        # --- Paso 4: Cambio de tendencia al final del patron ---
         # Buscamos que la tendencia LTF este girando a favor de la HTF
         # (reversal del movimiento correctivo)
         has_reversal, rev_desc = _has_reversal_pattern(analysis, direction)
         if has_reversal:
             confidence += 15.0
-            met.append(f"Paso 4: Cambio de tendencia en 1H - {rev_desc}")
+            met.append(f"Paso 4: Cambio de tendencia en {diagonal_tf} - {rev_desc}")
         else:
-            # Verificar rompimiento de EMA como alternativa
-            ema_1h_break, ema_1h_desc = _check_ema_break(analysis, "EMA_H1_50", direction)
-            if ema_1h_break:
+            diagonal_ema_key = f"EMA_{diagonal_tf}_50"
+            ema_diagonal_break, ema_diagonal_desc = _check_ema_break(analysis, diagonal_ema_key, direction)
+            if ema_diagonal_break:
                 confidence += 10.0
-                met.append(f"Paso 4: EMA 50 1H rota a favor - {ema_1h_desc}")
+                met.append(f"Paso 4: EMA 50 {diagonal_tf} rota a favor - {ema_diagonal_desc}")
             else:
-                failed.append(f"Paso 4: Sin cambio de tendencia claro en 1H - {rev_desc}")
+                failed.append(f"Paso 4: Sin cambio de tendencia claro en {diagonal_tf} - {rev_desc}")
 
         # Deceleration as supporting evidence
         if _has_deceleration(analysis):
@@ -4390,11 +4511,9 @@ class GreenStrategy(BaseStrategy):
             confidence += smc_bonus
             met.append(f"SMC: {smc_desc}")
 
-        # --- Paso 5: Entrada en 15M ---
-        # TradingLab: "copiar la diagonal de 1H a 15M y ejecutar en rompimiento+cierre+
-        # confirmacion de ese nivel" — NOT on EMA breaks.
-        # Primary: detect diagonal/trendline breakout on 15M.
-        # Fallback: use EMA breaks only if no diagonal data is available.
+        # --- Paso 5: Entrada en execution TF ---
+        # TradingLab: copiar la diagonal del timeframe superior y ejecutar SOLO
+        # cuando esa diagonal se rompe y confirma en el timeframe de ejecucion.
         diagonal_breakout_detected = False
         if hasattr(analysis, 'chart_patterns'):
             chart_patterns = analysis.chart_patterns or []
@@ -4402,40 +4521,18 @@ class GreenStrategy(BaseStrategy):
                 ptype = p.get("type", "") if isinstance(p, dict) else str(p)
                 ptf = p.get("timeframe", "") if isinstance(p, dict) else ""
                 ptype_lower = ptype.lower()
-                # Look for diagonal/trendline breakout on execution timeframe
-                # Forex: only M15 per Trading Mastery. Crypto: M5/M2 also accepted.
                 if any(k in ptype_lower for k in ("diagonal", "trendline", "wedge_break", "triangle_break")):
-                    is_crypto = _is_crypto_instrument(analysis.instrument)
-                    accepted_tfs = ("M15", "M5", "M2", "") if is_crypto else ("M15", "")
-                    if ptf in accepted_tfs:
+                    if ptf in (execution_tf, ""):
                         diagonal_breakout_detected = True
                         confidence += 15.0
-                        met.append(f"Paso 5: Rompimiento de diagonal en {ptf or 'M15'} detectado ({ptype})")
+                        met.append(
+                            f"Paso 5: Rompimiento de diagonal en {ptf or execution_tf} detectado ({ptype})"
+                        )
                         break
 
-        # Also check structure breaks as proxy for diagonal breakout
         if not diagonal_breakout_detected:
-            structure_breaks = getattr(analysis, 'structure_breaks', [])
-            for sb in structure_breaks[-5:]:
-                if isinstance(sb, dict):
-                    sb_dir = sb.get("direction", "")
-                    sb_type = sb.get("type", "")
-                    expected_dir = "bullish" if direction == "BUY" else "bearish"
-                    if sb_dir == expected_dir and sb_type in ("BOS", "CHOCH"):
-                        diagonal_breakout_detected = True
-                        confidence += 12.0
-                        met.append(f"Paso 5: Rompimiento estructural {sb_type} {sb_dir} (proxy para diagonal)")
-                        break
-
-        # GREEN entry is diagonal-ONLY per the mentorship: "copiar la diagonal
-        # de 1H a 15M y ejecutar en rompimiento+cierre+confirmacion de ese nivel"
-        # NO EMA fallback — if no diagonal breakout, no trade.
-        # TradingLab: "si no hay ruptura, fuera. No hay trade." — MANDATORY
-        if not diagonal_breakout_detected:
-            is_crypto_fb = _is_crypto_instrument(analysis.instrument)
-            tf_label = "M15/M5/M2" if is_crypto_fb else "M15"
             failed.append(
-                f"Paso 5 [OBLIGATORIO]: Sin rompimiento de diagonal en {tf_label} - GREEN requiere "
+                f"Paso 5 [OBLIGATORIO]: Sin rompimiento de diagonal en {execution_tf} - GREEN requiere "
                 "diagonal breakout (NO fallback a EMAs per mentorship)"
             )
             return None
@@ -4498,9 +4595,9 @@ class GreenStrategy(BaseStrategy):
 
         explanation_es = (
             f"Estrategia GREEN - La mas lucrativa (hasta 10:1 R:R)\n"
-            f"Direccion semanal: {'ALCISTA' if direction == 'BUY' else 'BAJISTA'}\n"
-            f"Patron diario en correccion semanal + entrada en 15M/5M\n"
-            f"Entrada: {entry_price:.5f} | SL: {sl:.5f} (ajustado al minimo 1H)\n"
+            f"Direccion {green_tf['direction']}: {'ALCISTA' if direction == 'BUY' else 'BAJISTA'}\n"
+            f"Patron {green_tf['pattern']} + entrada en {execution_tf}\n"
+            f"Entrada: {entry_price:.5f} | SL: {sl:.5f} (ajustado al contexto {green_tf['diagonal']})\n"
             f"TP1: {tp1:.5f}"
             + (f" | TP_max: {tp_max:.5f}" if tp_max else "") + "\n"
             f"R:R: {rr:.2f}:1 | Confianza: {confidence:.0f}%\n"
@@ -4549,36 +4646,38 @@ class GreenStrategy(BaseStrategy):
         """
         Green SL placement depends on green_sl_mode config:
 
-        - "advanced" (default): SL below last swing before diagonal break.
-          Tight SL for high R:R — the mentorship method.
-        - "beginner": SL below pattern minimum (wider, simpler).
-          Uses the lowest low / highest high of the corrective pattern.
+        - "beginner" (default): SL below pattern minimum (wider, simpler).
+          This is the initial GREEN mode taught before tightening entries.
+        - "advanced": SL below last swing before diagonal break.
+          Tighter SL once the user already dominates the structure.
 
-        TradingLab: Use 1H swing lows/highs (NOT daily S/R levels).
-        Previous 1H swing low/high only, NO Fibonacci.
+        TradingLab: use the swing of the GREEN diagonal timeframe, not a
+        generic daily S/R proxy and never Fibonacci for the SL itself.
         """
         # Check green_sl_mode from config
-        sl_mode = "advanced"
+        sl_mode = "beginner"
         try:
             sl_mode = settings.green_sl_mode
         except Exception as e:
-            logger.warning(f"GREEN SL mode config read failed, using default 'advanced': {e}")
+            logger.warning(f"GREEN SL mode config read failed, using default 'beginner': {e}")
 
-        # Mentorship: SL below the previous H1 minimum (BUY) or above the
-        # previous H1 maximum (SELL). swing_lows / swing_highs MUST be sourced
-        # from H1 candles for GREEN — never from daily S/R levels.
+        green_tf = self._get_green_timeframes(analysis.instrument)
+        diagonal_tf = green_tf["diagonal"]
+
+        # Mentorship: SL below the previous diagonal-TF minimum (BUY) or above
+        # the previous diagonal-TF maximum (SELL).
         swing_lows = getattr(analysis, 'swing_lows', [])
         swing_highs = getattr(analysis, 'swing_highs', [])
 
-        # Fallback: if swing data is empty, derive from raw H1 candles
-        h1_candles = getattr(analysis, 'last_candles', {}).get("H1", [])
-        if not swing_lows and h1_candles:
-            swing_lows = [c.get("low", c.get("l", 0)) for c in h1_candles if isinstance(c, dict)]
+        # Fallback: if swing data is empty, derive from raw diagonal-TF candles
+        diagonal_candles = getattr(analysis, 'last_candles', {}).get(diagonal_tf, [])
+        if not swing_lows and diagonal_candles:
+            swing_lows = [c.get("low", c.get("l", 0)) for c in diagonal_candles if isinstance(c, dict)]
             swing_lows = [v for v in swing_lows if v > 0]
-        if not swing_highs and h1_candles:
-            swing_highs = [c.get("high", c.get("h", 0)) for c in h1_candles if isinstance(c, dict)]
+        if not swing_highs and diagonal_candles:
+            swing_highs = [c.get("high", c.get("h", 0)) for c in diagonal_candles if isinstance(c, dict)]
             swing_highs = [v for v in swing_highs if v > 0]
-        ema_1h_50 = _ema_val(analysis, "EMA_H1_50")
+        ema_diagonal_50 = _ema_val(analysis, f"EMA_{diagonal_tf}_50")
 
         # Fallback: use key_levels supports/resistances if no swing data
         supports = analysis.key_levels.get("supports", []) if analysis.key_levels else []
@@ -4599,33 +4698,32 @@ class GreenStrategy(BaseStrategy):
                     return max(above) * (1 + 0.002)  # Widest SL = pattern maximum + buffer
                 return entry_price * 1.01
 
-        # Advanced mode (default): SL below last swing before diagonal
+        # Advanced mode: SL below last swing before diagonal
         # TradingLab: "le daremos un poquito de espacio" — 0.2% buffer
         buffer_pct = 0.002
         if direction == "BUY":
-            # 1H swing lows below entry = SL placement
+            # Diagonal-TF swing lows below entry = SL placement
             below = [sl for sl in swing_lows if sl < entry_price]
             if below:
-                return max(below) * (1 - buffer_pct)  # Tightest 1H swing low + buffer
+                return max(below) * (1 - buffer_pct)
             # Fallback to key_levels supports
             support_below = [s for s in supports if s < entry_price]
             if support_below:
                 return max(support_below) * (1 - buffer_pct)
-            # Fallback: ligeramente debajo de EMA 1H si disponible
-            if ema_1h_50 and ema_1h_50 < entry_price:
-                return ema_1h_50 * (1 - buffer_pct)
+            if ema_diagonal_50 and ema_diagonal_50 < entry_price:
+                return ema_diagonal_50 * (1 - buffer_pct)
             return entry_price * 0.995  # 0.5% tight SL
         else:
-            # 1H swing highs above entry = SL placement
+            # Diagonal-TF swing highs above entry = SL placement
             above = [sh for sh in swing_highs if sh > entry_price]
             if above:
-                return min(above) * (1 + buffer_pct)  # Tightest 1H swing high + buffer
+                return min(above) * (1 + buffer_pct)
             # Fallback to key_levels resistances
             resistance_above = [r for r in resistances if r > entry_price]
             if resistance_above:
                 return min(resistance_above) * (1 + buffer_pct)
-            if ema_1h_50 and ema_1h_50 > entry_price:
-                return ema_1h_50 * (1 + buffer_pct)
+            if ema_diagonal_50 and ema_diagonal_50 > entry_price:
+                return ema_diagonal_50 * (1 + buffer_pct)
             return entry_price * 1.005
 
     def get_tp_levels(self, analysis: AnalysisResult, direction: str, entry_price: float) -> Dict[str, float]:

@@ -32,6 +32,7 @@ from strategies.base import (
     _is_crypto_instrument, _apply_elliott_wave_priority,
     _classify_blue_variant, _has_reversal_pattern,
     _check_ema_break, _fib_zone_check, _is_at_key_level,
+    _check_minimum_candle_count,
 )
 from core.market_analyzer import AnalysisResult, Trend, MarketCondition
 
@@ -49,6 +50,7 @@ def make_analysis(
     ema_h4_50=None,
     supports=None,
     resistances=None,
+    fibonacci_levels=None,
     chart_patterns=None,
     candlestick_patterns=None,
     rsi_divergence=None,
@@ -60,6 +62,7 @@ def make_analysis(
     elliott_wave_detail=None,
     bmsb=None,
     last_candles=None,
+    structure_breaks=None,
 ):
     ema_values = {
         "EMA_M5_2": price_proxy,
@@ -88,7 +91,7 @@ def make_analysis(
             "resistances": resistances or [price_proxy + 0.01, price_proxy + 0.02],
         },
         ema_values=ema_values,
-        fibonacci_levels={"0.382": price_proxy - 0.004, "0.500": price_proxy - 0.005, "0.618": price_proxy - 0.006},
+        fibonacci_levels=fibonacci_levels or {"0.382": price_proxy - 0.004, "0.500": price_proxy - 0.005, "0.618": price_proxy - 0.006},
         candlestick_patterns=candlestick_patterns or [],
         chart_patterns=chart_patterns or [],
         rsi_divergence=rsi_divergence,
@@ -98,6 +101,7 @@ def make_analysis(
         elliott_wave_detail=elliott_wave_detail or {},
         bmsb=bmsb,
         last_candles=last_candles or {},
+        structure_breaks=structure_breaks or [],
         h4_impulse_high=h4_impulse_high,
         h4_impulse_low=h4_impulse_low,
     )
@@ -333,7 +337,7 @@ class TestWhiteStrategy:
         self.white = WhiteStrategy()
 
     def test_htf_pass_with_convergence(self):
-        """WHITE requires established trend + convergence."""
+        """WHITE passes with established trend; convergence is extra confluence."""
         analysis = make_analysis(
             htf_trend=Trend.BULLISH,
             ltf_trend=Trend.BULLISH,
@@ -343,16 +347,52 @@ class TestWhiteStrategy:
         ok, score, met, failed = self.white.check_htf_conditions(analysis)
         assert ok, f"WHITE should pass with convergence. Failed: {failed}"
 
-    def test_htf_fails_without_convergence(self):
-        """WHITE applies -10 confidence penalty without convergence (soft penalty, not hard-block)."""
+    def test_htf_does_not_fail_without_convergence_if_trend_is_intact(self):
+        """WHITE should not hard-block only because LTF alignment is temporarily absent."""
         analysis = make_analysis(
             convergence=False,
+            ema_h1_50=1.0980,
         )
         ok, score, met, failed = self.white.check_htf_conditions(analysis)
-        # WHITE no longer hard-blocks on convergence=False — it applies a -10 penalty instead
-        assert ok, "WHITE should pass without convergence (soft penalty, not hard-block)"
-        assert any("penalización" in f.lower() or "penalty" in f.lower() or "-10" in f for f in failed), \
-            "Should mention the convergence penalty"
+        assert ok, f"WHITE should stay valid without convergence if post-PINK bias is intact. Failed: {failed}"
+        assert any("sin convergencia" in f.lower() for f in failed)
+
+    def test_white_requires_completed_pink_context(self):
+        analysis = make_analysis(
+            chart_patterns=[
+                {"type": "channel", "timeframe": "H1"},
+                {"type": "trendline_break", "timeframe": "M5"},
+            ],
+            candlestick_patterns=["ENGULFING_BULLISH"],
+            rsi_divergence="bullish",
+            fibonacci_levels={"0.382": 1.1005, "0.500": 1.1002, "0.618": 1.0999},
+            last_candles={
+                "H1": [
+                    {"open": 1.1020, "high": 1.1030, "low": 1.1000, "close": 1.1015},
+                    {"open": 1.1015, "high": 1.1020, "low": 1.0985, "close": 1.0990},
+                    {"open": 1.0990, "high": 1.1000, "low": 1.0975, "close": 1.0980},
+                    {"open": 1.0980, "high": 1.0995, "low": 1.0970, "close": 1.0985},
+                    {"open": 1.0985, "high": 1.1015, "low": 1.0980, "close": 1.1010},
+                    {"open": 1.1010, "high": 1.1030, "low": 1.1005, "close": 1.1025},
+                ],
+                "M5": [
+                    {"open": 1.0998, "high": 1.1006, "low": 1.0995, "close": 1.1002},
+                    {"open": 1.1002, "high": 1.1010, "low": 1.1001, "close": 1.1008},
+                    {"open": 1.1008, "high": 1.1014, "low": 1.1006, "close": 1.1012},
+                ],
+            },
+            structure_breaks=[{"type": "BOS", "direction": "bullish"}],
+            swing_lows=[1.0997, 1.0992],
+            swing_highs=[1.1048, 1.1080],
+            supports=[1.0997, 1.0992],
+            resistances=[1.1048, 1.1080],
+            price_proxy=1.1004,
+            ema_h1_50=1.1000,
+            ema_h4_50=1.0950,
+        )
+        signal = self.white.check_ltf_entry(analysis)
+        assert signal is not None, "WHITE should validate only when post-PINK context is real"
+        assert signal.timeframes_analyzed == ["D", "H4", "H1", "M5"]
 
     def test_sl_uses_swing_extreme(self):
         """WHITE SL = previous swing extreme (not Fib like Blue)."""
@@ -546,6 +586,24 @@ class TestReversalPatterns:
         analysis = make_analysis(candlestick_patterns=["HAMMER"])
         found, _ = _has_reversal_pattern(analysis, "SELL")
         assert not found
+
+    def test_minimum_candle_count_uses_exec_timeframe_not_hardcoded_m5(self):
+        analysis = make_analysis(
+            ema_h1_50=1.0980,
+            last_candles={
+                "H1": [
+                    {"close": 1.0985},
+                    {"close": 1.0990},
+                    {"close": 1.0995},
+                ],
+                "M5": [
+                    {"close": 1.0970},
+                    {"close": 1.0972},
+                    {"close": 1.0974},
+                ],
+            },
+        )
+        assert _check_minimum_candle_count(analysis, "EMA_H1_50", "BUY", 3)
 
 
 # ── Section 10: Non-market entry restrictions ─────────────────────────

@@ -1334,6 +1334,13 @@ class RiskConfigRequest(BaseModel):
     cooldown_minutes_scalping: Optional[int] = None
     avoid_news_minutes_before_scalping: Optional[int] = None
     avoid_news_minutes_after_scalping: Optional[int] = None
+    strict_mentoria_mode: Optional[bool] = None
+    strict_recent_pink_context_hours: Optional[int] = None
+    auto_hold_qualified_overnight_positions: Optional[bool] = None
+    overnight_fee_rate_estimate: Optional[float] = None
+    overnight_fee_min_usd: Optional[float] = None
+    overnight_hold_min_open_r: Optional[float] = None
+    overnight_hold_min_remaining_r: Optional[float] = None
 
 
 # ── Trading Profiles ─────────────────────────────────────────────
@@ -1447,6 +1454,13 @@ async def get_risk_config():
         "avoid_news_minutes_after": settings.avoid_news_minutes_after,
         "avoid_news_minutes_before_scalping": getattr(settings, "avoid_news_minutes_before_scalping", 60),
         "avoid_news_minutes_after_scalping": getattr(settings, "avoid_news_minutes_after_scalping", 60),
+        "strict_mentoria_mode": getattr(settings, "strict_mentoria_mode", True),
+        "strict_recent_pink_context_hours": getattr(settings, "strict_recent_pink_context_hours", 72),
+        "auto_hold_qualified_overnight_positions": getattr(settings, "auto_hold_qualified_overnight_positions", True),
+        "overnight_fee_rate_estimate": getattr(settings, "overnight_fee_rate_estimate", 0.0003),
+        "overnight_fee_min_usd": getattr(settings, "overnight_fee_min_usd", 0.05),
+        "overnight_hold_min_open_r": getattr(settings, "overnight_hold_min_open_r", 0.25),
+        "overnight_hold_min_remaining_r": getattr(settings, "overnight_hold_min_remaining_r", 0.75),
         "avoid_news_minutes_before_swing": settings.avoid_news_minutes_before_swing,
         "avoid_news_minutes_after_swing": settings.avoid_news_minutes_after_swing,
         "news_impact_filter": settings.news_impact_filter,
@@ -1590,6 +1604,44 @@ async def set_risk_config(request: RiskConfigRequest):
             raise HTTPException(400, "avoid_news_minutes_after_scalping debe estar entre 0 y 240")
         settings.avoid_news_minutes_after_scalping = request.avoid_news_minutes_after_scalping
         updates["avoid_news_minutes_after_scalping"] = request.avoid_news_minutes_after_scalping
+
+    if request.strict_mentoria_mode is not None:
+        settings.strict_mentoria_mode = request.strict_mentoria_mode
+        updates["strict_mentoria_mode"] = request.strict_mentoria_mode
+
+    if request.strict_recent_pink_context_hours is not None:
+        if not (1 <= request.strict_recent_pink_context_hours <= 168):
+            raise HTTPException(400, "strict_recent_pink_context_hours debe estar entre 1 y 168")
+        settings.strict_recent_pink_context_hours = request.strict_recent_pink_context_hours
+        updates["strict_recent_pink_context_hours"] = request.strict_recent_pink_context_hours
+
+    if request.auto_hold_qualified_overnight_positions is not None:
+        settings.auto_hold_qualified_overnight_positions = request.auto_hold_qualified_overnight_positions
+        updates["auto_hold_qualified_overnight_positions"] = request.auto_hold_qualified_overnight_positions
+
+    if request.overnight_fee_rate_estimate is not None:
+        if not (0.0 <= request.overnight_fee_rate_estimate <= 0.01):
+            raise HTTPException(400, "overnight_fee_rate_estimate debe estar entre 0 y 0.01")
+        settings.overnight_fee_rate_estimate = request.overnight_fee_rate_estimate
+        updates["overnight_fee_rate_estimate"] = request.overnight_fee_rate_estimate
+
+    if request.overnight_fee_min_usd is not None:
+        if not (0.0 <= request.overnight_fee_min_usd <= 50.0):
+            raise HTTPException(400, "overnight_fee_min_usd debe estar entre 0 y 50")
+        settings.overnight_fee_min_usd = request.overnight_fee_min_usd
+        updates["overnight_fee_min_usd"] = request.overnight_fee_min_usd
+
+    if request.overnight_hold_min_open_r is not None:
+        if not (0.0 <= request.overnight_hold_min_open_r <= 5.0):
+            raise HTTPException(400, "overnight_hold_min_open_r debe estar entre 0 y 5")
+        settings.overnight_hold_min_open_r = request.overnight_hold_min_open_r
+        updates["overnight_hold_min_open_r"] = request.overnight_hold_min_open_r
+
+    if request.overnight_hold_min_remaining_r is not None:
+        if not (0.0 <= request.overnight_hold_min_remaining_r <= 10.0):
+            raise HTTPException(400, "overnight_hold_min_remaining_r debe estar entre 0 y 10")
+        settings.overnight_hold_min_remaining_r = request.overnight_hold_min_remaining_r
+        updates["overnight_hold_min_remaining_r"] = request.overnight_hold_min_remaining_r
 
     if not updates:
         raise HTTPException(400, "No se especificaron cambios")

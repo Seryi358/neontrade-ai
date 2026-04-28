@@ -64,6 +64,7 @@ class TradeRisk:
     limit_price: Optional[float] = None  # Price for limit/stop orders
     trailing_tp_only: bool = False  # True for crypto GREEN: skip hard TP1, use EMA 50 trailing
     strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED"
+    htf_context: str = "pullback"  # "pullback" or "run" for wider management/overnight decisions
 
 
 @dataclass

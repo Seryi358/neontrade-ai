@@ -15,6 +15,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass, field
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 sys.path.insert(0, ".")
@@ -281,6 +282,13 @@ def make_white_analysis() -> AnalysisResult:
         },
         swing_lows=[1.0997, 1.0992],
         swing_highs=[1.1048, 1.1080],
+        recent_strategy_events=[
+            {
+                "timestamp": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+                "strategy": "PINK",
+                "direction": "BUY",
+            }
+        ],
         current_price=1.1004,
     )
 

@@ -5,6 +5,7 @@ BUGFIX-001: Tests for BLUE (A/B/C), RED, PINK, WHITE, BLACK, GREEN
 import sys
 import pytest
 from unittest.mock import patch
+from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, ".")
 
@@ -63,6 +64,7 @@ def make_analysis(
     bmsb=None,
     last_candles=None,
     structure_breaks=None,
+    recent_strategy_events=None,
 ):
     ema_values = {
         "EMA_M5_2": price_proxy,
@@ -102,6 +104,7 @@ def make_analysis(
         bmsb=bmsb,
         last_candles=last_candles or {},
         structure_breaks=structure_breaks or [],
+        recent_strategy_events=recent_strategy_events or [],
         h4_impulse_high=h4_impulse_high,
         h4_impulse_low=h4_impulse_low,
     )
@@ -395,6 +398,34 @@ class TestPinkStrategy:
         )
         assert self.pink.check_ltf_entry(analysis) is None
 
+    def test_ltf_strict_mode_rejects_proxy_without_explicit_pattern(self):
+        analysis = make_analysis(
+            htf_trend=Trend.BULLISH,
+            ltf_trend=Trend.BULLISH,
+            convergence=True,
+            price_proxy=1.1001,
+            ema_h1_50=1.1000,
+            ema_h4_50=1.0940,
+            fibonacci_levels={"0.382": 1.1004, "0.500": 1.1002, "0.618": 1.1000},
+            candlestick_patterns=["DOJI", "DOJI", "ENGULFING_BULLISH"],
+            chart_patterns=[],
+            last_candles={
+                "H1": [
+                    {"open": 1.1015, "high": 1.1020, "low": 1.0998, "close": 1.1008},
+                    {"open": 1.1008, "high": 1.1012, "low": 1.0994, "close": 1.1000},
+                    {"open": 1.1000, "high": 1.1006, "low": 1.0996, "close": 1.1001},
+                    {"open": 1.1001, "high": 1.1005, "low": 1.0998, "close": 1.1000},
+                    {"open": 1.1000, "high": 1.1004, "low": 1.0997, "close": 1.1001},
+                ],
+                "M5": [
+                    {"open": 1.0999, "high": 1.1002, "low": 1.0998, "close": 1.1000},
+                    {"open": 1.1000, "high": 1.1003, "low": 1.0999, "close": 1.1001},
+                    {"open": 1.1001, "high": 1.1004, "low": 1.1000, "close": 1.1001},
+                ],
+            },
+        )
+        assert self.pink.check_ltf_entry(analysis) is None
+
 
 # ── Section 5: WHITE strategy ─────────────────────────────────────────
 
@@ -465,10 +496,51 @@ class TestWhiteStrategy:
             price_proxy=1.1004,
             ema_h1_50=1.1000,
             ema_h4_50=1.0950,
+            recent_strategy_events=[
+                {
+                    "timestamp": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+                    "strategy": "PINK",
+                    "direction": "BUY",
+                }
+            ],
         )
         signal = self.white.check_ltf_entry(analysis)
         assert signal is not None, "WHITE should validate only when post-PINK context is real"
         assert signal.timeframes_analyzed == ["D", "H4", "H1", "M5"]
+
+    def test_white_strict_mode_fails_without_real_pink_event(self):
+        analysis = make_analysis(
+            chart_patterns=[
+                {"type": "channel", "timeframe": "H1"},
+                {"type": "trendline_break", "timeframe": "M5"},
+            ],
+            candlestick_patterns=["ENGULFING_BULLISH"],
+            fibonacci_levels={"0.382": 1.1005, "0.500": 1.1002, "0.618": 1.0999},
+            last_candles={
+                "H1": [
+                    {"open": 1.1020, "high": 1.1030, "low": 1.1000, "close": 1.1015},
+                    {"open": 1.1015, "high": 1.1020, "low": 1.0985, "close": 1.0990},
+                    {"open": 1.0990, "high": 1.1000, "low": 1.0975, "close": 1.0980},
+                    {"open": 1.0980, "high": 1.0995, "low": 1.0970, "close": 1.0985},
+                    {"open": 1.0985, "high": 1.1015, "low": 1.0980, "close": 1.1010},
+                    {"open": 1.1010, "high": 1.1030, "low": 1.1005, "close": 1.1025},
+                ],
+                "M5": [
+                    {"open": 1.0998, "high": 1.1006, "low": 1.0995, "close": 1.1002},
+                    {"open": 1.1002, "high": 1.1010, "low": 1.1001, "close": 1.1008},
+                    {"open": 1.1008, "high": 1.1014, "low": 1.1006, "close": 1.1012},
+                ],
+            },
+            structure_breaks=[{"type": "BOS", "direction": "bullish"}],
+            swing_lows=[1.0997, 1.0992],
+            swing_highs=[1.1048, 1.1080],
+            supports=[1.0997, 1.0992],
+            resistances=[1.1048, 1.1080],
+            price_proxy=1.1004,
+            ema_h1_50=1.1000,
+            ema_h4_50=1.0950,
+        )
+        assert self.white.check_ltf_entry(analysis) is None
 
     def test_sl_uses_swing_extreme(self):
         """WHITE SL = previous swing extreme (not Fib like Blue)."""

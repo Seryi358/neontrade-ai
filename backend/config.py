@@ -255,6 +255,19 @@ class Settings(BaseSettings):
     # Atlas live default: close open positions before financing can accrue on
     # small accounts that are meant to stay intraday.
     auto_close_overnight_positions: bool = True
+    # Mentoría strict mode: disable heuristic shortcuts where we still relied
+    # on proxies instead of explicit structural evidence.
+    strict_mentoria_mode: bool = True
+    # WHITE should come after an actual PINK event in the engine flow, not
+    # just pattern resemblance on a single snapshot.
+    strict_recent_pink_context_hours: int = 72
+    # Keep overnight positions only when the trade is already protected and
+    # the expected upside justifies financing on the full exposure.
+    auto_hold_qualified_overnight_positions: bool = True
+    overnight_fee_rate_estimate: float = 0.0003  # ~0.03% daily on notional exposure
+    overnight_fee_min_usd: float = 0.05
+    overnight_hold_min_open_r: float = 0.25
+    overnight_hold_min_remaining_r: float = 0.75
     avoid_news_minutes_before: int = 30  # Don't trade 30 min before major news
     avoid_news_minutes_after: int = 30   # 30 min post-release — covers NFP/CPI/FOMC volatility window (audit §M5)
     avoid_news_minutes_before_scalping: int = 60  # Mentorship literal: no scalping 60 min before news
@@ -690,6 +703,13 @@ def _load_risk_overrides():
         "engine_mode",                   # "AUTO" | "MANUAL"
         "enabled_strategies",            # dict[str, bool]
         "trading_style",                 # "day_trading" | "swing" | "scalping"
+        "strict_mentoria_mode",          # bool — disable heuristic shortcuts
+        "strict_recent_pink_context_hours",  # int — recent PINK window for WHITE
+        "auto_hold_qualified_overnight_positions",  # bool
+        "overnight_fee_rate_estimate",   # float — estimated daily funding on notional
+        "overnight_fee_min_usd",         # float
+        "overnight_hold_min_open_r",     # float
+        "overnight_hold_min_remaining_r",  # float
         # Self-Improvement persisted toggles (Phase 5 — 2026-04-22)
         "auto_asr_enabled",              # bool — fire AutoASR after each close
         "auto_asr_model",                # str — gpt-4o by default
@@ -724,6 +744,11 @@ def _load_risk_overrides():
         "scalping_max_total_dd":  (0.01,  0.30),
         "trading_start_hour":     (0, 23),
         "trading_end_hour":       (0, 23),
+        "strict_recent_pink_context_hours": (1, 168),
+        "overnight_fee_rate_estimate": (0.0, 0.01),
+        "overnight_fee_min_usd": (0.0, 50.0),
+        "overnight_hold_min_open_r": (0.0, 5.0),
+        "overnight_hold_min_remaining_r": (0.0, 10.0),
         "max_trades_per_day_scalping": (0, 50),
         "cooldown_minutes_scalping": (0, 240),
         "avoid_news_minutes_before_scalping": (0, 240),
@@ -901,6 +926,13 @@ TRADING_PROFILES = {
             "trading_end_hour": 21,
             "close_before_friday_hour": 20,
             "no_new_trades_friday_hour": 18,
+            "strict_mentoria_mode": True,
+            "strict_recent_pink_context_hours": 72,
+            "auto_hold_qualified_overnight_positions": True,
+            "overnight_fee_rate_estimate": 0.0003,
+            "overnight_fee_min_usd": 0.05,
+            "overnight_hold_min_open_r": 0.25,
+            "overnight_hold_min_remaining_r": 0.75,
             "avoid_news_minutes_before": 30,
             "avoid_news_minutes_after": 30,
             # Watchlists — Alex's full set across markets

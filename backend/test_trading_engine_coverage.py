@@ -59,6 +59,16 @@ def engine():
         mock_settings.cooldown_minutes_scalping = 30
         mock_settings.scalping_max_daily_dd = 0.05
         mock_settings.scalping_max_total_dd = 0.10
+        mock_settings.strict_recent_pink_context_hours = 72
+        mock_settings.strict_mentoria_mode = True
+        mock_settings.auto_hold_qualified_overnight_positions = True
+        mock_settings.overnight_fee_rate_estimate = 0.0003
+        mock_settings.overnight_fee_min_usd = 0.05
+        mock_settings.overnight_hold_min_open_r = 0.25
+        mock_settings.overnight_hold_min_remaining_r = 0.75
+        mock_settings.auto_close_overnight_positions = True
+        mock_settings.funded_account_mode = False
+        mock_settings.funded_no_overnight = False
 
         mock_broker = MagicMock()
         mock_broker_fn.return_value = mock_broker
@@ -202,6 +212,67 @@ class TestFridayRules:
         """Friday 10:00 UTC should allow new trades."""
         friday = datetime(2025, 7, 18, 10, 0, tzinfo=timezone.utc)
         assert engine._is_friday_no_new_trades(friday) is False
+
+
+class TestAutoOvernightClose:
+    @pytest.mark.asyncio
+    async def test_keeps_qualified_run_position(self, engine):
+        from core.position_manager import ManagedPosition
+
+        pos = ManagedPosition(
+            trade_id="t1",
+            instrument="EUR_USD",
+            direction="BUY",
+            entry_price=100.0,
+            original_sl=99.0,
+            current_sl=100.2,
+            take_profit_1=101.8,
+            take_profit_max=103.0,
+            units=1.0,
+            style="day_trading",
+            htf_context="run",
+        )
+        engine.position_manager.positions = {"t1": pos}
+        engine.broker.get_current_price = AsyncMock(
+            return_value=type("Price", (), {"bid": 101.2, "ask": 101.2})()
+        )
+        engine.broker.close_trade = AsyncMock(return_value=True)
+
+        now = datetime(2025, 7, 15, 22, 0, tzinfo=timezone.utc)
+        await engine._handle_auto_overnight_close(now)
+
+        assert "t1" in engine.position_manager.positions
+        engine.broker.close_trade.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_closes_unqualified_position(self, engine):
+        from core.position_manager import ManagedPosition
+
+        pos = ManagedPosition(
+            trade_id="t2",
+            instrument="EUR_USD",
+            direction="BUY",
+            entry_price=100.0,
+            original_sl=99.0,
+            current_sl=99.0,
+            take_profit_1=101.0,
+            units=1.0,
+            style="day_trading",
+            htf_context="pullback",
+        )
+        engine.position_manager.positions = {"t2": pos}
+        engine.position_manager.remove_position.side_effect = lambda tid: engine.position_manager.positions.pop(tid, None)
+        engine.broker.get_current_price = AsyncMock(
+            return_value=type("Price", (), {"bid": 100.3, "ask": 100.3})()
+        )
+        engine.broker.close_trade = AsyncMock(return_value=True)
+        engine.risk_manager._current_balance = 1000.0
+
+        now = datetime(2025, 7, 15, 22, 0, tzinfo=timezone.utc)
+        await engine._handle_auto_overnight_close(now)
+
+        engine.broker.close_trade.assert_awaited_once_with("t2")
+        assert "t2" not in engine.position_manager.positions
 
 
 class TestScalpingScan:

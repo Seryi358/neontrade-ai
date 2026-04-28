@@ -21,6 +21,7 @@ Cada estrategia implementa:
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, List, Tuple
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from loguru import logger
 
@@ -448,6 +449,42 @@ def _detect_completed_pink_context(
     met: List[str] = []
     failed: List[str] = []
 
+    if getattr(settings, "strict_mentoria_mode", False):
+        now = datetime.now(timezone.utc)
+        window_hours = int(getattr(settings, "strict_recent_pink_context_hours", 72) or 72)
+        recent_events = getattr(analysis, "recent_strategy_events", []) or []
+        pink_event_found = False
+        for event in recent_events:
+            if not isinstance(event, dict):
+                continue
+            if str(event.get("strategy", "")).upper() != "PINK":
+                continue
+            if str(event.get("direction", "")).upper() != direction:
+                continue
+            ts_raw = event.get("timestamp")
+            if ts_raw:
+                try:
+                    ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
+                    age_hours = (now - ts.astimezone(timezone.utc)).total_seconds() / 3600.0
+                    if age_hours > window_hours:
+                        continue
+                except Exception:
+                    pass
+            pink_event_found = True
+            met.append(
+                f"Contexto PINK real en motor: evento previo {event.get('strategy')} "
+                f"{event.get('direction')} detectado recientemente"
+            )
+            break
+        if not pink_event_found:
+            failed.append(
+                "White requiere una PINK previa REAL detectada por el motor "
+                f"(ventana {window_hours}h) en modo estricto"
+            )
+            return False, met, failed
+
     setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
     confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
     setup_tf = _tf_from_ema_key(setup_ema_key)
@@ -547,6 +584,12 @@ def _has_confirm_tf_freno_or_consolidation(
         ):
             name = _pattern_name(pattern) or "patron correctivo"
             return True, f"Patron de freno/consolidacion detectado en {confirm_tf or 'confirm TF'} ({name})"
+
+    if getattr(settings, "strict_mentoria_mode", False):
+        return (
+            False,
+            f"Modo estricto: falta patron explicito de freno/consolidacion en {confirm_tf or 'confirm TF'}"
+        )
 
     candles = _get_recent_candles(analysis, confirm_tf, min_count=4)
     if len(candles) < 4:
@@ -2999,6 +3042,12 @@ class PinkStrategy(BaseStrategy):
                             break
 
         if not pattern_near_completion:
+            if getattr(settings, "strict_mentoria_mode", False):
+                failed.append(
+                    "Paso 4c: Modo estricto — sin patron correctivo explicito cerca "
+                    "de completitud; no se acepta proxy por compresion/DOJIs"
+                )
+                return None
             # If no chart_patterns data available, use price compression as proxy:
             # low distance to EMA and DOJIs indicate the pattern is narrowing
             if doji_count >= 2 and dist < 0.5:

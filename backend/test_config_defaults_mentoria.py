@@ -176,3 +176,22 @@ class TestTradingProfiles:
         """Comment should NOT claim NON-NEGOTIABLE per mentorship (that's false)."""
         profile = TRADING_PROFILES["conservative"]
         assert profile["settings"]["risk_swing"] == 0.01
+
+
+class TestStrictMentoriaAndOvernight:
+    def test_strict_mentoria_mode_enabled_by_default(self):
+        assert settings.strict_mentoria_mode is True
+
+    def test_recent_pink_context_window_is_72_hours(self):
+        assert settings.strict_recent_pink_context_hours == 72
+
+    def test_auto_hold_qualified_overnight_positions_enabled(self):
+        assert settings.auto_hold_qualified_overnight_positions is True
+
+    def test_overnight_fee_estimate_defaults(self):
+        assert settings.overnight_fee_rate_estimate == pytest.approx(0.0003)
+        assert settings.overnight_fee_min_usd == pytest.approx(0.05)
+
+    def test_overnight_r_thresholds_defaults(self):
+        assert settings.overnight_hold_min_open_r == pytest.approx(0.25)
+        assert settings.overnight_hold_min_remaining_r == pytest.approx(0.75)

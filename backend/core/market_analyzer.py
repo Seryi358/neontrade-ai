@@ -122,6 +122,9 @@ class AnalysisResult:
     # Swing highs/lows from H1 structure detection (used by PINK/WHITE TP calc)
     swing_highs: List[float] = field(default_factory=list)
     swing_lows: List[float] = field(default_factory=list)
+    # Recent engine-detected strategy events for this instrument. Used by
+    # strict mentorship mode so WHITE can require a real prior PINK context.
+    recent_strategy_events: List[Dict[str, Any]] = field(default_factory=list)
     # Recent 4H impulse extremes (used by WHITE tp_max to target the higher-timeframe impulse).
     h4_impulse_high: Optional[float] = None
     h4_impulse_low: Optional[float] = None

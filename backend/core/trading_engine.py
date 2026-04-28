@@ -18,7 +18,7 @@ import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import List, Optional, Dict, Callable
+from typing import Any, List, Optional, Dict, Callable
 from dataclasses import dataclass, field, asdict
 from loguru import logger
 
@@ -89,6 +89,7 @@ class PendingSetup:
     take_profit_max: Optional[float] = None  # Extended TP for HTF "run" context
     trailing_tp_only: bool = False  # True for crypto GREEN: use EMA 50 trailing, not hard TP1
     strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED"
+    htf_context: str = "pullback"
     analysis_snapshot: Optional[Dict] = None
     explanation_snapshot: Optional[Dict] = None
     status: str = "pending"  # "pending", "approved", "rejected", "expired"
@@ -267,6 +268,9 @@ class TradingEngine:
         self._pre_scalping_interval: int = self._scan_interval  # saved before scalping
         self._last_scan_results: Dict[str, AnalysisResult] = {}
         self._latest_explanations: Dict[str, StrategyExplanation] = {}
+        self._recent_strategy_events: Dict[str, List[Dict[str, Any]]] = {}
+        self._recent_strategy_event_limit: int = 40
+        self._recent_strategy_events_path = os.path.join("data", "recent_strategy_events.json")
         self._startup_error: str = ""  # Last broker connection error (for diagnostics)
 
         # WebSocket broadcast callback (set externally when WS is connected)
@@ -300,6 +304,23 @@ class TradingEngine:
                     logger.info(f"Loaded {len(self._notifications)} notifications from disk")
         except Exception as e:
             logger.warning(f"Could not load persisted notifications: {e}")
+
+        try:
+            if os.path.exists(self._recent_strategy_events_path):
+                with open(self._recent_strategy_events_path) as f:
+                    loaded_events = json.load(f)
+                if isinstance(loaded_events, dict):
+                    self._recent_strategy_events = {
+                        str(k).upper(): v
+                        for k, v in loaded_events.items()
+                        if isinstance(v, list)
+                    }
+                    self._prune_recent_strategy_events()
+                    logger.info(
+                        f"Loaded recent strategy events for {len(self._recent_strategy_events)} instruments"
+                    )
+        except Exception as e:
+            logger.warning(f"Could not load recent strategy events: {e}")
 
         # Equity snapshot tracking (record every 10 minutes)
         self._last_equity_snapshot: datetime = datetime.min.replace(tzinfo=timezone.utc)
@@ -356,6 +377,186 @@ class TradingEngine:
     @startup_error.setter
     def startup_error(self, value: str):
         self._startup_error = value
+
+    def _recent_strategy_window_hours(self) -> int:
+        try:
+            return max(1, int(getattr(settings, "strict_recent_pink_context_hours", 72) or 72))
+        except Exception:
+            return 72
+
+    def _prune_recent_strategy_events(self, instrument: Optional[str] = None):
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=self._recent_strategy_window_hours())
+        targets = [instrument.upper()] if instrument else list(self._recent_strategy_events.keys())
+        for key in targets:
+            events = self._recent_strategy_events.get(key, [])
+            kept: List[Dict[str, Any]] = []
+            for event in events:
+                try:
+                    ts = datetime.fromisoformat(str(event.get("timestamp", "")).replace("Z", "+00:00"))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
+                    if ts.astimezone(timezone.utc) >= cutoff:
+                        kept.append(event)
+                except Exception:
+                    continue
+            if kept:
+                self._recent_strategy_events[key] = kept[-self._recent_strategy_event_limit:]
+            else:
+                self._recent_strategy_events.pop(key, None)
+        self._save_recent_strategy_events()
+
+    def _save_recent_strategy_events(self):
+        try:
+            os.makedirs(os.path.dirname(self._recent_strategy_events_path), exist_ok=True)
+            with open(self._recent_strategy_events_path, "w") as f:
+                json.dump(self._recent_strategy_events, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not persist recent strategy events: {e}")
+
+    def _get_recent_strategy_events(self, instrument: str) -> List[Dict[str, Any]]:
+        if not instrument:
+            return []
+        key = instrument.upper()
+        self._prune_recent_strategy_events(key)
+        events = self._recent_strategy_events.get(key, [])
+        return [dict(event) for event in events]
+
+    def _record_strategy_event(
+        self,
+        instrument: str,
+        signal: SetupSignal,
+        analysis: Optional[AnalysisResult] = None,
+    ):
+        if not instrument or not getattr(signal, "strategy_variant", None):
+            return
+        key = instrument.upper()
+        self._prune_recent_strategy_events(key)
+        events = self._recent_strategy_events.setdefault(key, [])
+        now = datetime.now(timezone.utc)
+        strategy_name = str(getattr(signal, "strategy_variant", "")).upper()
+        direction = str(getattr(signal, "direction", "")).upper()
+        if events:
+            last = events[-1]
+            try:
+                last_ts = datetime.fromisoformat(str(last.get("timestamp", "")).replace("Z", "+00:00"))
+                if last_ts.tzinfo is None:
+                    last_ts = last_ts.replace(tzinfo=timezone.utc)
+                same_setup = (
+                    str(last.get("strategy", "")).upper() == strategy_name
+                    and str(last.get("direction", "")).upper() == direction
+                )
+                if same_setup and (now - last_ts.astimezone(timezone.utc)).total_seconds() < 1800:
+                    return
+            except Exception:
+                pass
+        events.append(
+            {
+                "timestamp": now.isoformat(),
+                "strategy": strategy_name,
+                "direction": direction,
+                "instrument": key,
+                "confidence": float(getattr(signal, "confidence", 0.0) or 0.0),
+                "score": float(getattr(analysis, "score", 0.0) or 0.0) if analysis else 0.0,
+            }
+        )
+        self._recent_strategy_events[key] = events[-self._recent_strategy_event_limit:]
+        self._save_recent_strategy_events()
+
+    def _infer_htf_context(
+        self,
+        signal: SetupSignal,
+        analysis: AnalysisResult,
+        style: TradingStyle,
+    ) -> str:
+        if style == TradingStyle.SWING:
+            return "run"
+        strategy_name = str(getattr(signal, "strategy_variant", "")).upper()
+        if strategy_name == "GREEN":
+            return "run"
+        tp_max = getattr(signal, "take_profit_max", None)
+        if tp_max is None:
+            return "pullback"
+        sl_distance = abs(float(signal.entry_price) - float(signal.stop_loss))
+        if sl_distance <= 0:
+            return "pullback"
+        tp1_extension_r = abs(float(tp_max) - float(signal.take_profit_1)) / sl_distance
+        total_target_r = abs(float(tp_max) - float(signal.entry_price)) / sl_distance
+        wave_count = str(
+            getattr(analysis, "elliott_wave_detail", {}).get("wave_count", "")
+        ).strip()
+        if analysis.htf_ltf_convergence and tp1_extension_r >= 0.75:
+            return "run"
+        if analysis.htf_ltf_convergence and wave_count in {"1", "3", "5"} and total_target_r >= 2.0:
+            return "run"
+        return "pullback"
+
+    def _estimate_overnight_fee(self, pos: ManagedPosition, current_price: float) -> float:
+        notional = abs(float(pos.units or 0.0)) * abs(float(current_price or 0.0))
+        rate_fee = notional * float(getattr(settings, "overnight_fee_rate_estimate", 0.0003) or 0.0003)
+        minimum_fee = float(getattr(settings, "overnight_fee_min_usd", 0.05) or 0.05)
+        return max(minimum_fee, rate_fee)
+
+    def _qualifies_for_overnight_hold(
+        self,
+        pos: ManagedPosition,
+        current_price: float,
+    ) -> tuple[bool, str]:
+        if not getattr(settings, "auto_hold_qualified_overnight_positions", False):
+            return False, "overnight cualificado desactivado"
+        if getattr(settings, "strict_mentoria_mode", False) and (pos.strategy_variant or "").upper() == "BLACK":
+            return False, "BLACK no se mantiene overnight en modo estricto"
+        if pos.style != "swing" and getattr(pos, "htf_context", "pullback") != "run":
+            return False, "solo swing o contexto HTF run pueden mantenerse overnight"
+
+        risk_distance = abs(float(pos.entry_price) - float(pos.original_sl))
+        if risk_distance <= 0:
+            return False, "distancia de riesgo invalida"
+
+        protected = (
+            (pos.direction == "BUY" and pos.current_sl >= pos.entry_price)
+            or (pos.direction == "SELL" and pos.current_sl <= pos.entry_price)
+        )
+        if not protected:
+            return False, "la posicion aun no esta protegida en BE o mejor"
+
+        price_diff = (
+            float(current_price) - float(pos.entry_price)
+            if pos.direction == "BUY"
+            else float(pos.entry_price) - float(current_price)
+        )
+        open_r = price_diff / risk_distance
+        min_open_r = float(getattr(settings, "overnight_hold_min_open_r", 0.25) or 0.25)
+        if open_r < min_open_r:
+            return False, f"beneficio abierto insuficiente ({open_r:.2f}R < {min_open_r:.2f}R)"
+
+        target_price = (
+            pos.take_profit_max
+            if getattr(pos, "htf_context", "pullback") == "run" and pos.take_profit_max
+            else pos.take_profit_1
+        )
+        if not target_price:
+            return False, "sin target operativo para valorar overnight"
+        remaining_distance = (
+            float(target_price) - float(current_price)
+            if pos.direction == "BUY"
+            else float(current_price) - float(target_price)
+        )
+        remaining_r = max(0.0, remaining_distance / risk_distance)
+        min_remaining_r = float(getattr(settings, "overnight_hold_min_remaining_r", 0.75) or 0.75)
+        if remaining_r < min_remaining_r:
+            return False, f"recorrido restante insuficiente ({remaining_r:.2f}R < {min_remaining_r:.2f}R)"
+
+        units = abs(float(pos.units or 0.0))
+        open_pnl = price_diff * (units if units > 0 else 1.0)
+        estimated_fee = self._estimate_overnight_fee(pos, current_price)
+        if open_pnl <= estimated_fee:
+            return False, f"beneficio abierto {open_pnl:.2f} USD no cubre fee estimado {estimated_fee:.2f} USD"
+
+        return (
+            True,
+            f"mantener overnight: open_r={open_r:.2f} remaining_r={remaining_r:.2f} "
+            f"fee_est={estimated_fee:.2f} pnl_abierto={open_pnl:.2f}",
+        )
 
     @property
     def last_scan_results(self) -> Dict[str, 'AnalysisResult']:
@@ -1212,6 +1413,7 @@ class TradingEngine:
             return
 
         closed = 0
+        held = 0
         now_iso = datetime.now(timezone.utc).isoformat()
         logger.warning(
             f"AUTO OVERNIGHT CLOSE: Closing {len(targets)} non-crypto positions outside session"
@@ -1222,6 +1424,13 @@ class TradingEngine:
                 current_price = (
                     price_data.bid if pos.direction == "BUY" else price_data.ask
                 )
+                keep_overnight, keep_reason = self._qualifies_for_overnight_hold(pos, current_price)
+                if keep_overnight:
+                    held += 1
+                    logger.info(
+                        f"AUTO OVERNIGHT HOLD: keeping {trade_id} {pos.instrument} | {keep_reason}"
+                    )
+                    continue
                 price_diff = (
                     (current_price - pos.entry_price)
                     if pos.direction == "BUY"
@@ -1285,13 +1494,14 @@ class TradingEngine:
             except Exception as e:
                 logger.warning(f"Auto overnight close failed for {trade_id}: {e}")
 
-        if closed > 0:
+        if closed + held == len(targets):
             self._last_auto_overnight_close_window = window_key
+        if closed > 0 or held > 0:
             if self.alert_manager:
                 try:
                     await self.alert_manager.send_engine_status(
                         "OVERNIGHT_CLOSE",
-                        f"Closed {closed} non-crypto positions outside session hours.",
+                        f"Overnight session review: cerradas={closed}, mantenidas={held}.",
                     )
                 except Exception as e:
                     logger.warning(f"Overnight close alert failed: {e}")
@@ -1736,6 +1946,7 @@ class TradingEngine:
                         take_profit_1=trade.take_profit or trade.entry_price * (1.01 if trade.direction == "BUY" else 0.99),
                         units=trade.units or 0,
                         style=settings.trading_style,
+                        htf_context="run" if settings.trading_style == "swing" else "pullback",
                     )
                     # Infer correct phase from SL position relative to entry
                     if pos.direction == "BUY" and pos.current_sl >= pos.entry_price:
@@ -2632,6 +2843,7 @@ class TradingEngine:
                         limit_price=getattr(signal, 'limit_price', None),
                         trailing_tp_only=getattr(signal, 'trailing_tp_only', False),
                         strategy_variant=getattr(signal, 'strategy_variant', None),
+                        htf_context=self._infer_htf_context(signal, base_analysis, style),
                     )
 
                     explanation = self._latest_explanations.get(instrument)
@@ -2715,6 +2927,8 @@ class TradingEngine:
 
         The get_best_setup() function runs all 6 and returns the highest-confidence match.
         """
+        analysis.recent_strategy_events = self._get_recent_strategy_events(analysis.instrument)
+
         # Run strategies filtered by user selection
         signal: Optional[SetupSignal] = get_best_setup(
             analysis, self._enabled_strategies
@@ -2727,6 +2941,7 @@ class TradingEngine:
             f"Strategy {signal.strategy_variant} detected on {signal.instrument}: "
             f"{signal.direction} | Confidence: {signal.confidence:.0f}%"
         )
+        self._record_strategy_event(signal.instrument, signal, analysis)
 
         # AI enrichment: generate explanation and opinion (INFORMATIONAL ONLY)
         # Per TradingLab mentorship: 0% discretion for beginners. Technical analysis
@@ -2794,6 +3009,7 @@ class TradingEngine:
         risk_percent = self.risk_manager._adjust_for_correlation(signal.instrument, risk_percent)
         sl_distance = abs(signal.entry_price - signal.stop_loss)
         rr = abs(signal.take_profit_1 - signal.entry_price) / max(sl_distance, 0.00001)
+        htf_context = self._infer_htf_context(signal, analysis, style)
 
         trade_risk = TradeRisk(
             instrument=signal.instrument,
@@ -2810,6 +3026,7 @@ class TradingEngine:
             limit_price=getattr(signal, 'limit_price', None),
             trailing_tp_only=getattr(signal, 'trailing_tp_only', False),
             strategy_variant=getattr(signal, 'strategy_variant', None),
+            htf_context=htf_context,
         )
         # Carry strategy confidence and AI opinion from signal to setup for email/UI
         trade_risk._strategy_confidence = getattr(signal, 'confidence', 0.0)
@@ -2892,6 +3109,7 @@ class TradingEngine:
             "ltf_trend": analysis.ltf_trend.value if hasattr(analysis.ltf_trend, "value") else str(analysis.ltf_trend),
             "convergence": bool(analysis.htf_ltf_convergence),
             "score": analysis.score,
+            "htf_context": getattr(setup, "htf_context", "pullback"),
         }
         explanation_snapshot = asdict(explanation)
 
@@ -2978,6 +3196,7 @@ class TradingEngine:
             take_profit_max=setup.take_profit_max,
             trailing_tp_only=setup.trailing_tp_only,
             strategy_variant=setup.strategy_variant,
+            htf_context=getattr(setup, "htf_context", "pullback"),
             analysis_snapshot=getattr(setup, "_analysis_snapshot", None),
             explanation_snapshot=getattr(setup, "_explanation_snapshot", None),
             status="pending",
@@ -3187,6 +3406,7 @@ class TradingEngine:
                     lowest_price=fill_price,
                     trailing_tp_only=getattr(setup, 'trailing_tp_only', False),
                     strategy_variant=getattr(setup, 'strategy_variant', None),
+                    htf_context=getattr(setup, 'htf_context', 'pullback'),
                 ))
 
                 # Persist trade to database
@@ -3436,6 +3656,7 @@ class TradingEngine:
             direction=setup.direction,
             trailing_tp_only=setup.trailing_tp_only,
             strategy_variant=setup.strategy_variant,
+            htf_context=setup.htf_context,
         )
         # Preserve strategy name from PendingSetup so DB records the correct color
         trade_risk._strategy_name = setup.strategy

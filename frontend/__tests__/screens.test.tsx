@@ -362,8 +362,9 @@ describe('DashboardScreen', () => {
   it('renders the dashboard header', async () => {
     const { getByText } = render(<DashboardScreen />);
     await waitFor(() => {
-      expect(getByText('Dashboard')).toBeTruthy();
+      expect(getByText(/10,?000/)).toBeTruthy();
     });
+    expect(getByText('Dashboard')).toBeTruthy();
   });
 
   it('displays account balance after loading', async () => {

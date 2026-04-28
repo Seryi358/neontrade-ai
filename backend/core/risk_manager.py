@@ -672,8 +672,8 @@ class RiskManager:
         - BLACK -> settings.min_rr_black (2.0) — counter-trend, mandatory 2:1
         - GREEN -> settings.min_rr_green (2.0) — crypto swing, mandatory 2:1
         - BLUE_C -> 2.0 — mentoría says 2:1 min for Blue C
-        - All others -> settings.min_rr_ratio (1.5) — general minimum
-        Range: 1.5:1 to 2.5:1 per ch18.3.
+        - All others -> settings.min_rr_ratio (0.80 by Trading Plan PDF)
+        Range: 0.80:1 to 2.5:1 depending on the trader's plan.
         """
         if entry_price is None or stop_loss is None or take_profit_1 is None:
             return False

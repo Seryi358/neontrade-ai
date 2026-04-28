@@ -522,6 +522,59 @@ def _detect_completed_pink_context(
     return True, met, failed
 
 
+def _has_confirm_tf_freno_or_consolidation(
+    analysis: AnalysisResult, confirm_ema_key: str
+) -> Tuple[bool, str]:
+    """Detecta freno/consolidacion real en el TF de confirmacion.
+
+    BLACK necesita algo mas que separacion respecto a la EMA del TF de
+    confirmacion: TradingLab exige que el 4H (o TF equivalente) muestre
+    frenado/consolidacion antes de anticipar la reversión.
+    """
+    confirm_tf = _tf_from_ema_key(confirm_ema_key)
+
+    for pattern in getattr(analysis, "chart_patterns", []) or []:
+        ptf = _pattern_timeframe(pattern)
+        if ptf not in ("", confirm_tf):
+            continue
+        if _pattern_matches(
+            pattern,
+            "wedge", "cuna", "cuña",
+            "triangle", "triangulo", "triángulo",
+            "channel", "canal",
+            "range", "rango",
+            "consolid",
+        ):
+            name = _pattern_name(pattern) or "patron correctivo"
+            return True, f"Patron de freno/consolidacion detectado en {confirm_tf or 'confirm TF'} ({name})"
+
+    candles = _get_recent_candles(analysis, confirm_tf, min_count=4)
+    if len(candles) < 4:
+        return False, f"Sin suficientes velas en {confirm_tf or 'confirm TF'} para validar freno/consolidacion"
+
+    recent = candles[-4:]
+    ranges = [max(0.0, float(c.get("high", 0.0)) - float(c.get("low", 0.0))) for c in recent]
+    highs = [float(c.get("high", 0.0)) for c in recent]
+    lows = [float(c.get("low", 0.0)) for c in recent]
+    closes = [float(c.get("close", 0.0)) for c in recent]
+
+    compressing = ranges[-1] <= ranges[-2] <= ranges[-3]
+    total_span = max(highs) - min(lows)
+    close_span = max(closes) - min(closes) if closes else 0.0
+    ranging = total_span > 0 and close_span <= total_span * 0.45
+
+    if compressing or ranging:
+        if compressing and ranging:
+            reason = "compresion de rango + cierres contenidos"
+        elif compressing:
+            reason = "compresion progresiva del rango"
+        else:
+            reason = "cierres concentrados dentro de un rango estrecho"
+        return True, f"Freno/consolidacion en {confirm_tf or 'confirm TF'} ({reason})"
+
+    return False, f"Sin freno/consolidacion clara en {confirm_tf or 'confirm TF'}"
+
+
 def _get_current_price_proxy(analysis: AnalysisResult) -> Optional[float]:
     """Best estimate of current price. Prefers actual price over EMA proxies."""
     # 1. Use actual current price from market_analyzer (M5 latest close)
@@ -2320,8 +2373,8 @@ class RedStrategy(BaseStrategy):
         else:
             failed.append(f"Paso 4b: {pb_4h_desc}")
 
-        # Necesitamos al menos un pullback
-        if not pb_1h and not pb_4h:
+        # TradingLab RED: el pullback de calidad ataca setup EMA + confirm EMA + Fib.
+        if not pb_1h or not pb_4h:
             return None
 
         fib_ok, fib_desc = _fib_zone_check(analysis, entry_price, direction)
@@ -2330,6 +2383,7 @@ class RedStrategy(BaseStrategy):
             met.append(f"Paso 4c: {fib_desc}")
         else:
             failed.append(f"Paso 4c: {fib_desc}")
+            return None
 
         # --- Paso 5: Desaceleracion en 1H ---
         if _has_deceleration(analysis):
@@ -2632,7 +2686,7 @@ class RedStrategy(BaseStrategy):
                 and _has_deceleration(analysis)
             )
 
-            if htf_favor and not momentum_confirmed and fib_100 and tp1:
+            if htf_favor and fib_100 and tp1:
                 # PDF default: Fib 1.0 extension
                 valid = (fib_100 > tp1) if direction == "BUY" else (fib_100 < tp1)
                 if valid:
@@ -2647,25 +2701,24 @@ class RedStrategy(BaseStrategy):
                     else:
                         result["tp_max"] = fib_100
 
-            # Extended Wave 3 (with momentum confirmed) CAN scale to 1.618
-            # (then 1.272 as fallback).
-            if htf_favor and momentum_confirmed and fib_1618_dir and tp1 and "tp_max" not in result:
-                valid = (fib_1618_dir > tp1) if direction == "BUY" else (fib_1618_dir < tp1)
-                if valid:
-                    intermediate_levels = []
-                    if direction == "BUY":
-                        intermediate_levels = sorted([r for r in resistances if tp1 < r < fib_1618_dir])
-                    else:
-                        intermediate_levels = sorted([s for s in supports if fib_1618_dir < s < tp1], reverse=True)
-                    if intermediate_levels:
-                        result["tp_max"] = intermediate_levels[0]
-                    else:
-                        result["tp_max"] = fib_1618_dir
-            # Fallback to 1.272 for Wave 3 with momentum when 1.618 not usable
-            if htf_favor and momentum_confirmed and "tp_max" not in result and fib_1272_dir and tp1:
-                valid = (fib_1272_dir > tp1) if direction == "BUY" else (fib_1272_dir < tp1)
-                if valid:
-                    result["tp_max"] = fib_1272_dir
+                # TradingLab allows a Wave 3 extension beyond Fib 1.0 only in
+                # the exceptional momentum case, not as the default behavior.
+                # Prefer 1.272 as the practical extended target and only fall
+                # back to 1.618 if 1.272 is unavailable.
+                if momentum_confirmed:
+                    fib_ext_target = fib_1272_dir or fib_1618_dir
+                    if fib_ext_target:
+                        ext_valid = (
+                            fib_ext_target > tp1 if direction == "BUY"
+                            else fib_ext_target < tp1
+                        )
+                        if ext_valid:
+                            if direction == "BUY":
+                                blockers = sorted([r for r in resistances if tp1 < r < fib_ext_target])
+                            else:
+                                blockers = sorted([s for s in supports if fib_ext_target < s < tp1], reverse=True)
+                            if not blockers:
+                                result["tp_max"] = fib_ext_target
 
             # Without HTF favor: no Fib extensions (PDF rule is "con HTF a favor").
             # tp_max defaults to next S/R (falls through to final fallback below).
@@ -2851,27 +2904,32 @@ class PinkStrategy(BaseStrategy):
             confidence -= 3.0
             failed.append(f"Volumen bajo ({vol_ratio:.1f}x) - sin confirmacion de volumen")
 
-        # --- Paso 4: Verificar que correccion se esta completando ---
-        # Pink concept: HTF already confirmed setup EMA 50 break (correction).
-        # LTF should check for corrective pattern completion (price returning),
-        # NOT re-check EMA direction (which would conflict with HTF check).
-        # Style-adaptive: day=H1, swing=D, scalping=M5
-        price = _get_current_price_proxy(analysis)
+        # --- Paso 4: Pullback real a EMA setup + EMA confirm + Fibonacci ---
         setup_ema_key = _tf_ema("setup", 50, analysis.instrument)
-        ema_1h = _ema_val(analysis, setup_ema_key) or _ema_val(analysis, "EMA_H1_50")
-        if price and ema_1h:
-            dist = abs(price - ema_1h) / ema_1h * 100
-            if dist < 0.5:
-                # Price is returning near EMA 50 1H - correction completing
-                confidence += 15.0
-                met.append(f"Paso 4: Precio regresando a EMA 50 1H ({dist:.2f}%) - correccion completandose")
-            elif dist < 1.0:
-                confidence += 8.0
-                met.append(f"Paso 4: Precio cerca de EMA 50 1H ({dist:.2f}%) - correccion en progreso")
-            else:
-                failed.append(f"Paso 4: Precio lejos de EMA 50 1H ({dist:.2f}%) - correccion no completada")
-                return None
+        confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
+        pb_setup, pb_setup_desc = _check_ema_pullback(analysis, setup_ema_key, direction)
+        pb_confirm, pb_confirm_desc = _check_ema_pullback(analysis, confirm_ema_key, direction)
+        fib_ok, fib_desc = _fib_zone_check(analysis, entry_price, direction)
+
+        if pb_setup:
+            confidence += 10.0
+            met.append(f"Paso 4a: {pb_setup_desc}")
         else:
+            failed.append(f"Paso 4a: {pb_setup_desc}")
+            return None
+
+        if pb_confirm:
+            confidence += 10.0
+            met.append(f"Paso 4b: {pb_confirm_desc}")
+        else:
+            failed.append(f"Paso 4b: {pb_confirm_desc}")
+            return None
+
+        if fib_ok:
+            confidence += 10.0
+            met.append(f"Paso 4c: {fib_desc}")
+        else:
+            failed.append(f"Paso 4c: {fib_desc}")
             return None
 
         # Verificar patron correctivo (usamos patrones de velas como proxy)
@@ -3231,6 +3289,18 @@ class WhiteStrategy(BaseStrategy):
         self.name = "WHITE - Post-Pink Continuacion (Onda 3 de 5)"
         self.min_confidence = 55.0
 
+    def _determine_direction(self, analysis: AnalysisResult) -> Optional[str]:
+        """WHITE prioriza el sesgo post-PINK; si el HTF esta neutro, usa LTF."""
+        if analysis.htf_trend == Trend.BULLISH:
+            return "BUY"
+        if analysis.htf_trend == Trend.BEARISH:
+            return "SELL"
+        if analysis.ltf_trend == Trend.BULLISH:
+            return "BUY"
+        if analysis.ltf_trend == Trend.BEARISH:
+            return "SELL"
+        return None
+
     def check_htf_conditions(self, analysis: AnalysisResult) -> Tuple[bool, float, List[str], List[str]]:
         score = 0.0
         met: List[str] = []
@@ -3241,13 +3311,15 @@ class WhiteStrategy(BaseStrategy):
             failed.append("Paso 1: Sin tendencia HTF clara (White requiere tendencia establecida)")
             return False, score, met, failed
 
-        # --- Paso 1: Debe venir de contexto Pink (tendencia establecida + impulso previo) ---
+        # --- Paso 1: Debe venir de contexto Pink. El diario ayuda, pero ya no manda ---
         if analysis.htf_trend != Trend.RANGING:
             score += 10.0
             met.append(f"Paso 1: Tendencia HTF establecida ({analysis.htf_trend.value})")
         else:
-            failed.append("Paso 1: Sin tendencia HTF - White requiere contexto post-Pink")
-            return False, score, met, failed
+            failed.append(
+                "Paso 1: HTF en rango en este instante "
+                "(WHITE sigue siendo valida si el contexto post-PINK es correcto)"
+            )
 
         if analysis.htf_ltf_convergence:
             score += 5.0
@@ -3696,7 +3768,7 @@ class BlackStrategy(BaseStrategy):
         else:
             failed.append("Paso 3: Sin senales de desaceleracion en diario")
 
-        # --- Paso 4: Confirm-TF sobrecomprado + precio lejos de EMA 50 confirm-TF ---
+        # --- Paso 4: Confirm-TF sobreextendido + freno/consolidacion reales ---
         # TradingLab: "sobrecompra clara e INNEGOCIABLE en gráfico de 4 horas"
         # This is a HARD REQUIREMENT — not just a bonus.
         confirm_ema_key = _tf_ema("confirm", 50, analysis.instrument)
@@ -3716,6 +3788,16 @@ class BlackStrategy(BaseStrategy):
                 return False, score, met, failed
         else:
             failed.append("Paso 4 [INNEGOCIABLE FALLIDO]: No se puede evaluar distancia a EMA 50 4H")
+            return False, score, met, failed
+
+        confirm_freno, confirm_freno_desc = _has_confirm_tf_freno_or_consolidation(
+            analysis, confirm_ema_key
+        )
+        if confirm_freno:
+            score += 8.0
+            met.append(f"Paso 4b [INNEGOCIABLE]: {confirm_freno_desc}")
+        else:
+            failed.append(f"Paso 4b [INNEGOCIABLE FALLIDO]: {confirm_freno_desc}")
             return False, score, met, failed
 
         passed = score >= 25.0  # Minimo: Paso 1 + Paso 4 cumplidos

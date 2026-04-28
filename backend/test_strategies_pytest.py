@@ -272,6 +272,41 @@ class TestRedStrategy:
         ok, score, met, failed = self.red.check_htf_conditions(analysis)
         assert not ok, "RED should fail without convergence"
 
+    def test_ltf_requires_pullback_to_setup_confirm_and_fib(self):
+        analysis = make_analysis(
+            ema_h1_50=1.1000,
+            ema_h4_50=1.0940,
+            price_proxy=1.1002,
+            fibonacci_levels={"0.382": 1.1005, "0.500": 1.1003, "0.618": 1.1001},
+            candlestick_patterns=["ENGULFING_BULLISH"],
+            chart_patterns=[{"type": "trendline_break", "timeframe": "M5"}],
+            last_candles={"M5": [{"close": 1.1000}, {"close": 1.1001}, {"close": 1.1002}]},
+        )
+        assert self.red.check_ltf_entry(analysis) is None
+
+    def test_wave3_tp_max_defaults_to_fib_1_0(self):
+        analysis = make_analysis(
+            ema_h4_50=1.0950,
+            price_proxy=1.1000,
+            convergence=True,
+            elliott_wave_detail={"wave_count": "3"},
+            htf_condition=MarketCondition.NEUTRAL,
+            candlestick_patterns=[],
+            fibonacci_levels={
+                "0.382": 1.0980,
+                "0.500": 1.0970,
+                "0.618": 1.0960,
+                "ext_bull_1.0": 1.1150,
+                "ext_bull_1.272": 1.1180,
+                "ext_bull_1.618": 1.1220,
+            },
+            swing_highs=[1.1080, 1.1120],
+            resistances=[1.1080, 1.1300],
+        )
+        tps = self.red.get_tp_levels(analysis, "BUY", 1.1000)
+        assert tps["tp1"] == pytest.approx(1.1080)
+        assert tps["tp_max"] == pytest.approx(1.1150)
+
 
 # ── Section 4: PINK strategy ─────────────────────────────────────────
 
@@ -329,6 +364,37 @@ class TestPinkStrategy:
         ok, score, met, failed = self.pink.check_htf_conditions(analysis)
         assert not ok, "PINK should fail without convergence"
 
+    def test_ltf_requires_confirm_ema_pullback_and_fib(self):
+        analysis = make_analysis(
+            htf_trend=Trend.BULLISH,
+            ltf_trend=Trend.BULLISH,
+            convergence=True,
+            price_proxy=1.1002,
+            ema_h1_50=1.1000,
+            ema_h4_50=1.0940,
+            fibonacci_levels={"0.382": 1.1005, "0.500": 1.1003, "0.618": 1.1001},
+            candlestick_patterns=["ENGULFING_BULLISH"],
+            chart_patterns=[
+                {"type": "triangle", "timeframe": "H1"},
+                {"type": "trendline_break", "timeframe": "M5"},
+            ],
+            last_candles={
+                "H1": [
+                    {"open": 1.1030, "high": 1.1035, "low": 1.0995, "close": 1.1005},
+                    {"open": 1.1005, "high": 1.1010, "low": 1.0985, "close": 1.0990},
+                    {"open": 1.0990, "high": 1.1000, "low": 1.0975, "close": 1.0980},
+                    {"open": 1.0980, "high": 1.1015, "low": 1.0978, "close": 1.1008},
+                    {"open": 1.1008, "high": 1.1012, "low": 1.1000, "close": 1.1002},
+                ],
+                "M5": [
+                    {"open": 1.0999, "high": 1.1003, "low": 1.0997, "close": 1.1000},
+                    {"open": 1.1000, "high": 1.1005, "low": 1.0999, "close": 1.1001},
+                    {"open": 1.1001, "high": 1.1006, "low": 1.1000, "close": 1.1002},
+                ],
+            },
+        )
+        assert self.pink.check_ltf_entry(analysis) is None
+
 
 # ── Section 5: WHITE strategy ─────────────────────────────────────────
 
@@ -356,6 +422,16 @@ class TestWhiteStrategy:
         ok, score, met, failed = self.white.check_htf_conditions(analysis)
         assert ok, f"WHITE should stay valid without convergence if post-PINK bias is intact. Failed: {failed}"
         assert any("sin convergencia" in f.lower() for f in failed)
+
+    def test_htf_can_fall_back_to_ltf_bias_when_htf_is_ranging(self):
+        analysis = make_analysis(
+            htf_trend=Trend.RANGING,
+            ltf_trend=Trend.BULLISH,
+            convergence=False,
+            ema_h1_50=1.0980,
+        )
+        ok, score, met, failed = self.white.check_htf_conditions(analysis)
+        assert ok, f"WHITE should remain evaluable with LTF bias if HTF is ranging. Failed: {failed}"
 
     def test_white_requires_completed_pink_context(self):
         analysis = make_analysis(
@@ -457,6 +533,27 @@ class TestBlackStrategy:
     def test_min_rr_is_2(self):
         """BLACK requires minimum 2:1 R:R."""
         assert self.black.min_confidence == 60.0
+
+    def test_htf_requires_confirm_tf_consolidation(self):
+        analysis = make_analysis(
+            htf_trend=Trend.BULLISH,
+            htf_condition=MarketCondition.OVERBOUGHT,
+            resistances=[1.1005],
+            price_proxy=1.1000,
+            ema_h4_50=1.0850,
+            chart_patterns=[],
+            last_candles={
+                "H4": [
+                    {"open": 1.0900, "high": 1.0980, "low": 1.0890, "close": 1.0970},
+                    {"open": 1.0970, "high": 1.1060, "low": 1.0960, "close": 1.1050},
+                    {"open": 1.1050, "high": 1.1150, "low": 1.1040, "close": 1.1140},
+                    {"open": 1.1140, "high": 1.1250, "low": 1.1130, "close": 1.1240},
+                ],
+            },
+        )
+        ok, score, met, failed = self.black.check_htf_conditions(analysis)
+        assert not ok
+        assert any("consolidacion" in f.lower() or "freno" in f.lower() for f in failed)
 
 
 # ── Section 7: GREEN strategy (crypto-only) ──────────────────────────

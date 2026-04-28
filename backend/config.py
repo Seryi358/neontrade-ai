@@ -116,18 +116,15 @@ class Settings(BaseSettings):
     #  swing trading en acciones de Estados Unidos". Treating equities as
     # day_trading violated mentorship — when True, equity instruments are sized
     # under the SWING style regardless of the global `trading_style`.
-    # Default OFF for this deploy: enabling without exhaustive testing changes
-    # HTF/LTF timeframe pyramids inside strategies and could silently kill all
-    # equity setups. Flip to True once the swing equity flow has been backtested.
-    swing_for_equities: bool = False
+    # TradingLab Watchlist Acciones: Alex opera acciones de EEUU en swing.
+    swing_for_equities: bool = True
 
     # Risk per trade by style (ch18.3 Regla del 1%)
     risk_day_trading: float = 0.01        # 1% — the foundational rule
     risk_scalping: float = 0.005          # Trading Plan PDF: 0.50% for scalping
-    # Intentional app caps for small-capital ($190) safety — NOT from mentorship.
-    # Trading Plan PDF pg.3: risk_swing=3%, max_total_risk=7%. We cap below that.
-    risk_swing: float = 0.01             # 1% cap for <$500 accounts (PDF says 3%)
-    max_total_risk: float = 0.05          # 5% cap for <$500 accounts (PDF says 7%)
+    # Trading Plan PDF pg.3: risk_swing=3%, max_total_risk=7%.
+    risk_swing: float = 0.03
+    max_total_risk: float = 0.07
 
     # Leverage ratios by asset class (Capital.com defaults for retail accounts)
     # Position sizing uses these to verify margin availability before placing orders.
@@ -148,9 +145,7 @@ class Settings(BaseSettings):
     # Trading Plan PDF: R:R mínimo 0.80:1 con 61% win rate (Alex experimentado)
     # Mentoría ch18.3: R:R referencia ~2.5:1 con 30% win rate → breakeven con 1% riesgo
     # Trading Plan PDF: Alex uses 0.80:1 minimum to TP1 (with 61% win rate)
-    # Default 1.5:1 is more conservative for users with unknown win rate.
-    # Adjust down to 0.80 once you achieve 60%+ win rate over 100+ trades.
-    min_rr_ratio: float = 1.5            # Mentorship: 2.5:1 reference with 30% WR; 1.5 conservative default
+    min_rr_ratio: float = 0.80           # Trading Plan PDF: minimo hasta TP1 con 61% WR historico de Alex
     min_rr_black: float = 2.0   # BLACK is counter-trend, needs higher R:R (mentoría explícita)
     min_rr_green: float = 2.0   # GREEN has potential up to 10:1 R:R (mentoría explícita)
     min_rr_blue_c: float = 2.0  # Blue C requires min 2:1 R:R (mentorship: "minimo 2 a 1, incluso 3 a 1")
@@ -344,9 +339,8 @@ class Settings(BaseSettings):
     green_sl_mode: str = "beginner"
 
     # ── Discretion Level (ch22.1 Trading Plan) ──────────────────
-    # Beginners: 100% precision, 0% discretion. Follow the plan exactly.
-    # Alex (experienced): 80% precision, 20% discretion.
-    discretion_pct: float = 0.0  # 0% discretion — follow the plan exactly (especially with small capital)
+    # Trading Plan PDF / transcript: 80% precision, 20% discretion.
+    discretion_pct: float = 0.20
 
     # ── Forex Watchlist (from mentorship course materials) ──────────────────────────
     # TradingLab focus: "mercado de Divisas (including indices and metals)"
@@ -790,6 +784,37 @@ def _load_risk_overrides():
 _load_risk_overrides()
 
 
+def _upgrade_legacy_conservative_runtime_defaults():
+    """Promote the old small-account footprint to the canonical Trading Plan.
+
+    Earlier builds pinned runtime to a conservative combo
+    (swing=1%, total=5%, min_rr=1.5, equities as day trading, 0% discretion).
+    If the runtime still matches that exact legacy footprint, upgrade it
+    in-memory so the deployed app follows the Trading Plan PDF by default.
+    """
+    legacy_footprint = (
+        settings.trading_style == "day_trading"
+        and settings.position_management_style == "cp"
+        and abs(settings.risk_day_trading - 0.01) < 1e-12
+        and abs(settings.risk_scalping - 0.005) < 1e-12
+        and abs(settings.risk_swing - 0.01) < 1e-12
+        and abs(settings.max_total_risk - 0.05) < 1e-12
+        and abs(settings.min_rr_ratio - 1.5) < 1e-12
+        and getattr(settings, "swing_for_equities", False) is False
+        and abs(getattr(settings, "discretion_pct", 0.0) - 0.0) < 1e-12
+    )
+    if not legacy_footprint:
+        return
+    settings.risk_swing = 0.03
+    settings.max_total_risk = 0.07
+    settings.min_rr_ratio = 0.80
+    settings.swing_for_equities = True
+    settings.discretion_pct = 0.20
+
+
+_upgrade_legacy_conservative_runtime_defaults()
+
+
 def get_active_watchlist() -> list:
     """Build the combined watchlist from all active categories.
 
@@ -844,16 +869,16 @@ _apply_funded_evaluation_defaults()
 TRADING_PROFILES = {
     "tradinglab_recommended": {
         "name": "TradingLab Recommended",
-        "description": "Configuración TradingLab: Day Trading, 1% riesgo, salida rápida, sin parciales, BE a mitad de TP1",
+        "description": "Configuración TradingLab canónica: Day Trading, 1% riesgo, swing 3%, R:R mínimo 0.80, salida rápida, sin parciales, BE a mitad de TP1",
         "settings": {
             "trading_style": "day_trading",
             # Risk management — Alex's exact values
             "risk_day_trading": 0.01,       # 1% per trade
             "risk_scalping": 0.005,         # 0.5%
-            "risk_swing": 0.01,             # Alex's personal preference (oral). PDF pg.3 says 3%
+            "risk_swing": 0.03,             # Trading Plan PDF pg.3
             "max_total_risk": 0.07,         # 7% max simultaneous (Trading Plan PDF pg.3)
             "correlated_risk_pct": 0.0075,  # 0.75% per correlated pair
-            "min_rr_ratio": 1.5,            # 1.5:1 minimum R:R
+            "min_rr_ratio": 0.80,           # Trading Plan PDF: minimo hasta TP1
             "min_rr_black": 2.0,            # BLACK counter-trend
             "min_rr_green": 2.0,            # GREEN crypto
             # Position management — Alex prefers quick exits

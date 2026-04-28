@@ -1,10 +1,4 @@
-"""Atlas config defaults aligned with TradingLab mentorship + 190.88 USD capital.
-
-Covers the findings from 2026-04-17-findings-consolidated.md §A2, §A3, §M5.
-Values that are intentional caps for small-capital safety (risk_swing 1%,
-max_total_risk 5%) are kept — this test locks them in place with honest
-comments sourced in config.py.
-"""
+"""Atlas config defaults aligned with the canonical Trading Plan."""
 import pytest
 
 from config import settings, TRADING_PROFILES
@@ -33,9 +27,11 @@ def restore_mutable_defaults():
     # assertions are independent of whatever prior tests left behind.
     settings.scalping_enabled = False
     settings.trading_style = "day_trading"
-    settings.swing_for_equities = False
+    settings.swing_for_equities = True
     settings.auto_asr_enabled = False
     settings.self_improvement_tuning_mode = "off"
+    settings.discretion_pct = 0.20
+    settings.position_management_style = "cp"
     yield
     # Put whatever was there back — don't overwrite other tests' state.
     for k, v in snap.items():
@@ -52,8 +48,8 @@ class TestTradingStyle:
     def test_position_management_is_cp(self):
         assert settings.position_management_style == "cp"
 
-    def test_discretion_is_zero(self):
-        assert settings.discretion_pct == 0.0
+    def test_discretion_is_twenty_percent(self):
+        assert settings.discretion_pct == 0.20
 
 
 class TestRisk:
@@ -63,16 +59,17 @@ class TestRisk:
     def test_risk_scalping_is_half_percent(self):
         assert settings.risk_scalping == 0.005
 
-    def test_risk_swing_capped_at_1_percent_for_small_capital(self):
-        """Intentional cap for 190 USD capital. PDF pg.3 says 3% — we choose 1%."""
-        assert settings.risk_swing == 0.01
+    def test_risk_swing_is_3_percent(self):
+        assert settings.risk_swing == 0.03
 
-    def test_max_total_risk_capped_at_5_percent_for_small_capital(self):
-        """Intentional cap for 190 USD. PDF pg.3 says 7% — we choose 5%."""
-        assert settings.max_total_risk == 0.05
+    def test_max_total_risk_is_7_percent(self):
+        assert settings.max_total_risk == 0.07
 
     def test_correlated_risk_pct_is_075(self):
         assert settings.correlated_risk_pct == 0.0075
+
+    def test_min_rr_ratio_is_080(self):
+        assert settings.min_rr_ratio == 0.80
 
 
 class TestOvertrading:
@@ -163,15 +160,17 @@ class TestNewsFilter:
 
 
 class TestTradingProfiles:
-    def test_tradinglab_profile_risk_swing_comment_honest(self):
-        """Comment should reflect Alex's oral preference, not claim NON-NEGOTIABLE."""
+    def test_tradinglab_profile_risk_swing_pdf_value(self):
         profile = TRADING_PROFILES["tradinglab_recommended"]
-        assert profile["settings"]["risk_swing"] == 0.01
+        assert profile["settings"]["risk_swing"] == 0.03
 
     def test_tradinglab_profile_max_total_risk_pdf_7_percent(self):
-        """Profile tradinglab_recommended honors the PDF's 7% (vs global default 5%)."""
         profile = TRADING_PROFILES["tradinglab_recommended"]
         assert profile["settings"]["max_total_risk"] == 0.07
+
+    def test_tradinglab_profile_min_rr_ratio_pdf_value(self):
+        profile = TRADING_PROFILES["tradinglab_recommended"]
+        assert profile["settings"]["min_rr_ratio"] == 0.80
 
     def test_conservative_profile_risk_swing_honest_comment(self):
         """Comment should NOT claim NON-NEGOTIABLE per mentorship (that's false)."""

@@ -52,11 +52,11 @@ def test_rr_validation_green_requires_2():
     assert rm.validate_reward_risk(100.0, 99.0, 102.0, strategy="GREEN") == True
 
 
-def test_rr_validation_blue_allows_1_5():
-    """Regular BLUE should allow 1.5:1 R:R."""
+def test_rr_validation_blue_allows_0_8():
+    """Regular BLUE should allow the Trading Plan 0.80:1 minimum."""
     from core.risk_manager import RiskManager
     rm = RiskManager(broker_client=None)
-    assert rm.validate_reward_risk(100.0, 99.0, 101.5, strategy="BLUE") == True
+    assert rm.validate_reward_risk(100.0, 99.0, 100.8, strategy="BLUE") == True
 
 
 def test_rr_validation_blue_c_requires_2():
@@ -108,13 +108,12 @@ def test_funded_1phase_auto_dd():
 
 
 def test_config_default_risk_values():
-    """Verify default risk values match mentorship for small-capital account."""
+    """Verify default risk values match the canonical Trading Plan."""
     from config import settings
     assert settings.risk_day_trading == 0.01  # 1%
-    assert settings.risk_swing == 0.01  # 1%
-    # 5% max simultaneous risk — mentorship-tuned for $190 capital (was 3% earlier).
-    assert settings.max_total_risk == 0.05
+    assert settings.risk_swing == 0.03  # 3%
+    assert settings.max_total_risk == 0.07
     assert settings.correlated_risk_pct == 0.0075  # 0.75%
-    assert settings.min_rr_ratio == 1.5
+    assert settings.min_rr_ratio == 0.80
     assert settings.min_rr_black == 2.0
     assert settings.min_rr_green == 2.0

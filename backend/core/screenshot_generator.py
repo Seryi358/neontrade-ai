@@ -262,6 +262,84 @@ class TradeScreenshotGenerator:
             logger.error(f"Failed to generate trade close screenshot: {e}")
             return ""
 
+    async def capture_context_chart(
+        self,
+        trade_id: str,
+        instrument: str,
+        timeframe_label: str,
+        direction: str,
+        strategy: str,
+        candles: list[dict] | None = None,
+        entry_price: float | None = None,
+        current_price: float | None = None,
+    ) -> str:
+        """
+        Generate a reusable higher-timeframe context chart for exam/reporting.
+
+        This is used for mentorship deliverables where the trade explanation
+        needs separate Monthly / Weekly context, not just the execution chart.
+        """
+        if not HAS_MATPLOTLIB:
+            logger.warning("Cannot capture context chart - matplotlib not installed")
+            return ""
+
+        try:
+            tf_slug = "".join(ch.lower() for ch in timeframe_label if ch.isalnum()) or "context"
+            existing = self.get_context_screenshot_path(trade_id, tf_slug)
+            if existing:
+                return existing
+
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            filename = f"{instrument}_{trade_id}_context_{tf_slug}_{timestamp}.png"
+            filepath = os.path.join(self._data_dir, filename)
+
+            info_strategy = f"{strategy or 'Trade'} | {timeframe_label} Context"
+            display_entry = float(entry_price or current_price or 0)
+            levels = {
+                "entry": entry_price if entry_price else None,
+                "current_price": current_price if current_price is not None else entry_price,
+            }
+            trade_info = {
+                "instrument": instrument,
+                "direction": direction,
+                "strategy": info_strategy,
+                "entry": display_entry,
+                "sl": 0.0,
+                "tp1": 0.0,
+                "rr": 0.0,
+                "confidence": 0.0,
+                "event": "OPEN",
+                "timestamp": timestamp,
+            }
+
+            loop = asyncio.get_event_loop()
+            if candles and len(candles) > 0:
+                await loop.run_in_executor(
+                    None,
+                    self._generate_candlestick_chart,
+                    filepath,
+                    candles,
+                    levels,
+                    trade_info,
+                    None,
+                )
+            else:
+                await loop.run_in_executor(
+                    None,
+                    self._generate_info_card,
+                    filepath,
+                    trade_info,
+                )
+
+            logger.info(
+                f"Trade context screenshot saved: {filepath} "
+                f"({instrument} {direction} {timeframe_label})"
+            )
+            return filepath
+        except Exception as e:
+            logger.error(f"Failed to generate {timeframe_label} context screenshot: {e}")
+            return ""
+
     def get_screenshot_path(self, trade_id: str) -> list[str]:
         """
         Get all screenshot file paths for a given trade.
@@ -282,6 +360,20 @@ class TradeScreenshotGenerator:
                 paths.append(os.path.join(self._data_dir, filename))
 
         return paths
+
+    def get_context_screenshot_path(self, trade_id: str, timeframe_slug: str) -> str:
+        """
+        Return the newest saved context chart for a trade/timeframe, if any.
+        """
+        if not os.path.isdir(self._data_dir):
+            return ""
+
+        needle = f"_{trade_id}_context_{timeframe_slug}_"
+        matches: list[str] = []
+        for filename in sorted(os.listdir(self._data_dir)):
+            if needle in filename and filename.endswith(".png"):
+                matches.append(os.path.join(self._data_dir, filename))
+        return matches[-1] if matches else ""
 
     # ── Chart Generation (Candlestick) ────────────────────────────
 

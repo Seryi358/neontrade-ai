@@ -3306,6 +3306,258 @@ def _merge_exam_journal_data(trade: dict, engine_obj) -> dict:
     return merged
 
 
+def _normalize_exam_direction(direction: object) -> str:
+    raw = str(direction or "").strip().upper()
+    if raw == "BUY":
+        return "Long"
+    if raw == "SELL":
+        return "Short"
+    return str(direction or "Unknown")
+
+
+def _normalize_exam_style(style: object) -> tuple[str, str]:
+    raw = str(style or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if raw in {"day", "daytrading", "day_trading"}:
+        return "day_trading", "Day Trading"
+    if raw in {"swing", "swingtrading", "swing_trading"}:
+        return "swing", "Swing Trading"
+    if raw in {"scalp", "scalping"}:
+        return "scalping", "Scalping"
+    return "", ""
+
+
+def _default_timeframe_plan(style_key: str) -> Dict[str, str]:
+    plans = {
+        "day_trading": {
+            "monthly": "M",
+            "weekly": "W",
+            "directional": "D",
+            "confirmation": "H4",
+            "setup": "H1",
+            "execution": "M5",
+        },
+        "swing": {
+            "monthly": "M",
+            "weekly": "W",
+            "directional": "M",
+            "confirmation": "W",
+            "setup": "D",
+            "execution": "H1",
+        },
+        "scalping": {
+            "monthly": "M",
+            "weekly": "W",
+            "directional": "H1",
+            "confirmation": "M15",
+            "setup": "M5",
+            "execution": "M1",
+        },
+    }
+    return dict(plans.get(style_key, plans["day_trading"]))
+
+
+def _infer_exam_operativa(trade: dict) -> tuple[str, str]:
+    candidates = [
+        trade.get("trading_style"),
+        trade.get("style"),
+    ]
+    for candidate in candidates:
+        normalized = _normalize_exam_style(candidate)
+        if normalized[0]:
+            return normalized
+
+    raw_tfs = trade.get("timeframes_used") or []
+    tf_set = {str(tf or "").strip().upper() for tf in raw_tfs if tf}
+    if "M" in tf_set or "W" in tf_set:
+        return "swing", "Swing Trading"
+    if "M1" in tf_set or "M2" in tf_set:
+        return "scalping", "Scalping"
+    if "H4" in tf_set or "D" in tf_set:
+        return "day_trading", "Day Trading"
+    if "M15" in tf_set and "M5" in tf_set:
+        return "scalping", "Scalping"
+
+    duration_minutes = trade.get("duration_minutes")
+    try:
+        duration_float = float(duration_minutes)
+    except (TypeError, ValueError):
+        duration_float = 0.0
+    if duration_float >= 24 * 60:
+        return "swing", "Swing Trading"
+    if 0 < duration_float <= 120:
+        return "scalping", "Scalping"
+
+    try:
+        from strategies.base import _get_trading_style  # type: ignore
+
+        normalized = _normalize_exam_style(_get_trading_style(trade.get("instrument")))
+        if normalized[0]:
+            return normalized
+    except Exception:
+        pass
+
+    return "day_trading", "Day Trading"
+
+
+def _normalize_exam_timeframes(raw_timeframes: object, style_key: str) -> List[str]:
+    ordered = ["M", "W", "D", "H4", "H1", "M15", "M5", "M2", "M1"]
+    seen = set()
+    normalized: List[str] = []
+    if isinstance(raw_timeframes, list):
+        for tf in raw_timeframes:
+            value = str(tf or "").strip().upper()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized.append(value)
+    if normalized:
+        return normalized
+
+    plan = _default_timeframe_plan(style_key)
+    inferred = [
+        plan["monthly"],
+        plan["weekly"],
+        plan["directional"],
+        plan["confirmation"],
+        plan["setup"],
+        plan["execution"],
+    ]
+    for tf in inferred:
+        if tf not in seen:
+            seen.add(tf)
+            normalized.append(tf)
+    return [tf for tf in ordered if tf in normalized]
+
+
+def _candle_to_dict(candle: object) -> Optional[dict]:
+    if candle is None:
+        return None
+    if isinstance(candle, dict):
+        complete = candle.get("complete")
+        if complete is False:
+            return None
+        try:
+            return {
+                "time": candle.get("time") or candle.get("timestamp") or candle.get("datetime"),
+                "open": float(candle.get("open", 0)),
+                "high": float(candle.get("high", 0)),
+                "low": float(candle.get("low", 0)),
+                "close": float(candle.get("close", 0)),
+                "volume": int(candle.get("volume", 0) or 0),
+            }
+        except (TypeError, ValueError):
+            return None
+
+    try:
+        if getattr(candle, "complete", True) is False:
+            return None
+        return {
+            "time": getattr(candle, "time", None),
+            "open": float(getattr(candle, "open")),
+            "high": float(getattr(candle, "high")),
+            "low": float(getattr(candle, "low")),
+            "close": float(getattr(candle, "close")),
+            "volume": int(getattr(candle, "volume", 0) or 0),
+        }
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _aggregate_monthly_candles(weekly_candles: List[dict]) -> List[dict]:
+    buckets: Dict[str, dict] = {}
+    ordered_keys: List[str] = []
+    for candle in weekly_candles:
+        raw_time = candle.get("time")
+        if not raw_time:
+            continue
+        try:
+            dt = datetime.fromisoformat(str(raw_time).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        month_key = dt.strftime("%Y-%m")
+        if month_key not in buckets:
+            ordered_keys.append(month_key)
+            month_start = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            buckets[month_key] = {
+                "time": month_start.isoformat().replace("+00:00", "Z"),
+                "open": candle.get("open", 0.0),
+                "high": candle.get("high", 0.0),
+                "low": candle.get("low", 0.0),
+                "close": candle.get("close", 0.0),
+                "volume": candle.get("volume", 0) or 0,
+            }
+            continue
+
+        bucket = buckets[month_key]
+        bucket["high"] = max(float(bucket["high"]), float(candle.get("high", bucket["high"])))
+        bucket["low"] = min(float(bucket["low"]), float(candle.get("low", bucket["low"])))
+        bucket["close"] = candle.get("close", bucket["close"])
+        bucket["volume"] = int(bucket.get("volume", 0) or 0) + int(candle.get("volume", 0) or 0)
+
+    return [buckets[key] for key in ordered_keys]
+
+
+async def _build_exam_context_gallery(trade: dict, engine_obj, trade_id: str) -> List[dict]:
+    if engine_obj is None or getattr(engine_obj, "broker", None) is None:
+        return []
+    generator = getattr(engine_obj, "screenshot_generator", None)
+    if generator is None or not hasattr(generator, "capture_context_chart"):
+        return []
+
+    instrument = str(trade.get("instrument") or "")
+    direction = str(trade.get("direction") or "BUY")
+    strategy = str(trade.get("strategy") or trade.get("strategy_variant") or "UNKNOWN")
+    entry_price = trade.get("entry_price") or trade.get("exit_price") or 0.0
+    current_price = trade.get("exit_price") or trade.get("entry_price") or 0.0
+
+    try:
+        weekly_raw = await engine_obj.broker.get_candles(instrument, "W", 156)
+    except Exception as exc:
+        logger.warning(f"Exam context chart fetch failed for {instrument}: {exc}")
+        return []
+
+    weekly_candles = [c for c in (_candle_to_dict(item) for item in weekly_raw) if c]
+    monthly_candles = _aggregate_monthly_candles(weekly_candles)
+
+    gallery: List[dict] = []
+    chart_specs = [
+        ("Gráfico Mensual", "monthly", monthly_candles[-60:]),
+        ("Gráfico Semanal", "weekly", weekly_candles[-104:]),
+    ]
+    for label, tf_slug, candles in chart_specs:
+        if len(candles) < 3:
+            continue
+        path = await generator.capture_context_chart(
+            trade_id=trade_id,
+            instrument=instrument,
+            timeframe_label=label,
+            direction=direction,
+            strategy=strategy,
+            candles=candles,
+            entry_price=float(entry_price or 0.0),
+            current_price=float(current_price or 0.0),
+        )
+        if not path:
+            continue
+        try:
+            from pathlib import Path
+            import base64
+
+            shot_path = Path(path)
+            if not shot_path.exists():
+                continue
+            gallery.append(
+                {
+                    "label": label,
+                    "path": path,
+                    "b64": base64.b64encode(shot_path.read_bytes()).decode(),
+                }
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to embed {label} for {trade_id}: {exc}")
+    return gallery
+
+
 def _infer_exam_analysis_from_text(trade: dict) -> Optional[dict]:
     """Backfill exam HTF/LTF context for older trades without analysis_log rows.
 
@@ -3417,6 +3669,9 @@ async def generate_exam_report(req: ExamRequest):
 
         analysis_snapshot = await _load_exam_analysis_snapshot(db, tid)
         screenshot_paths = _collect_exam_screenshot_paths(trade, engine, tid)
+        style_key, operativa_label = _infer_exam_operativa(trade)
+        direction_label = _normalize_exam_direction(trade.get("direction"))
+        timeframes_used = _normalize_exam_timeframes(trade.get("timeframes_used"), style_key)
 
         gaps = _exam_gaps_for_trade(trade, screenshot_paths)
         if gaps:
@@ -3451,6 +3706,7 @@ async def generate_exam_report(req: ExamRequest):
                     "b64": base64.b64encode(shot_path.read_bytes()).decode(),
                 }
             )
+        context_gallery = await _build_exam_context_gallery(trade, engine, tid)
 
         # Compute derived metrics the mentorship exam wants to see
         _entry = trade.get("entry_price") or 0
@@ -3478,10 +3734,16 @@ async def generate_exam_report(req: ExamRequest):
         # Build trade analysis for exam
         exam_trade = {
             "trade_id": tid,
+            "activo": trade.get("instrument", "Unknown"),
             "instrument": trade.get("instrument", "Unknown"),
+            "operativa": operativa_label,
+            "operativa_key": style_key,
             "direction": trade.get("direction", "Unknown"),
+            "direction_label": direction_label,
             "strategy": trade.get("strategy", "Unknown"),
             "strategy_variant": trade.get("strategy_variant", ""),
+            "timeframes_used": timeframes_used,
+            "mentoria_timeframe_plan": _default_timeframe_plan(style_key),
             "entry_price": _entry,
             "exit_price": _exit,
             "stop_loss": _sl,
@@ -3506,6 +3768,7 @@ async def generate_exam_report(req: ExamRequest):
             "asr_lessons": trade.get("asr_lessons", ""),
             "asr_would_enter_again": trade.get("asr_would_enter_again"),
             "screenshots_b64": screenshot_gallery,
+            "context_charts_b64": context_gallery,
             "screenshot_files": screenshot_paths,
             "htf_analysis": None,
             "ltf_analysis": None,
@@ -3564,6 +3827,15 @@ async def get_exam_eligible_trades():
         row["exam_screenshots"] = screenshot_paths
         row["exam_gaps"] = _exam_gaps_for_trade(row, screenshot_paths)
         row["exam_ready"] = len(row["exam_gaps"]) == 0
+        style_key, operativa_label = _infer_exam_operativa(row)
+        row["exam_operativa"] = operativa_label
+        row["exam_operativa_key"] = style_key
+        row["exam_direction_label"] = _normalize_exam_direction(row.get("direction"))
+        row["exam_timeframes_used"] = _normalize_exam_timeframes(
+            row.get("timeframes_used"),
+            style_key,
+        )
+        row["exam_required_chart_timeframes"] = ["M", "W"]
         eligible.append(row)
     eligible.sort(
         key=lambda t: (
@@ -3604,6 +3876,7 @@ def _build_exam_html(trades: list) -> str:
         raw_status = (t.get("status", "") or "").replace("closed_", "").upper()
         status = raw_status or "CLOSED"
         direction = t.get("direction", "")
+        direction_label = t.get("direction_label") or _normalize_exam_direction(direction)
         dir_color = "#34C759" if direction.upper() == "BUY" else "#FF3B30"
         inst = t.get("instrument", "")
         rr_planned = t.get("risk_reward_ratio", 0) or 0
@@ -3625,6 +3898,20 @@ def _build_exam_html(trades: list) -> str:
                     </div>'''
                 )
             img_html = "".join(cards)
+
+        context_html = ""
+        context_gallery = t.get("context_charts_b64") or []
+        if context_gallery:
+            cards = []
+            for shot in context_gallery:
+                cards.append(
+                    f'''
+                    <div style="margin-bottom:12px;">
+                        <div style="font-size:11px;font-weight:600;color:#86868b;letter-spacing:0.4px;margin-bottom:6px;">{_esc(shot.get("label", "Context"))}</div>
+                        <img src="data:image/png;base64,{shot.get("b64", "")}" style="width:100%;border-radius:12px;display:block;" alt="{_esc(shot.get("label", "Context"))}">
+                    </div>'''
+                )
+            context_html = "".join(cards)
 
         # Analysis details
         htf_html = ""
@@ -3670,6 +3957,28 @@ def _build_exam_html(trades: list) -> str:
                 <span style="font-size:13px;color:#1d1d1f;line-height:1.7;">{_esc(t.get("management_notes", ""))}</span>
             </div>'''
 
+        timeframe_plan = t.get("mentoria_timeframe_plan") or {}
+        timeframes_used = t.get("timeframes_used") or []
+        timeframes_html = ""
+        if timeframe_plan or timeframes_used:
+            timeframe_plan_text = " · ".join(
+                [
+                    f"Mensual {timeframe_plan.get('monthly', 'M')}",
+                    f"Semanal {timeframe_plan.get('weekly', 'W')}",
+                    f"Direccional {timeframe_plan.get('directional', 'N/A')}",
+                    f"Confirmación {timeframe_plan.get('confirmation', 'N/A')}",
+                    f"Setup {timeframe_plan.get('setup', 'N/A')}",
+                    f"Ejecución {timeframe_plan.get('execution', 'N/A')}",
+                ]
+            )
+            timeframes_used_text = " · ".join(timeframes_used) if timeframes_used else "N/A"
+            timeframes_html = f'''
+            <div style="margin-top:12px;background:#f9f9f9;border-radius:10px;padding:12px;">
+                <span style="font-size:12px;font-weight:600;color:#86868b;">TEMPORALIDADES</span><br>
+                <span style="font-size:13px;color:#1d1d1f;line-height:1.7;">Plan mentoría: {timeframe_plan_text}</span><br>
+                <span style="font-size:13px;color:#86868b;line-height:1.7;">Usadas/derivadas: {timeframes_used_text}</span>
+            </div>'''
+
         asr_html = ""
         if t.get("asr_completed") or t.get("asr_lessons"):
             would_reenter = t.get("asr_would_enter_again")
@@ -3690,10 +3999,30 @@ def _build_exam_html(trades: list) -> str:
 
             <div style="font-size:24px;font-weight:700;color:#1d1d1f;letter-spacing:-0.3px;margin-bottom:4px;">{t.get("instrument", "")}</div>
             <div style="margin-bottom:16px;">
-                <span style="font-size:14px;font-weight:600;color:{dir_color};">{direction.upper()}</span>
+                <span style="font-size:14px;font-weight:600;color:{dir_color};">{direction_label}</span>
                 <span style="font-size:14px;color:#86868b;margin-left:8px;">{t.get("strategy", "")} {t.get("strategy_variant", "")}</span>
             </div>
 
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">OPERATIVA</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{_esc(t.get("operativa", "N/A"))}</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">ESTRATEGIA</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{_esc((t.get("strategy", "") + " " + (t.get("strategy_variant", "") or "")).strip())}</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">DIRECCIÓN</div>
+                    <div style="font-size:14px;font-weight:600;color:{dir_color};">{direction_label}</div>
+                </div>
+                <div style="background:#f9f9f9;border-radius:10px;padding:10px;">
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">ACTIVO</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{_esc(t.get("activo", inst))}</div>
+                </div>
+            </div>
+
+            {context_html}
             {img_html}
 
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
@@ -3742,6 +4071,7 @@ def _build_exam_html(trades: list) -> str:
                 <span style="font-size:14px;color:#1d1d1f;">Units: {t.get("units", 0)} &middot; Abierto: {t.get("opened_at", "—")} &middot; Cerrado: {t.get("closed_at", "—")}</span>
             </div>
 
+            {timeframes_html}
             {reasoning_html}
             {summary_html}
             {management_html}

@@ -309,6 +309,39 @@ class TestCaptureTradeClose:
         assert filepath != ""
 
 
+@pytest.mark.skipif(not HAS_MATPLOTLIB, reason="matplotlib not installed")
+class TestCaptureContextChart:
+    @pytest.mark.asyncio
+    async def test_context_chart_with_annotations(self, gen):
+        candles = _make_candles(40, base_price=10300)
+        filepath = await gen.capture_context_chart(
+            trade_id="ctx001",
+            instrument="UK100_GBP",
+            timeframe_label="Gráfico 15 Minutos",
+            direction="BUY",
+            strategy="BLACK",
+            candles=candles,
+            entry_price=10320.0,
+            current_price=10324.0,
+            annotations={
+                "overlay_levels": [
+                    {"price": 10310.0, "label": "S1", "color": THEME["tp"], "linestyle": ":"},
+                    {"price": 10328.0, "label": "R1", "color": THEME["sl"], "linestyle": ":"},
+                ],
+                "diagonals": [
+                    {"x0": 2, "y0": 10302.0, "x1": 39, "y1": 10326.0, "label": "Diagonal alcista", "color": THEME["entry"], "linestyle": "-."},
+                ],
+                "ema_overlays": [
+                    {"values": [c["close"] for c in candles], "label": "EMA 50 M15", "color": THEME["ema_slow"], "linewidth": 1.2},
+                ],
+                "notes": ["Sesgo alcista", "Soporte clave", "Resistencia inmediata"],
+            },
+        )
+        assert filepath != ""
+        assert os.path.exists(filepath)
+        assert "context" in filepath
+
+
 # ──────────────────────────────────────────────────────────────────
 # matplotlib not installed fallback
 # ──────────────────────────────────────────────────────────────────
@@ -428,6 +461,28 @@ class TestInternalChartMethods:
         fig, ax = plt.subplots()
         gen._draw_trade_info_box(ax, {"event": "UNKNOWN"}, 20)
         assert len(ax.texts) == 0  # No text added
+        plt.close(fig)
+
+    def test_draw_annotation_levels_diagonals_and_notes(self, gen):
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+        gen._draw_annotation_levels(
+            ax,
+            [
+                {"price": 1.10, "label": "S1", "color": THEME["tp"], "linestyle": ":"},
+                {"price": 1.12, "label": "R1", "color": THEME["sl"], "linestyle": ":"},
+            ],
+            20,
+        )
+        gen._draw_diagonals(
+            ax,
+            [
+                {"x0": 1, "y0": 1.09, "x1": 18, "y1": 1.11, "label": "Diagonal alcista", "color": THEME["entry"], "linestyle": "-."},
+            ],
+        )
+        gen._draw_context_notes(ax, ["Sesgo alcista", "Soporte respetado"])
+        assert len(ax.lines) >= 3
+        assert len(ax.texts) >= 3
         plt.close(fig)
 
 

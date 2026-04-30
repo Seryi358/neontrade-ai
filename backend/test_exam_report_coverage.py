@@ -1,4 +1,5 @@
 from api.routes import (
+    _build_exam_chart_analysis,
     _aggregate_monthly_candles,
     _build_exam_html,
     _exam_required_context_timeframes,
@@ -21,11 +22,13 @@ def test_infer_exam_operativa_from_timeframes():
 
 def test_normalize_exam_timeframes_falls_back_to_mentoria_plan():
     normalized = _normalize_exam_timeframes([], "swing")
-    assert normalized == ["M", "W", "D", "H1"]
+    assert normalized == ["M", "W", "D", "H4"]
 
 
-def test_day_trading_context_requires_daily_chart():
-    assert _exam_required_context_timeframes("day_trading") == ["M", "W", "D"]
+def test_exam_required_chart_timeframes_follow_operativa_sequence():
+    assert _exam_required_context_timeframes("day_trading") == ["D", "H4", "H1", "M15"]
+    assert _exam_required_context_timeframes("swing") == ["M", "W", "D", "H4"]
+    assert _exam_required_context_timeframes("scalping") == ["H1", "M15", "M5", "M1"]
 
 
 def test_aggregate_monthly_candles_from_weekly_series():
@@ -44,6 +47,38 @@ def test_aggregate_monthly_candles_from_weekly_series():
     assert monthly[0]["close"] == 12
     assert monthly[0]["volume"] == 30
     assert monthly[1]["close"] == 13
+
+
+def test_build_exam_chart_analysis_describes_levels_and_diagonal():
+    candles = []
+    prices = [100, 99, 101, 100, 102, 101, 103, 102, 104, 103, 105, 104, 106, 105]
+    for idx, close in enumerate(prices):
+        candles.append(
+            {
+                "time": f"2026-04-01T{idx:02d}:00:00Z",
+                "open": close - 0.4,
+                "high": close + 0.8,
+                "low": close - 0.8,
+                "close": close,
+                "volume": 100 + idx,
+            }
+        )
+
+    analysis = _build_exam_chart_analysis(
+        candles,
+        instrument="UK100_GBP",
+        timeframe_code="H1",
+        role_label="Armado del setup",
+        direction="BUY",
+        entry_price=104.5,
+        current_price=106.0,
+    )
+
+    assert analysis["candles"]
+    assert analysis["annotations"]["overlay_levels"]
+    assert analysis["annotations"]["ema_overlays"]
+    assert "soporte" in analysis["explanation"].lower()
+    assert "ejecución quedó anclada" in analysis["explanation"].lower()
 
 
 def test_build_exam_html_renders_required_exam_fields():
@@ -76,29 +111,42 @@ def test_build_exam_html_renders_required_exam_fields():
                 "screenshots_b64": [{"label": "Open", "b64": "ZmFrZQ=="}],
                 "context_charts_b64": [
                     {
-                        "label": "Gráfico Mensual",
-                        "b64": "ZmFrZQ==",
-                        "explanation": "Marco macro para ubicar la estructura mayor y las zonas amplias que condicionan la operativa.",
-                    },
-                    {
-                        "label": "Gráfico Semanal",
-                        "b64": "ZmFrZQ==",
-                        "explanation": "Marco estructural para validar el contexto de la semana y las zonas donde tiene sentido buscar el setup.",
-                    },
-                    {
                         "label": "Gráfico Diario",
                         "b64": "ZmFrZQ==",
-                        "explanation": "Marco direccional del día para confirmar el sesgo operativo y la ubicación del setup antes de ejecutar.",
+                        "role": "Contexto direccional",
+                        "explanation": "Acá se vio el sesgo principal del día y una zona de soporte que sostuvo la idea del trade.",
+                    },
+                    {
+                        "label": "Gráfico 4 Horas",
+                        "b64": "ZmFrZQ==",
+                        "role": "Confirmación estructural",
+                        "explanation": "Acá se vio la diagonal que contenía el precio y la resistencia desde donde se validó la presión vendedora previa.",
+                    },
+                    {
+                        "label": "Gráfico 1 Hora",
+                        "b64": "ZmFrZQ==",
+                        "role": "Armado del setup",
+                        "explanation": "Acá se vio el armado del setup con una diagonal de soporte y la ubicación precisa del pullback.",
+                    },
+                    {
+                        "label": "Gráfico 15 Minutos",
+                        "b64": "ZmFrZQ==",
+                        "role": "Ejecución",
+                        "explanation": "Acá se vio la ejecución exacta del trade, con soporte, resistencia y la zona donde entró la orden.",
                     },
                 ],
-                "timeframes_used": ["M", "W", "D", "H4", "H1", "M5"],
+                "timeframes_used": ["D", "H4", "H1", "M15"],
+                "exam_chart_plan": [
+                    {"code": "D", "role": "Contexto direccional"},
+                    {"code": "H4", "role": "Confirmación estructural"},
+                    {"code": "H1", "role": "Armado del setup"},
+                    {"code": "M15", "role": "Ejecución"},
+                ],
                 "mentoria_timeframe_plan": {
-                    "monthly": "M",
-                    "weekly": "W",
                     "directional": "D",
                     "confirmation": "H4",
                     "setup": "H1",
-                    "execution": "M5",
+                    "execution": "M15",
                 },
                 "htf_analysis": {"trend": "bearish", "condition": "overbought", "score": 75},
                 "ltf_analysis": {"trend": "bullish", "convergence": True},
@@ -116,8 +164,10 @@ def test_build_exam_html_renders_required_exam_fields():
     assert "ACTIVO" in html
     assert "Day Trading" in html
     assert "Long" in html
-    assert "Gráfico Mensual" in html
-    assert "Gráfico Semanal" in html
     assert "Gráfico Diario" in html
-    assert "Marco direccional del día" in html
+    assert "Gráfico 4 Horas" in html
+    assert "Gráfico 1 Hora" in html
+    assert "Gráfico 15 Minutos" in html
+    assert "ANÁLISIS MULTI-TIMEFRAME" in html
+    assert "Ejecución" in html
     assert "TEMPORALIDADES" in html

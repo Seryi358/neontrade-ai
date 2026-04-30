@@ -272,6 +272,7 @@ class TradeScreenshotGenerator:
         candles: list[dict] | None = None,
         entry_price: float | None = None,
         current_price: float | None = None,
+        annotations: dict | None = None,
     ) -> str:
         """
         Generate a reusable higher-timeframe context chart for exam/reporting.
@@ -322,6 +323,7 @@ class TradeScreenshotGenerator:
                     levels,
                     trade_info,
                     None,
+                    annotations,
                 )
             else:
                 await loop.run_in_executor(
@@ -384,6 +386,7 @@ class TradeScreenshotGenerator:
         levels: dict,
         trade_info: dict,
         ema_values: dict | None = None,
+        annotations: dict | None = None,
     ):
         """Render a full candlestick chart with trade levels and overlays."""
         # Limit to last 50-100 candles
@@ -391,7 +394,7 @@ class TradeScreenshotGenerator:
 
         fig, ax = plt.subplots(1, 1, figsize=(14, 8), facecolor=THEME["bg"])
         try:
-            self._render_candlestick_inner(fig, ax, filepath, candles, levels, trade_info, ema_values)
+            self._render_candlestick_inner(fig, ax, filepath, candles, levels, trade_info, ema_values, annotations)
         finally:
             plt.close(fig)
 
@@ -404,6 +407,7 @@ class TradeScreenshotGenerator:
         levels: dict,
         trade_info: dict,
         ema_values: dict | None = None,
+        annotations: dict | None = None,
     ):
         ax.set_facecolor(THEME["bg"])
 
@@ -413,9 +417,15 @@ class TradeScreenshotGenerator:
         # Draw EMA overlays
         if ema_values:
             self._draw_ema_overlays(ax, candles, ema_values)
+        if annotations and annotations.get("ema_overlays"):
+            self._draw_generic_ema_overlays(ax, candles, annotations.get("ema_overlays") or [])
 
         # Draw horizontal trade levels
         self._draw_trade_levels(ax, levels, len(candles))
+        if annotations and annotations.get("overlay_levels"):
+            self._draw_annotation_levels(ax, annotations.get("overlay_levels") or [], len(candles))
+        if annotations and annotations.get("diagonals"):
+            self._draw_diagonals(ax, annotations.get("diagonals") or [])
 
         # Draw current price marker
         current_price = levels.get("current_price")
@@ -438,6 +448,8 @@ class TradeScreenshotGenerator:
 
         # Trade info text box
         self._draw_trade_info_box(ax, trade_info, len(candles))
+        if annotations and annotations.get("notes"):
+            self._draw_context_notes(ax, annotations.get("notes") or [])
 
         # Chart title
         event = trade_info.get("event", "")
@@ -628,6 +640,126 @@ class TradeScreenshotGenerator:
                     alpha=0.85,
                 ),
             )
+
+    def _draw_annotation_levels(self, ax, overlay_levels: list[dict], num_candles: int):
+        for level in overlay_levels:
+            try:
+                price = float(level.get("price"))
+            except (TypeError, ValueError):
+                continue
+            label = str(level.get("label") or "Level")
+            color = str(level.get("color") or THEME["text_dim"])
+            linestyle = str(level.get("linestyle") or ":")
+            ax.axhline(
+                y=price,
+                color=color,
+                linewidth=1.0,
+                linestyle=linestyle,
+                alpha=0.55,
+                zorder=5,
+            )
+            ax.text(
+                num_candles + 0.5,
+                price,
+                f" {label}: {price:.5g}",
+                color=color,
+                fontsize=7,
+                fontweight="bold",
+                va="center",
+                ha="left",
+                zorder=7,
+                bbox=dict(
+                    boxstyle="round,pad=0.12",
+                    facecolor=THEME["bg"],
+                    edgecolor=color,
+                    alpha=0.7,
+                ),
+            )
+
+    def _draw_generic_ema_overlays(self, ax, candles: list[dict], overlays: list[dict]):
+        n = len(candles)
+        legend_added = False
+        for overlay in overlays:
+            values = list(overlay.get("values") or [])
+            if not values:
+                continue
+            vals = values[-n:]
+            x_offset = n - len(vals)
+            ax.plot(
+                [x_offset + j for j in range(len(vals))],
+                vals,
+                color=str(overlay.get("color") or THEME["ema_slow"]),
+                linewidth=float(overlay.get("linewidth") or 1.2),
+                alpha=0.85,
+                label=str(overlay.get("label") or "EMA"),
+                zorder=5,
+            )
+            legend_added = True
+        if legend_added:
+            legend = ax.legend(
+                loc="upper left",
+                fontsize=8,
+                framealpha=0.7,
+                facecolor=THEME["bg_card"],
+                edgecolor=THEME["grid"],
+                labelcolor=THEME["text_dim"],
+            )
+            legend.get_frame().set_linewidth(0.5)
+
+    def _draw_diagonals(self, ax, diagonals: list[dict]):
+        for diagonal in diagonals:
+            try:
+                x0 = float(diagonal.get("x0"))
+                y0 = float(diagonal.get("y0"))
+                x1 = float(diagonal.get("x1"))
+                y1 = float(diagonal.get("y1"))
+            except (TypeError, ValueError):
+                continue
+            color = str(diagonal.get("color") or THEME["entry"])
+            linestyle = str(diagonal.get("linestyle") or "-.")
+            label = str(diagonal.get("label") or "Diagonal")
+            ax.plot(
+                [x0, x1],
+                [y0, y1],
+                color=color,
+                linewidth=1.15,
+                linestyle=linestyle,
+                alpha=0.8,
+                zorder=6,
+            )
+            ax.text(
+                x1,
+                y1,
+                f" {label}",
+                color=color,
+                fontsize=7,
+                fontweight="bold",
+                ha="left",
+                va="bottom",
+                zorder=7,
+            )
+
+    def _draw_context_notes(self, ax, notes: list[str]):
+        clean = [str(note).strip() for note in notes if str(note).strip()]
+        if not clean:
+            return
+        text = "\n".join(f"• {note}" for note in clean[:4])
+        ax.text(
+            0.98, 0.97,
+            text,
+            transform=ax.transAxes,
+            fontsize=8,
+            color=THEME["text"],
+            va="top",
+            ha="right",
+            zorder=10,
+            bbox=dict(
+                boxstyle="round,pad=0.45",
+                facecolor="#ffffffdd",
+                edgecolor=THEME["info_box_border"],
+                linewidth=1.0,
+            ),
+        )
 
     def _draw_trade_info_box(self, ax, trade_info: dict, num_candles: int):
         """Draw a text box with trade information in the upper-right area."""

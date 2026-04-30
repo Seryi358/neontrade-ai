@@ -3329,31 +3329,49 @@ def _normalize_exam_style(style: object) -> tuple[str, str]:
 def _default_timeframe_plan(style_key: str) -> Dict[str, str]:
     plans = {
         "day_trading": {
-            "monthly": "M",
-            "weekly": "W",
             "directional": "D",
             "confirmation": "H4",
             "setup": "H1",
-            "execution": "M5",
+            "execution": "M15",
         },
         "swing": {
             "monthly": "M",
             "weekly": "W",
-            "directional": "M",
-            "confirmation": "W",
-            "setup": "D",
-            "execution": "H1",
+            "directional": "D",
+            "execution": "H4",
         },
         "scalping": {
-            "monthly": "M",
-            "weekly": "W",
             "directional": "H1",
-            "confirmation": "M15",
-            "setup": "M5",
+            "setup": "M15",
+            "confirmation": "M5",
             "execution": "M1",
         },
     }
     return dict(plans.get(style_key, plans["day_trading"]))
+
+
+def _exam_chart_specs(style_key: str) -> List[dict]:
+    specs = {
+        "day_trading": [
+            {"code": "D", "label": "Gráfico Diario", "role": "Contexto direccional"},
+            {"code": "H4", "label": "Gráfico 4 Horas", "role": "Confirmación estructural"},
+            {"code": "H1", "label": "Gráfico 1 Hora", "role": "Armado del setup"},
+            {"code": "M15", "label": "Gráfico 15 Minutos", "role": "Ejecución"},
+        ],
+        "swing": [
+            {"code": "M", "label": "Gráfico Mensual", "role": "Contexto macro"},
+            {"code": "W", "label": "Gráfico Semanal", "role": "Estructura mayor"},
+            {"code": "D", "label": "Gráfico Diario", "role": "Construcción del setup"},
+            {"code": "H4", "label": "Gráfico 4 Horas", "role": "Ejecución"},
+        ],
+        "scalping": [
+            {"code": "H1", "label": "Gráfico 1 Hora", "role": "Sesgo principal"},
+            {"code": "M15", "label": "Gráfico 15 Minutos", "role": "Setup"},
+            {"code": "M5", "label": "Gráfico 5 Minutos", "role": "Confirmación"},
+            {"code": "M1", "label": "Gráfico 1 Minuto", "role": "Ejecución"},
+        ],
+    }
+    return [dict(item) for item in specs.get(style_key, specs["day_trading"])]
 
 
 def _infer_exam_operativa(trade: dict) -> tuple[str, str]:
@@ -3413,15 +3431,7 @@ def _normalize_exam_timeframes(raw_timeframes: object, style_key: str) -> List[s
     if normalized:
         return normalized
 
-    plan = _default_timeframe_plan(style_key)
-    inferred = [
-        plan["monthly"],
-        plan["weekly"],
-        plan["directional"],
-        plan["confirmation"],
-        plan["setup"],
-        plan["execution"],
-    ]
+    inferred = [spec["code"] for spec in _exam_chart_specs(style_key)]
     for tf in inferred:
         if tf not in seen:
             seen.add(tf)
@@ -3498,30 +3508,291 @@ def _aggregate_monthly_candles(weekly_candles: List[dict]) -> List[dict]:
 
 
 def _exam_required_context_timeframes(style_key: str) -> List[str]:
-    if style_key == "scalping":
-        return ["W", "D"]
-    return ["M", "W", "D"]
+    return [spec["code"] for spec in _exam_chart_specs(style_key)]
+
+def _exam_fetch_count(timeframe_code: str) -> int:
+    return {
+        "M": 180,
+        "W": 180,
+        "D": 260,
+        "H4": 320,
+        "H1": 360,
+        "M15": 320,
+        "M5": 320,
+        "M1": 240,
+    }.get(timeframe_code, 260)
 
 
-def _exam_context_explanation(timeframe_code: str) -> str:
-    explanations = {
-        "M": (
-            "Marco macro para ubicar la estructura mayor y las zonas amplias "
-            "que condicionan la operativa."
+def _exam_price_decimals(instrument: str) -> int:
+    upper = (instrument or "").upper()
+    if "JPY" in upper:
+        return 3
+    if any(k in upper for k in ("BTC", "ETH", "XAU", "SPX", "NAS", "US30", "GER40", "UK100", "XCU")):
+        return 2
+    return 5
+
+
+def _format_exam_price(value: float | int | None, instrument: str) -> str:
+    if value is None:
+        return "N/A"
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "N/A"
+    decimals = _exam_price_decimals(instrument)
+    return f"{numeric:,.{decimals}f}"
+
+
+def _ema_series(candles: List[dict], period: int) -> List[float]:
+    closes = []
+    for candle in candles:
+        try:
+            closes.append(float(candle.get("close", 0.0)))
+        except (TypeError, ValueError):
+            closes.append(0.0)
+    if not closes:
+        return []
+    multiplier = 2.0 / (period + 1)
+    ema = closes[0]
+    values: List[float] = []
+    for price in closes:
+        ema = (price * multiplier) + (ema * (1.0 - multiplier))
+        values.append(ema)
+    return values
+
+
+def _find_pivots(candles: List[dict], kind: str, window: int) -> List[dict]:
+    if len(candles) < (window * 2 + 1):
+        return []
+    field = "low" if kind == "low" else "high"
+    pivots: List[dict] = []
+    values = [float(c.get(field, 0.0) or 0.0) for c in candles]
+    for idx in range(window, len(values) - window):
+        center = values[idx]
+        neighbors = values[idx - window: idx] + values[idx + 1: idx + window + 1]
+        if not neighbors:
+            continue
+        if kind == "low" and center <= min(neighbors):
+            pivots.append({"index": idx, "price": center})
+        if kind == "high" and center >= max(neighbors):
+            pivots.append({"index": idx, "price": center})
+    return pivots
+
+
+def _cluster_levels(pivots: List[dict], tolerance: float) -> List[dict]:
+    clusters: List[dict] = []
+    for pivot in sorted(pivots, key=lambda item: item["index"], reverse=True):
+        price = float(pivot["price"])
+        for cluster in clusters:
+            if abs(cluster["price"] - price) <= tolerance:
+                touches = int(cluster["touches"]) + 1
+                cluster["price"] = ((cluster["price"] * cluster["touches"]) + price) / touches
+                cluster["touches"] = touches
+                cluster["last_index"] = max(int(cluster["last_index"]), int(pivot["index"]))
+                break
+        else:
+            clusters.append(
+                {
+                    "price": price,
+                    "touches": 1,
+                    "last_index": int(pivot["index"]),
+                }
+            )
+    return clusters
+
+
+def _nearest_levels(clusters: List[dict], current_price: float, side: str) -> List[dict]:
+    if side == "support":
+        candidates = [c for c in clusters if float(c["price"]) <= current_price]
+        fallback = [c for c in clusters if float(c["price"]) > current_price]
+    else:
+        candidates = [c for c in clusters if float(c["price"]) >= current_price]
+        fallback = [c for c in clusters if float(c["price"]) < current_price]
+    pool = candidates or fallback
+    ranked = sorted(
+        pool,
+        key=lambda item: (
+            abs(float(item["price"]) - current_price),
+            -int(item["touches"]),
+            -int(item["last_index"]),
         ),
-        "W": (
-            "Marco estructural para validar el contexto de la semana y las "
-            "zonas donde tiene sentido buscar el setup."
-        ),
-        "D": (
-            "Marco direccional del día para confirmar el sesgo operativo y la "
-            "ubicación del setup antes de ejecutar."
-        ),
-    }
-    return explanations.get(
-        timeframe_code,
-        "Contexto superior usado para validar el trade.",
     )
+    return ranked[:2]
+
+
+def _build_diagonal(pivots: List[dict], kind: str, num_candles: int) -> Optional[dict]:
+    if len(pivots) < 2:
+        return None
+    ordered = sorted(pivots, key=lambda item: item["index"])
+    for right in range(len(ordered) - 1, 0, -1):
+        second = ordered[right]
+        for left in range(right - 1, -1, -1):
+            first = ordered[left]
+            dx = int(second["index"]) - int(first["index"])
+            if dx < 4:
+                continue
+            y0 = float(first["price"])
+            y1 = float(second["price"])
+            slope = (y1 - y0) / dx
+            label = "Diagonal"
+            if kind == "support":
+                label = "Diagonal alcista" if slope >= 0 else "Diagonal de soporte"
+            else:
+                label = "Diagonal bajista" if slope <= 0 else "Diagonal de resistencia"
+            projected = y0 + slope * (num_candles - 1 - int(first["index"]))
+            return {
+                "x0": int(first["index"]),
+                "y0": y0,
+                "x1": num_candles - 1,
+                "y1": projected,
+                "label": label,
+                "color": "#0A84FF" if kind == "support" else "#FF9500",
+                "linestyle": "-.",
+                "slope": slope,
+            }
+    return None
+
+
+def _build_exam_chart_analysis(
+    candles: List[dict],
+    *,
+    instrument: str,
+    timeframe_code: str,
+    role_label: str,
+    direction: str,
+    entry_price: float,
+    current_price: float,
+) -> dict:
+    trimmed = candles[-100:]
+    if not trimmed:
+        return {"candles": [], "annotations": {}, "explanation": ""}
+
+    highs = [float(c.get("high", 0.0) or 0.0) for c in trimmed]
+    lows = [float(c.get("low", 0.0) or 0.0) for c in trimmed]
+    last_close = float(trimmed[-1].get("close", current_price or entry_price or 0.0) or 0.0)
+    current = float(current_price or last_close or entry_price or 0.0)
+    price_range = max(max(highs) - min(lows), abs(last_close) * 0.002, 0.0001)
+    tolerance = max(price_range * 0.08, abs(last_close) * 0.0015, 0.0005)
+    pivot_window = 1 if timeframe_code in {"M", "W"} else 2 if timeframe_code in {"D", "H4"} else 3
+
+    low_pivots = _find_pivots(trimmed, "low", pivot_window)
+    high_pivots = _find_pivots(trimmed, "high", pivot_window)
+    support_levels = _nearest_levels(_cluster_levels(low_pivots, tolerance), current, "support")
+    resistance_levels = _nearest_levels(_cluster_levels(high_pivots, tolerance), current, "resistance")
+    if not support_levels:
+        support_levels = [
+            {
+                "price": min(lows[-20:]),
+                "touches": 1,
+                "last_index": max(0, len(trimmed) - 1),
+            }
+        ]
+    if not resistance_levels:
+        resistance_levels = [
+            {
+                "price": max(highs[-20:]),
+                "touches": 1,
+                "last_index": max(0, len(trimmed) - 1),
+            }
+        ]
+
+    ema50 = _ema_series(trimmed, 50)
+    ema50_last = ema50[-1] if ema50 else None
+    if ema50_last is not None:
+        trend_text = "alcista" if current >= ema50_last else "bajista"
+    else:
+        trend_text = "mixto"
+
+    support_diagonal = _build_diagonal(low_pivots, "support", len(trimmed))
+    resistance_diagonal = _build_diagonal(high_pivots, "resistance", len(trimmed))
+
+    overlay_levels: List[dict] = []
+    described_support = support_levels[:1]
+    described_resistance = resistance_levels[:1]
+    for idx, level in enumerate(described_support, 1):
+        overlay_levels.append(
+            {
+                "price": float(level["price"]),
+                "label": f"S{idx}",
+                "color": "#34C759",
+                "linestyle": ":",
+            }
+        )
+    for idx, level in enumerate(described_resistance, 1):
+        overlay_levels.append(
+            {
+                "price": float(level["price"]),
+                "label": f"R{idx}",
+                "color": "#FF3B30",
+                "linestyle": ":",
+            }
+        )
+
+    ema_overlays = []
+    if ema50:
+        ema_overlays.append(
+            {
+                "values": ema50,
+                "label": f"EMA 50 {timeframe_code}",
+                "color": "#AF52DE",
+                "linewidth": 1.35,
+            }
+        )
+
+    diagonals = [d for d in (support_diagonal, resistance_diagonal) if d]
+    direction_label = "Long" if str(direction or "").upper() == "BUY" else "Short"
+    explanations: List[str] = [
+        (
+            f"En {role_label.lower()} se vio que el precio quedó "
+            f"{'por encima' if ema50_last is not None and current >= ema50_last else 'por debajo' if ema50_last is not None else 'muy cerca'} "
+            f"de la EMA 50 de {timeframe_code}, dejando un sesgo {trend_text} "
+            f"para esta lectura."
+        )
+    ]
+    if described_support:
+        support = described_support[0]
+        touch_word = "varias veces" if int(support["touches"]) >= 2 else "al menos una vez"
+        explanations.append(
+            f"Acá se vio un soporte en {_format_exam_price(support['price'], instrument)} que el precio respetó {touch_word}, "
+            f"por eso esa zona quedó como referencia de defensa compradora."
+        )
+    if described_resistance:
+        resistance = described_resistance[0]
+        touch_word = "varias veces" if int(resistance["touches"]) >= 2 else "al menos una vez"
+        explanations.append(
+            f"También apareció una resistencia en {_format_exam_price(resistance['price'], instrument)} que actuó como techo {touch_word}, "
+            f"dejando clara la zona donde podían aparecer rechazos o toma de utilidad."
+        )
+    if diagonals:
+        diagonal = diagonals[0]
+        diagonal_side = "de soporte" if "alcista" in str(diagonal["label"]).lower() or "soporte" in str(diagonal["label"]).lower() else "de resistencia"
+        explanations.append(
+            f"Además se trazó una {diagonal_side} desde los swings recientes; esa línea ayudó a leer la compresión y el momento en que el trade {direction_label} "
+            f"empezó a tener sentido dentro del marco {timeframe_code}."
+        )
+    explanations.append(
+        f"La ejecución quedó anclada alrededor de {_format_exam_price(entry_price or current, instrument)}, "
+        f"así que este gráfico sirve para justificar por qué la entrada se tomó justo en esa zona y no en cualquier otro punto."
+    )
+
+    notes = [
+        f"Sesgo {trend_text} vs EMA 50 {timeframe_code}",
+        f"Soporte clave: {_format_exam_price(described_support[0]['price'], instrument)}" if described_support else "Sin soporte dominante claro",
+        f"Resistencia clave: {_format_exam_price(described_resistance[0]['price'], instrument)}" if described_resistance else "Sin resistencia dominante clara",
+    ]
+    if diagonals:
+        notes.append(str(diagonals[0]["label"]))
+
+    return {
+        "candles": trimmed,
+        "annotations": {
+            "overlay_levels": overlay_levels,
+            "diagonals": diagonals,
+            "ema_overlays": ema_overlays,
+            "notes": notes[:4],
+        },
+        "explanation": " ".join(explanations),
+    }
 
 
 async def _build_exam_context_gallery(
@@ -3541,44 +3812,59 @@ async def _build_exam_context_gallery(
     strategy = str(trade.get("strategy") or trade.get("strategy_variant") or "UNKNOWN")
     entry_price = trade.get("entry_price") or trade.get("exit_price") or 0.0
     current_price = trade.get("exit_price") or trade.get("entry_price") or 0.0
-    required_timeframes = _exam_required_context_timeframes(style_key)
-
-    try:
-        weekly_raw = await engine_obj.broker.get_candles(instrument, "W", 156)
-    except Exception as exc:
-        logger.warning(f"Exam context chart fetch failed for {instrument}: {exc}")
-        return []
-
-    weekly_candles = [c for c in (_candle_to_dict(item) for item in weekly_raw) if c]
-    monthly_candles = _aggregate_monthly_candles(weekly_candles)
-    daily_candles: List[dict] = []
-    if "D" in required_timeframes:
-        try:
-            daily_raw = await engine_obj.broker.get_candles(instrument, "D", 260)
-            daily_candles = [c for c in (_candle_to_dict(item) for item in daily_raw) if c]
-        except Exception as exc:
-            logger.warning(f"Exam daily context chart fetch failed for {instrument}: {exc}")
-
+    chart_specs = _exam_chart_specs(style_key)
     gallery: List[dict] = []
-    chart_specs = []
-    if "M" in required_timeframes:
-        chart_specs.append(("Gráfico Mensual", "monthly", "M", monthly_candles[-60:]))
-    if "W" in required_timeframes:
-        chart_specs.append(("Gráfico Semanal", "weekly", "W", weekly_candles[-104:]))
-    if "D" in required_timeframes:
-        chart_specs.append(("Gráfico Diario", "daily", "D", daily_candles[-180:]))
-    for label, tf_slug, timeframe_code, candles in chart_specs:
+    weekly_candles: List[dict] = []
+    monthly_candles: List[dict] = []
+    candle_cache: Dict[str, List[dict]] = {}
+
+    if any(spec["code"] in {"M", "W"} for spec in chart_specs):
+        try:
+            weekly_raw = await engine_obj.broker.get_candles(instrument, "W", _exam_fetch_count("W"))
+            weekly_candles = [c for c in (_candle_to_dict(item) for item in weekly_raw) if c]
+            monthly_candles = _aggregate_monthly_candles(weekly_candles)
+        except Exception as exc:
+            logger.warning(f"Exam weekly/monthly chart fetch failed for {instrument}: {exc}")
+
+    for spec in chart_specs:
+        timeframe_code = spec["code"]
+        label = spec["label"]
+        role = spec["role"]
+        if timeframe_code == "M":
+            candles = monthly_candles[-_exam_fetch_count("M"):]
+        elif timeframe_code == "W":
+            candles = weekly_candles[-_exam_fetch_count("W"):]
+        else:
+            if timeframe_code not in candle_cache:
+                try:
+                    raw = await engine_obj.broker.get_candles(instrument, timeframe_code, _exam_fetch_count(timeframe_code))
+                    candle_cache[timeframe_code] = [c for c in (_candle_to_dict(item) for item in raw) if c]
+                except Exception as exc:
+                    logger.warning(f"Exam chart fetch failed for {instrument} {timeframe_code}: {exc}")
+                    candle_cache[timeframe_code] = []
+            candles = candle_cache[timeframe_code]
         if len(candles) < 3:
             continue
+
+        chart_analysis = _build_exam_chart_analysis(
+            candles,
+            instrument=instrument,
+            timeframe_code=timeframe_code,
+            role_label=role,
+            direction=direction,
+            entry_price=float(entry_price or 0.0),
+            current_price=float(current_price or 0.0),
+        )
         path = await generator.capture_context_chart(
             trade_id=trade_id,
             instrument=instrument,
             timeframe_label=label,
             direction=direction,
             strategy=strategy,
-            candles=candles,
+            candles=chart_analysis["candles"],
             entry_price=float(entry_price or 0.0),
             current_price=float(current_price or 0.0),
+            annotations=chart_analysis["annotations"],
         )
         if not path:
             continue
@@ -3593,9 +3879,10 @@ async def _build_exam_context_gallery(
                 {
                     "label": label,
                     "timeframe": timeframe_code,
+                    "role": role,
                     "path": path,
                     "b64": base64.b64encode(shot_path.read_bytes()).decode(),
-                    "explanation": _exam_context_explanation(timeframe_code),
+                    "explanation": chart_analysis["explanation"],
                 }
             )
         except Exception as exc:
@@ -3783,6 +4070,7 @@ async def generate_exam_report(req: ExamRequest):
             "instrument": trade.get("instrument", "Unknown"),
             "operativa": operativa_label,
             "operativa_key": style_key,
+            "exam_chart_plan": _exam_chart_specs(style_key),
             "direction": trade.get("direction", "Unknown"),
             "direction_label": direction_label,
             "strategy": trade.get("strategy", "Unknown"),
@@ -3876,6 +4164,7 @@ async def get_exam_eligible_trades():
         row["exam_operativa"] = operativa_label
         row["exam_operativa_key"] = style_key
         row["exam_direction_label"] = _normalize_exam_direction(row.get("direction"))
+        row["exam_chart_plan"] = _exam_chart_specs(style_key)
         row["exam_timeframes_used"] = _normalize_exam_timeframes(
             row.get("timeframes_used"),
             style_key,
@@ -3952,12 +4241,18 @@ def _build_exam_html(trades: list) -> str:
                 cards.append(
                     f'''
                     <div style="margin-bottom:12px;">
-                        <div style="font-size:11px;font-weight:600;color:#86868b;letter-spacing:0.4px;margin-bottom:6px;">{_esc(shot.get("label", "Context"))}</div>
+                        <div style="font-size:11px;font-weight:600;color:#86868b;letter-spacing:0.4px;margin-bottom:4px;">{_esc(shot.get("label", "Context"))}</div>
+                        {f'<div style="font-size:11px;font-weight:600;color:#007AFF;letter-spacing:0.2px;margin-bottom:6px;">{_esc(shot.get("role", ""))}</div>' if shot.get("role") else ''}
                         {f'<div style="font-size:12px;color:#6e6e73;line-height:1.6;margin-bottom:8px;">{_esc(shot.get("explanation", ""))}</div>' if shot.get("explanation") else ''}
                         <img src="data:image/png;base64,{shot.get("b64", "")}" style="width:100%;border-radius:12px;display:block;" alt="{_esc(shot.get("label", "Context"))}">
                     </div>'''
                 )
-            context_html = "".join(cards)
+            context_html = (
+                '<div style="margin-bottom:16px;">'
+                '<div style="font-size:12px;font-weight:600;color:#86868b;letter-spacing:0.5px;margin-bottom:10px;">ANÁLISIS MULTI-TIMEFRAME</div>'
+                + "".join(cards)
+                + '</div>'
+            )
 
         # Analysis details
         htf_html = ""
@@ -4004,19 +4299,29 @@ def _build_exam_html(trades: list) -> str:
             </div>'''
 
         timeframe_plan = t.get("mentoria_timeframe_plan") or {}
+        chart_plan = t.get("exam_chart_plan") or []
         timeframes_used = t.get("timeframes_used") or []
         timeframes_html = ""
-        if timeframe_plan or timeframes_used:
-            timeframe_plan_text = " · ".join(
-                [
-                    f"Mensual {timeframe_plan.get('monthly', 'M')}",
-                    f"Semanal {timeframe_plan.get('weekly', 'W')}",
-                    f"Direccional {timeframe_plan.get('directional', 'N/A')}",
-                    f"Confirmación {timeframe_plan.get('confirmation', 'N/A')}",
-                    f"Setup {timeframe_plan.get('setup', 'N/A')}",
-                    f"Ejecución {timeframe_plan.get('execution', 'N/A')}",
-                ]
-            )
+        if timeframe_plan or timeframes_used or chart_plan:
+            if chart_plan:
+                timeframe_plan_text = " · ".join(
+                    f"{item.get('role', 'Marco')} {item.get('code', 'N/A')}"
+                    for item in chart_plan
+                )
+            else:
+                label_map = {
+                    "monthly": "Mensual",
+                    "weekly": "Semanal",
+                    "directional": "Direccional",
+                    "confirmation": "Confirmación",
+                    "setup": "Setup",
+                    "execution": "Ejecución",
+                }
+                timeframe_plan_text = " · ".join(
+                    f"{label_map[key]} {value}"
+                    for key, value in timeframe_plan.items()
+                    if value
+                )
             timeframes_used_text = " · ".join(timeframes_used) if timeframes_used else "N/A"
             timeframes_html = f'''
             <div style="margin-top:12px;background:#f9f9f9;border-radius:10px;padding:12px;">

@@ -3497,7 +3497,39 @@ def _aggregate_monthly_candles(weekly_candles: List[dict]) -> List[dict]:
     return [buckets[key] for key in ordered_keys]
 
 
-async def _build_exam_context_gallery(trade: dict, engine_obj, trade_id: str) -> List[dict]:
+def _exam_required_context_timeframes(style_key: str) -> List[str]:
+    if style_key == "scalping":
+        return ["W", "D"]
+    return ["M", "W", "D"]
+
+
+def _exam_context_explanation(timeframe_code: str) -> str:
+    explanations = {
+        "M": (
+            "Marco macro para ubicar la estructura mayor y las zonas amplias "
+            "que condicionan la operativa."
+        ),
+        "W": (
+            "Marco estructural para validar el contexto de la semana y las "
+            "zonas donde tiene sentido buscar el setup."
+        ),
+        "D": (
+            "Marco direccional del día para confirmar el sesgo operativo y la "
+            "ubicación del setup antes de ejecutar."
+        ),
+    }
+    return explanations.get(
+        timeframe_code,
+        "Contexto superior usado para validar el trade.",
+    )
+
+
+async def _build_exam_context_gallery(
+    trade: dict,
+    engine_obj,
+    trade_id: str,
+    style_key: str,
+) -> List[dict]:
     if engine_obj is None or getattr(engine_obj, "broker", None) is None:
         return []
     generator = getattr(engine_obj, "screenshot_generator", None)
@@ -3509,6 +3541,7 @@ async def _build_exam_context_gallery(trade: dict, engine_obj, trade_id: str) ->
     strategy = str(trade.get("strategy") or trade.get("strategy_variant") or "UNKNOWN")
     entry_price = trade.get("entry_price") or trade.get("exit_price") or 0.0
     current_price = trade.get("exit_price") or trade.get("entry_price") or 0.0
+    required_timeframes = _exam_required_context_timeframes(style_key)
 
     try:
         weekly_raw = await engine_obj.broker.get_candles(instrument, "W", 156)
@@ -3518,13 +3551,23 @@ async def _build_exam_context_gallery(trade: dict, engine_obj, trade_id: str) ->
 
     weekly_candles = [c for c in (_candle_to_dict(item) for item in weekly_raw) if c]
     monthly_candles = _aggregate_monthly_candles(weekly_candles)
+    daily_candles: List[dict] = []
+    if "D" in required_timeframes:
+        try:
+            daily_raw = await engine_obj.broker.get_candles(instrument, "D", 260)
+            daily_candles = [c for c in (_candle_to_dict(item) for item in daily_raw) if c]
+        except Exception as exc:
+            logger.warning(f"Exam daily context chart fetch failed for {instrument}: {exc}")
 
     gallery: List[dict] = []
-    chart_specs = [
-        ("Gráfico Mensual", "monthly", monthly_candles[-60:]),
-        ("Gráfico Semanal", "weekly", weekly_candles[-104:]),
-    ]
-    for label, tf_slug, candles in chart_specs:
+    chart_specs = []
+    if "M" in required_timeframes:
+        chart_specs.append(("Gráfico Mensual", "monthly", "M", monthly_candles[-60:]))
+    if "W" in required_timeframes:
+        chart_specs.append(("Gráfico Semanal", "weekly", "W", weekly_candles[-104:]))
+    if "D" in required_timeframes:
+        chart_specs.append(("Gráfico Diario", "daily", "D", daily_candles[-180:]))
+    for label, tf_slug, timeframe_code, candles in chart_specs:
         if len(candles) < 3:
             continue
         path = await generator.capture_context_chart(
@@ -3549,8 +3592,10 @@ async def _build_exam_context_gallery(trade: dict, engine_obj, trade_id: str) ->
             gallery.append(
                 {
                     "label": label,
+                    "timeframe": timeframe_code,
                     "path": path,
                     "b64": base64.b64encode(shot_path.read_bytes()).decode(),
+                    "explanation": _exam_context_explanation(timeframe_code),
                 }
             )
         except Exception as exc:
@@ -3706,7 +3751,7 @@ async def generate_exam_report(req: ExamRequest):
                     "b64": base64.b64encode(shot_path.read_bytes()).decode(),
                 }
             )
-        context_gallery = await _build_exam_context_gallery(trade, engine, tid)
+        context_gallery = await _build_exam_context_gallery(trade, engine, tid, style_key)
 
         # Compute derived metrics the mentorship exam wants to see
         _entry = trade.get("entry_price") or 0
@@ -3835,7 +3880,7 @@ async def get_exam_eligible_trades():
             row.get("timeframes_used"),
             style_key,
         )
-        row["exam_required_chart_timeframes"] = ["M", "W"]
+        row["exam_required_chart_timeframes"] = _exam_required_context_timeframes(style_key)
         eligible.append(row)
     eligible.sort(
         key=lambda t: (
@@ -3908,6 +3953,7 @@ def _build_exam_html(trades: list) -> str:
                     f'''
                     <div style="margin-bottom:12px;">
                         <div style="font-size:11px;font-weight:600;color:#86868b;letter-spacing:0.4px;margin-bottom:6px;">{_esc(shot.get("label", "Context"))}</div>
+                        {f'<div style="font-size:12px;color:#6e6e73;line-height:1.6;margin-bottom:8px;">{_esc(shot.get("explanation", ""))}</div>' if shot.get("explanation") else ''}
                         <img src="data:image/png;base64,{shot.get("b64", "")}" style="width:100%;border-radius:12px;display:block;" alt="{_esc(shot.get("label", "Context"))}">
                     </div>'''
                 )

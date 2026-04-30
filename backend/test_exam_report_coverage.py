@@ -1,6 +1,7 @@
 from api.routes import (
     _aggregate_monthly_candles,
     _build_exam_html,
+    _exam_required_context_timeframes,
     _infer_exam_operativa,
     _normalize_exam_direction,
     _normalize_exam_timeframes,
@@ -21,6 +22,10 @@ def test_infer_exam_operativa_from_timeframes():
 def test_normalize_exam_timeframes_falls_back_to_mentoria_plan():
     normalized = _normalize_exam_timeframes([], "swing")
     assert normalized == ["M", "W", "D", "H1"]
+
+
+def test_day_trading_context_requires_daily_chart():
+    assert _exam_required_context_timeframes("day_trading") == ["M", "W", "D"]
 
 
 def test_aggregate_monthly_candles_from_weekly_series():
@@ -70,8 +75,21 @@ def test_build_exam_html_renders_required_exam_fields():
                 "management_notes": "Gestion correcta.",
                 "screenshots_b64": [{"label": "Open", "b64": "ZmFrZQ=="}],
                 "context_charts_b64": [
-                    {"label": "Gráfico Mensual", "b64": "ZmFrZQ=="},
-                    {"label": "Gráfico Semanal", "b64": "ZmFrZQ=="},
+                    {
+                        "label": "Gráfico Mensual",
+                        "b64": "ZmFrZQ==",
+                        "explanation": "Marco macro para ubicar la estructura mayor y las zonas amplias que condicionan la operativa.",
+                    },
+                    {
+                        "label": "Gráfico Semanal",
+                        "b64": "ZmFrZQ==",
+                        "explanation": "Marco estructural para validar el contexto de la semana y las zonas donde tiene sentido buscar el setup.",
+                    },
+                    {
+                        "label": "Gráfico Diario",
+                        "b64": "ZmFrZQ==",
+                        "explanation": "Marco direccional del día para confirmar el sesgo operativo y la ubicación del setup antes de ejecutar.",
+                    },
                 ],
                 "timeframes_used": ["M", "W", "D", "H4", "H1", "M5"],
                 "mentoria_timeframe_plan": {
@@ -100,4 +118,6 @@ def test_build_exam_html_renders_required_exam_fields():
     assert "Long" in html
     assert "Gráfico Mensual" in html
     assert "Gráfico Semanal" in html
+    assert "Gráfico Diario" in html
+    assert "Marco direccional del día" in html
     assert "TEMPORALIDADES" in html

@@ -4,7 +4,8 @@
  *
  *   running, no pause          → green, pulse
  *   news_blackout / cooldown   → amber, static
- *   out_of_hours / friday_*    → gray, static
+ *   weekend / out_of_hours     → gray, static
+ *   friday_close               → gray, static
  *   !running                   → red, slow pulse
  *
  * Tap/hover shows a tooltip with paused_reason_text.
@@ -37,7 +38,7 @@ function classify(state: EngineState | null): DotVariant {
   if (r === 'news_blackout' || r === 'cooldown_after_losses' || r === 'max_trades_reached' || r === 'friday_no_new_trades') {
     return 'warning';
   }
-  if (r === 'out_of_hours' || r === 'friday_close') {
+  if (r === 'weekend_closed' || r === 'out_of_hours' || r === 'friday_close') {
     return 'idle';
   }
   return 'warning';

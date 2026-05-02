@@ -183,6 +183,26 @@ class TestIsMarketOpen:
             assert engine._is_market_open(now) is False
 
 
+class TestEngineStateWeekend:
+    def test_weekend_state_reports_closed_notice(self, engine):
+        """Saturday during normal UTC hours should still show a weekend pause."""
+        engine._running = True
+        engine.news_filter.get_active_and_upcoming.return_value = {
+            "active": None,
+            "next": None,
+        }
+        saturday = datetime(2026, 5, 2, 12, 32, tzinfo=timezone.utc)
+
+        with patch("core.trading_engine.datetime") as mock_datetime:
+            mock_datetime.now.return_value = saturday
+            state = engine.get_engine_state()
+
+        assert state["paused_reason"] == "weekend_closed"
+        assert "Fin de semana" in state["paused_reason_text"]
+        assert state["session"] == "quiet"
+        assert state["resumes_at_utc"].startswith("2026-05-04T07:00:00")
+
+
 # ──────────────────────────────────────────────────────────────────
 # _should_close_friday / _is_friday_no_new_trades
 # ──────────────────────────────────────────────────────────────────

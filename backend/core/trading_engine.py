@@ -4340,15 +4340,23 @@ class TradingEngine:
         except Exception:
             news_state = {"active": None, "next": None}
 
-        session = self._current_session(now, offset)
+        is_weekend = now.weekday() >= 5
+        session = "quiet" if is_weekend else self._current_session(now, offset)
 
         reason: Optional[str] = None
         text = "Activo — escaneando cada 120s"
         resumes_at: Optional[str] = None
 
-        # Priority order: out-of-hours > funded weekend > friday cutoff >
+        # Priority order: weekend > out-of-hours > friday cutoff >
         # news blackout > max trades reached > cooldown after losses
-        if hour < settings.trading_start_hour + offset or hour >= settings.trading_end_hour + offset:
+        if is_weekend:
+            reason = "weekend_closed"
+            text = (
+                "Fin de semana: forex, indices, acciones y commodities estan cerrados. "
+                "Atlas no abre nuevos trades automaticos hasta la siguiente sesion TradingLab."
+            )
+            resumes_at = self._next_trading_open_iso(now, offset)
+        elif hour < settings.trading_start_hour + offset or hour >= settings.trading_end_hour + offset:
             reason = "out_of_hours"
             text = (
                 f"Engine opera {settings.trading_start_hour:02d}:00–"

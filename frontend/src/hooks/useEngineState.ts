@@ -27,6 +27,7 @@ export interface MarketNotice {
 
 export type PausedReason =
   | 'news_blackout'
+  | 'weekend_closed'
   | 'out_of_hours'
   | 'friday_close'
   | 'friday_no_new_trades'

@@ -83,6 +83,15 @@ function reasonCopy(state: EngineState): ReasonCopy | null {
       bg: GRAY_BG,
     };
   }
+  if (reason === 'weekend_closed') {
+    return {
+      icon: 'WKND',
+      title: 'Mercado cerrado',
+      subtitle: `Fin de semana — reanuda el lunes ${resumeAt}`,
+      accent: GRAY_ACCENT,
+      bg: GRAY_BG,
+    };
+  }
   if (reason === 'friday_close') {
     return {
       icon: 'FRI',

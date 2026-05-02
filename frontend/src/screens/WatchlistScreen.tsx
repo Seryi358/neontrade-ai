@@ -233,7 +233,7 @@ export default function WatchlistScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
     padding: 16,
     paddingTop: 24,
   },
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#1d1d1f',
-    letterSpacing: -0.2,
+    letterSpacing: 0,
   },
   scoreBox: {
     alignItems: 'center',

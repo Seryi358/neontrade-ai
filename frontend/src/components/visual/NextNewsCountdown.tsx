@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: theme.colors.textPrimary,
-    letterSpacing: -0.1,
+    letterSpacing: 0,
   },
   stars: {
     fontFamily: theme.fonts.primary,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.heading,
     fontSize: 22,
     fontWeight: '700',
-    letterSpacing: -0.4,
+    letterSpacing: 0,
     fontVariant: ['tabular-nums' as const],
   },
   progressTrack: {

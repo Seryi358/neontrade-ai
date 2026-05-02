@@ -61,6 +61,8 @@ export function HUDCard({
         style,
       ]}
     >
+      <View pointerEvents="none" style={glassStyles.cardTopSheen} />
+      <View pointerEvents="none" style={glassStyles.cardBottomRefraction} />
       {title != null && (
         <Text style={glassStyles.cardTitle}>{title}</Text>
       )}
@@ -499,32 +501,55 @@ export function SubNavPills({ options, activeKey, onSelect }: SubNavPillsProps) 
 const glassStyles = StyleSheet.create({
   // -- HUDCard (Glass Card) -----------------------------------------------
   card: {
-    backgroundColor: theme.colors.backgroundCard,
+    position: 'relative',
+    backgroundColor: 'rgba(255,255,255,0.54)',
     borderRadius: theme.glass.card.borderRadius,
     borderWidth: 1,
-    borderColor: theme.colors.glassBorder,
+    borderColor: 'rgba(255,255,255,0.78)',
     padding: theme.spacing.md + 4,
     marginBottom: theme.spacing.md,
+    overflow: 'hidden',
     // Soft shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.09,
+    shadowRadius: 28,
+    elevation: 8,
     ...(Platform.OS === 'web'
       ? ({
-          backdropFilter: 'blur(32px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(32px) saturate(180%)',
-          boxShadow: '0 16px 40px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.75)',
+          background:
+            'linear-gradient(145deg, rgba(255,255,255,0.70), rgba(255,255,255,0.34) 48%, rgba(255,255,255,0.58))',
+          backdropFilter: 'blur(38px) saturate(205%)',
+          WebkitBackdropFilter: 'blur(38px) saturate(205%)',
+          boxShadow:
+            '0 18px 54px rgba(35,39,50,0.10), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.26)',
         } as any)
       : {}),
+  },
+  cardTopSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 12,
+    right: 12,
+    height: 18,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.42)',
+  },
+  cardBottomRefraction: {
+    position: 'absolute',
+    left: -20,
+    right: -20,
+    bottom: -26,
+    height: 54,
+    borderRadius: 54,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   cardTitle: {
     fontFamily: theme.fonts.semibold,
     fontWeight: '600',
     fontSize: 17,
     color: theme.colors.textPrimary,
-    letterSpacing: -0.2,
+    letterSpacing: 0,
     marginBottom: theme.spacing.sm + 4,
   },
 
@@ -545,7 +570,7 @@ const glassStyles = StyleSheet.create({
     fontFamily: theme.fonts.heading,
     fontWeight: '700',
     fontSize: 34,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
     color: theme.colors.textPrimary,
   },
   headerSubtitle: {

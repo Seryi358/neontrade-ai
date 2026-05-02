@@ -18,8 +18,10 @@ import {
   ScrollView,
   SafeAreaView,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
 import { useFonts } from 'expo-font';
+import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
 import { theme, cssTheme } from './src/theme/apple-glass';
 import EngineDot from './src/components/visual/EngineDot';
 import { useEngineState } from './src/hooks/useEngineState';
@@ -70,7 +72,7 @@ class ErrorBoundary extends React.Component<
 const errorStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
@@ -185,16 +187,21 @@ function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
           {tabs.map((tab, index) => {
             const isActive = index === activeTab;
             return (
-              <Text
+              <TouchableOpacity
                 key={tab.key}
                 style={[
                   subTabStyles.tab,
                   isActive && subTabStyles.tabActive,
                 ]}
                 onPress={() => setActiveTab(index)}
+                activeOpacity={0.72}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
               >
-                {tab.label}
-              </Text>
+                <Text style={[subTabStyles.tabText, isActive && subTabStyles.tabTextActive]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
             );
           })}
           <View style={subTabStyles.engineSlot}>
@@ -209,36 +216,74 @@ function SubTabScreen({ tabs }: { tabs: SubTab[] }) {
 
 const subTabStyles = StyleSheet.create({
   safeArea: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'transparent',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
   bar: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-    paddingHorizontal: 8,
-    paddingTop: 8,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.48)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.78)',
+    borderRadius: 24,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 8,
+    ...(Platform.OS === 'web'
+      ? ({
+          backdropFilter: 'blur(34px) saturate(190%)',
+          WebkitBackdropFilter: 'blur(34px) saturate(190%)',
+          boxShadow:
+            '0 18px 50px rgba(20,22,30,0.10), inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -1px 0 rgba(255,255,255,0.32)',
+        } as any)
+      : {}),
   },
   tab: {
     flex: 1,
-    textAlign: 'center',
-    fontWeight: '600',
-    fontSize: 13,
-    letterSpacing: 0.2,
-    color: '#8E8E93',
-    paddingVertical: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    borderRadius: 20,
   },
   tabActive: {
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow:
+            '0 10px 24px rgba(0,122,255,0.16), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.04)',
+        } as any)
+      : {}),
+  },
+  tabText: {
+    fontFamily: theme.fonts.medium,
+    fontWeight: '600',
+    fontSize: 13,
+    letterSpacing: 0,
+    color: '#7b7d86',
+  },
+  tabTextActive: {
     color: '#007AFF',
-    borderBottomColor: '#007AFF',
   },
   engineSlot: {
-    paddingHorizontal: 10,
+    width: 34,
+    height: 34,
+    marginLeft: 4,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.56)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
   },
 });
 
@@ -281,34 +326,288 @@ function LogScreen() {
 
 // ── Tab Bar Icon ────────────────────────────────────────
 
-const TAB_ICONS: Record<string, string> = {
-  HQ: 'HQ',
-  TRADE: 'TR',
-  MARKET: 'MK',
-  LOG: 'LG',
-  SYS: 'ST',
-};
+function LiquidIcon({ routeName, color }: { routeName: string; color: string }) {
+  const common = {
+    stroke: color,
+    strokeWidth: 2.2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    fill: 'none',
+  };
+  if (routeName === 'Dashboard') {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24">
+        <Path d="M4 11.2 12 4l8 7.2" {...common} />
+        <Path d="M6.6 10.4v8.3h4.1v-5h2.6v5h4.1v-8.3" {...common} />
+      </Svg>
+    );
+  }
+  if (routeName === 'Trade') {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24">
+        <Line x1="6" y1="5" x2="6" y2="19" {...common} />
+        <Rect x="4.1" y="8" width="3.8" height="6.2" rx="1.4" {...common} />
+        <Line x1="13" y1="4" x2="13" y2="20" {...common} />
+        <Rect x="11.1" y="6.2" width="3.8" height="9.8" rx="1.4" {...common} />
+        <Polyline points="17.2 15.8 19.3 13.6 21 15.1" {...common} />
+      </Svg>
+    );
+  }
+  if (routeName === 'Market') {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24">
+        <Rect x="4" y="4" width="6.2" height="6.2" rx="1.6" {...common} />
+        <Rect x="13.8" y="4" width="6.2" height="6.2" rx="1.6" {...common} />
+        <Rect x="4" y="13.8" width="6.2" height="6.2" rx="1.6" {...common} />
+        <Rect x="13.8" y="13.8" width="6.2" height="6.2" rx="1.6" {...common} />
+      </Svg>
+    );
+  }
+  if (routeName === 'Log') {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24">
+        <Path d="M7 4.5h7.2L18 8.3v11.2H7z" {...common} />
+        <Path d="M14.2 4.7v3.8H18" {...common} />
+        <Line x1="9.7" y1="12" x2="15.2" y2="12" {...common} />
+        <Line x1="9.7" y1="15.5" x2="14.2" y2="15.5" {...common} />
+      </Svg>
+    );
+  }
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24">
+      <Circle cx="12" cy="12" r="3.2" {...common} />
+      <Path d="M12 3.8v2.1M12 18.1v2.1M5.2 5.2l1.5 1.5M17.3 17.3l1.5 1.5M3.8 12h2.1M18.1 12h2.1M5.2 18.8l1.5-1.5M17.3 6.7l1.5-1.5" {...common} />
+    </Svg>
+  );
+}
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   return (
-    <Text
+    <View
       style={[
         tabIconStyles.icon,
         {
-          color: focused ? '#007AFF' : '#8E8E93',
+          opacity: focused ? 1 : 0.78,
         },
       ]}
     >
-      {TAB_ICONS[label] || label}
-    </Text>
+      <Text style={[tabIconStyles.legacyText, { color: focused ? '#007AFF' : '#7b7d86' }]}>
+        {label.slice(0, 2)}
+      </Text>
+    </View>
   );
 }
 
 const tabIconStyles = StyleSheet.create({
   icon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legacyText: {
+    fontFamily: theme.fonts.semibold,
     fontSize: 11,
     fontWeight: '700',
-    marginTop: 2,
+  },
+});
+
+function LiquidTabButton({ route, descriptor, navigation, isFocused }: any) {
+  const progress = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(progress, {
+      toValue: isFocused ? 1 : 0,
+      friction: 7,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+  }, [isFocused, progress]);
+
+  const { options } = descriptor;
+  const label =
+    options.tabBarLabel !== undefined
+      ? options.tabBarLabel
+      : options.title !== undefined
+        ? options.title
+        : route.name;
+
+  const onPress = () => {
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: route.key,
+      canPreventDefault: true,
+    });
+
+    if (!isFocused && !event.defaultPrevented) {
+      navigation.navigate(route.name, route.params);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      accessibilityRole="tab"
+      accessibilityState={isFocused ? { selected: true } : {}}
+      accessibilityLabel={options.tabBarAccessibilityLabel}
+      testID={options.tabBarButtonTestID}
+      onPress={onPress}
+      activeOpacity={0.78}
+      style={liquidTabStyles.item}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          liquidTabStyles.selectedLens,
+          {
+            opacity: progress,
+            transform: [
+              {
+                scale: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.82, 1],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          liquidTabStyles.iconWrap,
+          {
+            transform: [
+              {
+                translateY: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [2, -2],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <LiquidIcon routeName={route.name} color={isFocused ? '#007AFF' : '#6f737d'} />
+      </Animated.View>
+      <Text style={[liquidTabStyles.label, isFocused && liquidTabStyles.labelActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function LiquidTabBar({ state, descriptors, navigation }: any) {
+  return (
+    <View style={liquidTabStyles.host} pointerEvents="box-none">
+      <View style={liquidTabStyles.bar}>
+        <View pointerEvents="none" style={liquidTabStyles.edgeGlow} />
+        <View pointerEvents="none" style={liquidTabStyles.bottomLens} />
+        {state.routes.map((route: any, index: number) => (
+          <LiquidTabButton
+            key={route.key}
+            route={route}
+            descriptor={descriptors[route.key]}
+            navigation={navigation}
+            isFocused={state.index === index}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const liquidTabStyles = StyleSheet.create({
+  host: {
+    height: 98,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    justifyContent: 'flex-end',
+  },
+  bar: {
+    minHeight: 76,
+    borderRadius: 40,
+    padding: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.48)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.82)',
+    shadowColor: '#3a4150',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.18,
+    shadowRadius: 34,
+    elevation: 14,
+    overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? ({
+          backdropFilter: 'blur(46px) saturate(210%)',
+          WebkitBackdropFilter: 'blur(46px) saturate(210%)',
+          boxShadow:
+            '0 24px 70px rgba(36,40,52,0.18), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -1px 0 rgba(255,255,255,0.30)',
+        } as any)
+      : {}),
+  },
+  edgeGlow: {
+    position: 'absolute',
+    top: 1,
+    left: 24,
+    right: 24,
+    height: 22,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.58)',
+  },
+  bottomLens: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 4,
+    height: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  item: {
+    flex: 1,
+    minHeight: 62,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  selectedLens: {
+    position: 'absolute',
+    top: 2,
+    left: 3,
+    right: 3,
+    bottom: 2,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.68)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.92)',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 6,
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow:
+            '0 14px 32px rgba(0,122,255,0.16), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.05)',
+        } as any)
+      : {}),
+  },
+  iconWrap: {
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  label: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0,
+    color: '#777b85',
+  },
+  labelActive: {
+    color: '#007AFF',
   },
 });
 
@@ -341,7 +640,7 @@ function BootScreen() {
 const bootStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -406,7 +705,7 @@ export default function App() {
     if (Platform.OS !== 'web') return;
     document.body.style.setProperty(
       'background',
-      'radial-gradient(ellipse at top, #f8f8fb 0%, #ececf3 100%)',
+      'linear-gradient(180deg, #fbfbff 0%, #eef0f7 52%, #f8f8fb 100%)',
     );
     document.body.style.setProperty('min-height', '100vh');
     return () => {
@@ -421,24 +720,16 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <SafeAreaView style={appStyles.shell}>
         <NavigationContainer>
           <StatusBar style="dark" />
           <Tab.Navigator
             detachInactiveScreens
+            tabBar={(props) => <LiquidTabBar {...props} />}
             screenOptions={{
               headerShown: false,
               lazy: true,
               freezeOnBlur: true,
-              tabBarStyle: {
-                backgroundColor: 'rgba(255,255,255,0.92)',
-                borderTopWidth: StyleSheet.hairlineWidth,
-                borderTopColor: 'rgba(0,0,0,0.06)',
-                height: 60,
-                paddingBottom: 6,
-                paddingTop: 6,
-                elevation: 0,
-              },
               tabBarActiveTintColor: '#007AFF',
               tabBarInactiveTintColor: '#8E8E93',
               tabBarLabelStyle: {
@@ -504,3 +795,16 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+const appStyles = StyleSheet.create({
+  shell: {
+    flex: 1,
+    backgroundColor: '#eef0f7',
+    ...(Platform.OS === 'web'
+      ? ({
+          background:
+            'linear-gradient(180deg, #fbfbff 0%, #eef0f7 52%, #f8f8fb 100%)',
+        } as any)
+      : {}),
+  },
+});

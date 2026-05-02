@@ -456,11 +456,11 @@ export default function ManualModeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
   },
   fullScreen: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
   },
 
   // ── Mode Row ───────────────────────────────────────
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#1d1d1f',
-    letterSpacing: -0.3,
+    letterSpacing: 0,
     marginBottom: 4,
   },
 

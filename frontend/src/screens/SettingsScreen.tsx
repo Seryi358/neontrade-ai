@@ -1376,12 +1376,12 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
     padding: 16,
   },
   centered: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -1450,7 +1450,7 @@ const styles = StyleSheet.create({
   modeLabel: {
     fontSize: 22,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   },
   subModeLabel: {
     fontSize: 16,

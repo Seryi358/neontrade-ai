@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     fontSize: 42,
     fontWeight: '700',
     color: theme.colors.textPrimary,
-    letterSpacing: -1,
+    letterSpacing: 0,
     fontVariant: ['tabular-nums' as const],
   },
   scoreUnit: {

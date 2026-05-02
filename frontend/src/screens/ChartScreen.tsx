@@ -1006,7 +1006,7 @@ export default function ChartScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
   },
   scrollContent: {
     flex: 1,

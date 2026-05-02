@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '700',
     color: theme.colors.textPrimary,
-    letterSpacing: -0.4,
+    letterSpacing: 0,
     fontVariant: ['tabular-nums' as const],
   },
   centerLabel: {

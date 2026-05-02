@@ -459,7 +459,7 @@ export default function CryptoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
     paddingHorizontal: 16,
   },
   topPadding: {
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     fontSize: 34,
     color: '#1d1d1f',
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   trendArrow: {
     fontSize: 22,
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#007AFF',
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   },
   allocLabel: {
     fontSize: 11,

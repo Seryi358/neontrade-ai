@@ -5,7 +5,7 @@
  *
  * Design principles:
  * - Translucent glass cards with blur and saturation
- * - Light background (#f2f2f7) with white glass overlays
+ * - Light background (#eef0f7) with white glass overlays
  * - Subtle inner reflections and soft shadows
  * - Apple system colors for status indicators
  * - Generous whitespace, minimal borders
@@ -15,11 +15,11 @@
 export const theme = {
   colors: {
     // Backgrounds (Apple Light Mode)
-    background: '#f2f2f7',          // Apple: systemGroupedBackground
+    background: '#eef0f7',          // Soft content layer behind Liquid Glass
     backgroundDark: '#e5e5ea',      // Apple: systemGray5
     backgroundLight: '#ffffff',     // Apple: systemBackground
-    backgroundCard: 'rgba(255, 255, 255, 0.75)',  // Glass card base
-    backgroundHUD: 'rgba(255, 255, 255, 0.85)',   // Glass card opaque
+    backgroundCard: 'rgba(255, 255, 255, 0.54)',  // Glass card base
+    backgroundHUD: 'rgba(255, 255, 255, 0.68)',   // Glass card opaque
 
     // Primary accent — Apple Blue
     cp2077Yellow: '#007AFF',        // Apple: systemBlue (maps from old cyan primary)
@@ -78,8 +78,8 @@ export const theme = {
     borderMagenta: '#AF52DE',
 
     // Glass borders
-    glassBorder: 'rgba(255, 255, 255, 0.6)',
-    glassBorderSubtle: 'rgba(255, 255, 255, 0.4)',
+    glassBorder: 'rgba(255, 255, 255, 0.78)',
+    glassBorderSubtle: 'rgba(255, 255, 255, 0.56)',
 
     // Chart (Apple-aligned)
     chartBullish: '#34C759',
@@ -134,7 +134,7 @@ export const theme = {
     dataLarge: {
       fontSize: 34,
       fontWeight: '700' as const,
-      letterSpacing: -0.5,
+      letterSpacing: 0,
       fontVariant: ['tabular-nums' as const],
     },
     dataSmall: {
@@ -311,12 +311,12 @@ export const cssTheme = `
     --border: ${theme.colors.border};
     --border-active: ${theme.colors.borderActive};
 
-    --glass-bg: rgba(255, 255, 255, 0.75);
-    --glass-bg-opaque: rgba(255, 255, 255, 0.85);
-    --glass-border: rgba(255, 255, 255, 0.6);
-    --glass-blur: blur(40px) saturate(180%);
-    --glass-shadow: 0 8px 32px rgba(0,0,0,0.06);
-    --glass-inner: inset 0 1px 0 rgba(255,255,255,0.8);
+    --glass-bg: rgba(255, 255, 255, 0.52);
+    --glass-bg-opaque: rgba(255, 255, 255, 0.68);
+    --glass-border: rgba(255, 255, 255, 0.78);
+    --glass-blur: blur(44px) saturate(205%);
+    --glass-shadow: 0 18px 54px rgba(35,39,50,0.10);
+    --glass-inner: inset 0 1px 0 rgba(255,255,255,0.95);
 
     --font-primary: 'SFProDisplay-Regular', -apple-system, 'Helvetica Neue', sans-serif;
     --font-heading: 'SFProDisplay-Bold', -apple-system, 'Helvetica Neue', sans-serif;
@@ -344,24 +344,24 @@ export const cssTheme = `
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     font-weight: 700;
-    letter-spacing: -0.3px;
+    letter-spacing: 0;
     color: var(--text-primary);
   }
 
-  h1 { font-size: 34px; letter-spacing: -0.5px; }
-  h2 { font-size: 28px; letter-spacing: -0.4px; }
-  h3 { font-size: 22px; letter-spacing: -0.3px; }
-  h4, h5, h6 { font-size: 17px; letter-spacing: -0.2px; }
+  h1 { font-size: 34px; letter-spacing: 0; }
+  h2 { font-size: 28px; letter-spacing: 0; }
+  h3 { font-size: 22px; letter-spacing: 0; }
+  h4, h5, h6 { font-size: 17px; letter-spacing: 0; }
 
   /* Liquid Glass Card */
   .glass-card {
-    background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(255,255,255,0.45));
+    background: linear-gradient(145deg, rgba(255,255,255,0.70), rgba(255,255,255,0.34) 48%, rgba(255,255,255,0.58));
     backdrop-filter: blur(40px) saturate(180%);
     -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border: 1px solid rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.78);
     border-radius: var(--radius-xl);
     padding: 20px;
-    box-shadow: var(--glass-shadow), var(--glass-inner);
+    box-shadow: var(--glass-shadow), var(--glass-inner), inset 0 -1px 0 rgba(255,255,255,0.26);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
@@ -395,11 +395,13 @@ export const cssTheme = `
 
   /* Glass Tab Bar */
   .glass-tab-bar {
-    background: rgba(255,255,255,0.75);
-    backdrop-filter: blur(40px) saturate(180%);
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border-top: 1px solid rgba(0,0,0,0.06);
-    padding: 8px 0;
+    background: rgba(255,255,255,0.48);
+    backdrop-filter: blur(46px) saturate(210%);
+    -webkit-backdrop-filter: blur(46px) saturate(210%);
+    border: 1px solid rgba(255,255,255,0.82);
+    border-radius: 40px;
+    padding: 7px;
+    box-shadow: 0 24px 70px rgba(36,40,52,0.18), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -1px 0 rgba(255,255,255,0.30);
   }
 
   /* Apple-style labels */
@@ -407,7 +409,7 @@ export const cssTheme = `
     font-size: 17px;
     font-weight: 600;
     color: var(--text-primary);
-    letter-spacing: -0.2px;
+    letter-spacing: 0;
   }
 
   .label-secondary {
@@ -436,7 +438,7 @@ export const cssTheme = `
     font-size: 34px;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
-    letter-spacing: -0.5px;
+    letter-spacing: 0;
     color: var(--text-primary);
   }
 
@@ -606,8 +608,8 @@ export const cssTheme = `
   }
 
   /* Dark mode backgrounds */
-  body.dark-mode [style*="backgroundColor: #f2f2f7"],
-  body.dark-mode [style*="background-color: #f2f2f7"] {
+  body.dark-mode [style*="backgroundColor: #eef0f7"],
+  body.dark-mode [style*="background-color: #eef0f7"] {
     background-color: #000000 !important;
   }
   body.dark-mode [style*="backgroundColor: #ffffff"],

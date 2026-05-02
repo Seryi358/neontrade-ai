@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.textPrimary,
-    letterSpacing: -0.1,
+    letterSpacing: 0,
   },
   subtitle: {
     fontFamily: theme.fonts.primary,
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     fontVariant: ['tabular-nums' as const],
-    letterSpacing: -0.2,
+    letterSpacing: 0,
   },
   countdownLabel: {
     fontFamily: theme.fonts.primary,

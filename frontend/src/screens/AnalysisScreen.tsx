@@ -664,7 +664,7 @@ export default function AnalysisScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#eef0f7',
   },
   scrollContent: {
     flex: 1,
@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
   strategyName: {
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: 0,
     marginBottom: 16,
   },
   stepsContainer: {

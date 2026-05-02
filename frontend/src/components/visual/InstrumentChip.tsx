@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.textPrimary,
-    letterSpacing: -0.1,
+    letterSpacing: 0,
   },
   scorePill: {
     paddingHorizontal: 6,

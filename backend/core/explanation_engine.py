@@ -341,8 +341,7 @@ class ExplanationEngine:
         return (
             f"Entrada {signal.direction} en {signal.instrument} "
             f"a {signal.entry_price:.5f}. "
-            f"Estrategia: {self.STRATEGY_NAMES.get(signal.strategy.value, signal.strategy.value)}. "
-            f"Confianza: {signal.confidence:.0f}%."
+            f"Estrategia: {self.STRATEGY_NAMES.get(signal.strategy.value, signal.strategy.value)}."
         )
 
     def _build_sl_explanation(self, signal):
@@ -375,9 +374,9 @@ class ExplanationEngine:
             abs(signal.entry_price - signal.stop_loss), 0.00001
         )
         if rr >= 2.0 and signal.confidence >= 75:
-            return f"Riesgo BAJO: R:R favorable ({rr:.1f}:1) con alta confianza ({signal.confidence:.0f}%)."
+            return f"Riesgo BAJO: R:R favorable ({rr:.1f}:1) con checklist técnico completo."
         if rr >= 1.0:
-            return f"Riesgo MEDIO: R:R aceptable ({rr:.1f}:1) con confianza {signal.confidence:.0f}%."
+            return f"Riesgo MEDIO: R:R aceptable ({rr:.1f}:1) con checklist técnico parcial."
         return f"Riesgo ALTO: R:R bajo ({rr:.1f}:1). Considerar no operar."
 
     def _build_recommendation(self, analysis, signal, convergence):
@@ -419,8 +418,7 @@ class ExplanationEngine:
                 f"{bias_label} "
                 f"{explanation.instrument}: "
                 f"Estrategia {explanation.strategy_detected} detectada | "
-                f"Score: {explanation.score:.0f} | "
-                f"Confianza: {explanation.confidence_level}"
+                f"Score: {explanation.score:.0f}"
             )
         return (
             f"{explanation.instrument}: "

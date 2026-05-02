@@ -231,7 +231,7 @@ class AlertManager:
             parts.extend([
                 "",
                 "<b>IA informativa, no decisoria</b>",
-                f"<b>Score IA:</b> {ai_score}/100" if ai_score else "",
+                f"<b>Opinión IA:</b> {_h(ai_recommendation)}" if ai_recommendation else "",
                 _h(ai_reasoning[:400] + ("..." if len(ai_reasoning) > 400 else "")) if ai_reasoning else "",
             ])
         if reasoning:

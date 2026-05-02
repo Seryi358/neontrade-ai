@@ -72,7 +72,7 @@ interface AnalysisExplanation {
 interface AnalysisData {
   instrument: string;
   score: number;
-  confidence: string; // 'ALTA' | 'MEDIA' | 'BAJA'
+  confidence?: string; // Legacy API field; not displayed as a second score.
   htf_trend: string;
   ltf_trend: string;
   convergence: boolean;
@@ -85,15 +85,6 @@ interface AnalysisData {
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-const getConfidenceColor = (confidence: string) => {
-  switch (confidence?.toUpperCase()) {
-    case 'ALTA': return theme.colors.neonGreen;
-    case 'MEDIA': return theme.colors.neonYellow;
-    case 'BAJA': return theme.colors.neonRed;
-    default: return theme.colors.textMuted;
-  }
-};
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
@@ -516,13 +507,12 @@ export default function AnalysisScreen() {
 
   const renderRecommendation = () => {
     if (!analysis?.explanation?.recommendation) return null;
-    const confidenceColor = getConfidenceColor(analysis.confidence);
+    const scoreColor = getScoreColor(analysis.score);
 
     return (
-      <HUDCard accentColor={confidenceColor} borderColor={theme.colors.cp2077Yellow}>
+      <HUDCard accentColor={scoreColor} borderColor={theme.colors.cp2077Yellow}>
         <View style={styles.recommendationHeader}>
           <HUDSectionTitle title="RECOMENDACION" />
-          <HUDBadge label={analysis.confidence || '---'} color={confidenceColor} />
         </View>
         {analysis.htf_trend && (
           <View style={styles.directionBadgeRow}>

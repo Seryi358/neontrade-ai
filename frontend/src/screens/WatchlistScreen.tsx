@@ -26,7 +26,7 @@ import {
   LoadingState,
   ErrorState,
 } from '../components/HUDComponents';
-import StrategyBadge, { ConfidenceBadge } from '../components/StrategyBadge';
+import StrategyBadge from '../components/StrategyBadge';
 import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor, getTrendColor, getTrendIcon } from '../services/api';
 
 interface StrategyChecklistEntry {
@@ -71,12 +71,6 @@ export default function WatchlistScreen() {
     const interval = setInterval(fetchWatchlist, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  const getConfidenceColor = (level?: string) => {
-    if (level === 'ALTA') return theme.colors.neonGreen;
-    if (level === 'MEDIA') return theme.colors.neonYellow;
-    return theme.colors.neonRed;
-  };
 
   const getConvergenceLabel = (item: WatchlistItem): string | null => {
     if (!item.convergence) return null;
@@ -139,9 +133,6 @@ export default function WatchlistScreen() {
         {item.strategy_detected && (
           <View style={styles.strategyRow}>
             <StrategyBadge strategy={item.strategy_detected} size="sm" />
-            {item.confidence_level && (
-              <ConfidenceBadge level={item.confidence_level} />
-            )}
           </View>
         )}
 

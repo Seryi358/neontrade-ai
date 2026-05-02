@@ -88,5 +88,5 @@ def test_setup_reasoning_separates_analysis_quality_from_setup_confidence():
 
     assert "Score de análisis: 75/100" in reasoning
     assert "Calidad del análisis: MEDIA" in reasoning
-    assert "Confianza del setup: 100% (ALTA)" in reasoning
+    assert "Confianza del setup:" not in reasoning
     assert "Nota: BLACK es estrategia CONTRATENDENCIA" in reasoning

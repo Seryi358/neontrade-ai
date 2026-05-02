@@ -1468,7 +1468,7 @@ async def get_risk_config():
         "avoid_news_minutes_after_scalping": getattr(settings, "avoid_news_minutes_after_scalping", 60),
         "strict_mentoria_mode": getattr(settings, "strict_mentoria_mode", True),
         "strict_recent_pink_context_hours": getattr(settings, "strict_recent_pink_context_hours", 72),
-        "auto_hold_qualified_overnight_positions": getattr(settings, "auto_hold_qualified_overnight_positions", True),
+        "auto_hold_qualified_overnight_positions": getattr(settings, "auto_hold_qualified_overnight_positions", False),
         "overnight_fee_rate_estimate": getattr(settings, "overnight_fee_rate_estimate", 0.0003),
         "overnight_fee_min_usd": getattr(settings, "overnight_fee_min_usd", 0.05),
         "overnight_hold_min_open_r": getattr(settings, "overnight_hold_min_open_r", 0.25),
@@ -4232,7 +4232,9 @@ def _build_exam_html(trades: list) -> str:
         rr_planned = t.get("risk_reward_ratio", 0) or 0
         rr_achieved = t.get("rr_achieved", 0) or 0
         risk_dollars = t.get("risk_dollars", 0) or 0
-        confidence = t.get("confidence") or 0
+        canonical_score = 0
+        if t.get("htf_analysis"):
+            canonical_score = int((t["htf_analysis"] or {}).get("score") or 0)
 
         # Screenshot image
         img_html = ""
@@ -4425,8 +4427,8 @@ def _build_exam_html(trades: list) -> str:
                     <div style="font-size:14px;font-weight:600;color:#1d1d1f;">${risk_dollars:,.2f}</div>
                 </div>
                 <div style="background:#f9f9f9;border-radius:10px;padding:10px;text-align:center;">
-                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">CONFIANZA</div>
-                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{(confidence*100 if 0<=confidence<=1 else confidence):.0f}%</div>
+                    <div style="font-size:10px;font-weight:500;color:#aeaeb2;margin-bottom:2px;">SCORE</div>
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">{canonical_score}/100</div>
                 </div>
             </div>
 

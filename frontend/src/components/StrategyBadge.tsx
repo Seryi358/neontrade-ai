@@ -62,19 +62,6 @@ export default function StrategyBadge({ strategy, size = 'md', showLabel = true 
   );
 }
 
-export function ConfidenceBadge({ level }: { level: string }) {
-  const color =
-    level === 'ALTA' ? '#34C759' :
-    level === 'MEDIA' ? '#FF9500' :
-    '#8E8E93';
-
-  return (
-    <View style={[styles.confidenceBadge, { backgroundColor: `${color}14`, borderColor: 'transparent' }]}>
-      <Text style={[styles.confidenceText, { color }]}>{level}</Text>
-    </View>
-  );
-}
-
 export function DirectionBadge({ direction }: { direction: string }) {
   const isBuy = direction === 'BUY';
   return (
@@ -92,16 +79,6 @@ const styles = StyleSheet.create({
   },
   dot: {},
   label: {
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  confidenceBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  confidenceText: {
-    fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.3,
   },

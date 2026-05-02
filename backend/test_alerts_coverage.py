@@ -152,7 +152,8 @@ class TestHighLevelAlerts:
                 ai_score=85, ai_reasoning="Strong trend alignment",
             )
             body = mock.call_args[0][2]
-            assert "85/100" in body
+            assert "IA informativa" in body
+            assert "85/100" not in body
 
     @pytest.mark.asyncio
     async def test_trade_closed_fires(self):

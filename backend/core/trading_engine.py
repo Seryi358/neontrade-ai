@@ -30,7 +30,7 @@ from core.explanation_engine import ExplanationEngine, StrategyExplanation
 from core.news_filter import NewsFilter
 from core.trade_journal import TradeJournal
 from strategies.base import get_best_setup, SetupSignal
-from config import settings, get_active_watchlist
+from config import settings, get_active_watchlist, get_trading_watchlist
 from core.resilience import broker_circuit_breaker
 
 try:
@@ -87,6 +87,7 @@ class PendingSetup:
     confidence: float
     risk_reward_ratio: float
     reasoning: str  # Spanish explanation
+    score: Optional[float] = None  # Canonical public score: AnalysisResult.score
     take_profit_max: Optional[float] = None  # Extended TP for HTF "run" context
     trailing_tp_only: bool = False  # True for crypto GREEN: use EMA 50 trailing, not hard TP1
     strategy_variant: Optional[str] = None  # e.g. "GREEN", "BLUE_A", "RED"
@@ -1139,6 +1140,15 @@ class TradingEngine:
             await self._sync_positions_from_broker()
             await self._handle_auto_overnight_close(now)
 
+        # Funded no-overnight checks must run outside ``market_open`` because
+        # the normal session gate flips false exactly at the configured end.
+        if settings.funded_account_mode and settings.funded_no_overnight:
+            offset = self._dst_offset(now)
+            if now.hour >= settings.trading_end_hour + offset:
+                await self._sync_positions_from_broker()
+                await self._handle_funded_overnight_close()
+                return
+
         if market_open:
             # Check Friday close rule
             if self._should_close_friday(now):
@@ -1146,14 +1156,6 @@ class TradingEngine:
                 # Still manage open positions (trailing stop, BE) for any kept positions
                 await self._manage_open_positions()
                 return
-
-            # Funded account: close all positions at trading_end_hour every day (DST-adjusted)
-            if settings.funded_account_mode and settings.funded_no_overnight:
-                offset = self._dst_offset(now)
-                if now.hour >= settings.trading_end_hour + offset:
-                    await self._sync_positions_from_broker()
-                    await self._handle_funded_overnight_close()
-                    return
 
             # Funded account: close positions before weekend (Friday close, DST-adjusted)
             if settings.funded_account_mode and settings.funded_no_weekend:
@@ -1381,11 +1383,11 @@ class TradingEngine:
         return f"{anchor.isoformat()}::{start:02d}-{end:02d}"
 
     async def _handle_auto_overnight_close(self, now: datetime):
-        """Close non-crypto positions outside the configured trading session.
+        """Close positions outside the configured trading session.
 
         This is the live-account counterpart to funded no-overnight rules:
         keep Atlas trading automatically, but avoid swap / financing exposure
-        on non-crypto instruments when the main session is over.
+        when the main session is over.
         """
         from strategies.base import _is_crypto_instrument
 
@@ -1396,10 +1398,11 @@ class TradingEngine:
         if window_key is None:
             return
 
+        strict_no_overnight = not getattr(settings, "auto_hold_qualified_overnight_positions", False)
         targets = [
             (trade_id, pos)
             for trade_id, pos in list(self.position_manager.positions.items())
-            if not _is_crypto_instrument(pos.instrument)
+            if strict_no_overnight or not _is_crypto_instrument(pos.instrument)
         ]
         if not targets:
             return
@@ -1410,7 +1413,8 @@ class TradingEngine:
         held = 0
         now_iso = datetime.now(timezone.utc).isoformat()
         logger.warning(
-            f"AUTO OVERNIGHT CLOSE: Closing {len(targets)} non-crypto positions outside session"
+            "AUTO OVERNIGHT CLOSE: Closing "
+            f"{len(targets)} {'all' if strict_no_overnight else 'non-crypto'} positions outside session"
         )
         for trade_id, pos in targets:
             try:
@@ -1418,7 +1422,10 @@ class TradingEngine:
                 current_price = (
                     price_data.bid if pos.direction == "BUY" else price_data.ask
                 )
-                keep_overnight, keep_reason = self._qualifies_for_overnight_hold(pos, current_price)
+                keep_overnight = False
+                keep_reason = "strict no-overnight"
+                if not strict_no_overnight:
+                    keep_overnight, keep_reason = self._qualifies_for_overnight_hold(pos, current_price)
                 if keep_overnight:
                     held += 1
                     logger.info(
@@ -2444,9 +2451,10 @@ class TradingEngine:
         except Exception as e:
             logger.warning(f"Initial position sync failed: {e}")
 
-        logger.info(f"Initial scan: analyzing {len(get_active_watchlist())} pairs...")
+        trading_watchlist = get_trading_watchlist()
+        logger.info(f"Initial scan: analyzing {len(trading_watchlist)} executable instruments...")
         setups_found = 0
-        for instrument in get_active_watchlist():
+        for instrument in trading_watchlist:
             try:
                 analysis = await self.market_analyzer.full_analysis(instrument)
                 self._last_scan_results[instrument] = analysis
@@ -2482,7 +2490,7 @@ class TradingEngine:
                     logger.debug(f"WS progress broadcast failed: {e}")
 
         logger.info(
-            f"Initial scan complete: {len(self._last_scan_results)}/{len(get_active_watchlist())} pairs analyzed, "
+            f"Initial scan complete: {len(self._last_scan_results)}/{len(trading_watchlist)} executable instruments analyzed, "
             f"{setups_found} setups detected"
         )
 
@@ -2527,7 +2535,7 @@ class TradingEngine:
 
         # Round-robin scanning: if watchlist is large (>50), scan a batch per tick
         # to stay within scan interval. Each batch covers max 50 instruments.
-        full_watchlist = get_active_watchlist()
+        full_watchlist = get_trading_watchlist()
         max_per_scan = 50
         if len(full_watchlist) > max_per_scan:
             batch_idx = getattr(self, '_scan_batch_idx', 0)
@@ -2777,7 +2785,7 @@ class TradingEngine:
             logger.warning("Scalping: DD limits reached — scalping paused")
             return
 
-        full_watchlist = get_active_watchlist()
+        full_watchlist = get_trading_watchlist()
         max_per_scan = 50
         if len(full_watchlist) > max_per_scan:
             batch_idx = getattr(self, '_scalping_batch_idx', 0)
@@ -3201,18 +3209,11 @@ class TradingEngine:
     ) -> str:
         """Build a Spanish reasoning string for the setup."""
         parts = []
-        setup_confidence = getattr(setup, "_strategy_confidence", 0.0) or min(
-            setup.reward_risk_ratio * 33, 100.0
-        )
         parts.append(f"Instrumento: {setup.instrument}")
         parts.append(f"Dirección: {'COMPRA' if setup.direction == 'BUY' else 'VENTA'}")
         parts.append(f"Score de análisis: {analysis.score:.0f}/100")
         parts.append(f"Sesgo general: {explanation.overall_bias}")
         parts.append(f"Calidad del análisis: {explanation.confidence_level}")
-        parts.append(
-            "Confianza del setup: "
-            f"{setup_confidence:.0f}% ({self._confidence_level_from_pct(setup_confidence)})"
-        )
 
         if explanation.strategy_detected:
             name = self.explanation_engine.STRATEGY_NAMES.get(
@@ -3274,6 +3275,7 @@ class TradingEngine:
             confidence=getattr(setup, '_strategy_confidence', 0.0) or min(setup.reward_risk_ratio * 33, 100.0),
             risk_reward_ratio=setup.reward_risk_ratio,
             reasoning=reasoning,
+            score=(getattr(setup, "_analysis_snapshot", None) or {}).get("score"),
             take_profit_max=setup.take_profit_max,
             trailing_tp_only=setup.trailing_tp_only,
             strategy_variant=setup.strategy_variant,

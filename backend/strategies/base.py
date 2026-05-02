@@ -1094,13 +1094,14 @@ def _count_confluence_points(
         neg_pts += 1
         neg_details.append("Divergencia HTF/LTF")
 
-    # 4. EMA 8 Weekly filter
-    if _check_weekly_ema8_filter(analysis, direction):
-        pos_pts += 1
-        pos_details.append("EMA 8 semanal a favor")
-    else:
-        neg_pts += 1
-        neg_details.append("EMA 8 semanal en contra")
+    # 4. EMA 8 Weekly filter (crypto-only per TradingLab crypto module)
+    if _is_crypto_instrument(getattr(analysis, "instrument", None)):
+        if _check_weekly_ema8_filter(analysis, direction):
+            pos_pts += 1
+            pos_details.append("EMA 8 semanal a favor")
+        else:
+            neg_pts += 1
+            neg_details.append("EMA 8 semanal en contra")
 
     # 5. Fibonacci zone
     fib_ok, _ = _fib_zone_check(analysis, entry_price, direction)
@@ -1311,8 +1312,8 @@ def _check_stop_entry_opportunity(
         confluence_count += 1
         details.append(f"Volumen favorable ({vol_ratio:.1f}x)")
 
-    # EMA 8 Weekly filter
-    if _check_weekly_ema8_filter(analysis, direction):
+    # EMA 8 Weekly filter (crypto-only)
+    if _is_crypto_instrument(getattr(analysis, "instrument", None)) and _check_weekly_ema8_filter(analysis, direction):
         confluence_count += 1
         details.append("EMA 8 semanal a favor")
 

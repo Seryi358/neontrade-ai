@@ -244,9 +244,9 @@ class Settings(BaseSettings):
     # WHITE should come after an actual PINK event in the engine flow, not
     # just pattern resemblance on a single snapshot.
     strict_recent_pink_context_hours: int = 72
-    # Keep overnight positions only when the trade is already protected and
-    # the expected upside justifies financing on the full exposure.
-    auto_hold_qualified_overnight_positions: bool = True
+    # Live small-account rule: no overnight financing exposure until the user
+    # deliberately changes this after recurring profitability.
+    auto_hold_qualified_overnight_positions: bool = False
     overnight_fee_rate_estimate: float = 0.0003  # ~0.03% daily on notional exposure
     overnight_fee_min_usd: float = 0.05
     overnight_hold_min_open_r: float = 0.25
@@ -828,8 +828,8 @@ def get_active_watchlist() -> list:
 
     Returns instruments from forex_watchlist, forex_exotic_watchlist,
     commodities_watchlist, indices_watchlist, equities_watchlist, and
-    crypto_watchlist based on which categories are enabled in
-    active_watchlist_categories.
+    crypto_watchlist based on active_watchlist_categories. If market_view is
+    active, its symbols are included for analysis dashboards only.
     """
     category_map = {
         "forex": settings.forex_watchlist,
@@ -845,6 +845,28 @@ def get_active_watchlist() -> list:
         instruments = category_map.get(cat, [])
         combined.extend(instruments)
     # Deduplicate while preserving order
+    seen = set()
+    result = []
+    for inst in combined:
+        if inst not in seen:
+            seen.add(inst)
+            result.append(inst)
+    return result
+
+
+def get_trading_watchlist() -> list:
+    """Build the executable watchlist, excluding analysis-only categories."""
+    category_map = {
+        "forex": settings.forex_watchlist,
+        "forex_exotic": settings.forex_exotic_watchlist,
+        "commodities": settings.commodities_watchlist,
+        "indices": settings.indices_watchlist,
+        "equities": settings.equities_watchlist,
+        "crypto": settings.crypto_watchlist,
+    }
+    combined = []
+    for cat in settings.active_watchlist_categories:
+        combined.extend(category_map.get(cat, []))
     seen = set()
     result = []
     for inst in combined:
@@ -911,7 +933,7 @@ TRADING_PROFILES = {
             "no_new_trades_friday_hour": 18,
             "strict_mentoria_mode": True,
             "strict_recent_pink_context_hours": 72,
-            "auto_hold_qualified_overnight_positions": True,
+            "auto_hold_qualified_overnight_positions": False,
             "overnight_fee_rate_estimate": 0.0003,
             "overnight_fee_min_usd": 0.05,
             "overnight_hold_min_open_r": 0.25,
@@ -1129,12 +1151,19 @@ def apply_trading_profile(profile_id: str) -> dict:
             setattr(settings, key, value)
             applied[key] = value
 
-    # Persist risk-related settings to data/risk_config.json
+    # Persist runtime settings that must survive container restarts.
     risk_keys = {
         "risk_day_trading", "risk_scalping", "risk_swing", "max_total_risk",
         "correlated_risk_pct", "min_rr_ratio", "move_sl_to_be_pct_to_tp1",
         "drawdown_method", "delta_enabled", "delta_parameter", "delta_max_risk",
         "scale_in_require_be", "min_rr_black", "min_rr_green", "min_rr_blue_c",
+        "active_watchlist_categories", "auto_hold_qualified_overnight_positions",
+        "strict_mentoria_mode", "strict_recent_pink_context_hours",
+        "scalping_enabled", "scalping_blue_mode",
+        "avoid_news_minutes_before", "avoid_news_minutes_after",
+        "avoid_news_minutes_before_scalping", "avoid_news_minutes_after_scalping",
+        "avoid_news_minutes_before_swing", "avoid_news_minutes_after_swing",
+        "crypto_position_mgmt_style", "swing_for_equities",
     }
     risk_updates = {k: v for k, v in applied.items() if k in risk_keys}
     if risk_updates:

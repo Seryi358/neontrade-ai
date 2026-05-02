@@ -777,7 +777,6 @@ class TradeScreenshotGenerator:
             if tp_max is not None:
                 lines.append(f"TP Max: {tp_max:.5g}")
             lines.append(f"R:R  {trade_info.get('rr', 0):.2f}")
-            lines.append(f"Confidence: {trade_info.get('confidence', 0):.0%}")
         elif event == "CLOSE":
             lines = [
                 f"Direction: {trade_info.get('direction', 'N/A')}",
@@ -899,7 +898,6 @@ class TradeScreenshotGenerator:
                 detail_lines.append(f"TP Max:      {tp_max:.5g}")
             detail_lines.extend([
                 f"R:R:         {trade_info.get('rr', 0):.2f}",
-                f"Confidence:  {trade_info.get('confidence', 0):.0%}",
             ])
         elif event == "CLOSE":
             detail_lines = [

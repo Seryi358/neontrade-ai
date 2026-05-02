@@ -27,7 +27,7 @@ import {
   ErrorState,
   EmptyState,
 } from '../components/HUDComponents';
-import { API_URL, authFetch, STRATEGY_COLORS } from '../services/api';
+import { API_URL, authFetch, STRATEGY_COLORS, getScoreColor } from '../services/api';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +42,10 @@ interface PendingSetup {
   take_profit: number;
   units: number;
   confidence: number;
+  score?: number;
+  analysis_snapshot?: {
+    score?: number;
+  };
   risk_reward_ratio: number;
   reasoning: string;
   checklist?: string[];
@@ -55,16 +59,9 @@ const getStrategyDotColor = (color: string): string => {
   return STRATEGY_COLORS[color?.toUpperCase()] || theme.colors.textMuted;
 };
 
-const getConfidenceLabel = (confidence: number): string => {
-  if (confidence >= 75) return 'ALTA';
-  if (confidence >= 50) return 'MEDIA';
-  return 'BAJA';
-};
-
-const getConfidenceColor = (confidence: number): string => {
-  if (confidence >= 75) return theme.colors.neonGreen;
-  if (confidence >= 50) return theme.colors.neonYellow;
-  return theme.colors.neonOrange;
+const getCanonicalScore = (setup: PendingSetup): number | null => {
+  const raw = setup.score ?? setup.analysis_snapshot?.score;
+  return raw == null || isNaN(Number(raw)) ? null : Number(raw);
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -226,8 +223,7 @@ export default function ManualModeScreen() {
     const isRejecting = actionLoading === `reject-${item.id}`;
     const pipMultiplier = getPipMultiplier(item.instrument);
     const stratColor = getStrategyDotColor(item.strategy);
-    const confColor = getConfidenceColor(item.confidence);
-    const confLabel = getConfidenceLabel(item.confidence);
+    const canonicalScore = getCanonicalScore(item);
     const isBuy = item.direction === 'BUY';
 
     const slPips = (Math.abs(item.entry_price - item.stop_loss) * pipMultiplier).toFixed(1);
@@ -235,7 +231,7 @@ export default function ManualModeScreen() {
 
     return (
       <HUDCard accentColor={stratColor}>
-        {/* Header: Strategy badge + Direction + Confidence */}
+        {/* Header: Strategy badge + Direction + canonical score */}
         <View style={styles.setupHeader}>
           <View style={styles.setupHeaderLeft}>
             {/* Strategy badge */}
@@ -252,8 +248,11 @@ export default function ManualModeScreen() {
               small
             />
           </View>
-          {/* Confidence badge */}
-          <HUDBadge label={`${confLabel} (${item.confidence}%)`} color={confColor} small />
+          <HUDBadge
+            label={canonicalScore == null ? 'CHECKLIST' : `SCORE ${canonicalScore.toFixed(0)}`}
+            color={canonicalScore == null ? theme.colors.textMuted : getScoreColor(canonicalScore)}
+            small
+          />
         </View>
 
         {/* Instrument name */}

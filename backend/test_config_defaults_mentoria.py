@@ -185,8 +185,8 @@ class TestStrictMentoriaAndOvernight:
     def test_recent_pink_context_window_is_72_hours(self):
         assert settings.strict_recent_pink_context_hours == 72
 
-    def test_auto_hold_qualified_overnight_positions_enabled(self):
-        assert settings.auto_hold_qualified_overnight_positions is True
+    def test_auto_hold_qualified_overnight_positions_disabled_for_small_live_account(self):
+        assert settings.auto_hold_qualified_overnight_positions is False
 
     def test_overnight_fee_estimate_defaults(self):
         assert settings.overnight_fee_rate_estimate == pytest.approx(0.0003)

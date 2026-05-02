@@ -289,7 +289,7 @@ class TestScalpingScan:
         engine._last_scan_results = {"EUR_USD": MagicMock()}
         engine._check_scalping_dd_limits = MagicMock(return_value=True)
 
-        with patch("core.trading_engine.get_active_watchlist", return_value=["BAD_USD", "EUR_USD"]), \
+        with patch("core.trading_engine.get_trading_watchlist", return_value=["BAD_USD", "EUR_USD"]), \
              patch("core.trading_engine.asyncio.sleep", new=AsyncMock()):
             await engine._scan_scalping_setups()
 

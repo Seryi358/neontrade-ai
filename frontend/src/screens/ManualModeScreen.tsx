@@ -68,6 +68,7 @@ const getCanonicalScore = (setup: PendingSetup): number | null => {
 
 export default function ManualModeScreen() {
   const [setups, setSetups] = useState<PendingSetup[]>([]);
+  const [engineMode, setEngineMode] = useState<'AUTO' | 'MANUAL'>('AUTO');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -77,7 +78,14 @@ export default function ManualModeScreen() {
   const fetchSetups = useCallback(async () => {
     try {
       setError(null);
-      const res = await authFetch(`${API_URL}/api/v1/pending-setups`);
+      const [res, modeRes] = await Promise.all([
+        authFetch(`${API_URL}/api/v1/pending-setups`),
+        authFetch(`${API_URL}/api/v1/mode`).catch(() => null),
+      ]);
+      if (modeRes?.ok) {
+        const modeData = await modeRes.json();
+        setEngineMode(modeData?.mode === 'MANUAL' ? 'MANUAL' : 'AUTO');
+      }
       if (!res.ok) throw new Error('Error al cargar');
       const data = await res.json();
       setSetups(data);
@@ -209,6 +217,11 @@ export default function ManualModeScreen() {
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
   };
+
+  const isAutoMode = engineMode === 'AUTO';
+  const modeColor = isAutoMode ? theme.colors.profit : '#007AFF';
+  const headerTitle = isAutoMode ? 'AUTO EXECUTION' : 'PENDING OPS';
+  const headerSubtitle = isAutoMode ? 'CAPITAL.COM LIVE // AUTOMATIC' : 'MANUAL APPROVAL SYSTEM';
 
   const getPipMultiplier = (instrument: string | null): number => {
     if (!instrument) return 10000;
@@ -358,7 +371,7 @@ export default function ManualModeScreen() {
   if (loading) {
     return (
       <View style={styles.fullScreen}>
-        <HUDHeader title="PENDING OPS // MANUAL" subtitle="TRADE APPROVAL SYSTEM" />
+        <HUDHeader title={headerTitle} subtitle={headerSubtitle} />
         <LoadingState message="Cargando setups..." />
       </View>
     );
@@ -369,7 +382,7 @@ export default function ManualModeScreen() {
   if (error) {
     return (
       <View style={styles.fullScreen}>
-        <HUDHeader title="PENDING OPS // MANUAL" subtitle="TRADE APPROVAL SYSTEM" />
+        <HUDHeader title={headerTitle} subtitle={headerSubtitle} />
         <ErrorState message={error} onRetry={fetchSetups} />
       </View>
     );
@@ -380,13 +393,15 @@ export default function ManualModeScreen() {
   return (
     <View style={styles.container}>
       {/* HUD Header */}
-      <HUDHeader title="PENDING OPS // MANUAL" subtitle="TRADE APPROVAL SYSTEM" />
+      <HUDHeader title={headerTitle} subtitle={headerSubtitle} />
 
       {/* Mode indicator + count */}
       <View style={styles.modeRow}>
         <View style={styles.modeIndicator}>
-          <View style={styles.modeIndicatorDot} />
-          <Text style={styles.modeIndicatorText}>MANUAL ACTIVO</Text>
+          <View style={[styles.modeIndicatorDot, { backgroundColor: modeColor }]} />
+          <Text style={[styles.modeIndicatorText, { color: modeColor }]}>
+            {isAutoMode ? 'AUTO ACTIVO' : 'MANUAL ACTIVO'}
+          </Text>
         </View>
         {setups.length > 0 && (
           <View style={styles.countBadge}>
@@ -441,9 +456,17 @@ export default function ManualModeScreen() {
         </>
       ) : (
         <EmptyState
-          title="No hay operaciones pendientes"
-          subtitle="Cuando Atlas detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion."
-          hint="Cambia al modo MANUAL en Configuracion para aprobar operaciones manualmente."
+          title={isAutoMode ? 'Auto activo' : 'No hay operaciones pendientes'}
+          subtitle={
+            isAutoMode
+              ? 'Sin setups pendientes. Atlas ejecuta automaticamente los setups validos.'
+              : 'Cuando Atlas detecte una oportunidad en modo MANUAL, aparecera aqui para tu aprobacion.'
+          }
+          hint={
+            isAutoMode
+              ? 'Broker Capital.com conectado; la cola manual queda en espera.'
+              : 'Cambia al modo MANUAL en Configuracion para aprobar operaciones manualmente.'
+          }
         />
       )}
     </View>

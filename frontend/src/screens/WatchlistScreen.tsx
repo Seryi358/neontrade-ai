@@ -4,7 +4,7 @@
  * Apple Liquid Glass watchlist.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -54,23 +54,24 @@ export default function WatchlistScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { items: statusItems, refresh: refreshStatus } = useWatchlistStatus(20_000);
 
+  const fetchWatchlist = useCallback(async () => {
+    try {
+      setError(null);
+      const res = await authFetch(`${API_URL}/api/v1/watchlist`);
+      if (!res.ok) throw new Error('Error del servidor');
+      const data = await res.json();
+      setWatchlist(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch watchlist:', err);
+      setError('Error al cargar datos');
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchWatchlist = async () => {
-      try {
-        setError(null);
-        const res = await authFetch(`${API_URL}/api/v1/watchlist`);
-        if (!res.ok) throw new Error('Error del servidor');
-        const data = await res.json();
-        setWatchlist(data);
-      } catch (err) {
-        console.error('Failed to fetch watchlist:', err);
-        setError('Error al cargar datos');
-      }
-    };
     fetchWatchlist();
     const interval = setInterval(fetchWatchlist, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchWatchlist]);
 
   const getConvergenceLabel = (item: WatchlistItem): string | null => {
     if (!item.convergence) return null;
@@ -167,9 +168,8 @@ export default function WatchlistScreen() {
     </TouchableOpacity>
   );
 
-  return (
-    <View style={styles.container}>
-      {/* Header stats */}
+  const renderListHeader = () => (
+    <>
       <HUDCard accentColor={theme.colors.neonCyan}>
         <View style={styles.headerStatsRow}>
           <View style={styles.headerStat}>
@@ -197,21 +197,31 @@ export default function WatchlistScreen() {
           ))}
         </View>
       )}
+    </>
+  );
 
-      {/* Instrument list */}
+  return (
+    <View style={styles.container}>
       <FlatList
         data={watchlist}
         keyExtractor={(item) => item.instrument}
         renderItem={renderItem}
+        ListHeaderComponent={renderListHeader}
         style={styles.list}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        scrollEnabled
+        nestedScrollEnabled
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={async () => {
               setRefreshing(true);
-              await refreshStatus();
-              setRefreshing(false);
+              try {
+                await Promise.all([fetchWatchlist(), refreshStatus()]);
+              } finally {
+                setRefreshing(false);
+              }
             }}
             tintColor="#007AFF"
           />
@@ -225,11 +235,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#eef0f7',
-    padding: 16,
-    paddingTop: 24,
   },
   list: {
     flex: 1,
+  },
+  listContent: {
+    padding: 16,
+    paddingTop: 24,
+    paddingBottom: 132,
   },
   // Top row
   topRow: {

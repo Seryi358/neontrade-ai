@@ -295,7 +295,7 @@ function TradeScreen() {
       tabs={[
         { key: 'analysis', label: 'Scan', component: AnalysisScreen },
         { key: 'chart', label: 'Chart', component: ChartScreen },
-        { key: 'manual', label: 'Manual', component: ManualModeScreen },
+        { key: 'queue', label: 'Queue', component: ManualModeScreen },
       ]}
     />
   );

@@ -544,10 +544,11 @@ describe('JournalScreen', () => {
 // ─────────────────────────────────────────────────────────────────
 
 describe('ManualModeScreen', () => {
-  it('renders the manual mode header', async () => {
+  it('renders the auto execution header', async () => {
     const { getByText } = render(<ManualModeScreen />);
     await waitFor(() => {
-      expect(getByText('PENDING OPS // MANUAL')).toBeTruthy();
+      expect(getByText('AUTO EXECUTION')).toBeTruthy();
+      expect(getByText('AUTO ACTIVO')).toBeTruthy();
     });
   });
 
@@ -586,7 +587,7 @@ describe('ManualModeScreen', () => {
     setupFetchMock({ '/api/v1/pending-setups': [] });
     const { getByText } = render(<ManualModeScreen />);
     await waitFor(() => {
-      expect(getByText(/No hay operaciones pendientes/)).toBeTruthy();
+      expect(getByText(/Auto activo/)).toBeTruthy();
     });
   });
 });

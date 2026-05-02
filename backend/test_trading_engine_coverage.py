@@ -671,3 +671,74 @@ class TestPresessionChecklist:
         assert "emocional" in result
         assert "calendario económico" in result
         assert "respiraciones" in result
+
+
+class TestEmailSchedule:
+    def _prepare_email_engine(self, engine):
+        engine._email_schedule_state = {}
+        engine._save_email_schedule_state = MagicMock()
+        engine.alert_manager = MagicMock()
+        engine.alert_manager.send_alert = AsyncMock()
+        engine.position_manager.positions = {}
+        engine._last_scan_results = {"EUR_USD": MagicMock()}
+        engine.broker.get_account_summary = AsyncMock(
+            return_value=type("Account", (), {"balance": 183.69, "currency": "USD"})()
+        )
+        return engine
+
+    @pytest.mark.asyncio
+    async def test_weekend_status_sends_once_after_target_hour(self, engine):
+        """Weekend status should be sent once and skip NY checklist."""
+        engine = self._prepare_email_engine(engine)
+        saturday = datetime(2026, 5, 2, 13, 30, tzinfo=timezone.utc)
+
+        await engine._maybe_send_morning_heartbeat(saturday)
+        await engine._maybe_send_morning_heartbeat(saturday.replace(hour=15))
+
+        assert engine.alert_manager.send_alert.await_count == 1
+        args = engine.alert_manager.send_alert.await_args.args
+        assert args[0] == "engine_status"
+        assert "Mercado cerrado" in args[1]
+        assert "no abre nuevos trades automaticos" in args[2]
+        assert engine._email_schedule_state["daily_status"] == "2026-05-02"
+        assert "ny_checklist" not in engine._email_schedule_state
+
+    @pytest.mark.asyncio
+    async def test_weekday_catches_up_morning_and_ny_checklists(self, engine):
+        """If the exact target minutes are missed, send pending weekday emails."""
+        engine = self._prepare_email_engine(engine)
+        monday = datetime(2026, 5, 4, 14, 5, tzinfo=timezone.utc)
+
+        await engine._maybe_send_morning_heartbeat(monday)
+
+        assert engine.alert_manager.send_alert.await_count == 2
+        subjects = [call.args[1] for call in engine.alert_manager.send_alert.await_args_list]
+        assert any("Morning Heartbeat" in subject for subject in subjects)
+        assert any("Checklist Sesión New York" in subject for subject in subjects)
+        assert engine._email_schedule_state["daily_status"] == "2026-05-04"
+        assert engine._email_schedule_state["ny_checklist"] == "2026-05-04"
+
+    def test_daily_summary_queues_once_after_weekday_close(self, engine):
+        """Daily summary should catch up after close and avoid duplicates."""
+        engine._email_schedule_state = {}
+        engine._save_email_schedule_state = MagicMock()
+        engine._spawn_bg = MagicMock(side_effect=lambda coro, **_: coro.close())
+        monday_close = datetime(2026, 5, 4, 21, 30, tzinfo=timezone.utc)
+
+        engine._maybe_send_daily_summary(monday_close, offset=0)
+        engine._maybe_send_daily_summary(monday_close.replace(hour=22), offset=0)
+
+        engine._spawn_bg.assert_called_once()
+        assert engine._email_schedule_state["daily_summary"] == "2026-05-04"
+
+    def test_daily_summary_skips_weekends(self, engine):
+        """Weekend status email replaces trading-day daily summary."""
+        engine._email_schedule_state = {}
+        engine._save_email_schedule_state = MagicMock()
+        engine._spawn_bg = MagicMock(side_effect=lambda coro, **_: coro.close())
+        saturday = datetime(2026, 5, 2, 21, 30, tzinfo=timezone.utc)
+
+        engine._maybe_send_daily_summary(saturday, offset=0)
+
+        engine._spawn_bg.assert_not_called()
+        assert "daily_summary" not in engine._email_schedule_state

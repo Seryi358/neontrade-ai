@@ -264,6 +264,8 @@ class TradingEngine:
         self._notifications: List[Dict] = []
         self._max_notifications = 100
         self._notifications_path = os.path.join("data", "notifications.json")
+        self._email_schedule_state_path = os.path.join("data", "email_schedule_state.json")
+        self._email_schedule_state: Dict[str, str] = self._load_email_schedule_state()
         try:
             if os.path.exists(self._notifications_path):
                 with open(self._notifications_path) as f:
@@ -613,6 +615,46 @@ class TradingEngine:
         for n in unread:
             n["read"] = True
         return unread
+
+    def _load_email_schedule_state(self) -> Dict[str, str]:
+        """Load persisted once-per-day email sent markers."""
+        try:
+            if os.path.exists(self._email_schedule_state_path):
+                with open(self._email_schedule_state_path) as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    return {str(k): str(v) for k, v in loaded.items()}
+        except Exception as e:
+            logger.warning(f"Could not load email schedule state: {e}")
+        return {}
+
+    def _save_email_schedule_state(self) -> None:
+        """Persist email sent markers so deploys do not duplicate messages."""
+        try:
+            import tempfile
+
+            os.makedirs(os.path.dirname(self._email_schedule_state_path), exist_ok=True)
+            d = os.path.dirname(self._email_schedule_state_path)
+            fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(self._email_schedule_state, f, indent=2, sort_keys=True)
+                os.replace(tmp, self._email_schedule_state_path)
+            except Exception:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                raise
+        except Exception as e:
+            logger.warning(f"Could not persist email schedule state: {e}")
+
+    def _email_sent_today(self, key: str, now: datetime) -> bool:
+        return self._email_schedule_state.get(key) == now.date().isoformat()
+
+    def _mark_email_sent_today(self, key: str, now: datetime) -> None:
+        self._email_schedule_state[key] = now.date().isoformat()
+        self._save_email_schedule_state()
 
     # ── Strategy Selection ────────────────────────────────────────
 
@@ -1115,15 +1157,13 @@ class TradingEngine:
         # Always expire old pending setups
         self._expire_old_setups()
 
-        # Morning heartbeat email (proof of life)
+        # Daily status/checklist emails (proof of life, catch-up safe)
         await self._maybe_send_morning_heartbeat(now)
 
-        # Daily summary: send at end of trading day (21:00 UTC EDT = trading_end_hour) once
+        # Daily summary: send at/after end of trading day once, even if the
+        # engine missed the exact minute because of deploys/restarts.
         offset = self._dst_offset(now)
-        if now.hour == settings.trading_end_hour + offset and now.minute < 10:
-            if not hasattr(self, '_daily_summary_sent_date') or self._daily_summary_sent_date != now.date():
-                self._daily_summary_sent_date = now.date()
-                self._spawn_bg(self._send_daily_summary(), name="send_daily_summary")
+        self._maybe_send_daily_summary(now, offset)
 
         # Monthly ASR (After Session Review) on the 1st at ~08:00 UTC
         await self._maybe_send_monthly_asr(now)
@@ -4089,26 +4129,96 @@ class TradingEngine:
 
     async def _maybe_send_morning_heartbeat(self, now: datetime):
         """
-        Send a 'proof of life' email at ~8:00 UTC (3am Colombia) every day,
-        including the pre-session psychological checklist (Psychology Manual).
-        Also sends a NY session checklist at ~13:00 UTC.
-        """
-        # ── Morning heartbeat at 08:00 UTC ──
-        if now.hour == 8 and now.minute < 3:
-            if not (hasattr(self, '_heartbeat_sent_date') and self._heartbeat_sent_date == now.date()):
-                self._heartbeat_sent_date = now.date()
-                await self._send_heartbeat_with_checklist(now, "Mañana / London Open")
+        Send once-per-day proof-of-life emails after their target time.
 
-        # ── NY session checklist at 13:00 UTC ──
-        if now.hour == 13 and now.minute < 3:
-            if not (hasattr(self, '_ny_checklist_sent_date') and self._ny_checklist_sent_date == now.date()):
-                self._ny_checklist_sent_date = now.date()
-                await self._send_presession_checklist_alert(now, "Sesión New York")
+        This is intentionally catch-up based, not minute-window based: deploys,
+        broker retries, or a 120s tick drift must not make Atlas miss the only
+        daily email. Sent markers are persisted to data/email_schedule_state.json
+        so restarts do not duplicate messages.
+        """
+        is_weekend = now.weekday() >= 5
+
+        # Daily status after 08:00 UTC. On weekends, send a closed-market status
+        # instead of a pre-session checklist because no automatic trades should
+        # be opened.
+        if now.hour >= 8 and not self._email_sent_today("daily_status", now):
+            if is_weekend:
+                sent = await self._send_weekend_market_closed_status(now)
+            else:
+                sent = await self._send_heartbeat_with_checklist(now, "Mañana / London Open")
+            if sent:
+                self._mark_email_sent_today("daily_status", now)
+
+        # NY checklist after 13:00 UTC, weekdays only. If the target minute was
+        # missed, send it late rather than silently skipping the day.
+        if (
+            not is_weekend
+            and now.hour >= 13
+            and not self._email_sent_today("ny_checklist", now)
+        ):
+            sent = await self._send_presession_checklist_alert(now, "Sesión New York")
+            if sent:
+                self._mark_email_sent_today("ny_checklist", now)
+
+    def _maybe_send_daily_summary(self, now: datetime, offset: int) -> None:
+        """Queue the weekday daily summary once after the trading day closes."""
+        if now.weekday() >= 5:
+            return
+        if now.hour < settings.trading_end_hour + offset:
+            return
+        if self._email_sent_today("daily_summary", now):
+            return
+        self._mark_email_sent_today("daily_summary", now)
+        self._spawn_bg(self._send_daily_summary(), name="send_daily_summary")
+
+    async def _send_weekend_market_closed_status(self, now: datetime) -> bool:
+        """Send the weekend closed-market status email."""
+        if not self.alert_manager:
+            return False
+
+        try:
+            account = None
+            try:
+                account = await self.broker.get_account_summary()
+            except Exception:
+                pass
+
+            offset = self._dst_offset(now)
+            next_open = self._next_trading_open_iso(now, offset)
+            balance_str = f"{account.balance:.2f} {account.currency}" if account else "N/A"
+            open_positions = len(self.position_manager.positions)
+            pairs_analyzed = len(self._last_scan_results)
+            mode = self.mode.value.upper()
+
+            body = (
+                f"<b>Mercado cerrado por fin de semana.</b>\n\n"
+                f"<b>Balance:</b> {balance_str}\n"
+                f"<b>Mode:</b> {mode}\n"
+                f"<b>Open Positions:</b> {open_positions}\n"
+                f"<b>Pairs Watched:</b> {len(get_active_watchlist())}\n"
+                f"<b>Pairs Analyzed:</b> {pairs_analyzed}\n"
+                f"<b>Next Session:</b> {next_open}\n\n"
+                f"Atlas esta activo, pero no abre nuevos trades automaticos en sabado/domingo. "
+                f"Forex, indices, acciones y commodities quedan bloqueados hasta la siguiente "
+                f"sesion TradingLab. Crypto puede mostrar precios, pero el motor mantiene el "
+                f"bloqueo de fin de semana para evitar ejecucion desatendida y gaps."
+            )
+
+            await self.alert_manager.send_alert(
+                "engine_status",
+                f"Atlas - Mercado cerrado ({now.strftime('%Y-%m-%d')})",
+                body,
+            )
+            logger.info("Weekend market-closed status email sent")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to send weekend market-closed status: {e}")
+            return False
 
     async def _send_heartbeat_with_checklist(self, now: datetime, session_label: str):
         """Send the morning heartbeat email with pre-session checklist."""
         if not self.alert_manager:
-            return
+            return False
 
         try:
             # Gather status info
@@ -4145,14 +4255,16 @@ class TradingEngine:
                 body,
             )
             logger.info("Morning heartbeat email sent (with pre-session checklist)")
+            return True
         except Exception as e:
             logger.warning(f"Failed to send morning heartbeat: {e}")
+            return False
 
     async def _send_presession_checklist_alert(self, now: datetime, session_label: str):
         """Send a pre-session checklist notification before NY session (13:00 UTC).
         Psychology Manual: checklist both in the morning AND before NY session."""
         if not self.alert_manager:
-            return
+            return False
 
         try:
             open_positions = len(self.position_manager.positions)
@@ -4171,8 +4283,10 @@ class TradingEngine:
                 body,
             )
             logger.info(f"Pre-session checklist sent for {session_label}")
+            return True
         except Exception as e:
             logger.warning(f"Failed to send pre-session checklist: {e}")
+            return False
 
     # ── Status ───────────────────────────────────────────────────
 

@@ -5,7 +5,8 @@ Checks for upcoming high/medium-impact economic events to avoid trading during n
 Data sources (in priority order):
   1. FairEconomy  - Free ForexFactory calendar mirror (primary, no API key needed)
   2. Trading Economics - Free calendar scraping (secondary fallback)
-  3. Known recurring events - Hard-coded NFP/CPI schedule (final fallback)
+  3. Finnhub - API-key fallback when configured
+  4. Known recurring events - Hard-coded NFP/CPI schedule (final fallback)
 
 Supplementary:
   - NewsAPI.org - Forex news headlines for the UI (does NOT block trades)
@@ -132,6 +133,42 @@ _FAIRECONOMY_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.jso
 _FE_HIGH_IMPACT = {"High"}
 _FE_MEDIUM_IMPACT = {"Medium"}
 
+_FINNHUB_IMPACT_MAP = {
+    1: "low",
+    2: "medium",
+    3: "high",
+    "1": "low",
+    "2": "medium",
+    "3": "high",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+}
+
+_COUNTRY_TO_CURRENCY = {
+    "US": "USD",
+    "USA": "USD",
+    "UNITED STATES": "USD",
+    "EU": "EUR",
+    "EMU": "EUR",
+    "EA": "EUR",
+    "EURO AREA": "EUR",
+    "EUROZONE": "EUR",
+    "GB": "GBP",
+    "UK": "GBP",
+    "UNITED KINGDOM": "GBP",
+    "JP": "JPY",
+    "JAPAN": "JPY",
+    "AU": "AUD",
+    "AUSTRALIA": "AUD",
+    "NZ": "NZD",
+    "NEW ZEALAND": "NZD",
+    "CA": "CAD",
+    "CANADA": "CAD",
+    "CH": "CHF",
+    "SWITZERLAND": "CHF",
+}
+
 
 class NewsFilter:
     """Checks for upcoming high-impact news events.
@@ -160,6 +197,7 @@ class NewsFilter:
         self.minutes_before = minutes_before if minutes_before is not None else default_before
         self.minutes_after = minutes_after if minutes_after is not None else default_after
 
+        self.finnhub_key = finnhub_key
         self.newsapi_key = newsapi_key
         self._cached_events: List[NewsEvent] = []
         self._cache_date: Optional[str] = None
@@ -498,7 +536,18 @@ class NewsFilter:
         except Exception as e:
             logger.warning(f"Trading Economics calendar fetch failed: {e}")
 
-        # 3) DISK CACHE: reuse the last successful fetch if it's fresh.
+        # 3) FINNHUB: API-key fallback configured in EasyPanel.
+        try:
+            events = await self._fetch_from_finnhub(now)
+            if events:
+                self._cached_events = events
+                self._save_calendar_to_disk(events, now)
+                logger.info(f"Loaded {len(events)} news events from Finnhub for today")
+                return
+        except Exception as e:
+            logger.warning(f"Finnhub calendar fetch failed: {e}")
+
+        # 4) DISK CACHE: reuse the last successful fetch if it's fresh.
         disk_events = self._load_calendar_from_disk(now)
         if disk_events:
             self._cached_events = disk_events
@@ -508,7 +557,7 @@ class NewsFilter:
             )
             return
 
-        # 4) FINAL FALLBACK: known recurring high-impact schedule
+        # 5) FINAL FALLBACK: known recurring high-impact schedule
         self._cached_events = self._generate_known_events(now)
         logger.warning(
             f"External news sources AND disk cache unavailable — using "
@@ -725,7 +774,89 @@ class NewsFilter:
         return events
 
     # ------------------------------------------------------------------
-    # Source 3: Known recurring events (final fallback)
+    # Source 3: Finnhub (API-key fallback)
+    # ------------------------------------------------------------------
+
+    async def _fetch_from_finnhub(self, now: datetime) -> List[NewsEvent]:
+        """Fetch today's economic calendar from Finnhub when configured."""
+        if not self.finnhub_key:
+            return []
+
+        today = now.strftime("%Y-%m-%d")
+        resp = await self._http.get(
+            "https://finnhub.io/api/v1/calendar/economic",
+            params={
+                "from": today,
+                "to": today,
+                "token": self.finnhub_key,
+            },
+        )
+        if resp.status_code != 200:
+            logger.debug(f"Finnhub calendar returned status {resp.status_code}")
+            return []
+
+        raw_events = resp.json().get("economicCalendar", [])
+        events: List[NewsEvent] = []
+        for item in raw_events:
+            impact = _FINNHUB_IMPACT_MAP.get(item.get("impact"), "low")
+            if impact not in ("medium", "high"):
+                continue
+
+            currency = self._normalize_currency(
+                item.get("currency") or item.get("country") or ""
+            )
+            if currency not in WATCHED_CURRENCIES:
+                continue
+
+            event_time = self._parse_finnhub_time(item, today)
+            if not event_time or event_time.date() != now.date():
+                continue
+
+            events.append(NewsEvent(
+                time=event_time,
+                currency=currency,
+                impact=impact,
+                title=item.get("event", "Unknown"),
+            ))
+
+        return events
+
+    @staticmethod
+    def _normalize_currency(value: str) -> str:
+        key = str(value or "").strip().upper()
+        if key in WATCHED_CURRENCIES:
+            return key
+        return _COUNTRY_TO_CURRENCY.get(key, key)
+
+    @staticmethod
+    def _parse_finnhub_time(item: dict, today: str) -> Optional[datetime]:
+        date_part = str(item.get("date") or today).strip()[:10]
+        time_part = str(item.get("time") or "").strip()
+        candidates = []
+        if time_part:
+            candidates.extend([
+                f"{date_part} {time_part}",
+                f"{date_part}T{time_part}",
+            ])
+        candidates.append(date_part)
+
+        for raw in candidates:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+            try:
+                parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    return parsed.replace(tzinfo=timezone.utc)
+                return parsed.astimezone(timezone.utc)
+            except ValueError:
+                continue
+        return None
+
+    # ------------------------------------------------------------------
+    # Source 4: Known recurring events (final fallback)
     # ------------------------------------------------------------------
 
     def _generate_known_events(self, now: datetime) -> List[NewsEvent]:

@@ -102,6 +102,49 @@ async def test_failed_fetch_reuses_recent_disk_cache(tmp_cache):
 
 
 @pytest.mark.asyncio
+async def test_finnhub_fallback_is_used_when_free_sources_are_empty(tmp_cache):
+    """When configured, Finnhub is used before disk/recurring fallbacks."""
+    nf = NewsFilter(trading_style=TradingStyle.DAY_TRADING, finnhub_key="test-key")
+    now = datetime(2026, 5, 1, 12, 0, tzinfo=timezone.utc)
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {
+                "economicCalendar": [
+                    {
+                        "date": "2026-05-01",
+                        "time": "13:30:00",
+                        "country": "US",
+                        "impact": 3,
+                        "event": "Non-Farm Payrolls",
+                    },
+                    {
+                        "date": "2026-05-01",
+                        "time": "14:00:00",
+                        "country": "US",
+                        "impact": 1,
+                        "event": "Low impact event",
+                    },
+                ]
+            }
+
+    with patch.object(nf, "_fetch_from_faireconomy", new=AsyncMock(return_value=[])):
+        with patch.object(nf, "_fetch_from_trading_economics", new=AsyncMock(return_value=[])):
+            with patch.object(nf._http, "get", new=AsyncMock(return_value=Response())):
+                await nf._refresh_calendar(now)
+
+    assert len(nf._cached_events) == 1
+    assert nf._cached_events[0].currency == "USD"
+    assert nf._cached_events[0].impact == "high"
+    assert nf._cached_events[0].title == "Non-Farm Payrolls"
+    assert tmp_cache.exists()
+
+    await nf.close()
+
+
+@pytest.mark.asyncio
 async def test_failed_fetch_ignores_stale_disk_cache(tmp_cache):
     """Disk cache >48h old must NOT be used; fall back to recurring events."""
     nf = NewsFilter(trading_style=TradingStyle.DAY_TRADING)

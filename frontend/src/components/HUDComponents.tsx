@@ -26,6 +26,7 @@ import {
   ViewStyle,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { theme } from '../theme/apple-glass';
 
@@ -510,6 +511,13 @@ const glassStyles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 16,
     elevation: 4,
+    ...(Platform.OS === 'web'
+      ? ({
+          backdropFilter: 'blur(32px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.75)',
+        } as any)
+      : {}),
   },
   cardTitle: {
     fontFamily: theme.fonts.semibold,

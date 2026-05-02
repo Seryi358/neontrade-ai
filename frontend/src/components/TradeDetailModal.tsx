@@ -121,13 +121,13 @@ export default function TradeDetailModal({ tradeId, onClose }: Props) {
 
   if (!tradeId) return null;
 
-  const strategy = (history?.strategy_variant || journal?.strategy || history?.strategy || '—').toUpperCase();
+  const strategy = (history?.strategy_variant || journal?.strategy || history?.strategy || 'N/A').toUpperCase();
   const dotColor = STRATEGY_COLORS[strategy] || theme.colors.textMuted;
   const pnl = history?.pnl ?? journal?.pnl_dollars ?? 0;
   const pnlPositive = pnl >= 0;
 
   const asrRow = (label: string, val: boolean | null | undefined) => {
-    const sym = val === true ? '✓' : val === false ? '✗' : '—';
+    const sym = val === true ? 'OK' : val === false ? 'NO' : 'N/A';
     const color = val === true ? theme.colors.profit : val === false ? theme.colors.loss : theme.colors.textMuted;
     return (
       <View style={styles.asrRow} key={label}>
@@ -150,7 +150,7 @@ export default function TradeDetailModal({ tradeId, onClose }: Props) {
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+              <Text style={styles.closeBtnText}>X</Text>
             </TouchableOpacity>
           </View>
 

@@ -79,7 +79,7 @@ export function DirectionBadge({ direction }: { direction: string }) {
   const isBuy = direction === 'BUY';
   return (
     <Text style={[styles.direction, { color: isBuy ? theme.colors.profit : theme.colors.loss }]}>
-      {isBuy ? '▲ COMPRA' : '▼ VENTA'}
+      {isBuy ? 'COMPRA' : 'VENTA'}
     </Text>
   );
 }

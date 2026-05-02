@@ -1,6 +1,6 @@
 """
 Atlas - Configuration
-Multi-broker Trading System powered by TradingLab Strategies
+Capital.com Trading System powered by TradingLab Strategies
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,15 +10,8 @@ import os
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    # Active broker: "ibkr" or "capital" (OANDA removed — out of scope per PROJECT.md)
+    # Capital.com is the only live broker supported by this deployment.
     active_broker: str = "capital"
-
-    # Interactive Brokers (IBKR) - Web API OAuth 1.0a
-    ibkr_consumer_key: str = ""
-    ibkr_access_token: str = ""
-    ibkr_access_token_secret: str = ""
-    ibkr_keys_dir: str = "keys"  # directory with PEM files
-    ibkr_environment: str = "live"  # "live" or "paper"
 
     # Capital.com
     capital_api_key: str = ""
@@ -43,17 +36,7 @@ class Settings(BaseSettings):
     finnhub_api_key: str = ""
     newsapi_key: str = ""
 
-    # Alert channels
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
-    discord_webhook_url: str = ""
-    alert_email_smtp_server: str = "smtp.gmail.com"
-    alert_email_smtp_port: int = 587
-    alert_email_username: str = ""
-    alert_email_password: str = ""
-    alert_email_recipient: str = ""
-
-    # Gmail OAuth2 (preferred over SMTP for Gmail)
+    # Gmail OAuth2 notifications
     gmail_sender: str = ""
     gmail_recipient: str = ""
     gmail_client_id: str = ""
@@ -431,7 +414,7 @@ class Settings(BaseSettings):
     # Equities — US sector ETFs for swing trading (from mentorship course materials)
     # TradingLab: use sector ETFs to detect opportunities, then drill into holdings.
     # Alex: "yo enfoco el trading en acciones como swing trading en acciones de EEUU"
-    # Available only via IBKR (not Oanda/Capital.com).
+    # Kept to mirror TradingLab sector workflows where Capital.com offers an equivalent market.
     equities_watchlist: List[str] = [
         # Cleaned 2026-04-23: removed 16 ETFs not offered by Capital.com
         # under any equivalent epic (verified live via /admin/search-markets):

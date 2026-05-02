@@ -22,8 +22,8 @@
     "test:coverage": "jest --coverage"
   },
   "build": {
-    "appId": "com.phinodia.neontrade",
-    "productName": "NeonTrade AI",
+    "appId": "com.phinodia.atlas",
+    "productName": "Atlas",
     "directories": {
       "output": "builds"
     },

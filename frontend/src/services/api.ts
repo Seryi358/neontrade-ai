@@ -9,13 +9,37 @@
 // or Electron env variable for other setups.
 const DEFAULT_URL = 'http://localhost:8000';
 
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function isLocalHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
 function getBaseUrl(): string {
-  // 1. Check localStorage for user-configured remote URL
+  let sameOriginBase = '';
+  let pageIsRemoteHttp = false;
+  if (typeof window !== 'undefined' && window.location) {
+    const { hostname, protocol, port } = window.location;
+    pageIsRemoteHttp = (protocol === 'http:' || protocol === 'https:') && !isLocalHost(hostname);
+    if (pageIsRemoteHttp) {
+      sameOriginBase = `${protocol}//${hostname}${port ? ':' + port : ''}`;
+    }
+  }
+
+  // 1. Check localStorage for user-configured URL. On deployed web builds,
+  // ignore stale localhost values that would point at the visitor's browser.
   if (typeof window !== 'undefined') {
     try {
       const saved = window.localStorage.getItem('atlas_backend_url');
-      if (saved && saved.startsWith('http')) {
-        return saved.replace(/\/+$/, '');
+      if (saved && isHttpUrl(saved)) {
+        const clean = saved.replace(/\/+$/, '');
+        const savedHost = new URL(clean).hostname;
+        if (!(pageIsRemoteHttp && isLocalHost(savedHost))) {
+          return clean;
+        }
+        window.localStorage.removeItem('atlas_backend_url');
       }
     } catch {}
   }
@@ -23,14 +47,10 @@ function getBaseUrl(): string {
   if (typeof window !== 'undefined' && (window as any).__ATLAS_API_HOST__) {
     return `http://${(window as any).__ATLAS_API_HOST__}`;
   }
-  // 3. Auto-detect: if served from a non-localhost origin (EasyPanel/VPS),
+  // 3. Auto-detect: if served from a non-localhost HTTP origin (EasyPanel/VPS),
   //    use that origin as the API base URL (same-origin deployment)
-  if (typeof window !== 'undefined' && window.location) {
-    const { hostname, protocol, port } = window.location;
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      const base = `${protocol}//${hostname}${port ? ':' + port : ''}`;
-      return base;
-    }
+  if (sameOriginBase) {
+    return sameOriginBase;
   }
   // 4. Default: local backend
   return DEFAULT_URL;
@@ -51,6 +71,7 @@ export function setBackendUrl(url: string): void {
   API_URL = clean;
   WS_URL = clean.replace('http', 'ws') + '/ws';
   // Reconnect WebSocket to new URL
+  wsManager.resetAuth();
   wsManager.disconnect();
   wsManager.connect();
 }
@@ -65,6 +86,7 @@ export function resetBackendUrl(): void {
   API_URL = DEFAULT_URL;
   WS_URL = DEFAULT_URL.replace('http', 'ws') + '/ws';
   // Reconnect WebSocket to default URL
+  wsManager.resetAuth();
   wsManager.disconnect();
   wsManager.connect();
 }
@@ -90,12 +112,17 @@ export function setApiKey(key: string): void {
   if (typeof window !== 'undefined') {
     try { window.localStorage.setItem('atlas_api_key', key); } catch {}
   }
+  wsManager.resetAuth();
+  wsManager.disconnect();
+  wsManager.connect();
 }
 
 export function clearApiKey(): void {
   if (typeof window !== 'undefined') {
     try { window.localStorage.removeItem('atlas_api_key'); } catch {}
   }
+  wsManager.resetAuth();
+  wsManager.disconnect();
 }
 
 /**
@@ -350,13 +377,13 @@ export const api = {
 // ── Shared Constants ─────────────────────────────────────────────
 
 export const STRATEGY_COLORS: Record<string, string> = {
-  BLUE: '#3daee9',    // Daemon: ForegroundActive (61,174,233)
-  RED: '#fb3048',     // Daemon: ForegroundNegative (251,48,72)
-  PINK: '#ee00ff',    // Daemon: WM activeBackground (238,0,255)
-  WHITE: '#fcfcfc',   // Daemon: ForegroundNormal (252,252,252)
-  BLACK: '#a1a9b1',   // Daemon: ForegroundInactive (161,169,177)
-  GREEN: '#28c775',   // Daemon: ForegroundPositive (40,199,117)
-  DETECTED: '#fdf500', // Daemon: ForegroundNeutral (253,245,0)
+  BLUE: '#007AFF',
+  RED: '#FF3B30',
+  PINK: '#AF52DE',
+  WHITE: '#F2F2F7',
+  BLACK: '#8E8E93',
+  GREEN: '#34C759',
+  DETECTED: '#FFCC00',
 };
 
 export function getScoreColor(score: number | null): string {
@@ -376,9 +403,9 @@ export function getTrendColor(trend: string): string {
 
 export function getTrendIcon(trend: string): string {
   const upper = trend?.toUpperCase() || '';
-  if (upper.includes('BULL')) return '▲';
-  if (upper.includes('BEAR')) return '▼';
-  return '◆';
+  if (upper.includes('BULL')) return 'BUY';
+  if (upper.includes('BEAR')) return 'SELL';
+  return 'FLAT';
 }
 
 // ── WebSocket Manager ────────────────────────────────────────────

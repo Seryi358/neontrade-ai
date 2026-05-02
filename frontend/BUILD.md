@@ -1,16 +1,16 @@
-# NeonTrade AI - Build Instructions
+# Atlas - Build Instructions
 
 ## Desktop (ya generados)
 
 ### macOS (.dmg) - LISTO
 ```
-builds/NeonTrade AI-1.0.0-universal.dmg
+builds/Atlas-1.0.0-universal.dmg
 ```
 Doble clic para instalar. Arrastra a Applications.
 
 ### Windows (.exe) - LISTO
 ```
-builds/NeonTrade AI Setup 1.0.0.exe
+builds/Atlas Setup 1.0.0.exe
 ```
 Enviar al PC Windows y ejecutar el instalador.
 

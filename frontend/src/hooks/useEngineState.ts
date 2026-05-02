@@ -16,6 +16,15 @@ export interface NewsEvent {
   minutes_until?: number;
 }
 
+export interface MarketNotice {
+  type: string;
+  country?: string;
+  title: string;
+  message: string;
+  date?: string;
+  blocks_trading?: boolean;
+}
+
 export type PausedReason =
   | 'news_blackout'
   | 'out_of_hours'
@@ -47,6 +56,7 @@ export interface EngineState {
   max_trades_per_day: number;
   now_utc: string;
   trading_hours_utc: string;
+  market_notice?: MarketNotice | null;
 }
 
 const DEFAULT_POLL_MS = 10_000;

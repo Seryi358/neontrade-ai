@@ -32,35 +32,35 @@ const META: Record<InstrumentStatus, StatusMeta> = {
   setup_queued: {
     accent: '#1E88E5',
     badgeBg: 'rgba(30, 136, 229, 0.12)',
-    glyph: '\u27A4',       // ➤ send
+    glyph: 'Q',
     labelAlt: 'SETUP ENCOLADO',
     pulse: true,
   },
   ready_waiting: {
     accent: '#34C759',
     badgeBg: 'rgba(52, 199, 89, 0.12)',
-    glyph: '\u25C9',       // ◉ radar
+    glyph: 'R',
     labelAlt: 'LISTO',
     pulse: false,
   },
   forming: {
     accent: '#FF9500',
     badgeBg: 'rgba(255, 149, 0, 0.12)',
-    glyph: '\u231B',       // ⌛ clock
+    glyph: 'F',
     labelAlt: 'FORMANDO',
     pulse: false,
   },
   weak: {
     accent: '#BFBFC4',
     badgeBg: 'rgba(191, 191, 196, 0.18)',
-    glyph: '\u2212',       // − minus
+    glyph: 'W',
     labelAlt: 'DÉBIL',
     pulse: false,
   },
   no_pattern: {
     accent: '#86868b',
     badgeBg: 'rgba(134, 134, 139, 0.15)',
-    glyph: '\u2A2F',       // ⨯ x-like
+    glyph: 'N',
     labelAlt: 'SIN PATRÓN',
     pulse: false,
   },
@@ -75,9 +75,9 @@ function scoreColor(score: number): string {
 
 function directionGlyph(trend: string): { icon: string; color: string } {
   const up = (trend || '').toLowerCase();
-  if (up === 'bullish') return { icon: '\u2191', color: '#34C759' };
-  if (up === 'bearish') return { icon: '\u2193', color: '#FF3B30' };
-  return { icon: '\u00B1', color: theme.colors.textSecondary };
+  if (up === 'bullish') return { icon: 'BUY', color: '#34C759' };
+  if (up === 'bearish') return { icon: 'SELL', color: '#FF3B30' };
+  return { icon: 'FLAT', color: theme.colors.textSecondary };
 }
 
 export default function InstrumentChip({ item, onPress }: InstrumentChipProps) {

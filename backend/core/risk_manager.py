@@ -472,8 +472,9 @@ class RiskManager:
                 final_risk *= reentry_mult
                 logger.info(f"Reentry risk reduction for {instrument}: {reentry_mult}x -> {final_risk:.4f}")
 
-        # TradingLab: never exceed 2% per trade (absolute hard cap)
-        final_risk = min(final_risk, settings.delta_max_risk)
+        # Delta max caps only delta-based increases. It must not reduce a
+        # TradingLab base risk such as swing=3% from the written plan.
+        final_risk = min(final_risk, max(base_risk, settings.delta_max_risk))
 
         return final_risk
 

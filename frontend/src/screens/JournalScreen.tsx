@@ -1,7 +1,7 @@
 /**
  * Atlas - Journal Screen
  * Comprehensive trade journal with stats, trade list, and emotional notes.
- * CyberPunk 2077 HUD redesign with sub-navigation pills.
+ * Apple Liquid Glass journal screen.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -503,7 +503,7 @@ export default function JournalScreen() {
                 <Text style={styles.breakdownTitle}>RECOMENDACIONES</Text>
                 {monthlyReport.recommendations.map((rec: string, i: number) => (
                   <Text key={i} style={styles.recommendationText}>
-                    → {rec}
+                    {i + 1}. {rec}
                   </Text>
                 ))}
               </View>
@@ -602,7 +602,7 @@ export default function JournalScreen() {
                   styles.discretionaryBtnText,
                   item.is_discretionary && { color: theme.colors.neonYellow },
                 ]}>
-                  {item.is_discretionary ? '◆ DISCRECIONAL' : '○ SISTEMATICO'}
+                  {item.is_discretionary ? 'DISCRECIONAL' : 'SISTEMATICO'}
                 </Text>
               </TouchableOpacity>
 
@@ -695,7 +695,7 @@ export default function JournalScreen() {
 
           {/* Expand indicator */}
           <Text style={styles.expandIndicator}>
-            {isExpanded ? '▲ Ocultar notas' : '▼ Notas emocionales'}
+            {isExpanded ? 'Ocultar notas' : 'Notas emocionales'}
           </Text>
         </HUDCard>
       </TouchableOpacity>

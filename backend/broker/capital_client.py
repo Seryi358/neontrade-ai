@@ -59,7 +59,7 @@ GRANULARITY_MAP = {
     "W": "WEEK",
 }
 
-# ── Instrument mapping (OANDA format -> Capital.com epic) ─────
+# ── Instrument mapping (Atlas canonical format -> Capital.com epic) ─────
 # Capital.com uses different epic names for forex pairs.
 # We'll discover these dynamically via the search endpoint,
 # but keep common ones cached for speed.

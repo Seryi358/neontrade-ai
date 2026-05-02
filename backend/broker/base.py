@@ -1,6 +1,5 @@
 """
-Atlas - Abstract Broker Interface
-Enables multi-broker support (OANDA, TagMarkets, etc.)
+Atlas - Capital.com broker interface.
 """
 
 from abc import ABC, abstractmethod
@@ -11,12 +10,7 @@ from loguru import logger
 
 
 class BrokerType(Enum):
-    IBKR = "ibkr"
     CAPITAL = "capital"
-    OANDA = "oanda"
-    # Future brokers
-    ICMARKETS = "icmarkets"
-    PEPPERSTONE = "pepperstone"
 
 
 @dataclass
@@ -79,8 +73,8 @@ class TradeInfo:
 
 class BaseBroker(ABC):
     """
-    Abstract base class for all broker implementations.
-    Every broker must implement these methods to be compatible with Atlas.
+    Abstract base class for the Capital.com implementation.
+    The engine intentionally exposes a single live broker surface.
     """
 
     def __init__(self, broker_type: BrokerType):

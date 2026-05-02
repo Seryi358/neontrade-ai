@@ -843,7 +843,7 @@ class MonthlyReviewGenerator:
         """
         Format a MonthlyReport into a human-readable text summary.
 
-        Useful for logging, Telegram notifications, or console output.
+        Useful for logging, Gmail notifications, or console output.
         """
         lines: List[str] = []
         sep = "=" * 60

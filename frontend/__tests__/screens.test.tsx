@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Frontend Screen Tests
+ * Atlas - Frontend Screen Tests
  * Verifies that all 8 screens render correctly with mocked API data.
  *
  * Strategy: Mock global fetch (used by authFetch) to return realistic data,

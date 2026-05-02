@@ -218,7 +218,7 @@ class EconomicCalendar:
         return False
 
     def get_currencies_from_pair(self, instrument: str) -> List[str]:
-        """Extract currencies from an OANDA instrument name (e.g., EUR_USD -> [EUR, USD])."""
+        """Extract currencies from an Atlas instrument name (e.g., EUR_USD -> [EUR, USD])."""
         parts = instrument.replace("/", "_").split("_")
         return parts if len(parts) == 2 else []
 

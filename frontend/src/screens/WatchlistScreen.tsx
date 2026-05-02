@@ -1,7 +1,7 @@
 /**
  * Atlas - Watchlist Screen
  * Shows all watched pairs with analysis scores, strategy detections, and signals.
- * CyberPunk 2077 HUD redesign with sub-navigation pills.
+ * Apple Liquid Glass watchlist.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -45,6 +45,7 @@ interface WatchlistItem {
   strategy_detected?: string | null;
   confidence_level?: string;
   strategy_checklist?: StrategyChecklistEntry[];
+  no_trade_reason?: { reason: string; stage: string; timestamp?: string } | null;
 }
 
 export default function WatchlistScreen() {
@@ -153,7 +154,7 @@ export default function WatchlistScreen() {
                   styles.checklistDot,
                   { color: c.setup_found ? theme.colors.neonGreen : c.htf_passed ? theme.colors.neonCyan : theme.colors.textMuted }
                 ]}>
-                  {c.setup_found ? '✓' : c.htf_passed ? '◐' : '✗'}
+                  {c.setup_found ? 'OK' : c.htf_passed ? 'HTF' : 'NO'}
                 </Text>
                 <Text style={[
                   styles.checklistLabel,
@@ -164,6 +165,12 @@ export default function WatchlistScreen() {
               </View>
             ))}
           </View>
+        )}
+
+        {item.no_trade_reason && (
+          <Text style={styles.noTradeReason} numberOfLines={2}>
+            {item.no_trade_reason.reason}
+          </Text>
         )}
       </HUDCard>
     </TouchableOpacity>
@@ -301,6 +308,15 @@ const styles = StyleSheet.create({
   checklistLabel: {
     fontSize: 10,
     fontWeight: '500',
+  },
+  noTradeReason: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.04)',
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
   },
   // Header stats
   headerStatsRow: {

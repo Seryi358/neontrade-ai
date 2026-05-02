@@ -15,6 +15,19 @@ from loguru import logger
 router = APIRouter()
 
 
+INSTRUMENT_ALIASES = {
+    "SP500": "SPX500_USD",
+    "SPX500": "SPX500_USD",
+    "US500": "SPX500_USD",
+    "SPX500_USD": "SPX500_USD",
+}
+
+
+def _canonical_instrument(instrument: str) -> str:
+    key = (instrument or "").strip().upper().replace("/", "_")
+    return INSTRUMENT_ALIASES.get(key, key)
+
+
 # ── Request / Response Models ────────────────────────────────────
 
 class TradingModeRequest(BaseModel):
@@ -38,7 +51,7 @@ class StrategyConfigRequest(BaseModel):
 
 
 class BrokerSelectionRequest(BaseModel):
-    broker: str  # "oanda", "tagmarkets", etc.
+    broker: str
     api_key: Optional[str] = None
     account_id: Optional[str] = None
     environment: Optional[str] = "practice"
@@ -480,6 +493,8 @@ async def get_all_analyses():
 async def get_analysis(instrument: str):
     """Get latest analysis for a specific instrument with full explanation."""
     from main import engine
+    requested_instrument = instrument
+    instrument = _canonical_instrument(instrument)
     results = engine.last_scan_results
     if instrument not in results:
         # Build a descriptive message depending on engine state
@@ -494,6 +509,7 @@ async def get_analysis(instrument: str):
         # Return a default empty analysis instead of 404
         return {
             "instrument": instrument,
+            "requested_instrument": requested_instrument,
             "score": 0,
             "htf_trend": "unknown",
             "ltf_trend": "unknown",
@@ -505,12 +521,14 @@ async def get_analysis(instrument: str):
             "patterns": [],
             "elliott_wave": None,
             "message": msg,
+            "no_trade_reason": engine.last_no_trade_reasons.get(instrument, None),
         }
 
     analysis = results[instrument]
 
     response = {
         "instrument": instrument,
+        "requested_instrument": requested_instrument,
         "score": analysis.score,
         "htf_trend": analysis.htf_trend.value,
         "ltf_trend": analysis.ltf_trend.value,
@@ -530,6 +548,7 @@ async def get_analysis(instrument: str):
         "order_blocks": getattr(analysis, 'order_blocks', []),
         "structure_breaks": getattr(analysis, 'structure_breaks', []),
         "pivot_points": getattr(analysis, 'pivot_points', {}),
+        "no_trade_reason": engine.last_no_trade_reasons.get(instrument, None),
     }
 
     # Add detailed explanation if available
@@ -643,16 +662,16 @@ async def get_watchlist():
     for instrument in get_active_watchlist():
         entry = {
             "instrument": instrument,
-            "score": None,  # null until AI validates — no fake technical scores
+            "score": None,  # null until technical analysis has scanned it
             "trend": "unknown",
             "convergence": False,
             "patterns": [],
             "strategy_detected": None,
+            "no_trade_reason": engine.last_no_trade_reasons.get(instrument, None),
         }
         if instrument in engine.last_scan_results:
             analysis = engine.last_scan_results[instrument]
-            # Always show technical score so the UI has data to display
-            # When AI validates a setup, the score is overwritten with the AI score
+            # Single public score: technical analysis score only.
             entry["score"] = analysis.score
             entry["trend"] = analysis.htf_trend.value
             entry["convergence"] = analysis.htf_ltf_convergence
@@ -696,6 +715,8 @@ async def get_instrument_strategy_checklist(instrument: str):
     from main import engine
     from strategies.base import get_strategy_checklist
 
+    requested_instrument = instrument
+    instrument = _canonical_instrument(instrument)
     if instrument not in engine.last_scan_results:
         raise HTTPException(404, f"No analysis data for {instrument}. Wait for next scan cycle.")
 
@@ -703,10 +724,12 @@ async def get_instrument_strategy_checklist(instrument: str):
     checklist = get_strategy_checklist(analysis, engine._enabled_strategies)
     return {
         "instrument": instrument,
+        "requested_instrument": requested_instrument,
         "score": analysis.score,
         "htf_trend": analysis.htf_trend.value if hasattr(analysis.htf_trend, 'value') else str(analysis.htf_trend),
         "ltf_trend": analysis.ltf_trend.value if hasattr(analysis.ltf_trend, 'value') else str(analysis.ltf_trend),
         "strategies": checklist,
+        "no_trade_reason": engine.last_no_trade_reasons.get(instrument, None),
     }
 
 
@@ -972,19 +995,19 @@ async def get_current_broker():
 @router.post("/broker")
 async def set_broker(request: BrokerSelectionRequest):
     """Switch the active broker. Requires restart to take effect."""
-    supported = {"capital", "ibkr"}
+    supported = {"capital"}
     if request.broker.lower() not in supported:
         # 400 Bad Request: client sent a value outside the supported set.
         # 501 is for missing server implementations, not input validation.
         raise HTTPException(
             400,
             f"Broker '{request.broker}' no soportado. "
-            f"Disponibles: capital, ibkr.",
+            f"Disponible: capital.",
         )
     return {
-        "broker": request.broker,
-        "status": "pending_restart",
-        "message": f"Broker {request.broker} seleccionado. Cambia ACTIVE_BROKER={request.broker.lower()} en las variables de entorno y haz re-deploy para aplicar.",
+        "broker": "capital",
+        "status": "active",
+        "message": "Capital.com es el único broker conectado en esta instalación.",
     }
 
 
@@ -998,6 +1021,8 @@ async def get_candles(
 ):
     """Get candlestick data for charting."""
     from main import engine
+    requested_instrument = instrument
+    instrument = _canonical_instrument(instrument)
     broker = engine.broker
     try:
         candles = await broker.get_candles(instrument, granularity, count)
@@ -1024,7 +1049,7 @@ async def get_candles(
         not_found_indicators = ['not found', 'invalid', 'unknown', 'no such', 'epic',
                                 '404', 'does not exist', 'bad request', '400']
         if any(ind in lower for ind in not_found_indicators):
-            raise HTTPException(404, f"Instrument '{instrument}' not found")
+            raise HTTPException(404, f"Instrument '{requested_instrument}' not found")
         raise HTTPException(500, f"Error al obtener velas: {error_msg}")
 
 
@@ -1081,11 +1106,14 @@ async def admin_unblocklist(instrument: str):
 async def get_price(instrument: str):
     """Get current bid/ask price for an instrument."""
     from main import engine
+    requested_instrument = instrument
+    instrument = _canonical_instrument(instrument)
     broker = engine.broker
     try:
         price = await broker.get_current_price(instrument)
         return {
             "instrument": instrument,
+            "requested_instrument": requested_instrument,
             "bid": price.bid,
             "ask": price.ask,
             "spread": price.spread,
@@ -1097,7 +1125,7 @@ async def get_price(instrument: str):
         not_found_indicators = ['not found', 'invalid', 'unknown', 'no such', 'epic',
                                 '404', 'does not exist', 'bad request', '400']
         if any(ind in err_msg for ind in not_found_indicators):
-            raise HTTPException(404, f"Instrument '{instrument}' not found")
+            raise HTTPException(404, f"Instrument '{requested_instrument}' not found")
         raise HTTPException(500, f"Error al obtener precio: {str(e)}")
 
 
@@ -1167,7 +1195,7 @@ async def get_strategies_info():
             "name": "Patrón correctivo de continuación",
             "description": "Detecta patrones correctivos (cuña/triángulo/canal) en 1H dentro de "
                            "una tendencia establecida en 4H.",
-            "wave": "Onda 4→5 de Elliott",
+            "wave": "Onda 4-5 de Elliott",
             "risk_reward_avg": 1.8,
             "variants": [],
             "steps": 6,
@@ -1682,17 +1710,6 @@ async def set_risk_config(request: RiskConfigRequest):
 # ── Alert Configuration ────────────────────────────────────────
 
 class AlertConfigRequest(BaseModel):
-    telegram_enabled: Optional[bool] = None
-    telegram_bot_token: Optional[str] = None
-    telegram_chat_id: Optional[str] = None
-    discord_enabled: Optional[bool] = None
-    discord_webhook_url: Optional[str] = None
-    email_enabled: Optional[bool] = None
-    email_smtp_server: Optional[str] = None
-    email_smtp_port: Optional[int] = None
-    email_username: Optional[str] = None
-    email_password: Optional[str] = None
-    email_recipient: Optional[str] = None
     gmail_enabled: Optional[bool] = None
     gmail_sender: Optional[str] = None
     gmail_recipient: Optional[str] = None
@@ -1708,16 +1725,16 @@ class AlertConfigRequest(BaseModel):
 
 @router.get("/alerts/config")
 async def get_alert_config():
-    """Get current alert/notification channel configuration."""
+    """Get current Gmail notification configuration."""
     from main import engine
     if hasattr(engine, 'alert_manager'):
         return engine.alert_manager.get_config()
-    return {"telegram_enabled": False, "discord_enabled": False, "email_enabled": False, "gmail_enabled": False}
+    return {"gmail_enabled": False}
 
 
 @router.put("/alerts/config")
 async def set_alert_config(request: AlertConfigRequest):
-    """Update alert channel configuration."""
+    """Update Gmail notification configuration."""
     from main import engine
     if not hasattr(engine, 'alert_manager'):
         raise HTTPException(501, "Alert manager not available")
@@ -1725,7 +1742,23 @@ async def set_alert_config(request: AlertConfigRequest):
     from core.alerts import AlertConfig, _SENSITIVE_FIELDS
     current = engine.alert_manager._config
 
-    updates = {k: v for k, v in request.model_dump().items() if v is not None}
+    allowed = {
+        "gmail_enabled",
+        "gmail_sender",
+        "gmail_recipient",
+        "gmail_client_id",
+        "gmail_client_secret",
+        "gmail_refresh_token",
+        "notify_trade_executed",
+        "notify_setup_pending",
+        "notify_setup_rejected",
+        "notify_trade_closed",
+        "notify_daily_summary",
+    }
+    updates = {
+        k: v for k, v in request.model_dump().items()
+        if v is not None and k in allowed
+    }
     for key, value in updates.items():
         if hasattr(current, key):
             # Skip masked values (e.g. "*****abcd") to prevent overwriting real secrets
@@ -1736,22 +1769,21 @@ async def set_alert_config(request: AlertConfigRequest):
     engine.alert_manager.update_config(current)
     return {
         "config": engine.alert_manager.get_config(),
-        "message": f"Configuración de alertas actualizada",
+        "message": "Configuración de Gmail actualizada",
     }
 
 
 @router.post("/alerts/test/{channel}")
 async def test_alert_channel(channel: str):
-    """Send a test notification to verify channel configuration."""
+    """Send a test Gmail notification to verify channel configuration."""
     from main import engine
     if not hasattr(engine, 'alert_manager'):
         raise HTTPException(501, "Alert manager not available")
 
     from core.alerts import AlertChannel
-    try:
-        ch = AlertChannel(channel.lower())
-    except ValueError:
-        raise HTTPException(400, f"Canal no válido: {channel}. Usa: telegram, discord, email, gmail")
+    if channel.lower() != "gmail":
+        raise HTTPException(400, f"Canal no válido: {channel}. Usa: gmail")
+    ch = AlertChannel.GMAIL
 
     success = await engine.alert_manager.test_channel(ch)
     if success:

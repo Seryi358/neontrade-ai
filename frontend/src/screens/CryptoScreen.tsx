@@ -1,7 +1,7 @@
 /**
  * Atlas - Crypto Market Cycle Dashboard
  * Dedicated screen for crypto market analysis from TradingLab Esp. Criptomonedas.
- * CyberPunk 2077 HUD redesign with sub-navigation pills.
+ * Apple Liquid Glass crypto dashboard.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -218,7 +218,7 @@ export default function CryptoScreen() {
                 ? theme.colors.neonRed
                 : theme.colors.textMuted,
           }]}>
-            {cycle?.btc_dominance_trend === 'rising' ? '  ▲' : cycle?.btc_dominance_trend === 'falling' ? '  ▼' : '  —'}
+            {cycle?.btc_dominance_trend === 'rising' ? 'UP' : cycle?.btc_dominance_trend === 'falling' ? 'DOWN' : 'FLAT'}
           </Text>
         </View>
 
@@ -268,7 +268,7 @@ export default function CryptoScreen() {
                 </Text>
               </View>
               {idx < rotationSteps.length - 1 && (
-                <Text style={styles.rotationArrow}>→</Text>
+                <Text style={styles.rotationArrow}>to</Text>
               )}
             </React.Fragment>
           ))}

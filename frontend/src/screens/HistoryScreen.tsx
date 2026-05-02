@@ -234,7 +234,7 @@ export default function HistoryScreen() {
             />
           </View>
           <Text style={styles.tradePrices}>
-            {safe(item.entry_price, 5)} → {safe(item.exit_price, 5)}
+            {safe(item.entry_price, 5)} to {safe(item.exit_price, 5)}
           </Text>
         </View>
       </HUDCard>

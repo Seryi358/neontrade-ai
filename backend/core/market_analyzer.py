@@ -574,7 +574,7 @@ class MarketAnalyzer:
                     "volume": int(c.volume),
                 })
             else:
-                # Legacy OANDA raw dict format
+                # Legacy raw dict format
                 if not c.get("complete", True):
                     continue
                 mid = c.get("mid", {})

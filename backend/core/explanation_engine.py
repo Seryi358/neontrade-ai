@@ -410,15 +410,20 @@ class ExplanationEngine:
     def format_for_notification(self, explanation: StrategyExplanation) -> str:
         """Format a short version for push notifications."""
         if explanation.strategy_detected:
+            bias_label = (
+                "ALCISTA"
+                if explanation.overall_bias == "ALCISTA"
+                else "BAJISTA" if explanation.overall_bias == "BAJISTA" else "NEUTRAL"
+            )
             return (
-                f"{'🟢' if explanation.overall_bias == 'ALCISTA' else '🔴' if explanation.overall_bias == 'BAJISTA' else '🟡'} "
+                f"{bias_label} "
                 f"{explanation.instrument}: "
                 f"Estrategia {explanation.strategy_detected} detectada | "
                 f"Score: {explanation.score:.0f} | "
                 f"Confianza: {explanation.confidence_level}"
             )
         return (
-            f"📊 {explanation.instrument}: "
+            f"{explanation.instrument}: "
             f"Tendencia {explanation.overall_bias.lower()} | "
             f"Score: {explanation.score:.0f} | "
             f"Sin señal de entrada"

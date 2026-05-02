@@ -20,6 +20,7 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Any, List, Optional, Dict, Callable
 from dataclasses import dataclass, field, asdict
+from zoneinfo import ZoneInfo
 from loguru import logger
 
 from core.risk_manager import RiskManager, TradingStyle, TradeRisk
@@ -100,27 +101,17 @@ class PendingSetup:
 
 
 def _create_broker():
-    """Create the active broker based on config."""
-    if settings.active_broker == "ibkr":
-        from broker.ibkr_client import IBKRClient
-        return IBKRClient(
-            consumer_key=settings.ibkr_consumer_key,
-            access_token=settings.ibkr_access_token,
-            access_token_secret=settings.ibkr_access_token_secret,
-            keys_dir=settings.ibkr_keys_dir,
-            environment=settings.ibkr_environment,
-        )
-    elif settings.active_broker == "capital":
-        from broker.capital_client import CapitalClient
-        return CapitalClient(
-            api_key=settings.capital_api_key,
-            password=settings.capital_password,
-            identifier=settings.capital_identifier,
-            environment=settings.capital_environment,
-            account_id=settings.capital_account_id or None,
-        )
-    else:
-        raise ValueError(f"Unsupported broker: {settings.active_broker}. Supported: 'capital', 'ibkr'")
+    """Create the only supported live broker."""
+    if settings.active_broker != "capital":
+        raise ValueError(f"Unsupported broker: {settings.active_broker}. Supported: 'capital'")
+    from broker.capital_client import CapitalClient
+    return CapitalClient(
+        api_key=settings.capital_api_key,
+        password=settings.capital_password,
+        identifier=settings.capital_identifier,
+        environment=settings.capital_environment,
+        account_id=settings.capital_account_id or None,
+    )
 
 
 class TradingEngine:
@@ -189,15 +180,8 @@ class TradingEngine:
         self._scan_lock = asyncio.Lock()
         self.news_filter = self._build_news_filter()
 
-        # Alert manager (Telegram, Discord, Email, Gmail OAuth2)
+        # Alert manager: Gmail OAuth2 only.
         if _ALERTS_AVAILABLE:
-            # Auto-enable each channel if credentials are configured
-            tg_token = getattr(settings, 'telegram_bot_token', '')
-            tg_chat = getattr(settings, 'telegram_chat_id', '')
-            discord_url = getattr(settings, 'discord_webhook_url', '')
-            email_user = getattr(settings, 'alert_email_username', '')
-            email_pass = getattr(settings, 'alert_email_password', '')
-            email_recip = getattr(settings, 'alert_email_recipient', '')
             gmail_refresh = getattr(settings, 'gmail_refresh_token', '')
             gmail_cid = getattr(settings, 'gmail_client_id', '')
             gmail_secret = getattr(settings, 'gmail_client_secret', '')
@@ -205,17 +189,6 @@ class TradingEngine:
             gmail_recipient = getattr(settings, 'gmail_recipient', '') or gmail_sender
 
             alert_cfg = AlertConfig(
-                telegram_enabled=bool(tg_token and tg_chat),
-                telegram_bot_token=tg_token,
-                telegram_chat_id=tg_chat,
-                discord_enabled=bool(discord_url),
-                discord_webhook_url=discord_url,
-                email_enabled=bool(email_user and email_pass and email_recip),
-                email_smtp_server=getattr(settings, 'alert_email_smtp_server', 'smtp.gmail.com'),
-                email_smtp_port=getattr(settings, 'alert_email_smtp_port', 587),
-                email_username=email_user,
-                email_password=email_pass,
-                email_recipient=email_recip,
                 # Require ALL 5 OAuth fields so _send_gmail() never reaches the "skipped"
                 # warning at runtime for a partially-configured channel.
                 gmail_enabled=bool(gmail_refresh and gmail_cid and gmail_secret and gmail_sender and gmail_recipient),
@@ -229,12 +202,6 @@ class TradingEngine:
             channels = []
             if alert_cfg.gmail_enabled:
                 channels.append("Gmail")
-            if alert_cfg.telegram_enabled:
-                channels.append("Telegram")
-            if alert_cfg.discord_enabled:
-                channels.append("Discord")
-            if alert_cfg.email_enabled:
-                channels.append("Email/SMTP")
             if channels:
                 logger.info("Alert channels enabled: {}", ", ".join(channels))
             else:
@@ -268,6 +235,7 @@ class TradingEngine:
         self._pre_scalping_interval: int = self._scan_interval  # saved before scalping
         self._last_scan_results: Dict[str, AnalysisResult] = {}
         self._latest_explanations: Dict[str, StrategyExplanation] = {}
+        self._last_no_trade_reasons: Dict[str, Dict[str, Any]] = {}
         self._recent_strategy_events: Dict[str, List[Dict[str, Any]]] = {}
         self._recent_strategy_event_limit: int = 40
         self._recent_strategy_events_path = os.path.join("data", "recent_strategy_events.json")
@@ -565,6 +533,32 @@ class TradingEngine:
     @property
     def latest_explanations(self) -> Dict[str, 'StrategyExplanation']:
         return self._latest_explanations
+
+    @property
+    def last_no_trade_reasons(self) -> Dict[str, Dict[str, Any]]:
+        return self._last_no_trade_reasons
+
+    def _mark_no_trade(
+        self,
+        instrument: str,
+        stage: str,
+        reason: str,
+        analysis: Optional[AnalysisResult] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Keep the latest non-execution reason visible for the UI/operator."""
+        payload: Dict[str, Any] = {
+            "instrument": instrument,
+            "stage": stage,
+            "reason": reason,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "details": details or {},
+        }
+        if analysis is not None:
+            payload["score"] = round(float(getattr(analysis, "score", 0) or 0), 1)
+            payload["convergence"] = bool(getattr(analysis, "htf_ltf_convergence", False))
+        self._last_no_trade_reasons[instrument] = payload
+        logger.debug("[{}] No trade: {} - {}", instrument, stage, reason)
 
     @property
     def scan_interval(self) -> int:
@@ -2553,12 +2547,22 @@ class TradingEngine:
         for instrument in batch:
             try:
                 if not self._is_instrument_session_open(instrument, now_utc):
+                    self._mark_no_trade(
+                        instrument,
+                        "session",
+                        "Mercado o sesión fuera de horario para este instrumento",
+                    )
                     continue
 
                 # Skip instruments that the broker can't resolve (saves ~4 wasted
                 # API calls per scan cycle on each broken epic — 10+ indices were
                 # returning 404 every cycle before this guard).
                 if hasattr(self.broker, "is_blocklisted") and self.broker.is_blocklisted(instrument):
+                    self._mark_no_trade(
+                        instrument,
+                        "broker",
+                        "Capital.com no resolvió este instrumento; queda en blocklist temporal",
+                    )
                     continue
 
                 # Check if we can take more risk (per-instrument style routing)
@@ -2566,6 +2570,12 @@ class TradingEngine:
                 if not self.risk_manager.can_take_trade(
                     current_style, instrument
                 ):
+                    self._mark_no_trade(
+                        instrument,
+                        "risk",
+                        "Gestión de riesgo bloqueó una nueva posición",
+                        details={"style": current_style.value if hasattr(current_style, "value") else str(current_style)},
+                    )
                     continue
 
                 # Skip if already in a trade on this instrument
@@ -2573,6 +2583,11 @@ class TradingEngine:
                     pos.instrument == instrument
                     for pos in self.position_manager.positions.values()
                 ):
+                    self._mark_no_trade(
+                        instrument,
+                        "position",
+                        "Ya existe una posición abierta en este instrumento",
+                    )
                     continue
 
                 # TradingLab: Check reentry opportunity after TP1
@@ -2606,6 +2621,7 @@ class TradingEngine:
                 # Check for strategy setups
                 setup = await self._detect_setup(analysis)
                 if setup:
+                    self._last_no_trade_reasons.pop(instrument, None)
                     # Check if this is a reentry opportunity
                     # TradingLab: re-entry risk is CONFIGURABLE per trader's plan.
                     # Defaults: Reentry 1=50%, Reentry 2=25%, Reentry 3+=25% of normal risk.
@@ -2656,6 +2672,12 @@ class TradingEngine:
                             logger.info(
                                 f"[{instrument}] Reentry skipped — setup essence not preserved "
                                 f"(mentorship: Reentradas Efectivas)"
+                            )
+                            self._mark_no_trade(
+                                instrument,
+                                "reentry",
+                                "Reentrada inválida: la esencia del setup original ya no se conserva",
+                                analysis,
                             )
                             continue
 
@@ -2935,6 +2957,12 @@ class TradingEngine:
         )
 
         if signal is None:
+            self._mark_no_trade(
+                analysis.instrument,
+                "setup",
+                "Score alto no es una orden: ninguna estrategia TradingLab cerró patrón de entrada",
+                analysis,
+            )
             return None
 
         logger.info(
@@ -2977,6 +3005,18 @@ class TradingEngine:
             strategy=signal.strategy_variant,
         ):
             logger.info(f"R:R validation failed for {signal.instrument} ({signal.strategy_variant})")
+            self._mark_no_trade(
+                signal.instrument,
+                "reward_risk",
+                "R:R mínimo de la estrategia no se cumplió",
+                analysis,
+                {
+                    "strategy": signal.strategy_variant,
+                    "entry": signal.entry_price,
+                    "stop_loss": signal.stop_loss,
+                    "take_profit": signal.take_profit_1,
+                },
+            )
             return None
 
         # TradingLab: Scale-in rule — no new trade unless BE on existing
@@ -2985,6 +3025,13 @@ class TradingEngine:
             logger.info(
                 f"Scale-in blocked for {signal.instrument}: "
                 f"existing position has not reached BE"
+            )
+            self._mark_no_trade(
+                signal.instrument,
+                "scale_in",
+                "Scale-in bloqueado: la posición existente todavía no está en break-even",
+                analysis,
+                {"strategy": signal.strategy_variant},
             )
             return None
 
@@ -2998,6 +3045,17 @@ class TradingEngine:
                 f"Setup {signal.strategy_variant} on {signal.instrument} skipped: "
                 f"position size too small for current balance "
                 f"(entry={signal.entry_price:.5f}, sl={signal.stop_loss:.5f})"
+            )
+            self._mark_no_trade(
+                signal.instrument,
+                "position_size",
+                "Tamaño de posición calculado en 0 por balance, margen, SL o mínimo del broker",
+                analysis,
+                {
+                    "strategy": signal.strategy_variant,
+                    "entry": signal.entry_price,
+                    "stop_loss": signal.stop_loss,
+                },
             )
             return None
 
@@ -3098,6 +3156,13 @@ class TradingEngine:
             logger.info(
                 f"Setup {setup.instrument} {setup.direction} filtered: "
                 f"score {analysis.score:.0f} < {min_score} minimum — not operable"
+            )
+            self._mark_no_trade(
+                setup.instrument,
+                "quality_gate",
+                f"Setup filtrado: score {analysis.score:.0f} menor al mínimo operativo {min_score}",
+                analysis,
+                {"minimum_score": min_score, "strategy": setup.strategy_variant},
             )
             return
 
@@ -3370,6 +3435,13 @@ class TradingEngine:
             # result is now an OrderResult dataclass
             if not result.success:
                 logger.error(f"Order failed for {setup.instrument}: {result.error}")
+                self._mark_no_trade(
+                    setup.instrument,
+                    "broker_order",
+                    f"Capital.com rechazó la orden: {result.error or 'sin detalle'}",
+                    self._last_scan_results.get(setup.instrument),
+                    {"strategy": setup.strategy_variant},
+                )
                 return
 
             trade_id = result.trade_id
@@ -3388,7 +3460,7 @@ class TradingEngine:
                     try:
                         await self.alert_manager.send_alert(
                             "engine_status",
-                            f"⚠️ ORPHANED TRADE — {setup.instrument}",
+                            f"ORPHANED TRADE - {setup.instrument}",
                             f"Order succeeded but broker returned no trade_id.\n"
                             f"Direction: {setup.direction} | Units: {setup.units}\n"
                             f"Entry: {setup.entry_price:.5f} | SL: {setup.stop_loss:.5f}\n"
@@ -3398,6 +3470,13 @@ class TradingEngine:
                         )
                     except Exception as ae:
                         logger.error(f"CRITICAL: Orphaned trade alert ALSO failed to send: {ae}")
+                self._mark_no_trade(
+                    setup.instrument,
+                    "broker_order",
+                    "Capital.com aceptó la orden pero no devolvió trade_id; requiere revisión manual",
+                    self._last_scan_results.get(setup.instrument),
+                    {"strategy": setup.strategy_variant},
+                )
                 return
 
             if trade_id:
@@ -4131,6 +4210,7 @@ class TradingEngine:
                 }
                 for inst, result in dict(self._last_scan_results).items()
             },
+            "no_trade_reasons": dict(self._last_no_trade_reasons),
             "positions": [
                 {
                     "trade_id": tid,
@@ -4149,7 +4229,6 @@ class TradingEngine:
             "latest_explanations": {
                 inst: {
                     "overall_bias": expl.overall_bias,
-                    "score": expl.score,
                     "strategy_detected": expl.strategy_detected,
                     "confidence_level": expl.confidence_level,
                     "recommendation": expl.recommendation,
@@ -4212,6 +4291,36 @@ class TradingEngine:
         while next_open.weekday() >= 5:
             next_open += timedelta(days=1)
         return next_open.isoformat()
+
+    def _market_notice(self, now: datetime) -> Optional[Dict[str, Any]]:
+        """Return non-blocking local/market calendar notices for the UI."""
+        try:
+            bogota_now = now.astimezone(ZoneInfo("America/Bogota"))
+        except Exception:
+            bogota_now = now
+
+        colombia_fixed = {
+            (1, 1): "Año Nuevo",
+            (5, 1): "Día del Trabajo",
+            (7, 20): "Día de la Independencia de Colombia",
+            (8, 7): "Batalla de Boyacá",
+            (12, 8): "Inmaculada Concepción",
+            (12, 25): "Navidad",
+        }
+        holiday_name = colombia_fixed.get((bogota_now.month, bogota_now.day))
+        if holiday_name:
+            return {
+                "type": "local_holiday",
+                "country": "CO",
+                "title": f"Festivo en Colombia: {holiday_name}",
+                "message": (
+                    "Aviso local. No bloquea automáticamente forex/índices de EE.UU.; "
+                    "el engine sigue usando sesión, noticias y estado real de Capital.com."
+                ),
+                "date": bogota_now.date().isoformat(),
+                "blocks_trading": False,
+            }
+        return None
 
     def get_engine_state(self) -> Dict:
         """UI-friendly consolidated state: why the engine is/isn't taking trades.
@@ -4298,6 +4407,7 @@ class TradingEngine:
             "max_trades_per_day": self._active_max_trades_per_day(),
             "now_utc": now.isoformat(),
             "trading_hours_utc": f"{settings.trading_start_hour:02d}:00-{settings.trading_end_hour:02d}:00",
+            "market_notice": self._market_notice(now),
         }
 
     def get_watchlist_status(self) -> List[Dict]:
@@ -4309,6 +4419,7 @@ class TradingEngine:
         out: List[Dict] = []
         for inst, result in dict(self._last_scan_results).items():
             score = float(getattr(result, "score", 0) or 0)
+            no_trade = self._last_no_trade_reasons.get(inst)
             convergence = bool(getattr(result, "htf_ltf_convergence", False))
             htf = getattr(result, "htf_trend", "")
             ltf = getattr(result, "ltf_trend", "")
@@ -4320,7 +4431,11 @@ class TradingEngine:
                 status_text = "Setup en cola — pendiente de aprobación"
             elif score >= 75 and convergence:
                 status = "ready_waiting"
-                status_text = "HTF alineado, score alto — esperando patrón de entrada"
+                status_text = (
+                    no_trade["reason"]
+                    if no_trade and no_trade.get("stage") == "setup"
+                    else "HTF alineado, score alto — esperando patrón de entrada"
+                )
             elif score >= 55:
                 status = "forming"
                 status_text = "Condiciones formándose — aún sin patrón claro"
@@ -4339,6 +4454,7 @@ class TradingEngine:
                 "convergence": convergence,
                 "status": status,
                 "status_text": status_text,
+                "no_trade_reason": no_trade,
             })
         # Sort by score descending so the best candidates show first
         out.sort(key=lambda d: d["score"], reverse=True)

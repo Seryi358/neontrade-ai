@@ -22,7 +22,7 @@ interface NewsBannerProps {
 }
 
 interface ReasonCopy {
-  icon: string;       // unicode glyph
+  icon: string;
   title: string;
   subtitle: string;
   accent: string;     // left border color
@@ -49,16 +49,25 @@ function formatResumeHHMM(iso: string | null): string {
 
 function reasonCopy(state: EngineState): ReasonCopy | null {
   const reason: PausedReason = state.paused_reason;
+  if (!reason && state.market_notice) {
+    return {
+      icon: state.market_notice.country || 'CAL',
+      title: state.market_notice.title,
+      subtitle: state.market_notice.message,
+      accent: AMBER_ACCENT,
+      bg: AMBER_BG,
+    };
+  }
   if (!reason) return null;
 
   const resumeAt = formatResumeHHMM(state.resumes_at_utc);
   const news = state.news?.active;
 
   if (reason === 'news_blackout') {
-    const flag = news ? flagForCurrency(news.currency) : '\u{1F4F0}';
+    const flag = news ? flagForCurrency(news.currency) : 'NEWS';
     const title = news ? `${flag} ${news.title}` : 'News blackout activo';
     return {
-      icon: '\u23F0',  // ⏰
+      icon: 'N',
       title,
       subtitle: `Sin nuevos trades hasta ${resumeAt}`,
       accent: AMBER_ACCENT,
@@ -67,7 +76,7 @@ function reasonCopy(state: EngineState): ReasonCopy | null {
   }
   if (reason === 'out_of_hours') {
     return {
-      icon: '\u{1F319}',
+      icon: 'OFF',
       title: 'Engine inactivo',
       subtitle: `Reanuda a las ${resumeAt}`,
       accent: GRAY_ACCENT,
@@ -76,7 +85,7 @@ function reasonCopy(state: EngineState): ReasonCopy | null {
   }
   if (reason === 'friday_close') {
     return {
-      icon: '\u{1F4C5}',
+      icon: 'FRI',
       title: 'Fin de semana',
       subtitle: `Mercado cerrado — reanuda el lunes ${resumeAt}`,
       accent: GRAY_ACCENT,
@@ -85,7 +94,7 @@ function reasonCopy(state: EngineState): ReasonCopy | null {
   }
   if (reason === 'friday_no_new_trades') {
     return {
-      icon: '\u{1F4C5}',
+      icon: 'FRI',
       title: 'Viernes: sin nuevos trades',
       subtitle: `Cierre de semana a las ${resumeAt}`,
       accent: AMBER_ACCENT,
@@ -94,7 +103,7 @@ function reasonCopy(state: EngineState): ReasonCopy | null {
   }
   if (reason === 'max_trades_reached') {
     return {
-      icon: '\u2713',
+      icon: 'MAX',
       title: `${state.setups_executed_today}/${state.max_trades_per_day} trades ejecutados hoy`,
       subtitle: `Reanuda mañana ${resumeAt}`,
       accent: GREEN_ACCENT,
@@ -103,7 +112,7 @@ function reasonCopy(state: EngineState): ReasonCopy | null {
   }
   if (reason === 'cooldown_after_losses') {
     return {
-      icon: '\u{1F6E1}',
+      icon: 'DD',
       title: 'Cooldown post-pérdidas',
       subtitle: `Reanuda ${resumeAt}`,
       accent: SHIELD_ACCENT,
@@ -141,6 +150,7 @@ export default function NewsBanner({ state }: NewsBannerProps) {
   if (!state || !copy) return null;
 
   const news = state.news?.active;
+  const showCountdown = !!state.paused_reason;
   const countdownDisplay = countdown.totalSeconds > 0 ? countdown.mmss : '00:00';
 
   return (
@@ -167,10 +177,17 @@ export default function NewsBanner({ state }: NewsBannerProps) {
             {copy.subtitle}
           </Text>
         </View>
-        <View style={styles.countdownWrap}>
-          <Text style={[styles.countdown, { color: copy.accent }]}>{countdownDisplay}</Text>
-          <Text style={styles.countdownLabel}>restante</Text>
-        </View>
+        {showCountdown ? (
+          <View style={styles.countdownWrap}>
+            <Text style={[styles.countdown, { color: copy.accent }]}>{countdownDisplay}</Text>
+            <Text style={styles.countdownLabel}>restante</Text>
+          </View>
+        ) : (
+          <View style={styles.countdownWrap}>
+            <Text style={[styles.countdown, { color: copy.accent }]}>INFO</Text>
+            <Text style={styles.countdownLabel}>aviso</Text>
+          </View>
+        )}
       </TouchableOpacity>
       {expanded && (
         <View style={[styles.details, { borderLeftColor: copy.accent }]}>
@@ -196,6 +213,9 @@ export default function NewsBanner({ state }: NewsBannerProps) {
             <Text style={styles.detailRow}>
               Pérdidas consecutivas: {state.consecutive_losses_today}
             </Text>
+          )}
+          {state.market_notice && !state.paused_reason && (
+            <Text style={styles.detailRow}>{state.market_notice.message}</Text>
           )}
         </View>
       )}
@@ -224,7 +244,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   iconWrap: {
-    width: 32,
+    width: 36,
     height: 32,
     borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.5)',
@@ -232,7 +252,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   icon: {
-    fontSize: 18,
+    fontSize: 11,
     fontWeight: '600',
   },
   textBlock: {

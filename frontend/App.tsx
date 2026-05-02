@@ -282,11 +282,11 @@ function LogScreen() {
 // ── Tab Bar Icon ────────────────────────────────────────
 
 const TAB_ICONS: Record<string, string> = {
-  HQ: '\u25C7',       // ◇
-  TRADE: '\u25C8',    // ◈
-  MARKET: '\u25C6',   // ◆
-  LOG: '\u25A3',      // ▣
-  SYS: '\u2699',      // ⚙
+  HQ: 'HQ',
+  TRADE: 'TR',
+  MARKET: 'MK',
+  LOG: 'LG',
+  SYS: 'ST',
 };
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
@@ -306,7 +306,8 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 
 const tabIconStyles = StyleSheet.create({
   icon: {
-    fontSize: 18,
+    fontSize: 11,
+    fontWeight: '700',
     marginTop: 2,
   },
 });
@@ -403,190 +404,14 @@ export default function App() {
   // Transforms React Native Web white cards into translucent glass panels
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-
-    // Dark mode color map
-    const DARK_COLOR_MAP: Record<string, string> = {
-      'rgb(29, 29, 31)': '#f5f5f7',
-      'rgb(134, 134, 139)': '#a1a1a6',
-      'rgb(174, 174, 178)': '#636366',
-      'rgb(242, 242, 247)': '#000000',
-    };
-
-    // Card backgrounds to detect (RN Web renders cards as white variants)
-    const isCardBg = (bg: string): boolean => {
-      return bg === 'rgb(255, 255, 255)' ||
-             bg === 'rgba(255, 255, 255, 0.75)' ||
-             bg === 'rgba(255, 255, 255, 0.92)' ||
-             bg === 'rgba(255, 255, 255, 0.85)' ||
-             bg === 'rgb(242, 242, 242)' ||
-             bg.startsWith('rgba(255, 255, 255, 0.');
-    };
-    const isGroupedBg = (bg: string): boolean => {
-      return bg === 'rgb(242, 242, 247)';
-    };
-
-    let originalStyles = new WeakMap<HTMLElement, {
-      color?: string; bg?: string; backdrop?: string;
-      border?: string; boxShadow?: string; backgroundImage?: string;
-    }>();
-
-    const saveOriginal = (el: HTMLElement) => {
-      if (!originalStyles.has(el)) {
-        originalStyles.set(el, {
-          color: el.style.color,
-          bg: el.style.backgroundColor,
-          backdrop: (el.style as any).backdropFilter,
-          border: el.style.border,
-          boxShadow: el.style.boxShadow,
-          backgroundImage: el.style.backgroundImage,
-        });
-      }
-    };
-
-    const applyLiquidGlass = (isDark: boolean) => {
-      // Root background gradient (iOS 26 style)
-      if (isDark) {
-        document.body.style.setProperty('background',
-          'radial-gradient(ellipse at top, #1a1a2e 0%, #000000 60%, #000000 100%)',
-          'important');
-        document.body.style.setProperty('min-height', '100vh', 'important');
-      } else {
-        document.body.style.setProperty('background',
-          'radial-gradient(ellipse at top, #f5f5f7 0%, #e8e8f0 100%)',
-          'important');
-      }
-
-      const all = document.querySelectorAll('*') as NodeListOf<HTMLElement>;
-      all.forEach(el => {
-        saveOriginal(el);
-        const cs = getComputedStyle(el);
-        const color = cs.color;
-        const bg = cs.backgroundColor;
-        const rect = el.getBoundingClientRect();
-        const isLarge = rect.width > 100 && rect.height > 40;
-
-        // Dark mode: invert text colors
-        if (isDark && DARK_COLOR_MAP[color]) {
-          el.style.setProperty('color', DARK_COLOR_MAP[color], 'important');
-        }
-
-        // Liquid Glass transformation for card-like elements (white/translucent bg + large size)
-        if (isCardBg(bg) && isLarge) {
-          if (isDark) {
-            // Dark glass: translucent dark with saturated blur
-            el.style.setProperty('background',
-              'linear-gradient(135deg, rgba(44,44,46,0.72) 0%, rgba(28,28,30,0.48) 100%)',
-              'important');
-            el.style.setProperty('backdrop-filter', 'blur(40px) saturate(200%)', 'important');
-            (el.style as any).webkitBackdropFilter = 'blur(40px) saturate(200%)';
-            el.style.setProperty('border', '1px solid rgba(255,255,255,0.12)', 'important');
-            el.style.setProperty('box-shadow',
-              '0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
-              'important');
-          } else {
-            // Light glass: translucent white with blur
-            el.style.setProperty('background',
-              'linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.55) 100%)',
-              'important');
-            el.style.setProperty('backdrop-filter', 'blur(40px) saturate(180%)', 'important');
-            (el.style as any).webkitBackdropFilter = 'blur(40px) saturate(180%)';
-            el.style.setProperty('border', '1px solid rgba(255,255,255,0.6)', 'important');
-            el.style.setProperty('box-shadow',
-              '0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
-              'important');
-          }
-        }
-
-        // Background layer (grouped background → transparent so body gradient shows)
-        if (isGroupedBg(bg)) {
-          el.style.setProperty('background-color', 'transparent', 'important');
-        }
-      });
-    };
-
-    const removeAllStyles = () => {
+    document.body.style.setProperty(
+      'background',
+      'radial-gradient(ellipse at top, #f8f8fb 0%, #ececf3 100%)',
+    );
+    document.body.style.setProperty('min-height', '100vh');
+    return () => {
       document.body.style.removeProperty('background');
       document.body.style.removeProperty('min-height');
-      const all = document.querySelectorAll('*') as NodeListOf<HTMLElement>;
-      all.forEach(el => {
-        const orig = originalStyles.get(el);
-        if (orig) {
-          if (orig.color !== undefined) el.style.color = orig.color;
-          else el.style.removeProperty('color');
-          if (orig.bg !== undefined) el.style.backgroundColor = orig.bg;
-          else el.style.removeProperty('background-color');
-          if (orig.backgroundImage !== undefined) el.style.backgroundImage = orig.backgroundImage;
-          else el.style.removeProperty('background-image');
-          if (orig.backdrop !== undefined) (el.style as any).backdropFilter = orig.backdrop;
-          else el.style.removeProperty('backdrop-filter');
-          (el.style as any).webkitBackdropFilter = '';
-          if (orig.border !== undefined) el.style.border = orig.border;
-          else el.style.removeProperty('border');
-          if (orig.boxShadow !== undefined) el.style.boxShadow = orig.boxShadow;
-          else el.style.removeProperty('box-shadow');
-        }
-      });
-      originalStyles = new WeakMap();
-    };
-
-    let observer: MutationObserver | null = null;
-    let currentMode: 'dark' | 'light' | null = null;
-    // Re-entry guard: applyLiquidGlass mutates inline styles, which the
-    // MutationObserver would re-observe and re-fire forever. We also watch
-    // only `class` + `childList` (not `style`) and debounce to rAF so that
-    // rapid React renders coalesce into a single re-apply.
-    let applying = false;
-    let rafHandle: number | null = null;
-
-    const safeApply = (isDark: boolean) => {
-      if (applying) return;
-      applying = true;
-      try {
-        if (observer) observer.disconnect();
-        applyLiquidGlass(isDark);
-      } finally {
-        if (observer) {
-          observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['class'],
-          });
-        }
-        applying = false;
-      }
-    };
-
-    const updateTheme = () => {
-      const hour = new Date().getHours();
-      const isDark = hour >= 18 || hour < 6;
-      const newMode = isDark ? 'dark' : 'light';
-      document.body.classList.toggle('dark-mode', isDark);
-
-      if (newMode !== currentMode) {
-        if (observer) { observer.disconnect(); observer = null; }
-        if (currentMode !== null) removeAllStyles();
-        currentMode = newMode;
-        // Coalesced rAF re-apply: batches many React DOM mutations into one
-        // full-tree style pass instead of paying O(N) per mutation event.
-        observer = new MutationObserver(() => {
-          if (applying) return;
-          if (rafHandle !== null) return;
-          rafHandle = requestAnimationFrame(() => {
-            rafHandle = null;
-            safeApply(isDark);
-          });
-        });
-        safeApply(isDark);
-      }
-    };
-
-    updateTheme();
-    const interval = setInterval(updateTheme, 60000);
-    return () => {
-      clearInterval(interval);
-      if (rafHandle !== null) cancelAnimationFrame(rafHandle);
-      if (observer) observer.disconnect();
     };
   }, []);
 

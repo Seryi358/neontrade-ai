@@ -58,13 +58,6 @@ const BROKERS = [
     active: true,
     badge: 'Activo',
   },
-  {
-    id: 'ibkr',
-    name: 'Interactive Brokers',
-    description: 'Broker profesional con acceso global a todos los mercados',
-    active: false,
-    badge: 'Pendiente OAuth',
-  },
 ];
 
 const STRATEGIES = [
@@ -642,14 +635,6 @@ export default function SettingsScreen() {
     );
   }
 
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <ErrorState message={error} onRetry={fetchData} />
-      </View>
-    );
-  }
-
   // ── Render ─────────────────────────────────────────
 
   return (
@@ -668,6 +653,15 @@ export default function SettingsScreen() {
         title="SYSTEM CONFIGURATION"
         subtitle="// SYS"
       />
+
+      {error && (
+        <HUDCard accentColor={theme.colors.loss}>
+          <ErrorState message={error} onRetry={fetchData} />
+          <Text style={styles.hintText}>
+            Puedes corregir Backend URL y API Key en System Info aunque el servidor no responda.
+          </Text>
+        </HUDCard>
+      )}
 
       {/* ═══ 2. Mode Control Card ════════════════════════ */}
       <HUDCard accentColor={theme.colors.cp2077Yellow}>
@@ -1076,8 +1070,6 @@ export default function SettingsScreen() {
         </Text>
 
         {[
-          { key: 'telegram_enabled', label: 'Telegram' },
-          { key: 'discord_enabled', label: 'Discord' },
           { key: 'gmail_enabled', label: 'Gmail OAuth2' },
         ].map((ch) => (
           <View key={ch.key} style={styles.configRow}>
@@ -1091,7 +1083,7 @@ export default function SettingsScreen() {
           </View>
         ))}
 
-        {(alertConfig.telegram_enabled || alertConfig.discord_enabled || alertConfig.gmail_enabled) && (
+        {alertConfig.gmail_enabled && (
           <>
             <HUDDivider />
             <HUDStatRow
@@ -1238,7 +1230,7 @@ export default function SettingsScreen() {
                     setBackendUrl(backendUrlDraft);
                     setBackendUrlState(backendUrlDraft);
                     setEditingBackendUrl(false);
-                    Alert.alert('Backend', 'URL actualizada. Reinicia la app para aplicar.');
+                    Alert.alert('Backend', 'URL actualizada. Reconectando...');
                   } else {
                     Alert.alert('Error', 'URL debe empezar con http:// o https://');
                   }
@@ -1263,7 +1255,7 @@ export default function SettingsScreen() {
               resetBackendUrl();
               setBackendUrlState('http://localhost:8000');
               setEditingBackendUrl(false);
-              Alert.alert('Backend', 'Restaurado a localhost. Reinicia la app.');
+              Alert.alert('Backend', 'Restaurado a localhost. Reconectando...');
             }}
           >
             <Text style={styles.resetLinkText}>Restaurar a localhost</Text>

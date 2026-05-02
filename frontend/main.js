@@ -1,5 +1,5 @@
 /**
- * NeonTrade AI - Electron Main Process
+ * Atlas - Electron Main Process
  * Self-contained desktop app: auto-starts Python backend on launch.
  */
 
@@ -134,26 +134,25 @@ function createSplash() {
   body {
     height: 100vh; display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    background: linear-gradient(145deg, #0a0a1a 0%, #1a0a2e 40%, #0f0a20 100%);
+    background: linear-gradient(145deg, rgba(255,255,255,0.88) 0%, rgba(242,242,247,0.62) 100%);
     font-family: ${fontFamily};
-    border-radius: 18px; border: 1px solid rgba(235,78,202,0.3);
+    border-radius: 22px; border: 1px solid rgba(255,255,255,0.72);
     overflow: hidden; -webkit-app-region: drag;
   }
   .glow-ring {
     width: 80px; height: 80px; border-radius: 50%;
-    border: 2px solid #eb4eca; margin-bottom: 24px;
+    border: 2px solid rgba(0,122,255,0.32); margin-bottom: 24px;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 20px rgba(235,78,202,0.4), inset 0 0 20px rgba(235,78,202,0.1);
+    box-shadow: 0 20px 44px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9);
     animation: pulse 2s ease-in-out infinite;
   }
-  .glow-ring span { font-size: 32px; color: #fff; font-weight: bold; }
+  .glow-ring span { font-size: 32px; color: #007AFF; font-weight: bold; }
   @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 20px rgba(235,78,202,0.4), inset 0 0 20px rgba(235,78,202,0.1); }
-    50% { box-shadow: 0 0 40px rgba(235,78,202,0.6), inset 0 0 30px rgba(235,78,202,0.2); }
+    0%, 100% { box-shadow: 0 20px 44px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9); }
+    50% { box-shadow: 0 24px 54px rgba(0,122,255,0.16), inset 0 1px 0 rgba(255,255,255,0.95); }
   }
-  h1 { font-size: 26px; letter-spacing: 8px; color: #eb4eca; margin-bottom: 6px;
-    text-shadow: 0 0 10px rgba(235,78,202,0.5), 0 0 20px rgba(235,78,202,0.3); }
-  .subtitle { font-size: 11px; color: #00f0ff; letter-spacing: 5px; margin-bottom: 30px; }
+  h1 { font-size: 26px; letter-spacing: 4px; color: #1d1d1f; margin-bottom: 6px; }
+  .subtitle { font-size: 11px; color: #007AFF; letter-spacing: 3px; margin-bottom: 30px; }
   .status {
     font-size: 10px; color: #888; letter-spacing: 2px;
     animation: blink 1.5s step-end infinite;
@@ -164,7 +163,7 @@ function createSplash() {
     margin-top: 14px; overflow: hidden;
   }
   .bar-fill {
-    height: 100%; width: 30%; background: linear-gradient(90deg, #eb4eca, #00f0ff);
+    height: 100%; width: 30%; background: linear-gradient(90deg, #007AFF, #AF52DE);
     border-radius: 2px; animation: loading 1.8s ease-in-out infinite;
   }
   @keyframes loading {
@@ -174,8 +173,8 @@ function createSplash() {
   }
 </style></head><body>
   <div class="glow-ring"><span>N</span></div>
-  <h1>NEONTRADE</h1>
-  <div class="subtitle">AI TRADING BOT</div>
+  <h1>ATLAS</h1>
+  <div class="subtitle">CAPITAL.COM TRADING</div>
   <div class="status" id="s">INICIANDO SISTEMA...</div>
   <div class="bar"><div class="bar-fill"></div></div>
 </body></html>`;
@@ -287,7 +286,7 @@ async function startBackend() {
     dialog.showMessageBoxSync({
       type: 'error',
       title: 'Python no encontrado',
-      message: 'NeonTrade AI necesita Python 3.10+\n\nDescárgalo en:\nhttps://www.python.org/downloads/',
+      message: 'Atlas necesita Python 3.10+\n\nDescárgalo en:\nhttps://www.python.org/downloads/',
     });
     return false;
   }
@@ -358,10 +357,10 @@ function createWindow() {
     height: 880,
     minWidth: 900,
     minHeight: 650,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: '#f2f2f7',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    title: 'NeonTrade AI',
+    title: 'Atlas',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -380,7 +379,7 @@ function createWindow() {
     if (fs.existsSync(appDistIndex)) {
       mainWindow.loadFile(appDistIndex);
     } else {
-      mainWindow.loadURL(`data:text/html,<h1 style="color:#eb4eca;font-family:monospace;text-align:center;margin-top:40vh">Error: dist/index.html not found</h1>`);
+      mainWindow.loadURL(`data:text/html,<h1 style="color:#1d1d1f;font-family:-apple-system,Helvetica,Arial,sans-serif;text-align:center;margin-top:40vh">Error: dist/index.html not found</h1>`);
     }
   }
 
@@ -406,7 +405,7 @@ function createMenu() {
   const isMac = process.platform === 'darwin';
   const template = [
     ...(isMac ? [{
-      label: 'NeonTrade AI',
+      label: 'Atlas',
       submenu: [
         { role: 'about' },
         { type: 'separator' },
@@ -477,7 +476,7 @@ app.whenReady().then(async () => {
     dialog.showMessageBoxSync({
       type: 'error',
       title: 'Error fatal',
-      message: `NeonTrade AI falló al iniciar:\n\n${e.message}\n\nRevisa la consola para más detalles.`,
+      message: `Atlas falló al iniciar:\n\n${e.message}\n\nRevisa la consola para más detalles.`,
     });
     app.quit();
   }

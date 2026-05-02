@@ -834,7 +834,7 @@ def test_24_config_all_defaults():
         check("Settings() with defaults no error", True)
         check("min_rr_ratio is set", s.min_rr_ratio > 0)
         check("trading_style is set", s.trading_style in ("day_trading", "scalping", "swing"))
-        check("active_broker is set", s.active_broker in ("oanda", "capital", "ibkr"))
+        check("active_broker is set", s.active_broker == "capital")
         check("forex_watchlist is non-empty", len(s.forex_watchlist) > 0)
         check("crypto_watchlist is non-empty", len(s.crypto_watchlist) > 0)
         check("drawdown_method is valid", s.drawdown_method in ("fixed_1pct", "variable", "fixed_levels"))

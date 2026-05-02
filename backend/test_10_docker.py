@@ -99,7 +99,7 @@ else:
 # Copy to .env and fill in your values
 
 # ── Broker Selection ──────────────────────────────────────────
-# Options: "capital", "oanda", "ibkr"
+# Options: "capital"
 ACTIVE_BROKER=capital
 
 # ── Capital.com ───────────────────────────────────────────────
@@ -108,18 +108,6 @@ CAPITAL_PASSWORD=
 CAPITAL_IDENTIFIER=
 CAPITAL_ENVIRONMENT=demo
 CAPITAL_ACCOUNT_ID=
-
-# ── OANDA (alternative) ──────────────────────────────────────
-OANDA_API_KEY=
-OANDA_ACCOUNT_ID=
-OANDA_ENVIRONMENT=practice
-
-# ── Interactive Brokers ───────────────────────────────────────
-IBKR_CONSUMER_KEY=
-IBKR_ACCESS_TOKEN=
-IBKR_ACCESS_TOKEN_SECRET=
-IBKR_KEYS_DIR=keys
-IBKR_ENVIRONMENT=live
 
 # ── OpenAI ────────────────────────────────────────────────────
 OPENAI_API_KEY=

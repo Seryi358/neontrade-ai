@@ -395,9 +395,9 @@ class Settings(BaseSettings):
         # Energy (from mentorship course materials: CL, QM, HO, NG, QG, EH, RB)
         "BCO_USD", "WTICO_USD", "NATGAS_USD",
         # Agricultural (from mentorship course materials: ZW, KE, ZC, ZO, ZS, ZL, ZM, ZR, SB, KC, CC, LBS + livestock)
-        # Oanda CFDs available:
+        # Capital.com CFDs available:
         "WHEAT_USD", "CORN_USD", "SOYBN_USD", "SUGAR_USD",
-        # Not available as Oanda CFDs: oats (ZO), soybean oil (ZL), soybean meal (ZM),
+        # Not available in the current Capital.com execution set: oats (ZO), soybean oil (ZL), soybean meal (ZM),
         # rough rice (ZR), KC wheat (KE), cocoa (CC), coffee (KC), lumber (LBS),
         # lean hogs (HE), live cattle (LE), feeder cattle (GF), milk (DC)
         # Metals (from mentorship course materials: PL, PA, SI, GC, HG)

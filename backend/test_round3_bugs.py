@@ -683,7 +683,7 @@ class TestConfigValidation:
 
     def test_settings_broker_options(self):
         """Verify all broker types are valid."""
-        valid_brokers = ("ibkr", "capital", "oanda")
+        valid_brokers = ("capital",)
         from config import Settings
         for broker in valid_brokers:
             s = Settings(active_broker=broker)

@@ -22,9 +22,9 @@ function getBaseUrl(): string {
   let pageIsRemoteHttp = false;
   if (typeof window !== 'undefined' && window.location) {
     const { hostname, protocol, port } = window.location;
-    pageIsRemoteHttp = (protocol === 'http:' || protocol === 'https:') && !isLocalHost(hostname);
-    if (pageIsRemoteHttp) {
+    if (protocol === 'http:' || protocol === 'https:') {
       sameOriginBase = `${protocol}//${hostname}${port ? ':' + port : ''}`;
+      pageIsRemoteHttp = !isLocalHost(hostname);
     }
   }
 
@@ -47,8 +47,8 @@ function getBaseUrl(): string {
   if (typeof window !== 'undefined' && (window as any).__ATLAS_API_HOST__) {
     return `http://${(window as any).__ATLAS_API_HOST__}`;
   }
-  // 3. Auto-detect: if served from a non-localhost HTTP origin (EasyPanel/VPS),
-  //    use that origin as the API base URL (same-origin deployment)
+  // 3. Auto-detect same-origin deployment. This is required for EasyPanel/VPS
+  //    and also avoids localhost vs 127.0.0.1 mismatches in local QA.
   if (sameOriginBase) {
     return sameOriginBase;
   }
@@ -83,8 +83,8 @@ export function resetBackendUrl(): void {
   if (typeof window !== 'undefined') {
     try { window.localStorage.removeItem('atlas_backend_url'); } catch {}
   }
-  API_URL = DEFAULT_URL;
-  WS_URL = DEFAULT_URL.replace('http', 'ws') + '/ws';
+  API_URL = getBaseUrl();
+  WS_URL = API_URL.replace('http', 'ws') + '/ws';
   // Reconnect WebSocket to default URL
   wsManager.resetAuth();
   wsManager.disconnect();

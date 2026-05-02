@@ -296,15 +296,21 @@ security_config = SecurityConfig()
 # Module-level rate limiter instance for periodic cleanup from main.py
 rate_limiter = RateLimiter()
 
-# Auto-register API key from env (API_SECRET_KEY) if no keys exist yet
+# Auto-register API key from env (API_SECRET_KEY)
 def _bootstrap_env_key():
-    """If API_SECRET_KEY is set in env and no keys exist, register it."""
+    """Register API_SECRET_KEY so the injected frontend key can authenticate.
+
+    Deployments may already have persisted API keys in data/security.json. The
+    env key still has to be accepted because main.py injects that exact value
+    into the served frontend for same-origin API calls.
+    """
     from config import settings
     env_key = getattr(settings, 'api_secret_key', '')
-    if env_key and not security_config.api_keys:
+    if env_key:
         key_hash = SecurityConfig._hash_key(env_key)
-        security_config.api_keys[key_hash] = "env_bootstrap"
-        security_config.save()
-        logger.info("API key registered from API_SECRET_KEY env var")
+        if key_hash not in security_config.api_keys:
+            security_config.api_keys[key_hash] = "env_bootstrap"
+            security_config.save()
+            logger.info("API key registered from API_SECRET_KEY env var")
 
 _bootstrap_env_key()

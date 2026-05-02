@@ -591,6 +591,9 @@ export default function AnalysisScreen() {
   );
 
   // ── Main Render ───────────────────────────────────────────────────────────
+  const isWaitingForScan = Boolean(
+    error && /esperando|disponible|escaneo inicial|analizando pares/i.test(error),
+  );
 
   return (
     <View style={styles.container}>
@@ -625,7 +628,7 @@ export default function AnalysisScreen() {
           <LoadingState message={`Analizando ${selectedInstrument.replace('_', '/')}...`} />
         ) : error ? (
           <View style={styles.centerMessage}>
-            {error.includes('esperando') || error.includes('disponible') ? (
+            {isWaitingForScan ? (
               <>
                 <ActivityIndicator size="large" color={theme.colors.neonCyan} />
                 <Text style={[styles.waitingText, { marginTop: 16 }]}>{error}</Text>

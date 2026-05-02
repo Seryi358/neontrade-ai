@@ -378,7 +378,7 @@ class TestFormatNotification:
         assert "GBP_JPY" in result
         assert "Sin señal" in result
 
-    def test_bullish_gets_green_emoji(self, engine):
+    def test_bullish_notification_is_text_only(self, engine):
         explanation = StrategyExplanation(
             instrument="EUR_USD",
             timestamp="",
@@ -397,9 +397,10 @@ class TestFormatNotification:
             confidence_level="ALTA",
         )
         result = engine.format_for_notification(explanation)
-        assert "🟢" in result
+        assert "ALCISTA" in result
+        assert "🟢" not in result
 
-    def test_bearish_gets_red_emoji(self, engine):
+    def test_bearish_notification_is_text_only(self, engine):
         explanation = StrategyExplanation(
             instrument="EUR_USD",
             timestamp="",
@@ -418,7 +419,8 @@ class TestFormatNotification:
             confidence_level="ALTA",
         )
         result = engine.format_for_notification(explanation)
-        assert "🔴" in result
+        assert "BAJISTA" in result
+        assert "🔴" not in result
 
 
 # ──────────────────────────────────────────────────────────────────

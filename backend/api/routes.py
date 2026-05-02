@@ -972,22 +972,6 @@ async def get_current_broker():
                 "demo_available": True,
                 "implemented": True,
             },
-            {
-                "id": "icmarkets",
-                "name": "IC Markets",
-                "description": "ECN broker australiano con spreads bajos.",
-                "safe_in_colombia": True,
-                "demo_available": True,
-                "implemented": False,
-            },
-            {
-                "id": "pepperstone",
-                "name": "Pepperstone",
-                "description": "Broker australiano regulado con MT4/MT5.",
-                "safe_in_colombia": True,
-                "demo_available": True,
-                "implemented": False,
-            },
         ],
     }
 

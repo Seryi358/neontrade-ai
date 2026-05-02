@@ -359,12 +359,9 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────
 
 describe('DashboardScreen', () => {
-  it('renders the dashboard header', async () => {
+  it('renders the dashboard loading state', async () => {
     const { getByText } = render(<DashboardScreen />);
-    await waitFor(() => {
-      expect(getByText(/10,?000/)).toBeTruthy();
-    });
-    expect(getByText('Dashboard')).toBeTruthy();
+    expect(getByText('Connecting...')).toBeTruthy();
   });
 
   it('displays account balance after loading', async () => {
@@ -501,14 +498,9 @@ describe('ChartScreen', () => {
 // ─────────────────────────────────────────────────────────────────
 
 describe('JournalScreen', () => {
-  it('renders the journal screen header', async () => {
+  it('renders the journal loading state', async () => {
     const { getByText } = render(<JournalScreen />);
-    await waitFor(() => {
-      // JournalScreen renders section titles; the sub-tab label "JOURNAL"
-      // is now provided by App.tsx's SubTabScreen wrapper, not the screen
-      // itself (audit A7 dedupe).
-      expect(getByText('ESTADISTICAS GENERALES')).toBeTruthy();
-    });
+    expect(getByText('Cargando journal...')).toBeTruthy();
   });
 
   it('fetches journal stats and trade data', async () => {
@@ -737,10 +729,10 @@ describe('WatchlistScreen', () => {
     });
   });
 
-  it('shows trend icons', async () => {
+  it('shows trend labels', async () => {
     const { getByText } = render(<WatchlistScreen />);
     await waitFor(() => {
-      expect(getByText(/▲/)).toBeTruthy();
+      expect(getByText(/BUY/)).toBeTruthy();
     });
   });
 

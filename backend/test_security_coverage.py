@@ -5,6 +5,8 @@ Tests for security.py — covering API key auth, rate limiting, IP whitelist.
 import pytest
 import time
 from unittest.mock import patch, MagicMock
+import config as config_module
+import core.security as security_module
 from core.security import SecurityConfig, RateLimiter, PUBLIC_ENDPOINTS
 
 
@@ -85,6 +87,23 @@ class TestSecurityConfig:
         config.ip_whitelist = ["192.168.1.1", "10.0.0.1"]
         assert config.check_ip("192.168.1.1") is True
         assert config.check_ip("172.16.0.1") is False
+
+    def test_bootstrap_env_key_registers_with_existing_keys(self, monkeypatch):
+        """API_SECRET_KEY must remain valid even when security.json has keys."""
+        config = SecurityConfig.__new__(SecurityConfig)
+        config.api_keys = {SecurityConfig._hash_key("old_key"): "existing"}
+        config.auth_enabled = True
+
+        env_key = "nt_env_frontend_key"
+        monkeypatch.setattr(security_module, "security_config", config)
+        monkeypatch.setattr(config_module.settings, "api_secret_key", env_key)
+
+        with patch.object(config, "save") as save:
+            security_module._bootstrap_env_key()
+
+        assert config.validate_key(env_key) is True
+        assert config.validate_key("old_key") is True
+        save.assert_called_once()
 
 
 # ──────────────────────────────────────────────────────────────────

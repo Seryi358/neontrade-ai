@@ -437,8 +437,8 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
     <View style={glassStyles.errorContainer}>
       <View style={glassStyles.errorContent}>
         <View style={glassStyles.errorHeaderRow}>
-          <Text style={glassStyles.errorIconText}>{'\u26A0'}</Text>
-          <Text style={glassStyles.errorTitle}>Something went wrong</Text>
+          <Text style={glassStyles.errorIconText}>!</Text>
+          <Text style={glassStyles.errorTitle}>No se pudo cargar</Text>
         </View>
         <Text style={glassStyles.errorMessage}>{message}</Text>
         {onRetry && (
@@ -447,7 +447,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
             onPress={onRetry}
             activeOpacity={0.7}
           >
-            <Text style={glassStyles.retryButtonText}>Try Again</Text>
+            <Text style={glassStyles.retryButtonText}>Reintentar</Text>
           </TouchableOpacity>
         )}
       </View>

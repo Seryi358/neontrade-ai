@@ -525,13 +525,13 @@ class TestBroker:
         assert data["broker"] == "capital"
         assert data["connected"] is True
         assert "available_brokers" in data
-        assert len(data["available_brokers"]) >= 2
+        assert [b["id"] for b in data["available_brokers"]] == ["capital"]
 
     def test_set_broker_valid(self, client):
         resp = client.post("/api/v1/broker",
                            json={"broker": "capital"})
         assert resp.status_code == 200
-        assert resp.json()["status"] == "pending_restart"
+        assert resp.json()["status"] == "active"
 
     def test_set_broker_unsupported(self, client):
         resp = client.post("/api/v1/broker",
@@ -683,16 +683,16 @@ class TestAlerts:
         resp = client.get("/api/v1/alerts/config")
         assert resp.status_code == 200
         data = resp.json()
-        assert "telegram_enabled" in data
+        assert "gmail_enabled" in data
 
     def test_set_alert_config(self, client):
         resp = client.put("/api/v1/alerts/config",
-                          json={"telegram_enabled": True, "telegram_bot_token": "tok123"})
+                          json={"gmail_enabled": True, "gmail_sender": "sender@example.com"})
         assert resp.status_code == 200
         assert "config" in resp.json()
 
     def test_test_alert_channel_valid(self, client):
-        resp = client.post("/api/v1/alerts/test/telegram")
+        resp = client.post("/api/v1/alerts/test/gmail")
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
 
@@ -974,12 +974,9 @@ class TestAlertManager:
     """Tests for the AlertManager notification system."""
 
     def test_alert_config_defaults(self):
-        """Test default AlertConfig has all channels disabled."""
+        """Test default AlertConfig has Gmail disabled."""
         from core.alerts import AlertConfig
         cfg = AlertConfig()
-        assert cfg.telegram_enabled is False
-        assert cfg.discord_enabled is False
-        assert cfg.email_enabled is False
         assert cfg.gmail_enabled is False
         assert cfg.notify_trade_executed is True
 
@@ -987,25 +984,19 @@ class TestAlertManager:
         """Test that sensitive fields are masked in get_config()."""
         from core.alerts import AlertConfig, AlertManager
         cfg = AlertConfig(
-            telegram_bot_token="12345678:ABC-DEFghiJKLmnop",
-            discord_webhook_url="https://discord.com/api/webhooks/secret123",
-            email_password="my_secret_password",
             gmail_client_secret="gmail-secret-value",
             gmail_refresh_token="refresh-token-abc123",
+            gmail_sender="sender@example.com",
         )
         mgr = AlertManager(config=cfg)
         exposed = mgr.get_config()
 
         # Sensitive fields should be masked (only last 4 chars visible)
-        assert exposed["telegram_bot_token"].endswith("mnop")
-        assert exposed["telegram_bot_token"].startswith("*")
-        assert exposed["discord_webhook_url"].endswith("t123")
-        assert exposed["email_password"].endswith("word")
         assert exposed["gmail_client_secret"].endswith("alue")
         assert exposed["gmail_refresh_token"].endswith("c123")
 
         # Non-sensitive fields should not be masked
-        assert exposed["telegram_enabled"] is False
+        assert exposed["gmail_sender"] == "sender@example.com"
 
     def test_mask_short_values(self):
         """Test masking of short values (<=4 chars)."""
@@ -1062,97 +1053,12 @@ class TestAlertManager:
         await mgr.close()
 
     @pytest.mark.asyncio
-    async def test_telegram_send_mocked(self):
-        """Test Telegram send with mocked HTTP."""
-        from core.alerts import AlertConfig, AlertManager
-        cfg = AlertConfig(
-            telegram_enabled=True,
-            telegram_bot_token="fake_token",
-            telegram_chat_id="12345",
-        )
-        mgr = AlertManager(config=cfg)
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-
-        with patch.object(mgr, '_get_http') as mock_http:
-            mock_http.return_value.post = AsyncMock(return_value=mock_response)
-            await mgr._send_telegram("Test", "Body")
-
-        await mgr.close()
-
-    @pytest.mark.asyncio
-    async def test_telegram_send_missing_config(self):
-        """Test Telegram send with missing token/chat_id (should skip)."""
-        from core.alerts import AlertConfig, AlertManager
-        cfg = AlertConfig(telegram_enabled=True)  # No token or chat_id
-        mgr = AlertManager(config=cfg)
-        # Should not raise — just skip
-        await mgr._send_telegram("Test", "Body")
-        await mgr.close()
-
-    @pytest.mark.asyncio
-    async def test_discord_send_mocked(self):
-        """Test Discord send with mocked HTTP."""
-        from core.alerts import AlertConfig, AlertManager
-        cfg = AlertConfig(
-            discord_enabled=True,
-            discord_webhook_url="https://discord.com/api/webhooks/fake",
-        )
-        mgr = AlertManager(config=cfg)
-
-        mock_response = MagicMock()
-        mock_response.status_code = 204
-
-        with patch.object(mgr, '_get_http') as mock_http:
-            mock_http.return_value.post = AsyncMock(return_value=mock_response)
-            await mgr._send_discord("Test", "Body", "test")
-
-        await mgr.close()
-
-    @pytest.mark.asyncio
-    async def test_discord_send_missing_url(self):
-        """Test Discord send with missing webhook URL (should skip)."""
-        from core.alerts import AlertConfig, AlertManager
-        cfg = AlertConfig(discord_enabled=True)  # No webhook URL
-        mgr = AlertManager(config=cfg)
-        await mgr._send_discord("Test", "Body", "test")
-        await mgr.close()
-
-    @pytest.mark.asyncio
-    async def test_email_send_missing_config(self):
-        """Test email send with incomplete config (should skip)."""
-        from core.alerts import AlertConfig, AlertManager
-        cfg = AlertConfig(email_enabled=True)  # No SMTP credentials
-        mgr = AlertManager(config=cfg)
-        await mgr._send_email("Test", "Body")
-        await mgr.close()
-
-    @pytest.mark.asyncio
     async def test_gmail_send_missing_config(self):
-        """Test Gmail send with missing OAuth2 config (should skip)."""
+        """Test Gmail send with missing sender/recipient skips."""
         from core.alerts import AlertConfig, AlertManager
         cfg = AlertConfig(gmail_enabled=True)  # No OAuth2 credentials
         mgr = AlertManager(config=cfg)
         await mgr._send_gmail("Test", "Body")
-        await mgr.close()
-
-    @pytest.mark.asyncio
-    async def test_email_send_mocked(self):
-        """Test email send with mocked SMTP."""
-        from core.alerts import AlertConfig, AlertManager
-        cfg = AlertConfig(
-            email_enabled=True,
-            email_username="test@example.com",
-            email_password="password123",
-            email_recipient="recipient@example.com",
-        )
-        mgr = AlertManager(config=cfg)
-
-        with patch.object(mgr, '_smtp_send') as mock_smtp:
-            await mgr._send_email("Test Subject", "Test body <b>bold</b>")
-            mock_smtp.assert_called_once()
-
         await mgr.close()
 
     @pytest.mark.asyncio
@@ -1190,18 +1096,18 @@ class TestAlertManager:
         """Test test_channel returns True on success."""
         from core.alerts import AlertConfig, AlertManager, AlertChannel
         cfg = AlertConfig(
-            telegram_enabled=True,
-            telegram_bot_token="tok",
-            telegram_chat_id="123",
+            gmail_enabled=True,
+            gmail_sender="sender@example.com",
+            gmail_recipient="dest@example.com",
+            gmail_client_id="client-id",
+            gmail_client_secret="client-secret",
+            gmail_refresh_token="refresh-token",
         )
         mgr = AlertManager(config=cfg)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-
-        with patch.object(mgr, '_get_http') as mock_http:
-            mock_http.return_value.post = AsyncMock(return_value=mock_response)
-            result = await mgr.test_channel(AlertChannel.TELEGRAM)
+        with patch.object(mgr, '_send_gmail', new_callable=AsyncMock) as mock_send:
+            result = await mgr.test_channel(AlertChannel.GMAIL)
+            mock_send.assert_called_once()
             assert result is True
 
         await mgr.close()
@@ -1211,29 +1117,20 @@ class TestAlertManager:
         """Test test_channel returns False on error."""
         from core.alerts import AlertConfig, AlertManager, AlertChannel
         cfg = AlertConfig(
-            telegram_enabled=True,
-            telegram_bot_token="tok",
-            telegram_chat_id="123",
+            gmail_enabled=True,
+            gmail_sender="sender@example.com",
+            gmail_recipient="dest@example.com",
+            gmail_client_id="client-id",
+            gmail_client_secret="client-secret",
+            gmail_refresh_token="refresh-token",
         )
         mgr = AlertManager(config=cfg)
 
-        with patch.object(mgr, '_get_http') as mock_http:
-            mock_http.return_value.post = AsyncMock(
-                side_effect=Exception("Network error"))
-            result = await mgr.test_channel(AlertChannel.TELEGRAM)
+        with patch.object(mgr, '_send_gmail', new_callable=AsyncMock, side_effect=Exception("Network error")):
+            result = await mgr.test_channel(AlertChannel.GMAIL)
             assert result is False
 
         await mgr.close()
-
-    def test_discord_colour_for_type(self):
-        """Test that different alert types get correct embed colours."""
-        from core.alerts import AlertManager
-        assert AlertManager._discord_colour_for_type("trade_executed") == 0x00FF9D
-        assert AlertManager._discord_colour_for_type("setup_pending") == 0xFFD700
-        assert AlertManager._discord_colour_for_type("trade_closed") == 0x3498DB
-        assert AlertManager._discord_colour_for_type("daily_summary") == 0x9B59B6
-        # Unknown type returns default
-        assert AlertManager._discord_colour_for_type("unknown") == 0x00FF9D
 
     @pytest.mark.asyncio
     async def test_safe_send_catches_exceptions(self):
@@ -1280,36 +1177,32 @@ class TestAlertManager:
         """Test update_config persists and replaces config."""
         from core.alerts import AlertConfig, AlertManager
         mgr = AlertManager(config=AlertConfig())
-        new_cfg = AlertConfig(telegram_enabled=True)
+        new_cfg = AlertConfig(gmail_enabled=True)
 
         with patch.object(mgr, '_save_config'):
             mgr.update_config(new_cfg)
 
-        assert mgr._config.telegram_enabled is True
+        assert mgr._config.gmail_enabled is True
 
     def test_alert_channel_enum(self):
         """Test AlertChannel enum values."""
         from core.alerts import AlertChannel
-        assert AlertChannel.TELEGRAM.value == "telegram"
-        assert AlertChannel.DISCORD.value == "discord"
-        assert AlertChannel.EMAIL.value == "email"
         assert AlertChannel.GMAIL.value == "gmail"
+        assert len(AlertChannel) == 1
 
 
 class TestTextHelpers:
     """Test module-level text helper functions in alerts.py."""
 
     def test_html_to_discord_md(self):
-        from core.alerts import _html_to_discord_md
-        result = _html_to_discord_md("<b>Bold</b> and <i>italic</i>")
-        assert "**Bold**" in result
-        assert "*italic*" in result
+        from core.alerts import _html_to_plain
+        result = _html_to_plain("<b>Bold</b> and <i>italic</i>")
+        assert result == "Bold and italic"
 
     def test_strip_emoji_tags(self):
-        from core.alerts import _strip_emoji_tags
-        # Function is a passthrough — emojis are plain Unicode
-        text = "\U0001F7E2 Trade Executed"
-        assert _strip_emoji_tags(text) == text
+        from core.alerts import _build_email_html
+        html = _build_email_html("Trade Executed", "Body")
+        assert "\U0001F7E2" not in html
 
 
 # ═══════════════════════════════════════════════════════════════

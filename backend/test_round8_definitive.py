@@ -1268,9 +1268,9 @@ def test_ai_explanation_alerts():
     from core.alerts import AlertConfig, AlertChannel, _mask, _SENSITIVE_FIELDS
 
     config = AlertConfig()
-    check("T271: AlertConfig default telegram disabled", config.telegram_enabled is False)
-    check("T272: AlertConfig default discord disabled", config.discord_enabled is False)
-    check("T273: AlertConfig default email disabled", config.email_enabled is False)
+    check("T271: AlertConfig has no telegram channel", not hasattr(config, "telegram_enabled"))
+    check("T272: AlertConfig has no discord channel", not hasattr(config, "discord_enabled"))
+    check("T273: AlertConfig has no smtp channel", not hasattr(config, "email_enabled"))
     check("T274: AlertConfig default gmail disabled", config.gmail_enabled is False)
     check("T275: AlertConfig default notify_trade_executed True", config.notify_trade_executed is True)
     check("T276: AlertConfig default notify_setup_pending True", config.notify_setup_pending is True)
@@ -1282,10 +1282,10 @@ def test_ai_explanation_alerts():
     check("T280: _mask short string", _mask("abc") == "****")
     check("T281: _mask long string shows last 4", _mask("abcdefgh").endswith("efgh"))
 
-    check("T282: SENSITIVE_FIELDS includes telegram_bot_token", "telegram_bot_token" in _SENSITIVE_FIELDS)
-    check("T283: SENSITIVE_FIELDS includes email_password", "email_password" in _SENSITIVE_FIELDS)
+    check("T282: SENSITIVE_FIELDS excludes telegram_bot_token", "telegram_bot_token" not in _SENSITIVE_FIELDS)
+    check("T283: SENSITIVE_FIELDS excludes email_password", "email_password" not in _SENSITIVE_FIELDS)
     check("T284: SENSITIVE_FIELDS includes gmail_client_secret", "gmail_client_secret" in _SENSITIVE_FIELDS)
-    check("T285: AlertChannel has 4 channels", len(AlertChannel) == 4)
+    check("T285: AlertChannel has Gmail only", len(AlertChannel) == 1 and AlertChannel.GMAIL.value == "gmail")
 
     # --- AI Module (286-295) ---
     try:

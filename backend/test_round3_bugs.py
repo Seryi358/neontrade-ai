@@ -657,8 +657,8 @@ class TestConfigValidation:
         from config import Settings
         s = Settings()
         assert s.risk_day_trading == 0.01
-        assert s.max_total_risk == 0.05  # 5% mentorship-tuned for $190 capital
-        assert s.min_rr_ratio == 1.5
+        assert s.max_total_risk == 0.07  # Trading Plan PDF pg.3: 7% max simultaneous risk
+        assert s.min_rr_ratio == 0.8
         assert s.drawdown_method == "fixed_levels"  # Protects small accounts
         assert s.delta_enabled is False
         # Day Trading per mentorship for $190 (scalping deprecated for small

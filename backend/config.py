@@ -670,7 +670,7 @@ def _load_risk_overrides():
         "risk_day_trading", "risk_scalping", "risk_swing", "max_total_risk",
         "correlated_risk_pct", "min_rr_ratio", "move_sl_to_be_pct_to_tp1",
         "drawdown_method", "delta_enabled", "delta_parameter", "delta_max_risk",
-        "scale_in_require_be", "min_rr_black", "min_rr_green", "min_rr_blue_c",
+        "scale_in_require_be", "max_trades_per_day", "min_rr_black", "min_rr_green", "min_rr_blue_c",
         "funded_account_mode", "funded_account_type", "funded_evaluation_type",
         "funded_max_daily_dd", "funded_max_total_dd", "funded_max_total_dd_phase2",
         "funded_profit_target_phase1", "funded_profit_target_phase2",

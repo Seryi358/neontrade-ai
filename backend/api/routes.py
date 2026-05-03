@@ -1342,6 +1342,7 @@ class RiskConfigRequest(BaseModel):
     delta_parameter: Optional[float] = None
     # Scale-in
     scale_in_require_be: Optional[bool] = None
+    max_trades_per_day: Optional[int] = None
     max_trades_per_day_scalping: Optional[int] = None
     cooldown_minutes_scalping: Optional[int] = None
     avoid_news_minutes_before_scalping: Optional[int] = None
@@ -1494,6 +1495,7 @@ async def get_risk_config():
         "position_management_style": settings.position_management_style,
         # Scale-in rule
         "scale_in_require_be": settings.scale_in_require_be,
+        "max_trades_per_day": getattr(settings, "max_trades_per_day", 3),
         "max_trades_per_day_scalping": getattr(settings, "max_trades_per_day_scalping", 10),
         "cooldown_minutes_scalping": getattr(settings, "cooldown_minutes_scalping", 30),
         # Friday trading cutoff
@@ -1592,6 +1594,12 @@ async def set_risk_config(request: RiskConfigRequest):
     if request.scale_in_require_be is not None:
         settings.scale_in_require_be = request.scale_in_require_be
         updates["scale_in_require_be"] = request.scale_in_require_be
+
+    if request.max_trades_per_day is not None:
+        if not (0 <= request.max_trades_per_day <= 10):
+            raise HTTPException(400, "max_trades_per_day debe estar entre 0 y 10")
+        settings.max_trades_per_day = request.max_trades_per_day
+        updates["max_trades_per_day"] = request.max_trades_per_day
 
     if request.max_trades_per_day_scalping is not None:
         if not (0 <= request.max_trades_per_day_scalping <= 50):

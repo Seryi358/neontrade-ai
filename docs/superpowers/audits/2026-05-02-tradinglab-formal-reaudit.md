@@ -55,6 +55,7 @@ Important operating constraint: `auto_hold_qualified_overnight_positions=false` 
 | Overnight fees | Avoid unattended overnight on small account | automatic out-of-session close enabled; qualified overnight disabled | PASS |
 | AUTO mode | AUTO executes valid setups; manual queue is not the active mode | backend `engine_mode=AUTO`; frontend reads `/mode` and shows `AUTO ACTIVO` | PASS |
 | Watchlist breadth | Operates full opportunity set when enabled | active categories: forex, forex_exotic, commodities, indices, equities, crypto | PASS |
+| Broker surface | Only Capital.com should be connected | runtime broker package contains Capital.com only; production `/api/v1/broker` reports `capital` connected | PASS |
 | Scalping | Workshop exists; scalping is riskier and uses 0.50% risk plus wider news filter | code default remains off, production override is currently enabled for the user's requested faster validation; `/api/v1/scalping/status` reports enabled | PASS / USER-REQUESTED |
 | Discretion | Alex uses discretion; automated system must avoid discretionary overrides | strict mode enabled; no discretionary override in execution path | PASS |
 
@@ -143,3 +144,4 @@ No real trade was opened by Codex during this reaudit. Real market execution is 
 - Frontend export: PASS - web bundle generated successfully.
 - Production authenticated API smoke: PASS - health, broker, account, mode, risk, strategies, watchlist, scalping, positions, news, calendar and Gmail checked.
 - Production UI smoke: PASS - AUTO dashboard, weekend closed banner, Queue/AUTO label, watchlist scroll and single score display verified in browser.
+- Legacy broker residue check: PASS - no IBKR/OANDA references in runtime broker/core/api/frontend source or maintained broker tests.

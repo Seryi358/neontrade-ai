@@ -859,10 +859,7 @@ def test_25_import_every_module():
         ("strategies.base", "ALL_STRATEGIES"),
         ("ai.openai_analyzer", "OpenAIAnalyzer"),
         ("broker.base", "BaseBroker"),
-        ("broker.oanda_client", None),
         ("broker.capital_client", None),
-        # ibkr_client requires 'cryptography' package (optional external dep)
-        # ("broker.ibkr_client", None),
         ("api.routes", "router"),
         ("core.alerts", None),
         ("core.news_filter", None),

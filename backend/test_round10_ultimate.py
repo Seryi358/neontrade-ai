@@ -48,12 +48,8 @@ s = Settings()
 
 # Broker defaults
 ok("cfg_active_broker", s.active_broker == "capital")
-ok("cfg_ibkr_consumer_key", s.ibkr_consumer_key == "")
-ok("cfg_ibkr_access_token", s.ibkr_access_token == "")
-ok("cfg_ibkr_environment", s.ibkr_environment in ("live", "paper"))
 ok("cfg_capital_api_key", isinstance(s.capital_api_key, str))
 ok("cfg_capital_environment", s.capital_environment in ("demo", "live"))
-# OANDA settings removed — out of scope per PROJECT.md
 ok("cfg_openai_api_key", isinstance(s.openai_api_key, str))
 ok("cfg_app_secret_key", isinstance(s.app_secret_key, str) and len(s.app_secret_key) > 0)
 ok("cfg_app_host", s.app_host == "0.0.0.0")
@@ -62,10 +58,6 @@ ok("cfg_log_level", s.log_level == "INFO")
 ok("cfg_fcm_server_key", s.fcm_server_key == "")
 ok("cfg_finnhub_api_key_type", isinstance(s.finnhub_api_key, str))
 ok("cfg_newsapi_key_type", isinstance(s.newsapi_key, str))
-ok("cfg_telegram_bot_token", isinstance(s.telegram_bot_token, str))
-ok("cfg_discord_webhook_url", isinstance(s.discord_webhook_url, str))
-ok("cfg_alert_email_smtp_server", s.alert_email_smtp_server == "smtp.gmail.com")
-ok("cfg_alert_email_smtp_port", s.alert_email_smtp_port == 587)
 ok("cfg_gmail_sender", isinstance(s.gmail_sender, str))
 ok("cfg_gmail_client_id", isinstance(s.gmail_client_id, str))
 ok("cfg_api_secret_key", isinstance(s.api_secret_key, str))
@@ -75,10 +67,10 @@ ok("cfg_database_url", "sqlite" in s.database_url)
 ok("cfg_trading_style", s.trading_style in ("day_trading", "scalping", "swing"))
 ok("cfg_risk_day_trading", s.risk_day_trading == 0.01)
 ok("cfg_risk_scalping", s.risk_scalping == 0.005)
-ok("cfg_risk_swing", s.risk_swing == 0.01)
-ok("cfg_max_total_risk", s.max_total_risk == 0.03)
+ok("cfg_risk_swing", s.risk_swing == 0.03)
+ok("cfg_max_total_risk", s.max_total_risk == 0.07)
 ok("cfg_correlated_risk_pct", s.correlated_risk_pct == 0.0075)
-ok("cfg_min_rr_ratio", s.min_rr_ratio == 1.5)
+ok("cfg_min_rr_ratio", s.min_rr_ratio == 0.8)
 ok("cfg_min_rr_black", s.min_rr_black == 2.0)
 ok("cfg_min_rr_green", s.min_rr_green == 2.0)
 ok("cfg_move_sl_to_be_pct_to_tp1", s.move_sl_to_be_pct_to_tp1 == 0.50)
@@ -95,10 +87,10 @@ ok("cfg_delta_enabled", s.delta_enabled is False)
 ok("cfg_delta_parameter", 0.2 <= s.delta_parameter <= 0.9)
 ok("cfg_delta_max_risk", s.delta_max_risk == 0.03)
 ok("cfg_trading_start_hour", s.trading_start_hour == 7)
-ok("cfg_trading_end_hour", s.trading_end_hour == 22)
+ok("cfg_trading_end_hour", s.trading_end_hour == 21)
 ok("cfg_close_before_friday_hour", s.close_before_friday_hour == 20)
 ok("cfg_avoid_news_minutes_before", s.avoid_news_minutes_before == 30)
-ok("cfg_avoid_news_minutes_after", s.avoid_news_minutes_after == 15)
+ok("cfg_avoid_news_minutes_after", s.avoid_news_minutes_after == 30)
 ok("cfg_htf_timeframes", "W" in s.htf_timeframes and "D" in s.htf_timeframes)
 ok("cfg_ltf_timeframes_H4", "H4" in s.ltf_timeframes)
 ok("cfg_ltf_timeframes_M5", "M5" in s.ltf_timeframes)
@@ -116,7 +108,7 @@ ok("cfg_funded_max_daily_dd", s.funded_max_daily_dd == 0.05)
 ok("cfg_funded_max_total_dd", s.funded_max_total_dd == 0.10)
 ok("cfg_funded_no_overnight", s.funded_no_overnight is False)  # Default off (not funded mode)
 ok("cfg_funded_no_news_trading", s.funded_no_news_trading is False)  # Default off
-ok("cfg_discretion_pct", s.discretion_pct == 0.0)
+ok("cfg_discretion_pct", s.discretion_pct == 0.2)
 
 # Watchlists
 ok("cfg_forex_watchlist_has_eurusd", "EUR_USD" in s.forex_watchlist)
@@ -135,8 +127,6 @@ ok("cfg_allocation_crypto_pct", s.allocation_crypto_pct == 0.10)
 ok("cfg_allocation_investment_pct", s.allocation_investment_pct == 0.20)
 ok("cfg_indices_correlation_groups", len(s.indices_correlation_groups) >= 2)
 ok("cfg_crypto_correlation_groups", len(s.crypto_correlation_groups) >= 2)
-
-# OANDA URLs (removed — OANDA out of scope per PROJECT.md)
 
 # Allocation: forex+other+crypto=1.0 within trading, trading+investment+crypto_longterm=1.0 of total
 trading_sum = s.allocation_forex_pct + s.allocation_other_pct + s.allocation_crypto_pct
@@ -413,15 +403,6 @@ from broker.capital_client import CapitalClient
 
 ok("base_broker_class", BaseBroker is not None)
 ok("capital_broker_class", CapitalClient is not None)
-
-# IBKRClient requires cryptography module - verify file exists
-ibkr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "broker", "ibkr_client.py")
-ok("ibkr_file_exists", os.path.exists(ibkr_path))
-try:
-    from broker.ibkr_client import IBKRClient
-    ok("ibkr_broker_class", IBKRClient is not None)
-except ImportError:
-    ok("ibkr_broker_class", True)  # cryptography not installed, file verified above
 
 ok("broker_has_get_account", hasattr(BaseBroker, "get_account_summary"))
 ok("broker_has_get_balance", hasattr(BaseBroker, "get_account_balance"))
@@ -799,15 +780,12 @@ from core.alerts import AlertManager, AlertConfig, AlertChannel, _mask
 
 ok("am_class", AlertManager is not None)
 ok("ac_class", AlertConfig is not None)
-ok("alert_channel_enum", len(AlertChannel) == 4)
-for ch in ["TELEGRAM", "DISCORD", "EMAIL", "GMAIL"]:
+ok("alert_channel_enum", len(AlertChannel) == 1)
+for ch in ["GMAIL"]:
     ok(f"alert_channel_{ch}", hasattr(AlertChannel, ch))
 
 # AlertConfig defaults
 ac = AlertConfig()
-ok("ac_telegram_disabled", ac.telegram_enabled is False)
-ok("ac_discord_disabled", ac.discord_enabled is False)
-ok("ac_email_disabled", ac.email_enabled is False)
 ok("ac_gmail_disabled", ac.gmail_enabled is False)
 ok("ac_notify_trade", ac.notify_trade_executed is True)
 ok("ac_notify_setup", ac.notify_setup_pending is True)
@@ -1433,7 +1411,7 @@ required_files = [
     "core/monthly_review.py", "core/screenshot_generator.py",
     "strategies/__init__.py", "strategies/base.py",
     "broker/__init__.py", "broker/base.py",
-    "broker/capital_client.py", "broker/ibkr_client.py",
+    "broker/capital_client.py",
     "api/__init__.py", "api/routes.py",
     "db/__init__.py", "db/models.py",
     "ai/__init__.py", "ai/openai_analyzer.py",

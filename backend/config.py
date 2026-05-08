@@ -526,16 +526,16 @@ class Settings(BaseSettings):
         "TIA_USD", "PYTH_USD", "WLD_USD", "ONDO_USD", "JTO_USD",
         # === Top 100-150 (expanded per mentorship recommendation) ===
         "FLOW_USD", "KAVA_USD", "ZIL_USD", "ONE_USD", "CELO_USD",
-        "ROSE_USD", "KDA_USD", "OCEAN_USD", "BAL_USD", "SUSHI_USD",
+        "KDA_USD", "OCEAN_USD", "BAL_USD", "SUSHI_USD",
         "YFI_USD", "ZRX_USD", "ANKR_USD", "SKL_USD", "STORJ_USD",
         "ICX_USD", "ONT_USD", "ZEC_USD", "DASH_USD", "KSM_USD",
-        "WAVES_USD", "1INCH_USD", "MASK_USD", "BAND_USD", "REN_USD",
+        "1INCH_USD", "MASK_USD", "BAND_USD", "REN_USD",
         "AUDIO_USD", "CELR_USD", "MTL_USD", "CTSI_USD", "RAD_USD",
-        "BAT_USD", "LOOM_USD", "NKN_USD", "OGN_USD", "PERP_USD",
-        "QNT_USD", "RLC_USD", "SPELL_USD", "SSV_USD", "WAXP_USD",
-        "API3_USD", "BAKE_USD", "BNT_USD", "COTI_USD", "HIFI_USD",
-        "JASMY_USD", "LPT_USD", "OMG_USD", "POLS_USD", "REEF_USD",
-        "SLP_USD", "SUPER_USD", "TOMO_USD", "TRB_USD", "UMA_USD",
+        "BAT_USD", "NKN_USD", "OGN_USD", "PERP_USD",
+        "QNT_USD", "RLC_USD", "SPELL_USD", "SSV_USD",
+        "API3_USD", "BNT_USD", "COTI_USD",
+        "JASMY_USD", "LPT_USD", "OMG_USD", "POLS_USD",
+        "SLP_USD", "SUPER_USD", "TRB_USD", "UMA_USD",
     ]
 
     # Currency Strength Indices (from mentorship: Watchlist para Forex)
